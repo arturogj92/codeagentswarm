@@ -126,7 +126,12 @@ class SimpleShell {
   executeRealCommand(command) {
     const args = command.split(' ');
     const cmd = args[0];
-    const cmdArgs = args.slice(1);
+    let cmdArgs = args.slice(1);
+    
+    // Improve ls command formatting
+    if (cmd === 'ls' && cmdArgs.length === 0) {
+      cmdArgs = ['-1']; // Force single column output
+    }
     
     const childProcess = spawn(cmd, cmdArgs, {
       cwd: this.cwd,
@@ -139,11 +144,17 @@ class SimpleShell {
     });
     
     childProcess.stdout.on('data', (data) => {
-      this.sendOutput(data.toString());
+      // Process the output to handle line endings properly
+      let output = data.toString();
+      // Convert \n to \r\n for proper terminal display
+      output = output.replace(/\n/g, '\r\n');
+      this.sendOutput(output);
     });
     
     childProcess.stderr.on('data', (data) => {
-      this.sendOutput(data.toString());
+      let output = data.toString();
+      output = output.replace(/\n/g, '\r\n');
+      this.sendOutput(output);
     });
     
     childProcess.on('exit', (code) => {
