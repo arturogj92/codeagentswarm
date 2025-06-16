@@ -17,6 +17,10 @@ class TerminalManager {
     }
 
     setupEventListeners() {
+        document.getElementById('check-claude-btn').addEventListener('click', () => {
+            this.checkClaudeCode();
+        });
+
         document.getElementById('new-terminal-btn').addEventListener('click', () => {
             this.createNewTerminal();
         });
@@ -126,11 +130,13 @@ class TerminalManager {
             placeholder.remove();
         }
 
+        // Create embedded terminal with xterm.js
         const terminalDiv = document.createElement('div');
         terminalDiv.className = 'terminal';
         terminalDiv.id = `terminal-${quadrant}`;
         wrapper.appendChild(terminalDiv);
 
+        // Initialize xterm.js terminal with better config
         const terminal = new Terminal({
             theme: {
                 background: '#0a0a0a',
@@ -160,7 +166,9 @@ class TerminalManager {
             cursorBlink: true,
             cursorStyle: 'block',
             scrollback: 1000,
-            allowTransparency: true
+            allowTransparency: true,
+            cols: 100,
+            rows: 30
         });
 
         const fitAddon = new FitAddon();
@@ -172,30 +180,62 @@ class TerminalManager {
         terminal.open(terminalDiv);
         fitAddon.fit();
 
-        // Start terminal process
+        // Create PTY terminal process
         await ipcRenderer.invoke('create-terminal', quadrant);
         
+        // Focus the terminal
+        terminal.focus();
+        
+        // Handle terminal input with debug
         terminal.onData(data => {
+            console.log(`Input captured for terminal ${quadrant}:`, data);
             ipcRenderer.send('terminal-input', quadrant, data);
         });
 
+        // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
             this.parseClaudeCodeOutput(data, quadrant);
         });
 
+        // Handle terminal exit
         ipcRenderer.on(`terminal-exit-${quadrant}`, (event, code) => {
             terminal.write(`\r\n\x1b[31mTerminal exited with code: ${code}\x1b[0m\r\n`);
         });
 
+        // Handle terminal resize
+        terminal.onResize(({ cols, rows }) => {
+            ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+        });
+
+        // Store terminal info
         this.terminals.set(quadrant, {
             terminal,
             fitAddon,
-            element: terminalDiv
+            element: terminalDiv,
+            type: 'embedded'
         });
 
         this.setActiveTerminal(quadrant);
         this.updateTerminalTitle(quadrant, 'Claude Code');
+        
+        // Add multiple event listeners to ensure focus
+        terminalDiv.addEventListener('click', () => {
+            console.log(`Focusing terminal ${quadrant}`);
+            terminal.focus();
+            this.setActiveTerminal(quadrant);
+        });
+        
+        terminalDiv.addEventListener('mousedown', () => {
+            terminal.focus();
+        });
+        
+        // Focus immediately when created
+        setTimeout(() => {
+            terminal.focus();
+        }, 100);
+
+        this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
 
     parseClaudeCodeOutput(data, quadrant) {
@@ -284,6 +324,12 @@ class TerminalManager {
         if (element) {
             element.classList.add('active');
         }
+        
+        // Focus the active terminal
+        const terminal = this.terminals.get(quadrant);
+        if (terminal && terminal.terminal) {
+            terminal.terminal.focus();
+        }
     }
 
     updateTerminalTitle(quadrant, title) {
@@ -337,7 +383,7 @@ class TerminalManager {
             wrapper.innerHTML = `
                 <div class="terminal-placeholder" data-quadrant="${quadrant}">
                     <div class="terminal-placeholder-icon">⚡</div>
-                    <div>Click to start Claude Code terminal</div>
+                    <div>Click to start Claude Code</div>
                 </div>
             `;
             
@@ -380,6 +426,16 @@ class TerminalManager {
         this.terminals.forEach((terminal, quadrant) => {
             this.closeTerminal(quadrant);
         });
+    }
+
+    async checkClaudeCode() {
+        const isAvailable = await ipcRenderer.invoke('check-claude-code');
+        
+        if (isAvailable) {
+            this.showNotification('✅ Claude Code is installed and available', 'success');
+        } else {
+            this.showNotification('❌ Claude Code not found. Install from claude.ai/code', 'warning');
+        }
     }
 
     showSettings() {
