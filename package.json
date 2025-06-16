@@ -1,10 +1,11 @@
 {
   "name": "codeagentswarm",
   "version": "1.0.0",
-  "description": "A simple Electron desktop application for macOS",
+  "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "dev": "electron . --dev",
     "build": "electron-builder",
     "dist": "electron-builder --publish=never"
   },
@@ -13,6 +14,12 @@
   "devDependencies": {
     "electron": "^27.0.0",
     "electron-builder": "^24.6.4"
+  },
+  "dependencies": {
+    "node-pty": "^1.0.0",
+    "xterm": "^5.3.0",
+    "xterm-addon-fit": "^0.8.0",
+    "xterm-addon-web-links": "^0.9.0"
   },
   "build": {
     "appId": "com.codeagentswarm.app",
@@ -24,6 +31,7 @@
       "main.js",
       "renderer.js",
       "index.html",
+      "styles.css",
       "package.json"
     ],
     "mac": {
