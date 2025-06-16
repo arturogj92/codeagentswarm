@@ -98,11 +98,15 @@ body {
 .terminals-container {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 4px 1fr;
-  grid-template-rows: 1fr 4px 1fr;
+  grid-template-columns: 1fr 8px 1fr;
+  grid-template-rows: 1fr 8px 1fr;
+  gap: 0;
   background: hsl(var(--border));
-  padding: 1px;
+  padding: 16px;
   position: relative;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 80px);
 }
 
 .vertical-resizer {
@@ -158,6 +162,7 @@ body {
   grid-column: 3;
   grid-row: 3;
 }
+
 
 .terminal-quadrant:hover {
   background: rgba(255, 255, 255, 0.04);

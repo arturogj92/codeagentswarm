@@ -13,12 +13,19 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     resizable: true,
+    movable: true,
+    minimizable: true,
+    maximizable: true,
+    closable: true,
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
       enableRemoteModule: true
     },
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: 'default',  // Changed from 'hiddenInset'
+    frame: true,               // Ensure frame is visible
+    show: true,
+    autoHideMenuBar: false,
     vibrancy: 'under-window',
     visualEffectState: 'active'
   });
@@ -258,12 +265,12 @@ ipcMain.handle('create-terminal', async (event, quadrant) => {
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
-    // Auto-execute claude-code after a moment
+    // Auto-execute claude-code after a longer delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
         shell.executeCommand('claude-code');
       }
-    }, 1000);
+    }, 3000);
     
     console.log(`Simple shell terminal ${quadrant} created successfully`);
     return quadrant;
