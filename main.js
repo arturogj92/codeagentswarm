@@ -57,6 +57,13 @@ class SimpleShell {
   }
   
   handleInput(data) {
+    // If we have an active interactive process, send input directly to it
+    if (this.activeInteractiveProcess) {
+      this.activeInteractiveProcess.stdin.write(data);
+      return;
+    }
+    
+    // Otherwise, handle as normal shell input
     for (let i = 0; i < data.length; i++) {
       const char = data[i];
       const charCode = data.charCodeAt(i);
@@ -119,6 +126,13 @@ class SimpleShell {
       return;
     }
     
+    if (command === 'path' || command === 'echo $PATH') {
+      this.sendOutput(`${process.env.PATH}\r\n`);
+      this.sendPrompt();
+      return;
+    }
+    
+    
     // Execute real commands
     this.executeRealCommand(command);
   }
@@ -133,15 +147,46 @@ class SimpleShell {
       cmdArgs = ['-1']; // Force single column output
     }
     
-    const childProcess = spawn(cmd, cmdArgs, {
-      cwd: this.cwd,
-      env: {
-        ...process.env,
-        PATH: process.env.PATH,
-        TERM: 'xterm-256color'
-      },
-      stdio: ['pipe', 'pipe', 'pipe']
-    });
+    // Use script command to create a real PTY for compatible commands
+    const userShell = process.env.SHELL || '/bin/zsh';
+    const fullCommand = `${cmd} ${cmdArgs.join(' ')}`;
+    
+    // For interactive commands like claude-code, use script to create a PTY
+    const isInteractiveCommand = cmd === 'claude-code' || cmd === 'claude' || cmd === 'vim' || cmd === 'nano';
+    
+    let childProcess;
+    if (isInteractiveCommand) {
+      // Use Python PTY bridge for real TTY support
+      const bridgePath = path.join(__dirname, 'pty_bridge.py');
+      childProcess = spawn('python3', [bridgePath, userShell, this.cwd, fullCommand], {
+        cwd: this.cwd,
+        env: {
+          ...process.env,
+          PATH: process.env.PATH
+        },
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+      
+      // Mark this as active interactive process
+      this.activeInteractiveProcess = childProcess;
+    } else {
+      // Regular commands use the normal approach
+      childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
+        cwd: this.cwd,
+        env: {
+          ...process.env,
+          PATH: process.env.PATH,
+          TERM: 'xterm-256color',
+          SHELL: userShell,
+          HOME: process.env.HOME,
+          USER: process.env.USER,
+          FORCE_COLOR: '1',
+          CLICOLOR: '1',
+          CLICOLOR_FORCE: '1'
+        },
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
+    }
     
     childProcess.stdout.on('data', (data) => {
       // Process the output to handle line endings properly
@@ -158,6 +203,11 @@ class SimpleShell {
     });
     
     childProcess.on('exit', (code) => {
+      // Clear interactive process reference
+      if (this.activeInteractiveProcess === childProcess) {
+        this.activeInteractiveProcess = null;
+      }
+      
       if (code !== 0) {
         this.sendOutput(`\r\nProcess exited with code: ${code}\r\n`);
       }
@@ -168,6 +218,28 @@ class SimpleShell {
       this.sendOutput(`\r\nCommand not found: ${cmd}\r\n`);
       this.sendPrompt();
     });
+  }
+  
+  createClaudeCodeWindow(command) {
+    // Create a controlled child window for Claude Code
+    const { BrowserWindow } = require('electron');
+    
+    const claudeWindow = new BrowserWindow({
+      width: 1000,
+      height: 700,
+      title: `Claude Code - Terminal ${this.quadrant + 1}`,
+      parent: require('electron').BrowserWindow.getFocusedWindow(),
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+    
+    // You could load a simple terminal interface here
+    claudeWindow.loadURL('data:text/html,<h1>Claude Code Window - Terminal ' + (this.quadrant + 1) + '</h1><p>This would contain Claude Code interface</p>');
+    
+    // Track the window
+    this.claudeWindow = claudeWindow;
   }
   
   kill() {
