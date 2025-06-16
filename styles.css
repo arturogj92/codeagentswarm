@@ -98,11 +98,37 @@ body {
 .terminals-container {
   flex: 1;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 1px;
+  grid-template-columns: 1fr 4px 1fr;
+  grid-template-rows: 1fr 4px 1fr;
   background: hsl(var(--border));
   padding: 1px;
+  position: relative;
+}
+
+.vertical-resizer {
+  grid-column: 2;
+  grid-row: 1 / -1;
+  background: hsl(var(--border));
+  cursor: col-resize;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.vertical-resizer:hover {
+  background: hsl(var(--primary));
+}
+
+.horizontal-resizer {
+  grid-row: 2;
+  grid-column: 1 / -1;
+  background: hsl(var(--border));
+  cursor: row-resize;
+  position: relative;
+  transition: background-color 0.2s ease;
+}
+
+.horizontal-resizer:hover {
+  background: hsl(var(--primary));
 }
 
 .terminal-quadrant {
@@ -111,6 +137,26 @@ body {
   position: relative;
   overflow: hidden;
   transition: all 0.3s ease;
+}
+
+.terminal-quadrant:nth-child(1) {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.terminal-quadrant:nth-child(3) {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.terminal-quadrant:nth-child(5) {
+  grid-column: 1;
+  grid-row: 3;
+}
+
+.terminal-quadrant:nth-child(7) {
+  grid-column: 3;
+  grid-row: 3;
 }
 
 .terminal-quadrant:hover {

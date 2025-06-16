@@ -62,8 +62,59 @@ class TerminalManager {
     }
 
     setupResizeHandlers() {
-        // Implementation for resize handles will be added later
-        console.log('Resize handlers setup');
+        const verticalResizer = document.getElementById('vertical-resizer');
+        const horizontalResizer = document.getElementById('horizontal-resizer');
+        const container = document.getElementById('terminals-container');
+        
+        let isResizing = false;
+        
+        // Vertical resizer (left/right)
+        verticalResizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+        
+        // Horizontal resizer (top/bottom)
+        horizontalResizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            document.body.style.cursor = 'row-resize';
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            
+            if (document.body.style.cursor === 'col-resize') {
+                const leftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+                const rightWidth = 100 - leftWidth;
+                
+                if (leftWidth > 20 && rightWidth > 20) {
+                    container.style.gridTemplateColumns = `${leftWidth}% 4px ${rightWidth}%`;
+                }
+            } else if (document.body.style.cursor === 'row-resize') {
+                const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+                const bottomHeight = 100 - topHeight;
+                
+                if (topHeight > 20 && bottomHeight > 20) {
+                    container.style.gridTemplateRows = `${topHeight}% 4px ${bottomHeight}%`;
+                }
+            }
+            
+            // Resize all active terminals
+            setTimeout(() => {
+                this.resizeAllTerminals();
+            }, 50);
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                document.body.style.cursor = 'default';
+            }
+        });
     }
 
     async startTerminal(quadrant) {
