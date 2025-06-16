@@ -19,8 +19,7 @@
   "dependencies": {
     "xterm": "^5.3.0",
     "xterm-addon-fit": "^0.8.0",
-    "xterm-addon-web-links": "^0.9.0",
-    "terminal-kit": "^3.0.1"
+    "xterm-addon-web-links": "^0.9.0"
   },
   "build": {
     "appId": "com.codeagentswarm.app",
