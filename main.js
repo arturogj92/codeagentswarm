@@ -278,12 +278,12 @@ class SimpleShell {
 }
 
 // IPC handlers for simple shell management
-ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir) => {
+ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sessionType = 'resume') => {
   try {
     const userHome = os.homedir();
     const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
     
-    console.log(`Creating simple shell terminal ${quadrant} in ${workingDir}`);
+    console.log(`Creating simple shell terminal ${quadrant} in ${workingDir} with ${sessionType} session`);
     
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
@@ -291,8 +291,10 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir) => {
     // Auto-execute claude code after a delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
-        // Execute command directly without echoing
-        shell.executeCommand('claude', true);
+        // Execute command based on session type
+        const command = sessionType === 'new' ? 'claude' : 'claude --resume';
+        console.log(`Executing: ${command} for terminal ${quadrant}`);
+        shell.executeCommand(command, true);
       }
     }, 600); // 600ms - quick but visible
     

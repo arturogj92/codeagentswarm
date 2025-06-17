@@ -211,11 +211,10 @@ class TerminalManager {
             if (selectedDir) {
                 this.lastSelectedDirectories[quadrant] = selectedDir;
                 this.saveDirectoryToStorage(quadrant, selectedDir); // Save to database
-                selectorDiv.querySelector('#directory-display').textContent = selectedDir;
                 
-                // Auto-start terminal with selected directory
+                // After selecting directory, show session selector
                 wrapper.removeChild(selectorDiv);
-                this.startTerminal(quadrant, selectedDir);
+                this.showSessionSelector(quadrant, selectedDir);
             } else {
                 // User cancelled, restore placeholder
                 restorePlaceholder();
@@ -233,7 +232,7 @@ class TerminalManager {
         if (lastDirectoryDisplay) {
             lastDirectoryDisplay.addEventListener('click', () => {
                 wrapper.removeChild(selectorDiv);
-                this.startTerminal(quadrant, this.lastSelectedDirectories[quadrant]);
+                this.showSessionSelector(quadrant, this.lastSelectedDirectories[quadrant]);
             });
         }
         
@@ -242,7 +241,7 @@ class TerminalManager {
         if (useLastBtn) {
             useLastBtn.addEventListener('click', () => {
                 wrapper.removeChild(selectorDiv);
-                this.startTerminal(quadrant, this.lastSelectedDirectories[quadrant]);
+                this.showSessionSelector(quadrant, this.lastSelectedDirectories[quadrant]);
             });
         }
         
@@ -261,7 +260,73 @@ class TerminalManager {
         document.addEventListener('keydown', handleEscape);
     }
 
-    async startTerminal(quadrant, selectedDirectory) {
+    showSessionSelector(quadrant, selectedDirectory) {
+        const wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
+        
+        // Create session selector modal
+        const selectorDiv = document.createElement('div');
+        selectorDiv.className = 'directory-selector'; // Reuse same styles
+        selectorDiv.innerHTML = `
+            <div class="directory-selector-content">
+                <h3>Claude Code Session</h3>
+                <div class="session-info">
+                    <div class="session-directory">
+                        📁 ${selectedDirectory.split('/').pop() || selectedDirectory}
+                    </div>
+                    <div class="session-path">
+                        ${selectedDirectory}
+                    </div>
+                </div>
+                <div class="session-selector-buttons">
+                    <button class="btn btn-primary" id="resume-session-btn">
+                        🔄 Resume
+                    </button>
+                    <button class="btn" id="new-session-btn">
+                        ✨ New
+                    </button>
+                </div>
+                <div class="session-back-button">
+                    <button class="btn btn-small" id="back-btn">← Back</button>
+                </div>
+            </div>
+        `;
+        
+        wrapper.appendChild(selectorDiv);
+        
+        // Function to restore directory selector
+        const goBack = () => {
+            wrapper.removeChild(selectorDiv);
+            this.showDirectorySelector(quadrant);
+        };
+
+        // Handle resume session
+        selectorDiv.querySelector('#resume-session-btn').addEventListener('click', () => {
+            wrapper.removeChild(selectorDiv);
+            this.startTerminal(quadrant, selectedDirectory, 'resume');
+        });
+
+        // Handle new session
+        selectorDiv.querySelector('#new-session-btn').addEventListener('click', () => {
+            wrapper.removeChild(selectorDiv);
+            this.startTerminal(quadrant, selectedDirectory, 'new');
+        });
+
+        // Handle back button
+        selectorDiv.querySelector('#back-btn').addEventListener('click', () => {
+            goBack();
+        });
+
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && wrapper.contains(selectorDiv)) {
+                goBack();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+    }
+
+    async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
         const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         const wrapper = quadrantElement.querySelector('.terminal-wrapper');
         const placeholder = wrapper.querySelector('.terminal-placeholder');
@@ -358,7 +423,7 @@ class TerminalManager {
         fitAddon.fit();
 
         // Create PTY terminal process with selected directory
-        await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory);
+        await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
         
         // Focus the terminal
         terminal.focus();
