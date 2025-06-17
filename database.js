@@ -1,174 +1,127 @@
-const sqlite3 = require('sqlite3').verbose();
+const Database = require('better-sqlite3');
 const path = require('path');
 const { app } = require('electron');
 
-class Database {
+class DatabaseManager {
     constructor() {
         // Store database in user data directory
         const dbPath = path.join(app.getPath('userData'), 'codeagentswarm.db');
-        console.log('Database path:', dbPath);
-        
-        this.db = new sqlite3.Database(dbPath, (err) => {
-            if (err) {
-                console.error('Error opening database:', err);
-            } else {
-                console.log('Connected to SQLite database');
-                this.initialize();
-            }
-        });
+        this.db = new Database(dbPath);
+        this.initialize();
     }
 
     initialize() {
         // Create tables if they don't exist
-        this.db.run(`
+        this.db.exec(`
             CREATE TABLE IF NOT EXISTS terminal_directories (
                 terminal_id INTEGER PRIMARY KEY,
                 directory TEXT,
                 last_used DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-        `, (err) => {
-            if (err) {
-                console.error('Error creating table:', err);
-            } else {
-                console.log('Terminal directories table ready');
-            }
-        });
+        `);
 
         // Create a table for app settings/preferences
-        this.db.run(`
+        this.db.exec(`
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-        `, (err) => {
-            if (err) {
-                console.error('Error creating settings table:', err);
-            }
-        });
+        `);
     }
 
     // Save or update directory for a terminal
     saveTerminalDirectory(terminalId, directory) {
-        return new Promise((resolve, reject) => {
-            const query = `
+        try {
+            const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO terminal_directories (terminal_id, directory, last_used)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-            `;
+            `);
             
-            this.db.run(query, [terminalId, directory], (err) => {
-                if (err) {
-                    console.error('Error saving directory:', err);
-                    reject(err);
-                } else {
-                    console.log(`Saved directory for terminal ${terminalId}: ${directory}`);
-                    resolve();
-                }
-            });
-        });
+            stmt.run(terminalId, directory);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
     }
 
     // Get directory for a terminal
     getTerminalDirectory(terminalId) {
-        return new Promise((resolve, reject) => {
-            const query = `
+        try {
+            const stmt = this.db.prepare(`
                 SELECT directory FROM terminal_directories
                 WHERE terminal_id = ?
-            `;
+            `);
             
-            this.db.get(query, [terminalId], (err, row) => {
-                if (err) {
-                    console.error('Error getting directory:', err);
-                    reject(err);
-                } else {
-                    resolve(row ? row.directory : null);
-                }
-            });
-        });
+            const row = stmt.get(terminalId);
+            return row ? row.directory : null;
+        } catch (err) {
+            return null;
+        }
     }
 
     // Get all terminal directories
     getAllTerminalDirectories() {
-        return new Promise((resolve, reject) => {
-            const query = `
+        try {
+            const stmt = this.db.prepare(`
                 SELECT terminal_id, directory FROM terminal_directories
                 ORDER BY terminal_id
-            `;
+            `);
             
-            this.db.all(query, [], (err, rows) => {
-                if (err) {
-                    console.error('Error getting all directories:', err);
-                    reject(err);
-                } else {
-                    const directories = {};
-                    rows.forEach(row => {
-                        directories[row.terminal_id] = row.directory;
-                    });
-                    resolve(directories);
-                }
+            const rows = stmt.all();
+            const directories = {};
+            rows.forEach(row => {
+                directories[row.terminal_id] = row.directory;
             });
-        });
+            return directories;
+        } catch (err) {
+            return {};
+        }
     }
 
     // Delete directory for a terminal
     deleteTerminalDirectory(terminalId) {
-        return new Promise((resolve, reject) => {
-            const query = `DELETE FROM terminal_directories WHERE terminal_id = ?`;
-            
-            this.db.run(query, [terminalId], (err) => {
-                if (err) {
-                    console.error('Error deleting directory:', err);
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });
-        });
+        try {
+            const stmt = this.db.prepare(`DELETE FROM terminal_directories WHERE terminal_id = ?`);
+            stmt.run(terminalId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
     }
 
     // Save app setting
     saveSetting(key, value) {
-        return new Promise((resolve, reject) => {
-            const query = `
+        try {
+            const stmt = this.db.prepare(`
                 INSERT OR REPLACE INTO app_settings (key, value, updated_at)
                 VALUES (?, ?, CURRENT_TIMESTAMP)
-            `;
+            `);
             
-            this.db.run(query, [key, JSON.stringify(value)], (err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
-            });
-        });
+            stmt.run(key, JSON.stringify(value));
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
     }
 
     // Get app setting
     getSetting(key) {
-        return new Promise((resolve, reject) => {
-            const query = `SELECT value FROM app_settings WHERE key = ?`;
-            
-            this.db.get(query, [key], (err, row) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve(row ? JSON.parse(row.value) : null);
-                }
-            });
-        });
+        try {
+            const stmt = this.db.prepare(`SELECT value FROM app_settings WHERE key = ?`);
+            const row = stmt.get(key);
+            return row ? JSON.parse(row.value) : null;
+        } catch (err) {
+            return null;
+        }
     }
 
     // Close database connection
     close() {
-        this.db.close((err) => {
-            if (err) {
-                console.error('Error closing database:', err);
-            } else {
-                console.log('Database connection closed');
-            }
-        });
+        if (this.db) {
+            this.db.close();
+        }
     }
 }
 
-module.exports = Database;
+module.exports = DatabaseManager;

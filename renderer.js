@@ -17,24 +17,34 @@ class TerminalManager {
         this.waitingForUserInteraction = new Map(); // Track terminals waiting for interaction
         this.terminalFocused = new Map(); // Track which terminals are focused
         this.init();
-        this.loadSavedDirectories(); // Load directories asynchronously
+        // Load directories asynchronously with error handling
+        this.loadSavedDirectories().catch(error => {
+            console.warn('Failed to load saved directories on startup:', error);
+        });
     }
     
     // Load saved directories asynchronously
     async loadSavedDirectories() {
-        this.lastSelectedDirectories = await this.loadDirectoriesFromStorage();
+        try {
+            this.lastSelectedDirectories = await this.loadDirectoriesFromStorage();
+        } catch (error) {
+            console.warn('Failed to load saved directories on startup:', error);
+            this.lastSelectedDirectories = {};
+        }
     }
     
     // Load saved directories from database
     async loadDirectoriesFromStorage() {
         try {
             const result = await ipcRenderer.invoke('db-get-all-directories');
-            if (result.success) {
-                return result.directories;
+            if (result && result.success) {
+                return result.directories || {};
             } else {
+                console.warn('Failed to load directories:', result);
                 return {};
             }
         } catch (error) {
+            console.warn('Error loading directories:', error);
             return {};
         }
     }
@@ -43,9 +53,11 @@ class TerminalManager {
     async saveDirectoryToStorage(quadrant, directory) {
         try {
             const result = await ipcRenderer.invoke('db-save-directory', quadrant, directory);
-            // Silent save
+            if (!result || !result.success) {
+                console.warn('Failed to save directory:', result);
+            }
         } catch (error) {
-            // Silent error
+            console.warn('Error saving directory:', error);
         }
     }
 
@@ -435,7 +447,13 @@ class TerminalManager {
         visibilityObserver.observe(terminalDiv);
 
         // Create PTY terminal process with selected directory
-        await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
+        try {
+            await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
+        } catch (error) {
+            console.error('Failed to create terminal:', error);
+            this.showNotification('Failed to create terminal', 'error');
+            return;
+        }
         
         // Focus the terminal
         terminal.focus();
@@ -492,7 +510,10 @@ class TerminalManager {
             terminalTitle = folderName || 'Claude Code';
             // Remember this directory for this terminal
             this.lastSelectedDirectories[quadrant] = selectedDirectory;
-            this.saveDirectoryToStorage(quadrant, selectedDirectory); // Save to database
+            // Save to database (fire and forget to avoid blocking)
+            this.saveDirectoryToStorage(quadrant, selectedDirectory).catch(err => {
+                console.warn('Failed to save directory to database:', err);
+            });
         }
         this.updateTerminalTitle(quadrant, terminalTitle);
         

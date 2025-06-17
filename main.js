@@ -1,8 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const os = require('os');
-const Database = require('./database');
+const DatabaseManager = require('./database');
 
 // Enable live reload for Electron in development
 if (process.argv.includes('--dev')) {
@@ -19,6 +20,16 @@ if (process.argv.includes('--dev')) {
 let mainWindow;
 const terminals = new Map();
 let db;
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -110,8 +121,9 @@ class SimpleShell {
   }
   
   executeCommand(command, silent = false) {
-    console.log(`[SimpleShell ${this.quadrant}] Executing command: "${command}" (silent: ${silent})`);
+    console.log(`[SimpleShell ${this.quadrant}] executeCommand called: "${command}" (silent: ${silent})`);
     if (!command) {
+      console.log(`[SimpleShell ${this.quadrant}] Empty command, showing prompt`);
       if (!silent) this.sendPrompt();
       return;
     }
@@ -175,18 +187,52 @@ class SimpleShell {
     const fullCommand = `${cmd} ${cmdArgs.join(' ')}`;
     
     // For interactive commands like claude code, use script to create a PTY
-    const isInteractiveCommand = cmd === 'claude' || cmd === 'vim' || cmd === 'nano';
+    // Check if it's claude (including full paths)
+    const isClaudeCommand = cmd === 'claude' || cmd.includes('claude') || cmd.includes('.nvm');
+    const isInteractiveCommand = isClaudeCommand || cmd === 'vim' || cmd === 'nano';
     
     let childProcess;
     if (isInteractiveCommand) {
       // Use Python PTY bridge for real TTY support
-      const bridgePath = path.join(__dirname, 'pty_bridge.py');
+      // Handle different paths for development vs packaged app
+    let bridgePath;
+    if (app.isPackaged) {
+      // In packaged app, look in extraResources
+      bridgePath = path.join(process.resourcesPath, 'pty_bridge.py');
+    } else {
+      // In development, look in current directory
+      bridgePath = path.join(__dirname, 'pty_bridge.py');
+    }
+    
+    console.log('Using pty_bridge.py at:', bridgePath);
+    
+    // Verify the file exists
+    if (!fs.existsSync(bridgePath)) {
+      console.error('pty_bridge.py not found at:', bridgePath);
+      throw new Error(`pty_bridge.py not found at ${bridgePath}`);
+    }
+      // Fix PATH for packaged apps - add common binary locations
+      const env = { ...process.env };
+      if (app.isPackaged) {
+        // Add directories to PATH for packaged app
+        const additionalPaths = [
+          '/usr/local/bin',
+          '/opt/homebrew/bin',
+          '/usr/bin',
+          path.join(os.homedir(), '.local/bin'),
+          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'), // ← ESTE ES EL CORRECTO!
+          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
+          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
+        ];
+        
+        const currentPath = env.PATH || '';
+        env.PATH = [...additionalPaths, currentPath].join(':');
+        console.log('PATH updated for packaged app');
+      }
+      
       childProcess = spawn('python3', [bridgePath, userShell, this.cwd, fullCommand], {
         cwd: this.cwd,
-        env: {
-          ...process.env,
-          PATH: process.env.PATH
-        },
+        env: env,
         stdio: ['pipe', 'pipe', 'pipe']
       });
       
@@ -285,18 +331,41 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
     
     console.log(`Creating simple shell terminal ${quadrant} in ${workingDir} with ${sessionType} session`);
     
+    // Fix PATH for packaged apps before creating shell
+    if (app.isPackaged) {
+      // Add common paths where claude might be installed
+      const additionalPaths = [
+        '/usr/local/bin',
+        '/opt/homebrew/bin', 
+        '/usr/bin',
+        path.join(os.homedir(), '.local/bin'),
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'), // ← LA UBICACIÓN CORRECTA!
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
+      ];
+      
+      const currentPath = process.env.PATH || '';
+      process.env.PATH = [...additionalPaths, currentPath].join(':');
+      console.log('Global PATH updated for terminal creation');
+    }
+    
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
     // Auto-execute claude code after a delay to ensure terminal is ready
+    console.log(`[create-terminal] Setting up auto-execute for terminal ${quadrant} with sessionType: ${sessionType}`);
     setTimeout(() => {
+      console.log(`[create-terminal] Timer fired for terminal ${quadrant}`);
       if (terminals.has(quadrant)) {
         // Execute command based on session type
+        // Use claude directly, the PATH should be configured correctly
         const command = sessionType === 'new' ? 'claude' : 'claude --resume';
-        console.log(`Executing: ${command} for terminal ${quadrant}`);
+        console.log(`[create-terminal] Executing: ${command} for terminal ${quadrant}`);
         shell.executeCommand(command, true);
+      } else {
+        console.log(`[create-terminal] Terminal ${quadrant} not found in terminals map!`);
       }
-    }, 600); // 600ms - quick but visible
+    }, 1000); // Increased to 1 second to ensure terminal is ready
     
     console.log(`Simple shell terminal ${quadrant} created successfully`);
     return quadrant;
@@ -379,37 +448,49 @@ ipcMain.handle('select-directory', async () => {
 // Database handlers
 ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
   try {
-    await db.saveTerminalDirectory(terminalId, directory);
-    return { success: true };
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.saveTerminalDirectory(terminalId, directory);
+    return result;
   } catch (error) {
-    console.error('Error saving directory to DB:', error);
     return { success: false, error: error.message };
   }
 });
 
 ipcMain.handle('db-get-directory', async (event, terminalId) => {
   try {
-    const directory = await db.getTerminalDirectory(terminalId);
+    if (!db) return { success: true, directory: null };
+    const directory = db.getTerminalDirectory(terminalId);
     return { success: true, directory };
   } catch (error) {
-    console.error('Error getting directory from DB:', error);
-    return { success: false, error: error.message };
+    return { success: true, directory: null };
   }
 });
 
 ipcMain.handle('db-get-all-directories', async () => {
   try {
-    const directories = await db.getAllTerminalDirectories();
+    if (!db) return { success: true, directories: {} };
+    const directories = db.getAllTerminalDirectories();
     return { success: true, directories };
   } catch (error) {
-    console.error('Error getting all directories from DB:', error);
-    return { success: false, error: error.message };
+    return { success: true, directories: {} };
   }
 });
 
 app.whenReady().then(() => {
   // Initialize database
-  db = new Database();
+  try {
+    db = new DatabaseManager();
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+    db = null;
+  }
+  
+  // Find claude binary on startup
+  CLAUDE_BINARY_PATH = findClaudeBinary();
+  if (!CLAUDE_BINARY_PATH) {
+    console.warn('Claude Code not found - users will need to install it');
+  }
+  
   createWindow();
   
   app.on('activate', () => {
@@ -429,6 +510,57 @@ app.on('window-all-closed', () => {
     app.quit();
   }
 });
+
+// Function to find claude binary dynamically
+function findClaudeBinary() {
+  const { execSync } = require('child_process');
+  
+  // Try to find claude using which command
+  try {
+    const claudePath = execSync('which claude', { encoding: 'utf8', shell: true }).trim();
+    if (claudePath && fs.existsSync(claudePath)) {
+      console.log('Found claude via which:', claudePath);
+      return claudePath;
+    }
+  } catch (e) {
+    console.log('which claude failed, searching manually...');
+  }
+  
+  // Search common locations
+  const possiblePaths = [
+    '/usr/local/bin/claude',
+    '/opt/homebrew/bin/claude',
+    '/usr/bin/claude',
+    path.join(os.homedir(), '.local/bin/claude')
+  ];
+  
+  // Search all nvm node versions
+  const nvmPath = path.join(os.homedir(), '.nvm/versions/node');
+  if (fs.existsSync(nvmPath)) {
+    try {
+      const nodeVersions = fs.readdirSync(nvmPath);
+      nodeVersions.forEach(version => {
+        possiblePaths.push(path.join(nvmPath, version, 'bin/claude'));
+      });
+    } catch (e) {
+      console.log('Error reading nvm versions:', e);
+    }
+  }
+  
+  // Check each path
+  for (const claudePath of possiblePaths) {
+    if (fs.existsSync(claudePath)) {
+      console.log('Found claude at:', claudePath);
+      return claudePath;
+    }
+  }
+  
+  console.error('Claude not found in any common location');
+  return null;
+}
+
+// Find claude once on startup
+let CLAUDE_BINARY_PATH = null;
 
 // Desktop notification handler
 ipcMain.on('show-desktop-notification', (event, title, message) => {
