@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
@@ -427,6 +427,31 @@ app.on('window-all-closed', () => {
   
   if (process.platform !== 'darwin') {
     app.quit();
+  }
+});
+
+// Desktop notification handler
+ipcMain.on('show-desktop-notification', (event, title, message) => {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: title,
+      body: message,
+      icon: path.join(__dirname, 'assets', 'icon.png'), // Optional: Add app icon
+      sound: true,
+      urgency: 'critical'
+    });
+    
+    notification.show();
+    
+    // Optional: Handle notification click
+    notification.on('click', () => {
+      if (mainWindow) {
+        if (mainWindow.isMinimized()) mainWindow.restore();
+        mainWindow.focus();
+      }
+    });
+  } else {
+    console.log('Desktop notifications not supported on this system');
   }
 });
 

@@ -9,6 +9,13 @@ class TerminalManager {
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
         this.lastSelectedDirectories = {}; // Initialize empty, will load async
+        this.lastConfirmationMessages = new Map(); // Track last confirmation per terminal
+        this.confirmationDebounce = new Map(); // Debounce confirmations
+        this.confirmedCommands = new Map(); // Track which commands already notified
+        this.lastMenuContent = new Map(); // Track last menu content per terminal
+        this.notificationBlocked = new Map(); // Block notifications until user interaction
+        this.waitingForUserInteraction = new Map(); // Track terminals waiting for interaction
+        this.terminalFocused = new Map(); // Track which terminals are focused
         this.init();
         this.loadSavedDirectories(); // Load directories asynchronously
     }
@@ -16,7 +23,6 @@ class TerminalManager {
     // Load saved directories asynchronously
     async loadSavedDirectories() {
         this.lastSelectedDirectories = await this.loadDirectoriesFromStorage();
-        console.log('Loaded directories from database:', this.lastSelectedDirectories);
     }
     
     // Load saved directories from database
@@ -26,11 +32,9 @@ class TerminalManager {
             if (result.success) {
                 return result.directories;
             } else {
-                console.error('Error loading directories from DB:', result.error);
                 return {};
             }
         } catch (error) {
-            console.error('Error loading saved directories:', error);
             return {};
         }
     }
@@ -39,11 +43,9 @@ class TerminalManager {
     async saveDirectoryToStorage(quadrant, directory) {
         try {
             const result = await ipcRenderer.invoke('db-save-directory', quadrant, directory);
-            if (!result.success) {
-                console.error('Error saving directory to DB:', result.error);
-            }
+            // Silent save
         } catch (error) {
-            console.error('Error saving directory:', error);
+            // Silent error
         }
     }
 
@@ -421,6 +423,16 @@ class TerminalManager {
         
         terminal.open(terminalDiv);
         fitAddon.fit();
+        
+        // Add visibility observer to ensure proper fitting when terminal becomes visible
+        const visibilityObserver = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting && entry.target === terminalDiv) {
+                    setTimeout(() => fitAddon.fit(), 50);
+                }
+            });
+        });
+        visibilityObserver.observe(terminalDiv);
 
         // Create PTY terminal process with selected directory
         await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
@@ -430,13 +442,26 @@ class TerminalManager {
         
         // Handle terminal input with debug
         terminal.onData(data => {
-            console.log(`Input captured for terminal ${quadrant}:`, data);
             ipcRenderer.send('terminal-input', quadrant, data);
+            
+            // UNBLOCK notifications ONLY if THIS terminal is focused AND pressed Enter
+            if (this.waitingForUserInteraction.get(quadrant) && this.activeTerminal === quadrant) {
+                console.log(`🔍 Terminal ${quadrant} key press: '${data.replace(/\r/g, 'ENTER').replace(/\n/g, 'NEWLINE')}'`);
+                // ONLY Enter key (\r) should unblock, and only if it's exactly one Enter press
+                if (data === '\r' || data === '\r\n') {
+                    console.log(`✅ UNBLOCKING terminal ${quadrant} - focused terminal pressed Enter`);
+                    this.unblockNotifications(quadrant);
+                }
+            } else if (this.waitingForUserInteraction.get(quadrant)) {
+                console.log(`⚠️ Terminal ${quadrant} - Enter pressed but terminal not focused (active: ${this.activeTerminal})`);
+            }
         });
 
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
+            // Force scroll to bottom after writing data
+            setTimeout(() => terminal.scrollToBottom(), 0);
             this.parseClaudeCodeOutput(data, quadrant);
         });
 
@@ -473,33 +498,36 @@ class TerminalManager {
         
         // Add multiple event listeners to ensure focus
         terminalDiv.addEventListener('click', () => {
-            console.log(`Focusing terminal ${quadrant}`);
             terminal.focus();
             this.setActiveTerminal(quadrant);
+            
+            // Focus will be handled by setActiveTerminal automatically
         });
         
         terminalDiv.addEventListener('mousedown', () => {
             terminal.focus();
         });
         
-        // Focus immediately when created
+        // Focus and fit immediately when created
         setTimeout(() => {
             terminal.focus();
+            fitAddon.fit();
         }, 100);
+        
+        // Additional fit attempts to ensure proper sizing
+        setTimeout(() => fitAddon.fit(), 200);
+        setTimeout(() => fitAddon.fit(), 500);
 
         this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
 
     parseClaudeCodeOutput(data, quadrant) {
         const text = data.toString();
-        console.log(`Terminal ${quadrant} output:`, text);
         
         // Check if Claude Code is ready
         if (!this.claudeCodeReady[quadrant]) {
             const loader = document.getElementById(`loader-${quadrant}`);
             const terminalDiv = document.getElementById(`terminal-${quadrant}`);
-            
-            console.log(`Checking Claude Code readiness for terminal ${quadrant}`);
             
             // Update loader status
             if (loader) {
@@ -511,8 +539,6 @@ class TerminalManager {
                     text.includes('▓') ||  // Claude Code's UI elements
                     text.includes('claude code') ||  // The actual command
                     text.includes('Claude Code')) {  // Claude Code mentions
-                    
-                    console.log(`Claude Code activity detected for terminal ${quadrant}`);
                     
                     // Update status based on specific message
                     if (text.includes('Do you trust the files in this folder?')) {
@@ -527,13 +553,15 @@ class TerminalManager {
                     
                     // Show terminal immediately for any Claude Code activity
                     if (loader.style.display !== 'none') {
-                        console.log(`Showing terminal ${quadrant} immediately`);
                         loader.style.display = 'none';
                         terminalDiv.style.display = 'block';
                         
                         const terminalInfo = this.terminals.get(quadrant);
                         if (terminalInfo && terminalInfo.fitAddon) {
-                            terminalInfo.fitAddon.fit();
+                            // Multiple fit attempts to ensure proper sizing
+                            setTimeout(() => terminalInfo.fitAddon.fit(), 0);
+                            setTimeout(() => terminalInfo.fitAddon.fit(), 50);
+                            setTimeout(() => terminalInfo.fitAddon.fit(), 200);
                         }
                     }
                 } else if (text.includes('command not found')) {
@@ -546,11 +574,17 @@ class TerminalManager {
         // Parse Claude Code specific outputs for notifications
         if (text.includes('Task completed successfully')) {
             this.showNotification('Task completed successfully', 'success');
-        } else if (text.includes('Error:') || text.includes('ERROR:')) {
-            this.showNotification('Error occurred in Claude Code', 'error');
-        } else if (text.includes('Waiting for confirmation') || text.includes('Continue? (y/n)')) {
-            this.showNotification('Claude Code needs confirmation', 'warning');
-            this.highlightTerminal(quadrant);
+        } else if (text.includes('Waiting for confirmation') || 
+                   text.includes('Continue? (y/n)') ||
+                   text.includes('Do you want to') ||
+                   text.includes('Would you like to') ||
+                   text.includes('Proceed?') ||
+                   text.includes('Allow access to') ||
+                   text.includes('Grant permission') ||
+                   text.includes('Enable MCP') ||
+                   text.includes('Trust this') ||
+                   text.includes('Confirm')) {
+            this.handleConfirmationRequest(text, quadrant);
         } else if (text.includes('Starting task') || text.includes('Processing...')) {
             this.showNotification('Claude Code is processing', 'info');
         }
@@ -611,6 +645,171 @@ class TerminalManager {
                 }
             }, 300);
         }, 3000);
+    }
+
+    showDesktopNotification(title, message) {
+        // Send IPC message to main process to show native notification
+        ipcRenderer.send('show-desktop-notification', title, message);
+        
+        // Also show in-app notification as fallback
+        this.showNotification(message, 'warning');
+    }
+
+    handleConfirmationRequest(text, quadrant) {
+        // RADICAL SOLUTION: If notifications are blocked for this terminal, skip entirely
+        if (this.notificationBlocked.get(quadrant)) {
+            console.log(`❌ BLOCKED: Notification skipped for terminal ${quadrant} - waiting for user interaction`);
+            return;
+        }
+        
+        // Skip if this is just cursor movement (single character updates)
+        if (text.length < 10) {
+            return;
+        }
+        
+        // Detect if this is menu navigation (contains selection arrow and numbered options)
+        const isMenuNavigation = text.includes('❯') && /\s*[0-9]+\./m.test(text);
+        
+        // Create a content signature to detect reprints of the same menu
+        const contentSignature = text
+            .replace(/❯/g, '') // Remove selection arrow
+            .replace(/\s*[0-9]+\./g, '') // Remove option numbers
+            .replace(/\s+/g, ' ') // Normalize whitespace
+            .trim();
+        
+        // Check if this is just a reprint of the same menu content
+        const lastContent = this.lastMenuContent.get(quadrant);
+        if (lastContent === contentSignature) {
+            return; // Same menu content, just different selection
+        }
+        
+        // Update last menu content
+        this.lastMenuContent.set(quadrant, contentSignature);
+        
+        // Extract command from the text (usually appears before "Do you want to proceed?")
+        let command = '';
+        const lines = text.split('\n');
+        
+        // Look for the command line (usually contains the actual command like "mkdir pruebas2")
+        for (const line of lines) {
+            const trimmedLine = line.trim();
+            // Skip empty lines, UI elements, and option lines
+            if (trimmedLine && 
+                !trimmedLine.includes('│') && 
+                !trimmedLine.includes('╭') && 
+                !trimmedLine.includes('╰') && 
+                !trimmedLine.includes('❯') &&
+                !trimmedLine.match(/^[0-9]+\./) &&
+                !trimmedLine.includes('Do you want to') &&
+                !trimmedLine.includes('Bash command') &&
+                trimmedLine.length > 3) {
+                command = trimmedLine;
+                break;
+            }
+        }
+        
+        // Find the confirmation question
+        let confirmationQuestion = '';
+        for (const line of lines) {
+            if (line.includes('Do you want to') || line.includes('Proceed?') || 
+                line.includes('Continue?') || line.includes('Would you like to') ||
+                line.includes('Allow access to') || line.includes('Grant permission') ||
+                line.includes('Enable MCP') || line.includes('Trust this') ||
+                line.includes('Waiting for confirmation')) {
+                confirmationQuestion = line.trim().replace(/[│]/g, '').trim();
+                break;
+            }
+        }
+        
+        // If no clear confirmation question found, skip
+        if (!confirmationQuestion) {
+            return;
+        }
+        
+        // Create a unique identifier for this specific command + question combination
+        const commandKey = `${command}_${confirmationQuestion}`.replace(/\s+/g, '_');
+        
+        // If we already notified for this exact command, skip (unless it's been a while)
+        const now = Date.now();
+        const lastNotified = this.confirmedCommands.get(`${quadrant}_${commandKey}`);
+        if (lastNotified && (now - lastNotified) < 30000) { // 30 second cooldown per command
+            return;
+        }
+        
+        // If this is menu navigation, increase debounce significantly
+        const debounceTime = isMenuNavigation ? 2000 : 500;
+        
+        // Clear existing debounce timer
+        if (this.confirmationDebounce.has(quadrant)) {
+            clearTimeout(this.confirmationDebounce.get(quadrant));
+        }
+        
+        // BLOCK IMMEDIATELY before any debounce
+        this.notificationBlocked.set(quadrant, true);
+        this.waitingForUserInteraction.set(quadrant, true);
+        
+        // Set new debounce timer
+        const timeoutId = setTimeout(() => {
+            // Double check this isn't menu navigation at execution time
+            const terminalInfo = this.terminals.get(quadrant);
+            if (terminalInfo && terminalInfo.terminal) {
+                // Mark this command as notified
+                this.confirmedCommands.set(`${quadrant}_${commandKey}`, now);
+                
+                this.showDesktopNotification('Confirmation Required', `Terminal ${quadrant + 1}: Claude Code needs confirmation`);
+                this.highlightTerminalForConfirmation(quadrant);
+                
+                console.log(`🔒 BLOCKED notifications for terminal ${quadrant} until user interaction`);
+                
+                // Clean up old confirmed commands after 5 minutes
+                setTimeout(() => {
+                    const entries = Array.from(this.confirmedCommands.entries());
+                    entries.forEach(([key, timestamp]) => {
+                        if (Date.now() - timestamp > 300000) { // 5 minutes
+                            this.confirmedCommands.delete(key);
+                        }
+                    });
+                }, 300000);
+            }
+        }, debounceTime);
+        
+        this.confirmationDebounce.set(quadrant, timeoutId);
+    }
+    
+    unblockNotifications(quadrant) {
+        console.log(`🔓 Unblocking notifications for terminal ${quadrant} - user clicked terminal and pressed Enter`);
+        this.notificationBlocked.set(quadrant, false);
+        this.waitingForUserInteraction.set(quadrant, false);
+        // Focus state is handled by activeTerminal
+        
+        // Remove highlight animation since user is responding
+        const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+        if (terminalElement) {
+            terminalElement.classList.remove('confirmation-highlight');
+        }
+    }
+    
+    hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        return hash;
+    }
+
+    highlightTerminalForConfirmation(quadrant) {
+        const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+        if (terminalElement) {
+            // Add pulsing highlight effect
+            terminalElement.classList.add('confirmation-highlight');
+            
+            // Remove highlight after 10 seconds
+            setTimeout(() => {
+                terminalElement.classList.remove('confirmation-highlight');
+            }, 10000);
+        }
     }
 
     setActiveTerminal(quadrant) {
