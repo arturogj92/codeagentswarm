@@ -8,8 +8,43 @@ class TerminalManager {
         this.terminals = new Map();
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
-        this.lastSelectedDirectories = {}; // Remember last selected directory per terminal
+        this.lastSelectedDirectories = {}; // Initialize empty, will load async
         this.init();
+        this.loadSavedDirectories(); // Load directories asynchronously
+    }
+    
+    // Load saved directories asynchronously
+    async loadSavedDirectories() {
+        this.lastSelectedDirectories = await this.loadDirectoriesFromStorage();
+        console.log('Loaded directories from database:', this.lastSelectedDirectories);
+    }
+    
+    // Load saved directories from database
+    async loadDirectoriesFromStorage() {
+        try {
+            const result = await ipcRenderer.invoke('db-get-all-directories');
+            if (result.success) {
+                return result.directories;
+            } else {
+                console.error('Error loading directories from DB:', result.error);
+                return {};
+            }
+        } catch (error) {
+            console.error('Error loading saved directories:', error);
+            return {};
+        }
+    }
+    
+    // Save directory to database
+    async saveDirectoryToStorage(quadrant, directory) {
+        try {
+            const result = await ipcRenderer.invoke('db-save-directory', quadrant, directory);
+            if (!result.success) {
+                console.error('Error saving directory to DB:', result.error);
+            }
+        } catch (error) {
+            console.error('Error saving directory:', error);
+        }
     }
 
     init() {
@@ -182,6 +217,7 @@ class TerminalManager {
             const selectedDir = await ipcRenderer.invoke('select-directory');
             if (selectedDir) {
                 this.lastSelectedDirectories[quadrant] = selectedDir;
+                this.saveDirectoryToStorage(quadrant, selectedDir); // Save to database
                 selectorDiv.querySelector('#directory-display').textContent = selectedDir;
                 
                 // Auto-start terminal with selected directory
@@ -373,6 +409,7 @@ class TerminalManager {
             terminalTitle = folderName || 'Claude Code';
             // Remember this directory for this terminal
             this.lastSelectedDirectories[quadrant] = selectedDirectory;
+            this.saveDirectoryToStorage(quadrant, selectedDirectory); // Save to database
         }
         this.updateTerminalTitle(quadrant, terminalTitle);
         
@@ -584,8 +621,7 @@ class TerminalManager {
             terminal.terminal.dispose();
             ipcRenderer.send('kill-terminal', quadrant);
             this.terminals.delete(quadrant);
-            // Clean up the saved directory for this terminal
-            delete this.lastSelectedDirectories[quadrant];
+            // Note: We keep the directory in memory so it's remembered next time
             
             const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
             const wrapper = quadrantElement.querySelector('.terminal-wrapper');

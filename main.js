@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
+const Database = require('./database');
 
 // Enable live reload for Electron in development
 if (process.argv.includes('--dev')) {
@@ -17,6 +18,7 @@ if (process.argv.includes('--dev')) {
 
 let mainWindow;
 const terminals = new Map();
+let db;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -107,9 +109,10 @@ class SimpleShell {
     }
   }
   
-  executeCommand(command) {
+  executeCommand(command, silent = false) {
+    console.log(`[SimpleShell ${this.quadrant}] Executing command: "${command}" (silent: ${silent})`);
     if (!command) {
-      this.sendPrompt();
+      if (!silent) this.sendPrompt();
       return;
     }
     
@@ -118,7 +121,7 @@ class SimpleShell {
     // Handle built-in commands
     if (command === 'clear') {
       this.sendOutput('\x1b[2J\x1b[H'); // Clear screen and move cursor to top
-      this.sendPrompt();
+      if (!silent) this.sendPrompt();
       return;
     }
     
@@ -135,19 +138,19 @@ class SimpleShell {
       } catch (error) {
         this.sendOutput(`cd: ${error.message}\r\n`);
       }
-      this.sendPrompt();
+      if (!silent) this.sendPrompt();
       return;
     }
     
     if (command === 'pwd') {
       this.sendOutput(`${this.cwd}\r\n`);
-      this.sendPrompt();
+      if (!silent) this.sendPrompt();
       return;
     }
     
     if (command === 'path' || command === 'echo $PATH') {
       this.sendOutput(`${process.env.PATH}\r\n`);
-      this.sendPrompt();
+      if (!silent) this.sendPrompt();
       return;
     }
     
@@ -160,6 +163,7 @@ class SimpleShell {
     const args = command.split(' ');
     const cmd = args[0];
     let cmdArgs = args.slice(1);
+    console.log(`[SimpleShell ${this.quadrant}] Parsed command: cmd="${cmd}", args=[${cmdArgs.join(', ')}]`);
     
     // Improve ls command formatting
     if (cmd === 'ls' && cmdArgs.length === 0) {
@@ -230,12 +234,19 @@ class SimpleShell {
       if (code !== 0) {
         this.sendOutput(`\r\nProcess exited with code: ${code}\r\n`);
       }
-      this.sendPrompt();
+      
+      // Don't send prompt for interactive commands that are still running
+      if (!isInteractiveCommand || this.activeInteractiveProcess === null) {
+        this.sendPrompt();
+      }
     });
     
     childProcess.on('error', (error) => {
       this.sendOutput(`\r\nCommand not found: ${cmd}\r\n`);
-      this.sendPrompt();
+      // Don't send prompt for interactive commands
+      if (!isInteractiveCommand) {
+        this.sendPrompt();
+      }
     });
   }
   
@@ -280,7 +291,8 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir) => {
     // Auto-execute claude code after a delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
-        shell.executeCommand('claude code');
+        // Execute command directly without echoing
+        shell.executeCommand('claude', true);
       }
     }, 600); // 600ms - quick but visible
     
@@ -346,7 +358,40 @@ ipcMain.handle('select-directory', async () => {
   return null;
 });
 
+// Database handlers
+ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
+  try {
+    await db.saveTerminalDirectory(terminalId, directory);
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving directory to DB:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('db-get-directory', async (event, terminalId) => {
+  try {
+    const directory = await db.getTerminalDirectory(terminalId);
+    return { success: true, directory };
+  } catch (error) {
+    console.error('Error getting directory from DB:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('db-get-all-directories', async () => {
+  try {
+    const directories = await db.getAllTerminalDirectories();
+    return { success: true, directories };
+  } catch (error) {
+    console.error('Error getting all directories from DB:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 app.whenReady().then(() => {
+  // Initialize database
+  db = new Database();
   createWindow();
   
   app.on('activate', () => {
@@ -368,6 +413,12 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
+  // Close database
+  if (db) {
+    db.close();
+  }
+  
+  // Kill all terminals
   terminals.forEach((shell) => {
     shell.kill();
   });
