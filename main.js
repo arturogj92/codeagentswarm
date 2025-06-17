@@ -73,257 +73,86 @@ class SimpleShell {
   constructor(quadrant, workingDir) {
     this.quadrant = quadrant;
     this.cwd = workingDir;
-    this.buffer = '';
-    this.currentLine = '';
-    this.history = [];
-    this.historyIndex = -1;
-    this.ready = true;
-    
-    this.sendOutput(`\r\n🚀 Terminal ${quadrant + 1} ready!\r\n`);
-    this.sendPrompt();
+
+    const userShell = process.env.SHELL || '/bin/bash';
+    let bridgePath;
+    if (app.isPackaged) {
+      bridgePath = path.join(process.resourcesPath, 'pty_bridge.py');
+    } else {
+      bridgePath = path.join(__dirname, 'pty_bridge.py');
+    }
+
+    if (!fs.existsSync(bridgePath)) {
+      throw new Error(`pty_bridge.py not found at ${bridgePath}`);
+    }
+
+    const env = { ...process.env };
+    if (app.isPackaged) {
+      const additionalPaths = [
+        '/usr/local/bin',
+        '/opt/homebrew/bin',
+        '/usr/bin',
+        path.join(os.homedir(), '.local/bin'),
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'),
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
+        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
+      ];
+      const currentPath = env.PATH || '';
+      env.PATH = [...additionalPaths, currentPath].join(':');
+    }
+
+    this.ptyProcess = spawn('python3', [bridgePath, userShell, this.cwd], {
+      cwd: this.cwd,
+      env,
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+
+    this.ptyProcess.stdout.on('data', data => {
+      let output = data.toString().replace(/\n/g, '\r\n');
+      this.sendOutput(output);
+    });
+
+    this.ptyProcess.stderr.on('data', data => {
+      let output = data.toString().replace(/\n/g, '\r\n');
+      this.sendOutput(output);
+    });
+
+    this.ptyProcess.on('exit', code => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(`terminal-exit-${this.quadrant}`, code);
+      }
+    });
   }
-  
+
   sendOutput(data) {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(`terminal-output-${this.quadrant}`, data);
     }
   }
-  
-  sendPrompt() {
-    const promptText = `\x1b[32m➜\x1b[0m  \x1b[36m${path.basename(this.cwd)}\x1b[0m $ `;
-    this.sendOutput(promptText);
-  }
-  
+
   handleInput(data) {
-    // If we have an active interactive process, send input directly to it
-    if (this.activeInteractiveProcess) {
-      this.activeInteractiveProcess.stdin.write(data);
-      return;
-    }
-    
-    // Otherwise, handle as normal shell input
-    for (let i = 0; i < data.length; i++) {
-      const char = data[i];
-      const charCode = data.charCodeAt(i);
-      
-      if (charCode === 13) { // Enter
-        this.sendOutput('\r\n');
-        this.executeCommand(this.currentLine.trim());
-        this.currentLine = '';
-      } else if (charCode === 127 || charCode === 8) { // Backspace
-        if (this.currentLine.length > 0) {
-          this.currentLine = this.currentLine.slice(0, -1);
-          this.sendOutput('\b \b'); // Move back, write space, move back again
-        }
-      } else if (charCode === 3) { // Ctrl+C
-        this.sendOutput('^C\r\n');
-        this.currentLine = '';
-        this.sendPrompt();
-      } else if (charCode >= 32 && charCode <= 126) { // Printable characters
-        this.currentLine += char;
-        this.sendOutput(char); // Echo the character
-      }
+    if (this.ptyProcess) {
+      this.ptyProcess.stdin.write(data);
     }
   }
-  
+
   executeCommand(command, silent = false) {
-    if (!command) {
-      if (!silent) this.sendPrompt();
-      return;
+    if (this.ptyProcess) {
+      this.ptyProcess.stdin.write(command + '\n');
     }
-    
-    this.history.push(command);
-    
-    // Handle built-in commands
-    if (command === 'clear') {
-      this.sendOutput('\x1b[2J\x1b[H'); // Clear screen and move cursor to top
-      if (!silent) this.sendPrompt();
-      return;
-    }
-    
-    if (command.startsWith('cd ')) {
-      const newDir = command.substring(3).trim();
-      try {
-        const fullPath = path.resolve(this.cwd, newDir);
-        if (require('fs').existsSync(fullPath)) {
-          this.cwd = fullPath;
-          this.sendOutput(`Changed directory to: ${this.cwd}\r\n`);
-        } else {
-          this.sendOutput(`cd: no such file or directory: ${newDir}\r\n`);
-        }
-      } catch (error) {
-        this.sendOutput(`cd: ${error.message}\r\n`);
-      }
-      if (!silent) this.sendPrompt();
-      return;
-    }
-    
-    if (command === 'pwd') {
-      this.sendOutput(`${this.cwd}\r\n`);
-      if (!silent) this.sendPrompt();
-      return;
-    }
-    
-    if (command === 'path' || command === 'echo $PATH') {
-      this.sendOutput(`${process.env.PATH}\r\n`);
-      if (!silent) this.sendPrompt();
-      return;
-    }
-    
-    
-    // Execute real commands
-    this.executeRealCommand(command);
   }
-  
-  executeRealCommand(command) {
-    const args = command.split(' ');
-    const cmd = args[0];
-    let cmdArgs = args.slice(1);
-    // Command parsed for execution
-    
-    // Improve ls command formatting
-    if (cmd === 'ls' && cmdArgs.length === 0) {
-      cmdArgs = ['-1']; // Force single column output
+
+  resize(cols, rows) {
+    if (this.ptyProcess) {
+      const msg = `###RESIZE###${cols},${rows}\n`;
+      this.ptyProcess.stdin.write(msg);
     }
-    
-    // Use script command to create a real PTY for compatible commands
-    const userShell = process.env.SHELL || '/bin/zsh';
-    const fullCommand = `${cmd} ${cmdArgs.join(' ')}`;
-    
-    // For interactive commands like claude code, use script to create a PTY
-    // Check if it's claude (including full paths)
-    const isClaudeCommand = cmd === 'claude' || cmd.includes('claude') || cmd.includes('.nvm');
-    const isInteractiveCommand = isClaudeCommand || cmd === 'vim' || cmd === 'nano';
-    
-    let childProcess;
-    if (isInteractiveCommand) {
-      // Use Python PTY bridge for real TTY support
-      // Handle different paths for development vs packaged app
-    let bridgePath;
-    if (app.isPackaged) {
-      // In packaged app, look in extraResources
-      bridgePath = path.join(process.resourcesPath, 'pty_bridge.py');
-    } else {
-      // In development, look in current directory
-      bridgePath = path.join(__dirname, 'pty_bridge.py');
-    }
-    
-    // Using pty_bridge.py
-    
-    // Verify the file exists
-    if (!fs.existsSync(bridgePath)) {
-      console.error('pty_bridge.py not found at:', bridgePath);
-      throw new Error(`pty_bridge.py not found at ${bridgePath}`);
-    }
-      // Fix PATH for packaged apps - add common binary locations
-      const env = { ...process.env };
-      if (app.isPackaged) {
-        // Add directories to PATH for packaged app
-        const additionalPaths = [
-          '/usr/local/bin',
-          '/opt/homebrew/bin',
-          '/usr/bin',
-          path.join(os.homedir(), '.local/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'), // ← ESTE ES EL CORRECTO!
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
-        ];
-        
-        const currentPath = env.PATH || '';
-        env.PATH = [...additionalPaths, currentPath].join(':');
-        // PATH updated for packaged app
-      }
-      
-      childProcess = spawn('python3', [bridgePath, userShell, this.cwd, fullCommand], {
-        cwd: this.cwd,
-        env: env,
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-      
-      // Mark this as active interactive process
-      this.activeInteractiveProcess = childProcess;
-    } else {
-      // Regular commands use the normal approach
-      childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
-        cwd: this.cwd,
-        env: {
-          ...process.env,
-          PATH: process.env.PATH,
-          TERM: 'xterm-256color',
-          SHELL: userShell,
-          HOME: process.env.HOME,
-          USER: process.env.USER,
-          FORCE_COLOR: '1',
-          CLICOLOR: '1',
-          CLICOLOR_FORCE: '1'
-        },
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-    }
-    
-    childProcess.stdout.on('data', (data) => {
-      // Process the output to handle line endings properly
-      let output = data.toString();
-      // Convert \n to \r\n for proper terminal display
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
-    });
-    
-    childProcess.stderr.on('data', (data) => {
-      let output = data.toString();
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
-    });
-    
-    childProcess.on('exit', (code) => {
-      // Clear interactive process reference
-      if (this.activeInteractiveProcess === childProcess) {
-        this.activeInteractiveProcess = null;
-      }
-      
-      if (code !== 0) {
-        this.sendOutput(`\r\nProcess exited with code: ${code}\r\n`);
-      }
-      
-      // Don't send prompt for interactive commands that are still running
-      if (!isInteractiveCommand || this.activeInteractiveProcess === null) {
-        this.sendPrompt();
-      }
-    });
-    
-    childProcess.on('error', (error) => {
-      this.sendOutput(`\r\nCommand not found: ${cmd}\r\n`);
-      // Don't send prompt for interactive commands
-      if (!isInteractiveCommand) {
-        this.sendPrompt();
-      }
-    });
   }
-  
-  createClaudeCodeWindow(command) {
-    // Create a controlled child window for Claude Code
-    const { BrowserWindow } = require('electron');
-    
-    const claudeWindow = new BrowserWindow({
-      width: 1000,
-      height: 700,
-      title: `Claude Code - Terminal ${this.quadrant + 1}`,
-      parent: require('electron').BrowserWindow.getFocusedWindow(),
-      webPreferences: {
-        nodeIntegration: true,
-        contextIsolation: false
-      }
-    });
-    
-    // You could load a simple terminal interface here
-    claudeWindow.loadURL('data:text/html,<h1>Claude Code Window - Terminal ' + (this.quadrant + 1) + '</h1><p>This would contain Claude Code interface</p>');
-    
-    // Track the window
-    this.claudeWindow = claudeWindow;
-  }
-  
+
   kill() {
-    // Clean up if needed
+    if (this.ptyProcess) {
+      this.ptyProcess.kill();
+    }
   }
 }
 
@@ -385,22 +214,12 @@ ipcMain.on('terminal-input', (event, quadrant, data) => {
 });
 
 ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
-  // Terminal ${quadrant} resized
-  
   const shell = terminals.get(quadrant);
-  if (shell && shell.activeInteractiveProcess) {
+  if (shell) {
     try {
-      // Send SIGWINCH (window change) signal to notify about terminal resize
-      if (shell.activeInteractiveProcess.pid) {
-        process.kill(shell.activeInteractiveProcess.pid, 'SIGWINCH');
-        // Sent SIGWINCH signal
-      }
-      
-      // Don't send escape sequences to avoid text spam in Claude Code
-      // SIGWINCH should be enough for proper applications
-      
+      shell.resize(cols, rows);
     } catch (error) {
-      console.error(`Error sending resize signal to terminal ${quadrant}:`, error);
+      console.error(`Error resizing terminal ${quadrant}:`, error);
     }
   }
 });

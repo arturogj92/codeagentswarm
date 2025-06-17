@@ -5,7 +5,9 @@ import sys
 import subprocess
 import select
 import signal
-import json
+import fcntl
+import termios
+import struct
 
 def create_pty_session(shell_command, cwd):
     """Create a real PTY session and bridge it to stdin/stdout"""
@@ -39,11 +41,21 @@ def create_pty_session(shell_command, cwd):
             
             for fd in ready:
                 if fd == sys.stdin:
-                    # Read from stdin and write to PTY
+                    # Read from stdin and handle special commands
                     try:
                         data = os.read(sys.stdin.fileno(), 1024)
-                        if data:
-                            os.write(master, data)
+                        if not data:
+                            continue
+                        if data.startswith(b'###RESIZE###'):
+                            try:
+                                payload = data[len('###RESIZE###'):].decode().strip()
+                                cols, rows = [int(x) for x in payload.split(',')]
+                                fcntl.ioctl(master, termios.TIOCSWINSZ, struct.pack('hhhh', rows, cols, 0, 0))
+                                os.kill(process.pid, signal.SIGWINCH)
+                            except Exception:
+                                pass
+                            continue
+                        os.write(master, data)
                     except OSError:
                         break
                         
