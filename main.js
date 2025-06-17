@@ -277,12 +277,12 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir) => {
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
-    // Auto-execute claude code after a short delay to ensure terminal is ready
+    // Auto-execute claude code after a delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
         shell.executeCommand('claude code');
       }
-    }, 500);
+    }, 600); // 600ms - quick but visible
     
     console.log(`Simple shell terminal ${quadrant} created successfully`);
     return quadrant;

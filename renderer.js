@@ -8,7 +8,7 @@ class TerminalManager {
         this.terminals = new Map();
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
-        this.lastSelectedDirectory = null; // Remember last selected directory
+        this.lastSelectedDirectories = {}; // Remember last selected directory per terminal
         this.init();
     }
 
@@ -125,52 +125,111 @@ class TerminalManager {
     showDirectorySelector(quadrant) {
         const wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
         
+        // Remove placeholder if it exists
+        const placeholder = wrapper.querySelector('.terminal-placeholder');
+        if (placeholder) {
+            placeholder.remove();
+        }
+        
         // Create directory selector modal
         const selectorDiv = document.createElement('div');
         selectorDiv.className = 'directory-selector';
         selectorDiv.innerHTML = `
             <div class="directory-selector-content">
                 <h3>Select Working Directory</h3>
-                <div class="selected-directory-display">
-                    ${this.lastSelectedDirectory || 'No directory selected'}
+                ${this.lastSelectedDirectories[quadrant] ? `
+                    <div class="last-directory-section">
+                        <div class="last-directory-label">Last used:</div>
+                        <div class="selected-directory-display clickable last-directory" id="last-directory-display">
+                            ${this.lastSelectedDirectories[quadrant]}
+                        </div>
+                    </div>
+                ` : ''}
+                <div class="selected-directory-display clickable" id="directory-display">
+                    ${this.lastSelectedDirectories[quadrant] ? 'Click to select different directory' : 'Click to select directory'}
                 </div>
                 <div class="directory-selector-buttons">
                     <button class="btn" id="choose-dir-btn">Browse...</button>
-                    <button class="btn" id="use-default-btn">Use Default</button>
-                    ${this.lastSelectedDirectory ? '<button class="btn btn-primary" id="use-last-btn">Use Last</button>' : ''}
+                    ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn">Use Last</button>' : ''}
+                    <button class="btn" id="cancel-btn">Cancel</button>
                 </div>
             </div>
         `;
         
         wrapper.appendChild(selectorDiv);
         
-        // Handle browse button
-        selectorDiv.querySelector('#choose-dir-btn').addEventListener('click', async () => {
+        // Function to restore placeholder if cancelled
+        const restorePlaceholder = () => {
+            if (wrapper.contains(selectorDiv)) {
+                wrapper.removeChild(selectorDiv);
+            }
+            if (!wrapper.querySelector('.terminal-placeholder') && !wrapper.querySelector('.terminal')) {
+                wrapper.innerHTML = `
+                    <div class="terminal-placeholder" data-quadrant="${quadrant}">
+                        <div class="terminal-placeholder-icon">⚡</div>
+                        <div>Click to start Claude Code</div>
+                    </div>
+                `;
+                wrapper.querySelector('.terminal-placeholder').addEventListener('click', (e) => {
+                    const quadrant = parseInt(e.currentTarget.dataset.quadrant);
+                    this.showDirectorySelector(quadrant);
+                });
+            }
+        };
+
+        // Function to handle directory selection
+        const selectDirectory = async () => {
             const selectedDir = await ipcRenderer.invoke('select-directory');
             if (selectedDir) {
-                this.lastSelectedDirectory = selectedDir;
-                selectorDiv.querySelector('.selected-directory-display').textContent = selectedDir;
+                this.lastSelectedDirectories[quadrant] = selectedDir;
+                selectorDiv.querySelector('#directory-display').textContent = selectedDir;
                 
                 // Auto-start terminal with selected directory
                 wrapper.removeChild(selectorDiv);
                 this.startTerminal(quadrant, selectedDir);
+            } else {
+                // User cancelled, restore placeholder
+                restorePlaceholder();
             }
-        });
+        };
+
+        // Handle browse button
+        selectorDiv.querySelector('#choose-dir-btn').addEventListener('click', selectDirectory);
         
-        // Handle default button
-        selectorDiv.querySelector('#use-default-btn').addEventListener('click', () => {
-            wrapper.removeChild(selectorDiv);
-            this.startTerminal(quadrant, null); // null = use default (Desktop)
-        });
+        // Handle clickable directory display
+        selectorDiv.querySelector('#directory-display').addEventListener('click', selectDirectory);
+        
+        // Handle last directory click (if exists)
+        const lastDirectoryDisplay = selectorDiv.querySelector('#last-directory-display');
+        if (lastDirectoryDisplay) {
+            lastDirectoryDisplay.addEventListener('click', () => {
+                wrapper.removeChild(selectorDiv);
+                this.startTerminal(quadrant, this.lastSelectedDirectories[quadrant]);
+            });
+        }
         
         // Handle use last button if it exists
         const useLastBtn = selectorDiv.querySelector('#use-last-btn');
         if (useLastBtn) {
             useLastBtn.addEventListener('click', () => {
                 wrapper.removeChild(selectorDiv);
-                this.startTerminal(quadrant, this.lastSelectedDirectory);
+                this.startTerminal(quadrant, this.lastSelectedDirectories[quadrant]);
             });
         }
+        
+        // Handle cancel button
+        selectorDiv.querySelector('#cancel-btn').addEventListener('click', () => {
+            restorePlaceholder();
+        });
+        
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && wrapper.contains(selectorDiv)) {
+                restorePlaceholder();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
     }
 
     async startTerminal(quadrant, selectedDirectory) {
@@ -306,7 +365,16 @@ class TerminalManager {
         });
 
         this.setActiveTerminal(quadrant);
-        this.updateTerminalTitle(quadrant, 'Claude Code');
+        
+        // Set terminal title based on directory
+        let terminalTitle = 'Claude Code';
+        if (selectedDirectory) {
+            const folderName = selectedDirectory.split('/').pop() || selectedDirectory.split('\\').pop();
+            terminalTitle = folderName || 'Claude Code';
+            // Remember this directory for this terminal
+            this.lastSelectedDirectories[quadrant] = selectedDirectory;
+        }
+        this.updateTerminalTitle(quadrant, terminalTitle);
         
         // Add multiple event listeners to ensure focus
         terminalDiv.addEventListener('click', () => {
@@ -345,8 +413,9 @@ class TerminalManager {
                 if (text.includes('Welcome to Claude Code') || 
                     text.includes('Do you trust the files in this folder?') ||
                     text.includes('I\'ll help you with') ||
-                    text.includes('code') ||  // Sometimes the prompt shows first
-                    text.includes('▓')) {  // Claude Code's UI elements
+                    text.includes('▓') ||  // Claude Code's UI elements
+                    text.includes('claude code') ||  // The actual command
+                    text.includes('Claude Code')) {  // Claude Code mentions
                     
                     console.log(`Claude Code activity detected for terminal ${quadrant}`);
                     
@@ -515,6 +584,8 @@ class TerminalManager {
             terminal.terminal.dispose();
             ipcRenderer.send('kill-terminal', quadrant);
             this.terminals.delete(quadrant);
+            // Clean up the saved directory for this terminal
+            delete this.lastSelectedDirectories[quadrant];
             
             const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
             const wrapper = quadrantElement.querySelector('.terminal-wrapper');
@@ -528,7 +599,7 @@ class TerminalManager {
             // Re-add event listener
             wrapper.querySelector('.terminal-placeholder').addEventListener('click', (e) => {
                 const quadrant = parseInt(e.currentTarget.dataset.quadrant);
-                this.startTerminal(quadrant);
+                this.showDirectorySelector(quadrant);
             });
             
             this.updateTerminalTitle(quadrant, `Terminal ${quadrant + 1}`);
