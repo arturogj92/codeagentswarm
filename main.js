@@ -262,17 +262,14 @@ class SimpleShell {
     }
     
     childProcess.stdout.on('data', (data) => {
-      // Process the output to handle line endings properly
-      let output = data.toString();
-      // Convert \n to \r\n for proper terminal display
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
+      // Forward data directly to the terminal without modification to
+      // preserve real TTY behaviour. Converting line endings was causing
+      // display issues with interactive applications like Claude Code.
+      this.sendOutput(data.toString());
     });
-    
+
     childProcess.stderr.on('data', (data) => {
-      let output = data.toString();
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
+      this.sendOutput(data.toString());
     });
     
     childProcess.on('exit', (code) => {
