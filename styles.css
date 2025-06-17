@@ -231,8 +231,16 @@ body {
   height: 100%;
   background: #0a0a0a;
   border-radius: 6px;
-  overflow: hidden;
+  overflow: auto;
   position: relative;
+}
+
+.terminal .xterm {
+  height: 100%;
+}
+
+.terminal .xterm-viewport {
+  overflow-y: auto !important;
 }
 
 .terminal.active {
@@ -362,6 +370,47 @@ body {
 
 .notification.info {
   border-left: 4px solid #3b82f6;
+}
+
+.terminal-loader {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(10, 10, 10, 0.95);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  border-radius: 6px;
+}
+
+.loader-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid rgba(102, 126, 234, 0.2);
+  border-top: 3px solid hsl(var(--primary));
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.loader-text {
+  color: hsl(var(--foreground));
+  font-size: 14px;
+  margin-bottom: 8px;
+}
+
+.loader-status {
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
 }
 
 .resize-handle {

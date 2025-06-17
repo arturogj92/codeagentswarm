@@ -130,10 +130,26 @@ class TerminalManager {
             placeholder.remove();
         }
 
+        // Create loader
+        const loader = document.createElement('div');
+        loader.className = 'terminal-loader';
+        loader.id = `loader-${quadrant}`;
+        loader.innerHTML = `
+            <div class="loader-spinner"></div>
+            <div class="loader-text">Starting Claude Code...</div>
+            <div class="loader-status">Initializing terminal</div>
+        `;
+        wrapper.appendChild(loader);
+
+        // Track Claude Code readiness
+        this.claudeCodeReady = this.claudeCodeReady || {};
+        this.claudeCodeReady[quadrant] = false;
+
         // Create embedded terminal with xterm.js
         const terminalDiv = document.createElement('div');
         terminalDiv.className = 'terminal';
         terminalDiv.id = `terminal-${quadrant}`;
+        terminalDiv.style.display = 'none';
         wrapper.appendChild(terminalDiv);
 
         // Initialize xterm.js terminal with better config
@@ -240,6 +256,40 @@ class TerminalManager {
 
     parseClaudeCodeOutput(data, quadrant) {
         const text = data.toString();
+        
+        // Check if Claude Code is ready
+        if (!this.claudeCodeReady[quadrant]) {
+            const loader = document.getElementById(`loader-${quadrant}`);
+            const terminalDiv = document.getElementById(`terminal-${quadrant}`);
+            
+            // Update loader status
+            if (loader) {
+                const statusElement = loader.querySelector('.loader-status');
+                if (text.includes('Welcome to Claude Code')) {
+                    statusElement.textContent = 'Claude Code detected...';
+                } else if (text.includes('I\'ll help you with')) {
+                    // Claude Code is ready!
+                    this.claudeCodeReady[quadrant] = true;
+                    
+                    // Hide loader and show terminal
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        terminalDiv.style.display = 'block';
+                        
+                        // Resize terminal now that it's visible
+                        const terminal = this.terminals.get(quadrant);
+                        if (terminal && terminal.fitAddon) {
+                            terminal.fitAddon.fit();
+                        }
+                        
+                        this.showNotification(`Claude Code ready in Terminal ${quadrant + 1}!`, 'success');
+                    }, 500);
+                } else if (text.includes('command not found')) {
+                    statusElement.textContent = 'Error: Claude Code not found';
+                    statusElement.style.color = '#ef4444';
+                }
+            }
+        }
         
         // Parse Claude Code specific outputs for notifications
         if (text.includes('Task completed successfully')) {

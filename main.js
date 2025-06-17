@@ -3,6 +3,18 @@ const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
 
+// Enable live reload for Electron in development
+if (process.argv.includes('--dev')) {
+    try {
+        require('electron-reload')(__dirname, {
+            electron: path.join(__dirname, 'node_modules', '.bin', 'electron'),
+            hardResetMethod: 'exit'
+        });
+    } catch (err) {
+        console.log('electron-reload not installed, run: npm install --save-dev electron-reload');
+    }
+}
+
 let mainWindow;
 const terminals = new Map();
 
@@ -265,12 +277,12 @@ ipcMain.handle('create-terminal', async (event, quadrant) => {
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
-    // Auto-execute claude code after a longer delay to ensure terminal is ready
+    // Auto-execute claude code after a short delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
         shell.executeCommand('claude code');
       }
-    }, 3000);
+    }, 500);
     
     console.log(`Simple shell terminal ${quadrant} created successfully`);
     return quadrant;
