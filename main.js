@@ -316,8 +316,25 @@ ipcMain.on('terminal-input', (event, quadrant, data) => {
 });
 
 ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
-  // Simple shell doesn't need resize handling
   console.log(`Terminal ${quadrant} resized to ${cols}x${rows}`);
+  
+  const shell = terminals.get(quadrant);
+  if (shell && shell.activeInteractiveProcess) {
+    try {
+      // Send SIGWINCH (window change) signal to notify about terminal resize
+      if (shell.activeInteractiveProcess.pid) {
+        process.kill(shell.activeInteractiveProcess.pid, 'SIGWINCH');
+        console.log(`Sent SIGWINCH to terminal ${quadrant} (PID: ${shell.activeInteractiveProcess.pid})`);
+      }
+      
+      // Also try sending terminal escape sequence
+      if (shell.activeInteractiveProcess.stdin && !shell.activeInteractiveProcess.stdin.destroyed) {
+        shell.activeInteractiveProcess.stdin.write(`\x1b[8;${rows};${cols}t`);
+      }
+    } catch (error) {
+      console.error(`Error sending resize signal to terminal ${quadrant}:`, error);
+    }
+  }
 });
 
 ipcMain.on('kill-terminal', (event, quadrant) => {

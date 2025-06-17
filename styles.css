@@ -270,20 +270,21 @@ body::before {
 }
 
 .terminal-header {
-  height: 44px;
+  height: 32px;
   background: rgba(255, 255, 255, 0.03);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 16px;
+  justify-content: center;
+  padding: 0 12px;
   border-radius: 16px 16px 0 0;
+  position: relative;
 }
 
 .terminal-title {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-secondary);
   letter-spacing: 0.5px;
@@ -293,17 +294,21 @@ body::before {
 .terminal-controls {
   display: flex;
   gap: 8px;
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 .terminal-control-btn {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
   background: var(--surface);
   color: var(--text-primary);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -320,7 +325,7 @@ body::before {
 .terminal-wrapper {
   flex: 1;
   padding: 12px;
-  height: calc(100% - 44px);
+  height: calc(100% - 32px);
 }
 
 .terminal {

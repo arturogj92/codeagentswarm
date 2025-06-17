@@ -644,8 +644,42 @@ class TerminalManager {
 
     resizeTerminal(quadrant) {
         const terminal = this.terminals.get(quadrant);
-        if (terminal) {
-            terminal.fitAddon.fit();
+        if (terminal && terminal.fitAddon) {
+            try {
+                // First, fit the terminal to its container
+                terminal.fitAddon.fit();
+                
+                // Then notify the backend about the resize so Claude Code can adjust
+                const cols = terminal.terminal.cols;
+                const rows = terminal.terminal.rows;
+                
+                console.log(`Terminal ${quadrant} resized to: ${cols}x${rows}`);
+                
+                // Send resize signal to the PTY
+                ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+                
+                // Also try to trigger a refresh in Claude Code by sending Ctrl+L (clear screen)
+                setTimeout(() => {
+                    if (terminal && terminal.terminal) {
+                        // Send Ctrl+L to refresh the display
+                        ipcRenderer.send('terminal-input', quadrant, '\x0C');
+                    }
+                }, 200);
+                
+            } catch (error) {
+                console.error(`Error resizing terminal ${quadrant}:`, error);
+                // Retry once after a delay
+                setTimeout(() => {
+                    try {
+                        terminal.fitAddon.fit();
+                        const cols = terminal.terminal.cols;
+                        const rows = terminal.terminal.rows;
+                        ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+                    } catch (retryError) {
+                        console.error(`Retry failed for terminal ${quadrant}:`, retryError);
+                    }
+                }, 100);
+            }
         }
     }
 
