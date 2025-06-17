@@ -158,8 +158,8 @@ class SimpleShell {
     const userShell = process.env.SHELL || '/bin/zsh';
     const fullCommand = `${cmd} ${cmdArgs.join(' ')}`;
     
-    // For interactive commands like claude-code, use script to create a PTY
-    const isInteractiveCommand = cmd === 'claude-code' || cmd === 'claude' || cmd === 'vim' || cmd === 'nano';
+    // For interactive commands like claude code, use script to create a PTY
+    const isInteractiveCommand = cmd === 'claude' || cmd === 'vim' || cmd === 'nano';
     
     let childProcess;
     if (isInteractiveCommand) {
@@ -265,10 +265,10 @@ ipcMain.handle('create-terminal', async (event, quadrant) => {
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
-    // Auto-execute claude-code after a longer delay to ensure terminal is ready
+    // Auto-execute claude code after a longer delay to ensure terminal is ready
     setTimeout(() => {
       if (terminals.has(quadrant)) {
-        shell.executeCommand('claude-code');
+        shell.executeCommand('claude code');
       }
     }, 3000);
     
