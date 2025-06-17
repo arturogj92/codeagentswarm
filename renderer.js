@@ -713,16 +713,16 @@ class TerminalManager {
                 
                 console.log(`Terminal ${quadrant} resized to: ${cols}x${rows}`);
                 
-                // Send resize signal to the PTY
-                ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+                // Debounce resize signals to avoid spam
+                if (terminal.resizeTimeout) {
+                    clearTimeout(terminal.resizeTimeout);
+                }
                 
-                // Also try to trigger a refresh in Claude Code by sending Ctrl+L (clear screen)
-                setTimeout(() => {
-                    if (terminal && terminal.terminal) {
-                        // Send Ctrl+L to refresh the display
-                        ipcRenderer.send('terminal-input', quadrant, '\x0C');
-                    }
-                }, 200);
+                terminal.resizeTimeout = setTimeout(() => {
+                    // Send resize signal to the PTY (only once after resize stops)
+                    ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+                    terminal.resizeTimeout = null;
+                }, 300); // Wait 300ms after resize stops
                 
             } catch (error) {
                 console.error(`Error resizing terminal ${quadrant}:`, error);
@@ -730,9 +730,6 @@ class TerminalManager {
                 setTimeout(() => {
                     try {
                         terminal.fitAddon.fit();
-                        const cols = terminal.terminal.cols;
-                        const rows = terminal.terminal.rows;
-                        ipcRenderer.send('terminal-resize', quadrant, cols, rows);
                     } catch (retryError) {
                         console.error(`Retry failed for terminal ${quadrant}:`, retryError);
                     }

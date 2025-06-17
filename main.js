@@ -329,10 +329,9 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
         console.log(`Sent SIGWINCH to terminal ${quadrant} (PID: ${shell.activeInteractiveProcess.pid})`);
       }
       
-      // Also try sending terminal escape sequence
-      if (shell.activeInteractiveProcess.stdin && !shell.activeInteractiveProcess.stdin.destroyed) {
-        shell.activeInteractiveProcess.stdin.write(`\x1b[8;${rows};${cols}t`);
-      }
+      // Don't send escape sequences to avoid text spam in Claude Code
+      // SIGWINCH should be enough for proper applications
+      
     } catch (error) {
       console.error(`Error sending resize signal to terminal ${quadrant}:`, error);
     }
