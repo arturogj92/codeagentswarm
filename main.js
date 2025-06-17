@@ -57,6 +57,12 @@ function createWindow() {
 
   mainWindow.loadFile('index.html');
   
+  // Send dev mode status to renderer after the page loads
+  mainWindow.webContents.once('did-finish-load', () => {
+    const isDevMode = process.argv.includes('--dev');
+    mainWindow.webContents.send('dev-mode-status', isDevMode);
+  });
+  
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
@@ -121,9 +127,7 @@ class SimpleShell {
   }
   
   executeCommand(command, silent = false) {
-    console.log(`[SimpleShell ${this.quadrant}] executeCommand called: "${command}" (silent: ${silent})`);
     if (!command) {
-      console.log(`[SimpleShell ${this.quadrant}] Empty command, showing prompt`);
       if (!silent) this.sendPrompt();
       return;
     }
@@ -175,7 +179,7 @@ class SimpleShell {
     const args = command.split(' ');
     const cmd = args[0];
     let cmdArgs = args.slice(1);
-    console.log(`[SimpleShell ${this.quadrant}] Parsed command: cmd="${cmd}", args=[${cmdArgs.join(', ')}]`);
+    // Command parsed for execution
     
     // Improve ls command formatting
     if (cmd === 'ls' && cmdArgs.length === 0) {
@@ -204,7 +208,7 @@ class SimpleShell {
       bridgePath = path.join(__dirname, 'pty_bridge.py');
     }
     
-    console.log('Using pty_bridge.py at:', bridgePath);
+    // Using pty_bridge.py
     
     // Verify the file exists
     if (!fs.existsSync(bridgePath)) {
@@ -227,7 +231,7 @@ class SimpleShell {
         
         const currentPath = env.PATH || '';
         env.PATH = [...additionalPaths, currentPath].join(':');
-        console.log('PATH updated for packaged app');
+        // PATH updated for packaged app
       }
       
       childProcess = spawn('python3', [bridgePath, userShell, this.cwd, fullCommand], {
@@ -329,7 +333,7 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
     const userHome = os.homedir();
     const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
     
-    console.log(`Creating simple shell terminal ${quadrant} in ${workingDir} with ${sessionType} session`);
+    // Creating terminal ${quadrant}
     
     // Fix PATH for packaged apps before creating shell
     if (app.isPackaged) {
@@ -346,28 +350,22 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
       
       const currentPath = process.env.PATH || '';
       process.env.PATH = [...additionalPaths, currentPath].join(':');
-      console.log('Global PATH updated for terminal creation');
+      // Global PATH updated
     }
     
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
     
     // Auto-execute claude code after a delay to ensure terminal is ready
-    console.log(`[create-terminal] Setting up auto-execute for terminal ${quadrant} with sessionType: ${sessionType}`);
     setTimeout(() => {
-      console.log(`[create-terminal] Timer fired for terminal ${quadrant}`);
       if (terminals.has(quadrant)) {
         // Execute command based on session type
-        // Use claude directly, the PATH should be configured correctly
         const command = sessionType === 'new' ? 'claude' : 'claude --resume';
-        console.log(`[create-terminal] Executing: ${command} for terminal ${quadrant}`);
         shell.executeCommand(command, true);
-      } else {
-        console.log(`[create-terminal] Terminal ${quadrant} not found in terminals map!`);
       }
     }, 1000); // Increased to 1 second to ensure terminal is ready
     
-    console.log(`Simple shell terminal ${quadrant} created successfully`);
+    // Terminal ${quadrant} created
     return quadrant;
     
   } catch (error) {
@@ -377,7 +375,7 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
 });
 
 ipcMain.on('terminal-input', (event, quadrant, data) => {
-  console.log(`Received input for terminal ${quadrant}:`, JSON.stringify(data));
+  // Input received for terminal ${quadrant}
   const shell = terminals.get(quadrant);
   if (shell) {
     shell.handleInput(data);
@@ -387,7 +385,7 @@ ipcMain.on('terminal-input', (event, quadrant, data) => {
 });
 
 ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
-  console.log(`Terminal ${quadrant} resized to ${cols}x${rows}`);
+  // Terminal ${quadrant} resized
   
   const shell = terminals.get(quadrant);
   if (shell && shell.activeInteractiveProcess) {
@@ -395,7 +393,7 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
       // Send SIGWINCH (window change) signal to notify about terminal resize
       if (shell.activeInteractiveProcess.pid) {
         process.kill(shell.activeInteractiveProcess.pid, 'SIGWINCH');
-        console.log(`Sent SIGWINCH to terminal ${quadrant} (PID: ${shell.activeInteractiveProcess.pid})`);
+        // Sent SIGWINCH signal
       }
       
       // Don't send escape sequences to avoid text spam in Claude Code
@@ -584,6 +582,105 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
     });
   } else {
     console.log('Desktop notifications not supported on this system');
+  }
+});
+
+// Git status handler
+ipcMain.handle('get-git-status', async () => {
+  const { execSync } = require('child_process');
+  try {
+    // Get current working directory from the first terminal or use process.cwd()
+    let cwd = process.cwd();
+    
+    // Try to get working directory from the active terminal
+    if (terminals.size > 0) {
+      const firstTerminal = terminals.values().next().value;
+      if (firstTerminal && firstTerminal.cwd) {
+        cwd = firstTerminal.cwd;
+      }
+    }
+    
+    // Check if directory is a git repository
+    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim() === 'true';
+    
+    if (!isGitRepo) {
+      return { success: false, error: 'Not a git repository' };
+    }
+    
+    // Get git status with porcelain format for easy parsing
+    const statusOutput = execSync('git status --porcelain', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    });
+    
+    // Parse the status output
+    const files = [];
+    const lines = statusOutput.trim().split('\n').filter(line => line.length > 0);
+    
+    lines.forEach(line => {
+      if (line.length < 3) return; // Skip invalid lines
+      
+      const status = line.substring(0, 2);
+      const fileName = line.substring(3);
+      
+      let statusText = '';
+      // Check both index and working tree status (first and second character)
+      const indexStatus = status[0];
+      const workingStatus = status[1];
+      
+      // Priority: working tree changes, then index changes
+      if (workingStatus === 'M' || indexStatus === 'M') {
+        statusText = 'Modified';
+      } else if (workingStatus === 'A' || indexStatus === 'A') {
+        statusText = 'Added';
+      } else if (workingStatus === 'D' || indexStatus === 'D') {
+        statusText = 'Deleted';
+      } else if (workingStatus === 'R' || indexStatus === 'R') {
+        statusText = 'Renamed';
+      } else if (workingStatus === 'C' || indexStatus === 'C') {
+        statusText = 'Copied';
+      } else if (workingStatus === 'T' || indexStatus === 'T') {
+        statusText = 'Type Changed';
+      } else if (status === '??') {
+        statusText = 'Untracked';
+      } else if (status === '!!') {
+        statusText = 'Ignored';
+      } else {
+        statusText = 'Modified'; // Default to Modified for most cases
+      }
+      
+      files.push({
+        file: fileName,
+        status: statusText,
+        raw: status
+      });
+    });
+    
+    // Get current branch
+    const branch = execSync('git branch --show-current', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim();
+    
+    return { 
+      success: true, 
+      files, 
+      branch,
+      workingDirectory: cwd
+    };
+    
+  } catch (error) {
+    console.error('Git status error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to get git status'
+    };
   }
 });
 

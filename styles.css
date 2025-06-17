@@ -89,6 +89,33 @@ body::before {
   text-shadow: 0 0 40px rgba(127, 90, 240, 0.5);
 }
 
+.dev-indicator {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #ff6b35 0%, #f7931e 100%);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 12px;
+  letter-spacing: 0.5px;
+  box-shadow: 0 0 20px rgba(255, 107, 53, 0.4);
+  /* animation: devPulse 2s ease-in-out infinite; */
+  z-index: 1001;
+}
+
+@keyframes devPulse {
+  0%, 100% {
+    opacity: 1;
+    transform: translateX(-50%) scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateX(-50%) scale(1.05);
+  }
+}
+
 .header-controls {
   display: flex;
   gap: 10px;
@@ -160,8 +187,7 @@ body::before {
   background: transparent;
   padding: 20px;
   position: relative;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   max-height: calc(100vh - 80px);
 }
 
@@ -255,7 +281,6 @@ body::before {
 .terminal-quadrant:hover {
   background: rgba(20, 20, 20, 0.8);
   border-color: var(--border-hover);
-  transform: translateY(-2px);
   box-shadow: var(--shadow-card), 0 0 40px rgba(127, 90, 240, 0.1);
 }
 
@@ -461,7 +486,6 @@ body::before {
   border-color: var(--primary);
   background: var(--surface-hover);
   color: var(--text-primary);
-  transform: scale(1.02);
 }
 
 .terminal-placeholder:hover::before {
@@ -472,7 +496,7 @@ body::before {
   font-size: 2.5rem;
   margin-bottom: 12px;
   filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.5));
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  /* animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; */
 }
 
 @keyframes pulse {
@@ -879,4 +903,216 @@ body::before {
     var(--shadow-card), 
     0 0 40px rgba(255, 137, 6, 0.6),
     inset 0 0 20px rgba(255, 137, 6, 0.1);
+}
+
+/* Git Status Modal */
+.git-status-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1003;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.git-status-modal.show {
+  opacity: 1;
+}
+
+.git-status-content {
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-card);
+  transform: scale(0.9);
+  transition: transform 0.3s ease;
+}
+
+.git-status-modal.show .git-status-content {
+  transform: scale(1);
+}
+
+.git-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.git-status-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.25rem;
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.3s ease;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  background: var(--surface);
+  color: var(--text-primary);
+}
+
+.git-info {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.git-branch,
+.git-directory {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.git-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 80px;
+  font-size: 0.875rem;
+}
+
+.git-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.git-path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--primary);
+  word-break: break-all;
+}
+
+.git-files-section h4 {
+  margin: 0 0 16px 0;
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.git-files-list {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.git-file-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.2s ease;
+}
+
+.git-file-item:last-child {
+  border-bottom: none;
+}
+
+.git-file-item:hover {
+  background: var(--surface-hover);
+}
+
+.file-status {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  min-width: 80px;
+  text-align: center;
+}
+
+.file-status-modified {
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  border: 1px solid rgba(255, 193, 7, 0.3);
+}
+
+.file-status-added {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
+}
+
+.file-status-deleted {
+  background: rgba(220, 53, 69, 0.2);
+  color: #dc3545;
+  border: 1px solid rgba(220, 53, 69, 0.3);
+}
+
+.file-status-untracked {
+  background: rgba(108, 117, 125, 0.2);
+  color: #6c757d;
+  border: 1px solid rgba(108, 117, 125, 0.3);
+}
+
+.file-status-renamed {
+  background: rgba(255, 137, 6, 0.2);
+  color: var(--accent);
+  border: 1px solid rgba(255, 137, 6, 0.3);
+}
+
+.file-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  flex: 1;
+  word-break: break-all;
+}
+
+.no-changes {
+  padding: 40px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.git-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 24px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
 }

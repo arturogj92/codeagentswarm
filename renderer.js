@@ -16,6 +16,7 @@ class TerminalManager {
         this.notificationBlocked = new Map(); // Block notifications until user interaction
         this.waitingForUserInteraction = new Map(); // Track terminals waiting for interaction
         this.terminalFocused = new Map(); // Track which terminals are focused
+        this.userTypingTimers = new Map(); // Track when user is actively typing
         this.init();
         // Load directories asynchronously with error handling
         this.loadSavedDirectories().catch(error => {
@@ -74,6 +75,10 @@ class TerminalManager {
 
         document.getElementById('settings-btn').addEventListener('click', () => {
             this.showSettings();
+        });
+
+        document.getElementById('git-status-btn').addEventListener('click', () => {
+            this.showGitStatus();
         });
 
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
@@ -369,7 +374,7 @@ class TerminalManager {
         // Set a timeout to show terminal even if Claude Code doesn't start
         setTimeout(() => {
             if (!this.claudeCodeReady[quadrant]) {
-                console.log(`Timeout reached for terminal ${quadrant}, showing terminal anyway`);
+                // Timeout reached, showing terminal
                 const timeoutLoader = document.getElementById(`loader-${quadrant}`);
                 const timeoutTerminalDiv = document.getElementById(`terminal-${quadrant}`);
                 
@@ -440,7 +445,7 @@ class TerminalManager {
         const visibilityObserver = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting && entry.target === terminalDiv) {
-                    setTimeout(() => fitAddon.fit(), 50);
+                    setTimeout(() => fitAddon.fit(), 100);
                 }
             });
         });
@@ -462,24 +467,21 @@ class TerminalManager {
         terminal.onData(data => {
             ipcRenderer.send('terminal-input', quadrant, data);
             
-            // UNBLOCK notifications ONLY if THIS terminal is focused AND pressed Enter
+            // Block notifications temporarily when user is typing
+            this.blockNotificationsWhileTyping(quadrant);
+            
+            // UNBLOCK notifications when user interacts with waiting terminal
             if (this.waitingForUserInteraction.get(quadrant) && this.activeTerminal === quadrant) {
-                console.log(`🔍 Terminal ${quadrant} key press: '${data.replace(/\r/g, 'ENTER').replace(/\n/g, 'NEWLINE')}'`);
-                // ONLY Enter key (\r) should unblock, and only if it's exactly one Enter press
-                if (data === '\r' || data === '\r\n') {
-                    console.log(`✅ UNBLOCKING terminal ${quadrant} - focused terminal pressed Enter`);
+                // Any meaningful input should unblock (Enter, y, n, etc.)
+                if (data === '\r' || data === '\r\n' || data === 'y' || data === 'n' || data === 'Y' || data === 'N') {
                     this.unblockNotifications(quadrant);
                 }
-            } else if (this.waitingForUserInteraction.get(quadrant)) {
-                console.log(`⚠️ Terminal ${quadrant} - Enter pressed but terminal not focused (active: ${this.activeTerminal})`);
             }
         });
 
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
-            // Force scroll to bottom after writing data
-            setTimeout(() => terminal.scrollToBottom(), 0);
             this.parseClaudeCodeOutput(data, quadrant);
         });
 
@@ -530,14 +532,14 @@ class TerminalManager {
         });
         
         // Focus and fit immediately when created
+        // Focus and fit on next tick
         setTimeout(() => {
             terminal.focus();
             fitAddon.fit();
-        }, 100);
+        }, 50);
         
-        // Additional fit attempts to ensure proper sizing
-        setTimeout(() => fitAddon.fit(), 200);
-        setTimeout(() => fitAddon.fit(), 500);
+        // Single delayed fit for proper sizing
+        setTimeout(() => fitAddon.fit(), 300);
 
         this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
@@ -580,7 +582,7 @@ class TerminalManager {
                         const terminalInfo = this.terminals.get(quadrant);
                         if (terminalInfo && terminalInfo.fitAddon) {
                             // Multiple fit attempts to ensure proper sizing
-                            setTimeout(() => terminalInfo.fitAddon.fit(), 0);
+                            // Single fit operation
                             setTimeout(() => terminalInfo.fitAddon.fit(), 50);
                             setTimeout(() => terminalInfo.fitAddon.fit(), 200);
                         }
@@ -679,12 +681,27 @@ class TerminalManager {
     handleConfirmationRequest(text, quadrant) {
         // RADICAL SOLUTION: If notifications are blocked for this terminal, skip entirely
         if (this.notificationBlocked.get(quadrant)) {
-            console.log(`❌ BLOCKED: Notification skipped for terminal ${quadrant} - waiting for user interaction`);
             return;
         }
         
-        // Skip if this is just cursor movement (single character updates)
-        if (text.length < 10) {
+        // Skip if this is just cursor movement or user typing
+        if (text.length < 50) {
+            return;
+        }
+        
+        // CRITICAL: Only process if text contains ACTUAL confirmation patterns
+        const hasConfirmation = text.includes('Do you want to') || 
+                              text.includes('Proceed?') || 
+                              text.includes('Continue?') || 
+                              text.includes('Would you like to') ||
+                              text.includes('Allow access to') || 
+                              text.includes('Grant permission') ||
+                              text.includes('Enable MCP') || 
+                              text.includes('Trust this') ||
+                              text.includes('Waiting for confirmation') ||
+                              text.includes('Do you trust the files');
+        
+        if (!hasConfirmation) {
             return;
         }
         
@@ -736,7 +753,7 @@ class TerminalManager {
                 line.includes('Continue?') || line.includes('Would you like to') ||
                 line.includes('Allow access to') || line.includes('Grant permission') ||
                 line.includes('Enable MCP') || line.includes('Trust this') ||
-                line.includes('Waiting for confirmation')) {
+                line.includes('Waiting for confirmation') || line.includes('Do you trust the files')) {
                 confirmationQuestion = line.trim().replace(/[│]/g, '').trim();
                 break;
             }
@@ -753,7 +770,7 @@ class TerminalManager {
         // If we already notified for this exact command, skip (unless it's been a while)
         const now = Date.now();
         const lastNotified = this.confirmedCommands.get(`${quadrant}_${commandKey}`);
-        if (lastNotified && (now - lastNotified) < 30000) { // 30 second cooldown per command
+        if (lastNotified && (now - lastNotified) < 60000) { // 60 second cooldown per command
             return;
         }
         
@@ -765,9 +782,7 @@ class TerminalManager {
             clearTimeout(this.confirmationDebounce.get(quadrant));
         }
         
-        // BLOCK IMMEDIATELY before any debounce
-        this.notificationBlocked.set(quadrant, true);
-        this.waitingForUserInteraction.set(quadrant, true);
+        // Don't block immediately, wait for debounce to complete
         
         // Set new debounce timer
         const timeoutId = setTimeout(() => {
@@ -780,7 +795,16 @@ class TerminalManager {
                 this.showDesktopNotification('Confirmation Required', `Terminal ${quadrant + 1}: Claude Code needs confirmation`);
                 this.highlightTerminalForConfirmation(quadrant);
                 
-                console.log(`🔒 BLOCKED notifications for terminal ${quadrant} until user interaction`);
+                // Block notifications temporarily (auto-unblock after 15 seconds)
+                this.notificationBlocked.set(quadrant, true);
+                this.waitingForUserInteraction.set(quadrant, true);
+                
+                // Auto-unblock after 15 seconds to prevent permanent blocking
+                setTimeout(() => {
+                    if (this.notificationBlocked.get(quadrant)) {
+                        this.unblockNotifications(quadrant);
+                    }
+                }, 15000);
                 
                 // Clean up old confirmed commands after 5 minutes
                 setTimeout(() => {
@@ -798,16 +822,32 @@ class TerminalManager {
     }
     
     unblockNotifications(quadrant) {
-        console.log(`🔓 Unblocking notifications for terminal ${quadrant} - user clicked terminal and pressed Enter`);
         this.notificationBlocked.set(quadrant, false);
         this.waitingForUserInteraction.set(quadrant, false);
-        // Focus state is handled by activeTerminal
         
         // Remove highlight animation since user is responding
         const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         if (terminalElement) {
             terminalElement.classList.remove('confirmation-highlight');
         }
+    }
+    
+    blockNotificationsWhileTyping(quadrant) {
+        // Block notifications temporarily while user is typing
+        this.notificationBlocked.set(quadrant, true);
+        
+        // Clear existing timer
+        if (this.userTypingTimers.has(quadrant)) {
+            clearTimeout(this.userTypingTimers.get(quadrant));
+        }
+        
+        // Auto-unblock after 3 seconds of no typing
+        const timerId = setTimeout(() => {
+            this.notificationBlocked.set(quadrant, false);
+            this.userTypingTimers.delete(quadrant);
+        }, 3000);
+        
+        this.userTypingTimers.set(quadrant, timerId);
     }
     
     hashString(str) {
@@ -995,7 +1035,118 @@ class TerminalManager {
     showSettings() {
         this.showNotification('Settings panel coming soon...', 'info');
     }
+
+    async showGitStatus() {
+        try {
+            const result = await ipcRenderer.invoke('get-git-status');
+            
+            if (result.success) {
+                this.displayGitStatusModal(result);
+            } else {
+                this.showNotification(result.error || 'Failed to get git status', 'warning');
+            }
+        } catch (error) {
+            console.error('Error getting git status:', error);
+            this.showNotification('Error getting git status', 'error');
+        }
+    }
+
+    displayGitStatusModal(gitData) {
+        // Remove existing modal if present
+        const existingModal = document.querySelector('.git-status-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'git-status-modal';
+        modal.innerHTML = `
+            <div class="git-status-content">
+                <div class="git-status-header">
+                    <h3>📋 Git Status</h3>
+                    <button class="close-btn" id="close-git-modal">×</button>
+                </div>
+                
+                <div class="git-info">
+                    <div class="git-branch">
+                        <span class="git-label">Branch:</span>
+                        <span class="git-value">${gitData.branch || 'unknown'}</span>
+                    </div>
+                    <div class="git-directory">
+                        <span class="git-label">Directory:</span>
+                        <span class="git-value git-path">${gitData.workingDirectory}</span>
+                    </div>
+                </div>
+
+                <div class="git-files-section">
+                    <h4>Modified Files (${gitData.files.length})</h4>
+                    <div class="git-files-list">
+                        ${gitData.files.length === 0 ? 
+                            '<div class="no-changes">No changes detected</div>' : 
+                            gitData.files.map(file => `
+                                <div class="git-file-item">
+                                    <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}</span>
+                                    <span class="file-name">${file.file}</span>
+                                </div>
+                            `).join('')
+                        }
+                    </div>
+                </div>
+                
+                <div class="git-actions">
+                    <button class="btn" id="refresh-git-status">🔄 Refresh</button>
+                    <button class="btn btn-primary" id="close-git-modal-btn">Close</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Add event listeners
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        modal.querySelector('#close-git-modal').addEventListener('click', closeModal);
+        modal.querySelector('#close-git-modal-btn').addEventListener('click', closeModal);
+        modal.querySelector('#refresh-git-status').addEventListener('click', () => {
+            modal.remove();
+            this.showGitStatus();
+        });
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Show modal with animation
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+    }
 }
+
+// Listen for dev mode status from main process
+ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
+    if (isDevMode) {
+        const devIndicator = document.getElementById('dev-indicator');
+        if (devIndicator) {
+            devIndicator.style.display = 'block';
+        }
+    }
+});
 
 // Initialize the terminal manager when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
