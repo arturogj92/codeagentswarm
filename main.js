@@ -262,16 +262,13 @@ class SimpleShell {
     }
     
     childProcess.stdout.on('data', (data) => {
-      // Process the output to handle line endings properly
-      let output = data.toString();
-      // Convert \n to \r\n for proper terminal display
-      output = output.replace(/\n/g, '\r\n');
+      // Send data as-is to preserve ANSI control sequences
+      const output = data.toString();
       this.sendOutput(output);
     });
-    
+
     childProcess.stderr.on('data', (data) => {
-      let output = data.toString();
-      output = output.replace(/\n/g, '\r\n');
+      const output = data.toString();
       this.sendOutput(output);
     });
     
