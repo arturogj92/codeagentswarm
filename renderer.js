@@ -8,6 +8,7 @@ class TerminalManager {
         this.terminals = new Map();
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
+        this.selectedDirectories = new Map(); // Track selected directories for each quadrant
         this.init();
     }
 
@@ -35,8 +36,21 @@ class TerminalManager {
 
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
             placeholder.addEventListener('click', (e) => {
+                // Don't start terminal if clicking the select folder button
+                if (e.target.classList.contains('select-folder-btn')) {
+                    return;
+                }
                 const quadrant = parseInt(e.currentTarget.dataset.quadrant);
                 this.startTerminal(quadrant);
+            });
+        });
+
+        // Handle directory selection buttons
+        document.querySelectorAll('.select-folder-btn').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const quadrant = parseInt(e.target.dataset.quadrant);
+                await this.selectDirectory(quadrant);
             });
         });
 
@@ -46,7 +60,9 @@ class TerminalManager {
                 const action = e.target.dataset.action;
                 const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
                 
-                if (action === 'fullscreen') {
+                if (action === 'folder') {
+                    this.selectDirectory(quadrant);
+                } else if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
                 } else if (action === 'close') {
                     this.closeTerminal(quadrant);
@@ -121,6 +137,23 @@ class TerminalManager {
         });
     }
 
+    async selectDirectory(quadrant) {
+        const selectedDir = await ipcRenderer.invoke('select-directory');
+        if (selectedDir) {
+            this.selectedDirectories.set(quadrant, selectedDir);
+            
+            // Update the display
+            const selectedFolderDisplay = document.querySelector(`.selected-folder[data-quadrant="${quadrant}"]`);
+            if (selectedFolderDisplay) {
+                const dirName = selectedDir.split('/').pop() || selectedDir;
+                selectedFolderDisplay.textContent = `📁 ${dirName}`;
+                selectedFolderDisplay.title = selectedDir; // Full path on hover
+            }
+            
+            this.showNotification(`Directory selected: ${selectedDir}`, 'success');
+        }
+    }
+
     async startTerminal(quadrant) {
         const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         const wrapper = quadrantElement.querySelector('.terminal-wrapper');
@@ -142,8 +175,29 @@ class TerminalManager {
         wrapper.appendChild(loader);
 
         // Track Claude Code readiness
-        this.claudeCodeReady = this.claudeCodeReady || {};
+        if (!this.claudeCodeReady) {
+            this.claudeCodeReady = {};
+        }
         this.claudeCodeReady[quadrant] = false;
+        
+        // Set a timeout to show terminal even if Claude Code doesn't start
+        setTimeout(() => {
+            if (!this.claudeCodeReady[quadrant]) {
+                console.log(`Timeout reached for terminal ${quadrant}, showing terminal anyway`);
+                const timeoutLoader = document.getElementById(`loader-${quadrant}`);
+                const timeoutTerminalDiv = document.getElementById(`terminal-${quadrant}`);
+                
+                if (timeoutLoader && timeoutTerminalDiv) {
+                    timeoutLoader.style.display = 'none';
+                    timeoutTerminalDiv.style.display = 'block';
+                    
+                    const terminalInfo = this.terminals.get(quadrant);
+                    if (terminalInfo && terminalInfo.fitAddon) {
+                        terminalInfo.fitAddon.fit();
+                    }
+                }
+            }
+        }, 10000); // 10 seconds timeout
 
         // Create embedded terminal with xterm.js
         const terminalDiv = document.createElement('div');
@@ -196,8 +250,9 @@ class TerminalManager {
         terminal.open(terminalDiv);
         fitAddon.fit();
 
-        // Create PTY terminal process
-        await ipcRenderer.invoke('create-terminal', quadrant);
+        // Create PTY terminal process with selected directory
+        const selectedDir = this.selectedDirectories.get(quadrant);
+        await ipcRenderer.invoke('create-terminal', quadrant, selectedDir);
         
         // Focus the terminal
         terminal.focus();
@@ -256,19 +311,40 @@ class TerminalManager {
 
     parseClaudeCodeOutput(data, quadrant) {
         const text = data.toString();
+        console.log(`Terminal ${quadrant} output:`, text);
         
         // Check if Claude Code is ready
         if (!this.claudeCodeReady[quadrant]) {
             const loader = document.getElementById(`loader-${quadrant}`);
             const terminalDiv = document.getElementById(`terminal-${quadrant}`);
             
+            console.log(`Checking Claude Code readiness for terminal ${quadrant}`);
+            
             // Update loader status
             if (loader) {
                 const statusElement = loader.querySelector('.loader-status');
                 if (text.includes('Welcome to Claude Code')) {
+                    console.log(`Claude Code welcome message detected for terminal ${quadrant}`);
                     statusElement.textContent = 'Claude Code detected...';
+                } else if (text.includes('Do you trust the files in this folder?')) {
+                    console.log(`Claude Code trust prompt detected for terminal ${quadrant}`);
+                    statusElement.textContent = 'Waiting for trust confirmation...';
+                    
+                    // Show terminal so user can respond to trust prompt
+                    setTimeout(() => {
+                        loader.style.display = 'none';
+                        terminalDiv.style.display = 'block';
+                        
+                        const terminalInfo = this.terminals.get(quadrant);
+                        if (terminalInfo && terminalInfo.fitAddon) {
+                            terminalInfo.fitAddon.fit();
+                        }
+                        
+                        this.showNotification(`Please confirm trust for Terminal ${quadrant + 1}`, 'warning');
+                    }, 1000);
                 } else if (text.includes('I\'ll help you with')) {
                     // Claude Code is ready!
+                    console.log(`Claude Code ready detected for terminal ${quadrant}`);
                     this.claudeCodeReady[quadrant] = true;
                     
                     // Hide loader and show terminal
@@ -277,9 +353,9 @@ class TerminalManager {
                         terminalDiv.style.display = 'block';
                         
                         // Resize terminal now that it's visible
-                        const terminal = this.terminals.get(quadrant);
-                        if (terminal && terminal.fitAddon) {
-                            terminal.fitAddon.fit();
+                        const terminalInfo = this.terminals.get(quadrant);
+                        if (terminalInfo && terminalInfo.fitAddon) {
+                            terminalInfo.fitAddon.fit();
                         }
                         
                         this.showNotification(`Claude Code ready in Terminal ${quadrant + 1}!`, 'success');

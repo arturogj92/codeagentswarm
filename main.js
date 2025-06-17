@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const os = require('os');
@@ -267,10 +267,10 @@ class SimpleShell {
 }
 
 // IPC handlers for simple shell management
-ipcMain.handle('create-terminal', async (event, quadrant) => {
+ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir) => {
   try {
     const userHome = os.homedir();
-    const workingDir = path.join(userHome, 'Desktop');
+    const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
     
     console.log(`Creating simple shell terminal ${quadrant} in ${workingDir}`);
     
@@ -331,6 +331,19 @@ ipcMain.handle('check-claude-code', async () => {
       resolve(false);
     });
   });
+});
+
+// Handle directory selection
+ipcMain.handle('select-directory', async () => {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: 'Select directory for Claude Code'
+  });
+  
+  if (!result.canceled) {
+    return result.filePaths[0];
+  }
+  return null;
 });
 
 app.whenReady().then(() => {

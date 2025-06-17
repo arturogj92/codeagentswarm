@@ -334,6 +334,22 @@ body {
   margin-bottom: 8px;
 }
 
+.select-folder-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+}
+
+.selected-folder {
+  margin-top: 8px;
+  font-size: 0.75rem;
+  color: hsl(var(--primary));
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .notification {
   position: fixed;
   top: 20px;
