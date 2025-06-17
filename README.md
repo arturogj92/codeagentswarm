@@ -50,3 +50,7 @@ npm run build
 - **Design**: Modern gradients, blur effects, and responsive quadrant system
 
 Built for efficient Claude Code workflow management with beautiful, functional design.
+
+### Note
+
+This version uses **node-pty** for more stable terminal sessions. Run `npm install` after updating to ensure all dependencies are installed.

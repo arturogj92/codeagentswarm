@@ -1,5 +1,6 @@
 const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const { spawn } = require('child_process');
+const pty = require('node-pty');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -97,7 +98,12 @@ class SimpleShell {
   handleInput(data) {
     // If we have an active interactive process, send input directly to it
     if (this.activeInteractiveProcess) {
-      this.activeInteractiveProcess.stdin.write(data);
+      // Write directly to the PTY process
+      if (typeof this.activeInteractiveProcess.write === 'function') {
+        this.activeInteractiveProcess.write(data);
+      } else if (this.activeInteractiveProcess.stdin) {
+        this.activeInteractiveProcess.stdin.write(data);
+      }
       return;
     }
     
@@ -197,25 +203,7 @@ class SimpleShell {
     
     let childProcess;
     if (isInteractiveCommand) {
-      // Use Python PTY bridge for real TTY support
-      // Handle different paths for development vs packaged app
-    let bridgePath;
-    if (app.isPackaged) {
-      // In packaged app, look in extraResources
-      bridgePath = path.join(process.resourcesPath, 'pty_bridge.py');
-    } else {
-      // In development, look in current directory
-      bridgePath = path.join(__dirname, 'pty_bridge.py');
-    }
-    
-    // Using pty_bridge.py
-    
-    // Verify the file exists
-    if (!fs.existsSync(bridgePath)) {
-      console.error('pty_bridge.py not found at:', bridgePath);
-      throw new Error(`pty_bridge.py not found at ${bridgePath}`);
-    }
-      // Fix PATH for packaged apps - add common binary locations
+      // Create a real PTY using node-pty for interactive commands
       const env = { ...process.env };
       if (app.isPackaged) {
         // Add directories to PATH for packaged app
@@ -224,22 +212,23 @@ class SimpleShell {
           '/opt/homebrew/bin',
           '/usr/bin',
           path.join(os.homedir(), '.local/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'), // ← ESTE ES EL CORRECTO!
+          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'),
           path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
           path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
         ];
-        
+
         const currentPath = env.PATH || '';
         env.PATH = [...additionalPaths, currentPath].join(':');
-        // PATH updated for packaged app
       }
-      
-      childProcess = spawn('python3', [bridgePath, userShell, this.cwd, fullCommand], {
+
+      childProcess = pty.spawn(userShell, ['-l', '-c', fullCommand], {
+        name: 'xterm-color',
         cwd: this.cwd,
         env: env,
-        stdio: ['pipe', 'pipe', 'pipe']
+        cols: 80,
+        rows: 30
       });
-      
+
       // Mark this as active interactive process
       this.activeInteractiveProcess = childProcess;
     } else {
@@ -261,43 +250,43 @@ class SimpleShell {
       });
     }
     
-    childProcess.stdout.on('data', (data) => {
-      // Process the output to handle line endings properly
-      let output = data.toString();
-      // Convert \n to \r\n for proper terminal display
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
-    });
-    
-    childProcess.stderr.on('data', (data) => {
-      let output = data.toString();
-      output = output.replace(/\n/g, '\r\n');
-      this.sendOutput(output);
-    });
-    
-    childProcess.on('exit', (code) => {
-      // Clear interactive process reference
+    if (childProcess.onData) {
+      childProcess.onData((data) => {
+        this.sendOutput(data);
+      });
+    } else {
+      childProcess.stdout.on('data', (data) => {
+        let output = data.toString();
+        output = output.replace(/\n/g, '\r\n');
+        this.sendOutput(output);
+      });
+      childProcess.stderr.on('data', (data) => {
+        let output = data.toString();
+        output = output.replace(/\n/g, '\r\n');
+        this.sendOutput(output);
+      });
+    }
+
+    const exitHandler = (code) => {
       if (this.activeInteractiveProcess === childProcess) {
         this.activeInteractiveProcess = null;
       }
-      
-      if (code !== 0) {
+
+      if (code !== 0 && code !== undefined) {
         this.sendOutput(`\r\nProcess exited with code: ${code}\r\n`);
       }
-      
-      // Don't send prompt for interactive commands that are still running
+
       if (!isInteractiveCommand || this.activeInteractiveProcess === null) {
         this.sendPrompt();
       }
-    });
-    
-    childProcess.on('error', (error) => {
-      this.sendOutput(`\r\nCommand not found: ${cmd}\r\n`);
-      // Don't send prompt for interactive commands
-      if (!isInteractiveCommand) {
-        this.sendPrompt();
-      }
-    });
+    };
+
+    if (childProcess.onExit) {
+      childProcess.onExit(({ exitCode }) => exitHandler(exitCode));
+    } else {
+      childProcess.on('exit', exitHandler);
+      childProcess.on('error', () => exitHandler(1));
+    }
   }
   
   createClaudeCodeWindow(command) {
@@ -323,7 +312,16 @@ class SimpleShell {
   }
   
   kill() {
-    // Clean up if needed
+    if (this.activeInteractiveProcess) {
+      if (typeof this.activeInteractiveProcess.kill === 'function') {
+        this.activeInteractiveProcess.kill();
+      } else if (this.activeInteractiveProcess.pid) {
+        try {
+          process.kill(this.activeInteractiveProcess.pid);
+        } catch (e) {}
+      }
+      this.activeInteractiveProcess = null;
+    }
   }
 }
 
@@ -390,15 +388,11 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
   const shell = terminals.get(quadrant);
   if (shell && shell.activeInteractiveProcess) {
     try {
-      // Send SIGWINCH (window change) signal to notify about terminal resize
-      if (shell.activeInteractiveProcess.pid) {
+      if (typeof shell.activeInteractiveProcess.resize === 'function') {
+        shell.activeInteractiveProcess.resize(cols, rows);
+      } else if (shell.activeInteractiveProcess.pid) {
         process.kill(shell.activeInteractiveProcess.pid, 'SIGWINCH');
-        // Sent SIGWINCH signal
       }
-      
-      // Don't send escape sequences to avoid text spam in Claude Code
-      // SIGWINCH should be enough for proper applications
-      
     } catch (error) {
       console.error(`Error sending resize signal to terminal ${quadrant}:`, error);
     }
