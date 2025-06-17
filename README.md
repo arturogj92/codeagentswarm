@@ -45,7 +45,7 @@ npm run build
 ## Architecture
 
 - **Frontend**: HTML/CSS/JavaScript with xterm.js for terminal rendering
-- **Backend**: Electron main process with node-pty for terminal management
+- **Backend**: Electron main process using a Python PTY bridge for terminal management
 - **IPC**: Communication between renderer and main process for terminal control
 - **Design**: Modern gradients, blur effects, and responsive quadrant system
 
