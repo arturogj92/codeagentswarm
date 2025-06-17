@@ -53,13 +53,6 @@ class TerminalManager {
     }
 
     setupEventListeners() {
-        document.getElementById('check-claude-btn').addEventListener('click', () => {
-            this.checkClaudeCode();
-        });
-
-        document.getElementById('new-terminal-btn').addEventListener('click', () => {
-            this.createNewTerminal();
-        });
 
         document.getElementById('clear-all-btn').addEventListener('click', () => {
             this.clearAllTerminals();
