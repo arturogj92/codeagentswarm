@@ -552,9 +552,6 @@ class TerminalManager {
         // Single delayed fit for proper sizing
         setTimeout(() => fitAddon.fit(), 300);
 
-        // Add scroll to bottom button
-        this.addScrollToBottomButton(terminalDiv, terminal, quadrant);
-
         this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
 
@@ -924,8 +921,6 @@ class TerminalManager {
             
             setTimeout(() => {
                 this.resizeTerminal(this.fullscreenTerminal);
-                // Reparar controles automáticamente después de salir del fullscreen
-                this.repairTerminalControls();
             }, 300);
             
             this.fullscreenTerminal = null;
@@ -1054,80 +1049,6 @@ class TerminalManager {
                     });
                 });
             }
-            
-            // También verificar y agregar botón de scroll si falta
-            const terminalDiv = quadrantElement.querySelector('.terminal');
-            if (terminalDiv && !terminalDiv.querySelector('.scroll-to-bottom-btn')) {
-                const terminal = this.terminals.get(quadrant);
-                if (terminal && terminal.terminal) {
-                    this.addScrollToBottomButton(terminalDiv, terminal.terminal, quadrant);
-                }
-            }
-        }
-    }
-
-    addScrollToBottomButton(terminalDiv, terminal, quadrant) {
-        // Create scroll to bottom button
-        const scrollBtn = document.createElement('button');
-        scrollBtn.className = 'scroll-to-bottom-btn';
-        scrollBtn.title = 'Scroll to bottom';
-        scrollBtn.innerHTML = '⬇';
-        
-        // Add button to terminal div
-        terminalDiv.style.position = 'relative';
-        terminalDiv.appendChild(scrollBtn);
-        
-        // Function to scroll to bottom
-        const scrollToBottom = () => {
-            const viewport = terminalDiv.querySelector('.xterm-viewport');
-            if (viewport) {
-                viewport.scrollTop = viewport.scrollHeight;
-            }
-            // Alternative method using terminal API
-            terminal.scrollToBottom();
-        };
-        
-        // Button click handler
-        scrollBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            scrollToBottom();
-        });
-        
-        // Show/hide button based on scroll position
-        const viewport = terminalDiv.querySelector('.xterm-viewport');
-        if (viewport) {
-            let scrollTimeout;
-            
-            const checkScrollPosition = () => {
-                const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 5);
-                const hasContent = viewport.scrollHeight > viewport.clientHeight;
-                
-                if (!isAtBottom && hasContent) {
-                    scrollBtn.classList.add('show');
-                } else {
-                    scrollBtn.classList.remove('show');
-                }
-            };
-            
-            // Check scroll position on scroll events
-            viewport.addEventListener('scroll', () => {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(checkScrollPosition, 100);
-            });
-            
-            // Check when new content is added
-            const observer = new MutationObserver(() => {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(checkScrollPosition, 100);
-            });
-            
-            observer.observe(viewport, {
-                childList: true,
-                subtree: true
-            });
-            
-            // Initial check
-            setTimeout(checkScrollPosition, 1000);
         }
     }
 
@@ -1545,11 +1466,6 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
 // Initialize the terminal manager when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.terminalManager = new TerminalManager();
-    
-    // Initialize Lucide icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
     
     // Start performance monitoring in dev mode
     const urlParams = new URLSearchParams(window.location.search);
