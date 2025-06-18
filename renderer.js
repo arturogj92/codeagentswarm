@@ -2,6 +2,7 @@ const { ipcRenderer } = require('electron');
 const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
+const PerformanceMonitor = require('./performance-monitor');
 
 class TerminalManager {
     constructor() {
@@ -1151,4 +1152,28 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
 // Initialize the terminal manager when the DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.terminalManager = new TerminalManager();
+    
+    // Start performance monitoring in dev mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const isDevMode = urlParams.get('dev') || process.argv?.includes?.('--dev');
+    
+    if (isDevMode) {
+        console.log('🚀 Starting Performance Monitor...');
+        const perfMonitor = new PerformanceMonitor();
+        perfMonitor.startMonitoring();
+        
+        // Wrap critical functions with performance measurement
+        const tm = window.terminalManager;
+        tm.parseClaudeCodeOutput = perfMonitor.measureFunction(
+            'parseClaudeCodeOutput',
+            tm.parseClaudeCodeOutput.bind(tm)
+        );
+        
+        tm.resizeAllTerminals = perfMonitor.measureFunction(
+            'resizeAllTerminals',
+            tm.resizeAllTerminals.bind(tm)
+        );
+        
+        window.perfMonitor = perfMonitor; // Expose for debugging
+    }
 });

@@ -313,12 +313,26 @@ class SimpleShell {
   
   kill() {
     if (this.activeInteractiveProcess) {
-      if (typeof this.activeInteractiveProcess.kill === 'function') {
-        this.activeInteractiveProcess.kill();
-      } else if (this.activeInteractiveProcess.pid) {
-        try {
-          process.kill(this.activeInteractiveProcess.pid);
-        } catch (e) {}
+      try {
+        // For node-pty processes
+        if (typeof this.activeInteractiveProcess.kill === 'function') {
+          this.activeInteractiveProcess.kill('SIGKILL');
+        } 
+        // For regular child processes
+        else if (this.activeInteractiveProcess.pid) {
+          // Kill the entire process tree
+          if (process.platform === 'darwin' || process.platform === 'linux') {
+            // Use pkill to kill the process and all its children
+            try {
+              require('child_process').execSync(`pkill -TERM -P ${this.activeInteractiveProcess.pid}`);
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+          process.kill(this.activeInteractiveProcess.pid, 'SIGKILL');
+        }
+      } catch (e) {
+        console.error('Error killing process:', e);
       }
       this.activeInteractiveProcess = null;
     }
@@ -402,8 +416,22 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
 ipcMain.on('kill-terminal', (event, quadrant) => {
   const shell = terminals.get(quadrant);
   if (shell) {
+    console.log(`Killing terminal ${quadrant} and all child processes...`);
     shell.kill();
     terminals.delete(quadrant);
+    
+    // Additional cleanup for hanging processes
+    setTimeout(() => {
+      // Try to clean up any orphaned processes
+      if (process.platform === 'darwin') {
+        try {
+          // Kill any Python processes started by this terminal
+          require('child_process').execSync(`ps aux | grep -E "claude.*${quadrant}" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+    }, 100);
   }
 });
 
@@ -678,15 +706,39 @@ ipcMain.handle('get-git-status', async () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  console.log('App is quitting, cleaning up processes...');
+  
+  // Prevent default quit to ensure cleanup
+  event.preventDefault();
+  
+  // Kill all terminals and their child processes
+  let cleanupCount = terminals.size;
+  terminals.forEach((shell, quadrant) => {
+    console.log(`Killing terminal ${quadrant}...`);
+    shell.kill();
+  });
+  terminals.clear();
+  
   // Close database
   if (db) {
     db.close();
   }
   
-  // Kill all terminals
-  terminals.forEach((shell) => {
-    shell.kill();
-  });
-  terminals.clear();
+  // Force kill any remaining Python processes after a short delay
+  setTimeout(() => {
+    if (process.platform === 'darwin') {
+      try {
+        // Kill any Python processes that might be hanging
+        require('child_process').execSync('pkill -f "Python.app/Contents/MacOS/Python" || true');
+        // Also kill any claude processes
+        require('child_process').execSync('pkill -f "claude" || true');
+      } catch (e) {
+        // Ignore errors
+      }
+    }
+    
+    // Now actually quit
+    app.exit(0);
+  }, 500);
 });
