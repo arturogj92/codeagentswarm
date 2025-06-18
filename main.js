@@ -607,20 +607,27 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
   }
 });
 
+// Git operations helpers
+function getGitWorkingDirectory() {
+  // Get current working directory from the first terminal or use process.cwd()
+  let cwd = process.cwd();
+  
+  // Try to get working directory from the active terminal
+  if (terminals.size > 0) {
+    const firstTerminal = terminals.values().next().value;
+    if (firstTerminal && firstTerminal.cwd) {
+      cwd = firstTerminal.cwd;
+    }
+  }
+  
+  return cwd;
+}
+
 // Git status handler
 ipcMain.handle('get-git-status', async () => {
   const { execSync } = require('child_process');
   try {
-    // Get current working directory from the first terminal or use process.cwd()
-    let cwd = process.cwd();
-    
-    // Try to get working directory from the active terminal
-    if (terminals.size > 0) {
-      const firstTerminal = terminals.values().next().value;
-      if (firstTerminal && firstTerminal.cwd) {
-        cwd = firstTerminal.cwd;
-      }
-    }
+    const cwd = getGitWorkingDirectory();
     
     // Check if directory is a git repository
     const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
@@ -648,7 +655,7 @@ ipcMain.handle('get-git-status', async () => {
       if (line.length < 3) return; // Skip invalid lines
       
       const status = line.substring(0, 2);
-      const fileName = line.substring(3);
+      const fileName = line.substring(2).trim();
       
       let statusText = '';
       // Check both index and working tree status (first and second character)
@@ -679,7 +686,8 @@ ipcMain.handle('get-git-status', async () => {
       files.push({
         file: fileName,
         status: statusText,
-        raw: status
+        raw: status,
+        staged: indexStatus !== ' ' && indexStatus !== '?'
       });
     });
     
@@ -690,11 +698,25 @@ ipcMain.handle('get-git-status', async () => {
       stdio: ['pipe', 'pipe', 'ignore']
     }).trim();
     
+    // Get recent commits
+    const commits = execSync('git log --oneline -10', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim().split('\n').filter(line => line.length > 0).map(line => {
+      const [hash, ...messageParts] = line.split(' ');
+      return {
+        hash: hash,
+        message: messageParts.join(' ')
+      };
+    });
+    
     return { 
       success: true, 
       files, 
       branch,
-      workingDirectory: cwd
+      workingDirectory: cwd,
+      commits
     };
     
   } catch (error) {
@@ -702,6 +724,128 @@ ipcMain.handle('get-git-status', async () => {
     return { 
       success: false, 
       error: error.message || 'Failed to get git status'
+    };
+  }
+});
+
+// Git commit handler
+ipcMain.handle('git-commit', async (event, message, files) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Check if directory is a git repository
+    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim() === 'true';
+    
+    if (!isGitRepo) {
+      return { success: false, error: 'Not a git repository' };
+    }
+    
+    // Add specific files or all if none specified
+    if (files && files.length > 0) {
+      for (const file of files) {
+        execSync(`git add "${file}"`, { cwd });
+      }
+    } else {
+      execSync('git add .', { cwd });
+    }
+    
+    // Commit with message
+    execSync(`git commit -m "${message}"`, { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: 'Commit successful' };
+    
+  } catch (error) {
+    console.error('Git commit error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to commit changes'
+    };
+  }
+});
+
+// Git push handler
+ipcMain.handle('git-push', async () => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Push to remote
+    const output = execSync('git push', { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: 'Push successful', output };
+    
+  } catch (error) {
+    console.error('Git push error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to push changes'
+    };
+  }
+});
+
+// Git pull handler
+ipcMain.handle('git-pull', async () => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Pull from remote
+    const output = execSync('git pull', { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: 'Pull successful', output };
+    
+  } catch (error) {
+    console.error('Git pull error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to pull changes'
+    };
+  }
+});
+
+// Git reset handler
+ipcMain.handle('git-reset', async (event, commitHash, hard = false) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Reset to specific commit
+    const resetType = hard ? '--hard' : '--soft';
+    const output = execSync(`git reset ${resetType} ${commitHash}`, { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: `Reset to ${commitHash} successful`, output };
+    
+  } catch (error) {
+    console.error('Git reset error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to reset'
+    };
+  }
+});
+
+// Git diff handler
+ipcMain.handle('git-diff', async (event, fileName) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Get diff for specific file or all files
+    const command = fileName ? `git diff "${fileName}"` : 'git diff';
+    const output = execSync(command, { cwd, encoding: 'utf8' });
+    
+    return { success: true, diff: output };
+    
+  } catch (error) {
+    console.error('Git diff error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to get diff'
     };
   }
 });

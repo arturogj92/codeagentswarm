@@ -64,6 +64,8 @@ body::before {
   z-index: 1;
 }
 
+
+
 .header {
   height: 60px;
   background: rgba(20, 20, 20, 0.8);
@@ -1115,4 +1117,359 @@ body::before {
   margin-top: 24px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+/* Git Tabs */
+.git-tabs {
+  margin-bottom: 16px;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.tab-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  padding: 12px 16px;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+}
+
+.tab-btn.active {
+  color: var(--primary);
+  background: var(--surface);
+  border-bottom-color: var(--primary);
+}
+
+.tab-content {
+  min-height: 300px;
+}
+
+.tab-panel {
+  display: none;
+}
+
+.tab-panel.active {
+  display: block;
+}
+
+/* Enhanced Git Files */
+.git-status-content {
+  width: 700px;
+}
+
+.git-files-list {
+  max-height: 250px;
+  margin-bottom: 20px;
+}
+
+.git-file-item {
+  justify-content: space-between;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.file-checkbox {
+  margin-right: 12px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+.file-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-small {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-small:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+
+.btn-small.btn-danger {
+  background: rgba(220, 53, 69, 0.1);
+  border-color: rgba(220, 53, 69, 0.3);
+  color: #dc3545;
+}
+
+.btn-small.btn-danger:hover {
+  background: rgba(220, 53, 69, 0.2);
+  border-color: #dc3545;
+}
+
+/* Commit Section */
+.commit-section {
+  border-top: 1px solid var(--border);
+  padding-top: 20px;
+}
+
+#commit-message {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 12px;
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+  margin-bottom: 12px;
+}
+
+#commit-message:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 2px rgba(127, 90, 240, 0.2);
+}
+
+.commit-buttons {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* Commits Tab */
+.commits-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.commit-item {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  transition: all 0.2s ease;
+}
+
+.commit-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+}
+
+.commit-hash {
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--primary);
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.commit-message {
+  color: var(--text-primary);
+  font-size: 14px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.commit-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.no-commits {
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Actions Tab */
+.git-action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+  padding: 40px;
+}
+
+.git-action-buttons .btn {
+  min-width: 200px;
+  justify-content: center;
+}
+
+.btn-success {
+  background: var(--gradient-secondary);
+  border-color: var(--secondary);
+  color: white;
+}
+
+.btn-success:hover {
+  box-shadow: 0 0 20px rgba(44, 182, 125, 0.3);
+}
+
+.btn-secondary {
+  background: var(--surface);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.btn-secondary:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* Diff Modal */
+.diff-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.diff-modal.show {
+  opacity: 1;
+}
+
+.diff-content {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  width: 800px;
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.diff-header h3 {
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.diff-body {
+  flex: 1;
+  overflow: auto;
+  margin-bottom: 20px;
+}
+
+.diff-text {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  line-height: 1.4;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.diff-added {
+  background: rgba(40, 167, 69, 0.2);
+  color: #4ade80;
+}
+
+.diff-removed {
+  background: rgba(220, 53, 69, 0.2);
+  color: #f87171;
+}
+
+.diff-location {
+  background: rgba(127, 90, 240, 0.2);
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.diff-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Inline Notifications */
+.inline-notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-card);
+  z-index: 1002;
+  transform: translateX(100%);
+  transition: transform 0.3s ease;
+  max-width: 400px;
+  font-size: 14px;
+}
+
+.inline-notification.show {
+  transform: translateX(0);
+}
+
+.inline-notification.success {
+  border-color: var(--secondary);
+  background: rgba(44, 182, 125, 0.1);
+  color: var(--secondary);
+}
+
+.inline-notification.error {
+  border-color: #dc3545;
+  background: rgba(220, 53, 69, 0.1);
+  color: #dc3545;
+}
+
+.inline-notification.info {
+  border-color: var(--primary);
+  background: rgba(127, 90, 240, 0.1);
+  color: var(--primary);
 }

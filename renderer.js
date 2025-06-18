@@ -2,7 +2,16 @@ const { ipcRenderer } = require('electron');
 const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
-const PerformanceMonitor = require('./performance-monitor');
+
+// Performance monitor function - lazy loaded
+function loadPerformanceMonitor() {
+    try {
+        return require('./performance-monitor');
+    } catch (e) {
+        console.log('Performance monitor not available (production build)');
+        return null;
+    }
+}
 
 class TerminalManager {
     constructor() {
@@ -651,32 +660,15 @@ class TerminalManager {
     }
 
     showNotification(message, type = 'info') {
-        const notification = document.createElement('div');
-        notification.className = `notification ${type}`;
-        notification.textContent = message;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-        
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    notification.parentNode.removeChild(notification);
-                }
-            }, 300);
-        }, 3000);
+        // Notificaciones internas deshabilitadas - solo notificaciones externas permitidas
+        return;
     }
 
     showDesktopNotification(title, message) {
         // Send IPC message to main process to show native notification
         ipcRenderer.send('show-desktop-notification', title, message);
         
-        // Also show in-app notification as fallback
-        this.showNotification(message, 'warning');
+        // Fallback de notificación interna removido - solo notificaciones externas
     }
 
     handleConfirmationRequest(text, quadrant) {
@@ -1065,7 +1057,7 @@ class TerminalManager {
         modal.innerHTML = `
             <div class="git-status-content">
                 <div class="git-status-header">
-                    <h3>📋 Git Status</h3>
+                    <h3>📋 Git Manager</h3>
                     <button class="close-btn" id="close-git-modal">×</button>
                 </div>
                 
@@ -1080,24 +1072,73 @@ class TerminalManager {
                     </div>
                 </div>
 
-                <div class="git-files-section">
-                    <h4>Modified Files (${gitData.files.length})</h4>
-                    <div class="git-files-list">
-                        ${gitData.files.length === 0 ? 
-                            '<div class="no-changes">No changes detected</div>' : 
-                            gitData.files.map(file => `
-                                <div class="git-file-item">
-                                    <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}</span>
-                                    <span class="file-name">${file.file}</span>
-                                </div>
-                            `).join('')
-                        }
+                <div class="git-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" data-tab="changes">📝 Changes</button>
+                        <button class="tab-btn" data-tab="commits">📚 Commits</button>
+                        <button class="tab-btn" data-tab="actions">⚙️ Actions</button>
                     </div>
-                </div>
-                
-                <div class="git-actions">
-                    <button class="btn" id="refresh-git-status">🔄 Refresh</button>
-                    <button class="btn btn-primary" id="close-git-modal-btn">Close</button>
+                    
+                    <div class="tab-content">
+                        <!-- Changes Tab -->
+                        <div class="tab-panel active" id="changes-tab">
+                            <div class="git-files-section">
+                                <h4>Modified Files (${gitData.files.length})</h4>
+                                <div class="git-files-list">
+                                    ${gitData.files.length === 0 ? 
+                                        '<div class="no-changes">No changes detected</div>' : 
+                                        gitData.files.map(file => `
+                                            <div class="git-file-item" data-file="${file.file}">
+                                                <div class="file-info">
+                                                    <input type="checkbox" class="file-checkbox" ${file.staged ? 'checked' : ''} data-file="${file.file}">
+                                                    <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}</span>
+                                                    <span class="file-name">${file.file}</span>
+                                                </div>
+                                                <div class="file-actions">
+                                                    <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}')">👁️ Diff</button>
+                                                </div>
+                                            </div>
+                                        `).join('')
+                                    }
+                                </div>
+                                ${gitData.files.length > 0 ? `
+                                    <div class="commit-section">
+                                        <textarea id="commit-message" placeholder="Enter commit message..." rows="3"></textarea>
+                                        <div class="commit-buttons">
+                                            <button class="btn btn-primary" id="commit-selected">💾 Commit Selected</button>
+                                            <button class="btn" id="commit-all">💾 Commit All</button>
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                        </div>
+                        
+                        <!-- Commits Tab -->
+                        <div class="tab-panel" id="commits-tab">
+                            <div class="commits-list">
+                                ${gitData.commits ? gitData.commits.map(commit => `
+                                    <div class="commit-item">
+                                        <div class="commit-hash">${commit.hash}</div>
+                                        <div class="commit-message">${commit.message}</div>
+                                        <div class="commit-actions">
+                                            <button class="btn-small" onclick="terminalManager.resetToCommit('${commit.hash}', false)">🔄 Soft Reset</button>
+                                            <button class="btn-small btn-danger" onclick="terminalManager.resetToCommit('${commit.hash}', true)">⚠️ Hard Reset</button>
+                                        </div>
+                                    </div>
+                                `).join('') : '<div class="no-commits">No commits found</div>'}
+                            </div>
+                        </div>
+                        
+                        <!-- Actions Tab -->
+                        <div class="tab-panel" id="actions-tab">
+                            <div class="git-action-buttons">
+                                <button class="btn btn-success" id="git-pull">⬇️ Pull</button>
+                                <button class="btn btn-primary" id="git-push">⬆️ Push</button>
+                                <button class="btn" id="refresh-git-status">🔄 Refresh</button>
+                                <button class="btn btn-secondary" id="close-git-modal-btn">Close</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         `;
@@ -1109,11 +1150,42 @@ class TerminalManager {
             modal.remove();
         };
 
+        // Tab switching
+        modal.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const tabName = e.target.dataset.tab;
+                
+                // Update tab buttons
+                modal.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                
+                // Update tab content
+                modal.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                modal.querySelector(`#${tabName}-tab`).classList.add('active');
+            });
+        });
+
+        // Git action handlers
         modal.querySelector('#close-git-modal').addEventListener('click', closeModal);
         modal.querySelector('#close-git-modal-btn').addEventListener('click', closeModal);
         modal.querySelector('#refresh-git-status').addEventListener('click', () => {
             modal.remove();
             this.showGitStatus();
+        });
+        
+        modal.querySelector('#git-pull')?.addEventListener('click', () => this.gitPull());
+        modal.querySelector('#git-push')?.addEventListener('click', () => this.gitPush());
+        
+        // Commit handlers
+        modal.querySelector('#commit-selected')?.addEventListener('click', () => {
+            const message = modal.querySelector('#commit-message').value;
+            const selectedFiles = Array.from(modal.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.file);
+            this.gitCommit(message, selectedFiles);
+        });
+        
+        modal.querySelector('#commit-all')?.addEventListener('click', () => {
+            const message = modal.querySelector('#commit-message').value;
+            this.gitCommit(message);
         });
 
         // Close on background click
@@ -1137,6 +1209,182 @@ class TerminalManager {
             modal.classList.add('show');
         }, 10);
     }
+    
+    async gitCommit(message, files = null) {
+        if (!message || message.trim() === '') {
+            this.showInlineNotification('Please enter a commit message', 'error');
+            return;
+        }
+        
+        try {
+            const result = await ipcRenderer.invoke('git-commit', message.trim(), files);
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Commit successful', 'success');
+                // Refresh the git status
+                setTimeout(() => this.showGitStatus(), 1000);
+            } else {
+                this.showInlineNotification(`❌ Commit failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error committing:', error);
+            this.showInlineNotification('❌ Error committing changes', 'error');
+        }
+    }
+    
+    async gitPush() {
+        try {
+            this.showInlineNotification('🚀 Pushing changes...', 'info');
+            const result = await ipcRenderer.invoke('git-push');
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Push successful', 'success');
+            } else {
+                this.showInlineNotification(`❌ Push failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error pushing:', error);
+            this.showInlineNotification('❌ Error pushing changes', 'error');
+        }
+    }
+    
+    async gitPull() {
+        try {
+            this.showInlineNotification('⬇️ Pulling changes...', 'info');
+            const result = await ipcRenderer.invoke('git-pull');
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Pull successful', 'success');
+                // Refresh the git status
+                setTimeout(() => this.showGitStatus(), 1000);
+            } else {
+                this.showInlineNotification(`❌ Pull failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error pulling:', error);
+            this.showInlineNotification('❌ Error pulling changes', 'error');
+        }
+    }
+    
+    async resetToCommit(commitHash, hard = false) {
+        const confirmMessage = hard ? 
+            'Are you sure you want to do a HARD reset? This will PERMANENTLY delete all uncommitted changes.' :
+            'Are you sure you want to reset to this commit? Uncommitted changes will be preserved.';
+            
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        try {
+            const resetType = hard ? 'hard' : 'soft';
+            this.showInlineNotification(`🔄 Performing ${resetType} reset...`, 'info');
+            const result = await ipcRenderer.invoke('git-reset', commitHash, hard);
+            
+            if (result.success) {
+                this.showInlineNotification(`✅ Reset to ${commitHash} successful`, 'success');
+                // Refresh the git status
+                setTimeout(() => this.showGitStatus(), 1000);
+            } else {
+                this.showInlineNotification(`❌ Reset failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error resetting:', error);
+            this.showInlineNotification('❌ Error resetting commit', 'error');
+        }
+    }
+    
+    async showFileDiff(fileName) {
+        try {
+            const result = await ipcRenderer.invoke('git-diff', fileName);
+            
+            if (result.success) {
+                this.displayDiffModal(fileName, result.diff);
+            } else {
+                this.showInlineNotification(`❌ Failed to get diff: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error getting diff:', error);
+            this.showInlineNotification('❌ Error getting file diff', 'error');
+        }
+    }
+    
+    displayDiffModal(fileName, diff) {
+        const modal = document.createElement('div');
+        modal.className = 'diff-modal';
+        modal.innerHTML = `
+            <div class="diff-content">
+                <div class="diff-header">
+                    <h3>📄 Diff: ${fileName}</h3>
+                    <button class="close-btn" id="close-diff-modal">×</button>
+                </div>
+                <div class="diff-body">
+                    <pre class="diff-text">${this.formatDiff(diff)}</pre>
+                </div>
+                <div class="diff-actions">
+                    <button class="btn" id="close-diff-btn">Close</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        const closeModal = () => modal.remove();
+        modal.querySelector('#close-diff-modal').addEventListener('click', closeModal);
+        modal.querySelector('#close-diff-btn').addEventListener('click', closeModal);
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+    
+    formatDiff(diff) {
+        if (!diff || diff.trim() === '') {
+            return 'No changes detected';
+        }
+        
+        return diff
+            .split('\n')
+            .map(line => {
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    return `<span class="diff-added">${this.escapeHtml(line)}</span>`;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    return `<span class="diff-removed">${this.escapeHtml(line)}</span>`;
+                } else if (line.startsWith('@@')) {
+                    return `<span class="diff-location">${this.escapeHtml(line)}</span>`;
+                }
+                return this.escapeHtml(line);
+            })
+            .join('\n');
+    }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+    
+    showInlineNotification(message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `inline-notification ${type}`;
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    notification.parentNode.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
 }
 
 // Listen for dev mode status from main process
@@ -1158,22 +1406,25 @@ document.addEventListener('DOMContentLoaded', () => {
     const isDevMode = urlParams.get('dev') || process.argv?.includes?.('--dev');
     
     if (isDevMode) {
-        console.log('🚀 Starting Performance Monitor...');
-        const perfMonitor = new PerformanceMonitor();
-        perfMonitor.startMonitoring();
-        
-        // Wrap critical functions with performance measurement
-        const tm = window.terminalManager;
-        tm.parseClaudeCodeOutput = perfMonitor.measureFunction(
-            'parseClaudeCodeOutput',
-            tm.parseClaudeCodeOutput.bind(tm)
-        );
-        
-        tm.resizeAllTerminals = perfMonitor.measureFunction(
-            'resizeAllTerminals',
-            tm.resizeAllTerminals.bind(tm)
-        );
-        
-        window.perfMonitor = perfMonitor; // Expose for debugging
+        const PerformanceMonitor = loadPerformanceMonitor();
+        if (PerformanceMonitor) {
+            console.log('🚀 Starting Performance Monitor...');
+            const perfMonitor = new PerformanceMonitor();
+            perfMonitor.startMonitoring();
+            
+            // Wrap critical functions with performance measurement
+            const tm = window.terminalManager;
+            tm.parseClaudeCodeOutput = perfMonitor.measureFunction(
+                'parseClaudeCodeOutput',
+                tm.parseClaudeCodeOutput.bind(tm)
+            );
+            
+            tm.resizeAllTerminals = perfMonitor.measureFunction(
+                'resizeAllTerminals',
+                tm.resizeAllTerminals.bind(tm)
+            );
+            
+            window.perfMonitor = perfMonitor; // Expose for debugging
+        }
     }
 });
