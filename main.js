@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const DatabaseManager = require('./database');
+const MCPTaskServer = require('./mcp-server');
 
 // Enable live reload for Electron in development
 if (process.argv.includes('--dev')) {
@@ -21,6 +22,7 @@ if (process.argv.includes('--dev')) {
 let mainWindow;
 const terminals = new Map();
 let db;
+let mcpServer;
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
@@ -452,6 +454,51 @@ ipcMain.handle('check-claude-code', async () => {
   });
 });
 
+// Auto-configure CLAUDE.md for MCP Task Manager
+function ensureClaudeMdConfiguration(directoryPath) {
+  try {
+    const claudeMdPath = path.join(directoryPath, 'CLAUDE.md');
+    const mcpConfig = `
+## MCP Servers
+
+### Task Manager
+- **Command**: \`node mcp-stdio-server.js\`
+- **Description**: Task management system for CodeAgentSwarm
+- **Tools**: create_task, start_task, complete_task, list_tasks
+- **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks
+
+*Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality.*
+`;
+
+    if (fs.existsSync(claudeMdPath)) {
+      // File exists, check if it has MCP configuration
+      const content = fs.readFileSync(claudeMdPath, 'utf8');
+      
+      if (!content.includes('### Task Manager') || !content.includes('mcp-stdio-server.js')) {
+        // Missing MCP config, append it
+        fs.appendFileSync(claudeMdPath, mcpConfig);
+        console.log('✅ Added MCP Task Manager configuration to existing CLAUDE.md');
+      } else {
+        console.log('✅ CLAUDE.md already has MCP Task Manager configuration');
+      }
+    } else {
+      // File doesn't exist, create it with MCP configuration
+      const initialContent = `# CodeAgentSwarm Project Configuration
+
+This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model Context Protocol) integration.
+${mcpConfig}`;
+      
+      fs.writeFileSync(claudeMdPath, initialContent);
+      console.log('✅ Created CLAUDE.md with MCP Task Manager configuration');
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to configure CLAUDE.md:', error.message);
+    return false;
+  }
+}
+
 // Handle directory selection
 ipcMain.handle('select-directory', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
@@ -460,7 +507,12 @@ ipcMain.handle('select-directory', async () => {
   });
   
   if (!result.canceled) {
-    return result.filePaths[0];
+    const selectedPath = result.filePaths[0];
+    
+    // Auto-configure CLAUDE.md for MCP Task Manager
+    ensureClaudeMdConfiguration(selectedPath);
+    
+    return selectedPath;
   }
   return null;
 });
@@ -496,13 +548,125 @@ ipcMain.handle('db-get-all-directories', async () => {
   }
 });
 
-app.whenReady().then(() => {
+// Task management handlers
+ipcMain.handle('task-create', async (event, title, description, terminalId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.createTask(title, description, terminalId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-update-status', async (event, taskId, status) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTaskStatus(taskId, status);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-get-all', async () => {
+  try {
+    if (!db) return { success: true, tasks: [] };
+    const tasks = db.getAllTasks();
+    return { success: true, tasks };
+  } catch (error) {
+    return { success: true, tasks: [] };
+  }
+});
+
+ipcMain.handle('task-get-current', async (event, terminalId) => {
+  try {
+    if (!db) return { success: true, task: null };
+    const task = db.getCurrentTask(terminalId);
+    return { success: true, task };
+  } catch (error) {
+    return { success: true, task: null };
+  }
+});
+
+ipcMain.handle('task-delete', async (event, taskId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.deleteTask(taskId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-update', async (event, taskId, title, description) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTask(taskId, title, description);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-mcp-port', async () => {
+  try {
+    if (!mcpServer) return { success: false, error: 'MCP server not started' };
+    const port = mcpServer.getPort();
+    return { success: true, port };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Open Kanban window
+ipcMain.on('open-kanban-window', () => {
+  const kanbanWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    title: 'Task Manager - Kanban Board',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    parent: mainWindow,
+    modal: false,
+    show: true,
+    autoHideMenuBar: true,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    closable: true
+  });
+
+  kanbanWindow.loadFile('kanban.html');
+  
+  // Open DevTools in development
+  if (process.argv.includes('--dev')) {
+    kanbanWindow.webContents.openDevTools();
+  }
+});
+
+app.whenReady().then(async () => {
   // Initialize database
   try {
     db = new DatabaseManager();
   } catch (error) {
     console.error('Failed to initialize database:', error);
     db = null;
+  }
+  
+  // Start MCP Task Server
+  try {
+    mcpServer = new MCPTaskServer();
+    const port = await mcpServer.start();
+    console.log(`MCP Task Server running on port ${port}`);
+    
+    // Create MCP configuration file for Claude Code
+    createMCPConfig(port);
+  } catch (error) {
+    console.error('Failed to start MCP Task Server:', error);
+    mcpServer = null;
   }
   
   // Find claude binary on startup
@@ -525,6 +689,11 @@ app.on('window-all-closed', () => {
     shell.kill();
   });
   terminals.clear();
+  
+  // Stop MCP server
+  if (mcpServer) {
+    mcpServer.stop();
+  }
   
   if (process.platform !== 'darwin') {
     app.quit();
@@ -581,6 +750,130 @@ function findClaudeBinary() {
 
 // Find claude once on startup
 let CLAUDE_BINARY_PATH = null;
+
+// Function to create MCP configuration for Claude Code
+function createMCPConfig(port) {
+  try {
+    const configDir = path.join(os.homedir(), '.claude');
+    const configPath = path.join(configDir, 'claude_desktop_config.json');
+    
+    // Create .claude directory if it doesn't exist
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
+    
+    // Read existing config or create new one
+    let config = {};
+    if (fs.existsSync(configPath)) {
+      try {
+        config = JSON.parse(fs.readFileSync(configPath, 'utf8'));
+      } catch (error) {
+        console.warn('Failed to parse existing Claude config, creating new one');
+        config = {};
+      }
+    }
+    
+    // Ensure mcpServers section exists
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Path to our MCP client script
+    const mcpClientPath = path.join(__dirname, 'mcp-client.js');
+    
+    // Add our task server with better configuration
+    config.mcpServers.codeagentswarm = {
+      command: "node",
+      args: [mcpClientPath, `--port=${port}`],
+      env: {
+        "NODE_OPTIONS": "--unhandled-rejections=strict"
+      }
+    };
+    
+    // Write config back
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log(`MCP configuration updated at ${configPath}`);
+    console.log(`Task server available at ws://localhost:${port}`);
+    
+    // Also create a README file with usage instructions
+    const readmePath = path.join(configDir, 'CODEAGENTSWARM_README.md');
+    const readmeContent = `# CodeAgentSwarm Task Management
+
+This MCP server provides task management capabilities for Claude Code.
+
+## Available Methods
+
+### \`tasks/create\`
+Create a new task.
+\`\`\`json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tasks/create",
+  "params": {
+    "title": "Task title",
+    "description": "Task description (optional)",
+    "terminal_id": 0
+  }
+}
+\`\`\`
+
+### \`tasks/update_status\`
+Update task status.
+\`\`\`json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tasks/update_status",
+  "params": {
+    "task_id": 1,
+    "status": "in_progress"
+  }
+}
+\`\`\`
+
+### \`tasks/get_all\`
+Get all tasks.
+\`\`\`json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tasks/get_all",
+  "params": {}
+}
+\`\`\`
+
+### \`tasks/get_current\`
+Get current task for a terminal.
+\`\`\`json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tasks/get_current",
+  "params": {
+    "terminal_id": 0
+  }
+}
+\`\`\`
+
+## Status Values
+- \`pending\`: Task is pending
+- \`in_progress\`: Task is currently being worked on
+- \`completed\`: Task is completed
+
+## Server Details
+- Port: ${port}
+- WebSocket URL: ws://localhost:${port}
+- Configuration: ${configPath}
+`;
+    
+    fs.writeFileSync(readmePath, readmeContent);
+    console.log(`Documentation created at ${readmePath}`);
+    
+  } catch (error) {
+    console.error('Failed to create MCP config:', error);
+  }
+}
 
 // Desktop notification handler
 ipcMain.on('show-desktop-notification', (event, title, message) => {
@@ -867,6 +1160,11 @@ app.on('before-quit', (event) => {
   // Close database
   if (db) {
     db.close();
+  }
+  
+  // Stop MCP server
+  if (mcpServer) {
+    mcpServer.stop();
   }
   
   // Force kill any remaining Python processes after a short delay

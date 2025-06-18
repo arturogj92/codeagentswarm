@@ -27,6 +27,7 @@ class TerminalManager {
         this.waitingForUserInteraction = new Map(); // Track terminals waiting for interaction
         this.terminalFocused = new Map(); // Track which terminals are focused
         this.userTypingTimers = new Map(); // Track when user is actively typing
+        this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
         this.init();
         // Load directories asynchronously with error handling
         this.loadSavedDirectories().catch(error => {
@@ -76,6 +77,7 @@ class TerminalManager {
         this.setupEventListeners();
         this.setupResizeHandlers();
         this.updateGitButtonVisibility(); // Initialize git button visibility
+        this.startTaskIndicatorUpdates(); // Initialize task indicators with periodic updates
     }
 
     setupEventListeners() {
@@ -87,6 +89,10 @@ class TerminalManager {
 
         document.getElementById('git-status-btn').addEventListener('click', () => {
             this.showGitStatus();
+        });
+
+        document.getElementById('kanban-btn').addEventListener('click', () => {
+            this.showKanban();
         });
 
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
@@ -826,6 +832,10 @@ class TerminalManager {
         const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         if (terminalElement) {
             terminalElement.classList.remove('confirmation-highlight');
+            // Clear the highlighted terminal reference
+            if (this.highlightedTerminal === quadrant) {
+                this.highlightedTerminal = null;
+            }
         }
     }
     
@@ -863,10 +873,38 @@ class TerminalManager {
             // Add pulsing highlight effect
             terminalElement.classList.add('confirmation-highlight');
             
-            // Remove highlight after 10 seconds
+            // Store the quadrant that needs attention
+            this.highlightedTerminal = quadrant;
+            
+            // Remove highlight only when user focuses on this terminal
+            const removeHighlightOnFocus = () => {
+                if (this.activeTerminal === quadrant) {
+                    terminalElement.classList.remove('confirmation-highlight');
+                    this.highlightedTerminal = null;
+                    // Remove the focus listener once used
+                    document.removeEventListener('click', handleTerminalClick);
+                }
+            };
+            
+            // Handle clicks on the terminal to detect focus
+            const handleTerminalClick = (event) => {
+                const clickedQuadrant = event.target.closest('[data-quadrant]');
+                if (clickedQuadrant && parseInt(clickedQuadrant.dataset.quadrant) === quadrant) {
+                    removeHighlightOnFocus();
+                }
+            };
+            
+            // Add click listener to detect when user focuses on the terminal
+            document.addEventListener('click', handleTerminalClick);
+            
+            // Fallback: Remove highlight after 30 seconds (increased from 10) as emergency timeout
             setTimeout(() => {
-                terminalElement.classList.remove('confirmation-highlight');
-            }, 10000);
+                if (terminalElement.classList.contains('confirmation-highlight')) {
+                    terminalElement.classList.remove('confirmation-highlight');
+                    this.highlightedTerminal = null;
+                    document.removeEventListener('click', handleTerminalClick);
+                }
+            }, 30000);
         }
     }
 
@@ -1224,6 +1262,11 @@ class TerminalManager {
             console.error('Error getting git status:', error);
             this.showNotification('Error getting git status', 'error');
         }
+    }
+
+    showKanban() {
+        // Request main process to open Kanban window
+        ipcRenderer.send('open-kanban-window');
     }
 
     displayGitStatusModal(gitData) {
@@ -1603,6 +1646,93 @@ class TerminalManager {
             const hasActiveTerminals = this.terminals.size > 0;
             gitButton.style.display = hasActiveTerminals ? 'block' : 'none';
         }
+    }
+
+    // ===== TASK MANAGEMENT METHODS =====
+    
+    async updateCurrentTaskIndicators() {
+        // Update task indicators for all terminals
+        for (let i = 0; i < 4; i++) {
+            await this.updateTerminalTaskIndicator(i);
+        }
+    }
+
+    async updateTerminalTaskIndicator(terminalId) {
+        try {
+            const result = await ipcRenderer.invoke('task-get-current', terminalId);
+            const taskIndicator = document.getElementById(`current-task-${terminalId}`);
+            
+            if (!taskIndicator) return;
+
+            if (result.success && result.task) {
+                const task = result.task;
+                const taskText = taskIndicator.querySelector('.task-text');
+                
+                if (taskText) {
+                    taskText.textContent = task.title;
+                    taskIndicator.style.display = 'flex';
+                    taskIndicator.title = `Task: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                }
+            } else {
+                taskIndicator.style.display = 'none';
+            }
+        } catch (error) {
+            console.error(`Error updating task indicator for terminal ${terminalId}:`, error);
+        }
+    }
+
+    async createTaskForTerminal(terminalId, title, description) {
+        try {
+            const result = await ipcRenderer.invoke('task-create', title, description, terminalId);
+            if (result.success) {
+                // Update task status to in_progress
+                await ipcRenderer.invoke('task-update-status', result.taskId, 'in_progress');
+                // Refresh the task indicator
+                await this.updateTerminalTaskIndicator(terminalId);
+                return result.taskId;
+            } else {
+                console.error('Failed to create task:', result.error);
+                return null;
+            }
+        } catch (error) {
+            console.error('Error creating task:', error);
+            return null;
+        }
+    }
+
+    async completeCurrentTask(terminalId) {
+        try {
+            const result = await ipcRenderer.invoke('task-get-current', terminalId);
+            if (result.success && result.task) {
+                const taskId = result.task.id;
+                const updateResult = await ipcRenderer.invoke('task-update-status', taskId, 'completed');
+                
+                if (updateResult.success) {
+                    // Refresh the task indicator
+                    await this.updateTerminalTaskIndicator(terminalId);
+                    
+                    // Show completion notification
+                    this.showNotification(`Task "${result.task.title}" completed!`, 'success');
+                    
+                    return true;
+                }
+            }
+            return false;
+        } catch (error) {
+            console.error('Error completing task:', error);
+            return false;
+        }
+    }
+
+    // Periodically update task indicators (every 30 seconds)
+    startTaskIndicatorUpdates() {
+        // Initial update
+        this.updateCurrentTaskIndicators();
+        
+        // Set up periodic updates
+        setInterval(() => {
+            this.updateCurrentTaskIndicators();
+        }, 30000); // 30 seconds
     }
 }
 

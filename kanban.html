@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager - Kanban Board</title>
+    <link rel="stylesheet" href="kanban.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+</head>
+<body>
+    <div class="kanban-container">
+        <header class="kanban-header">
+            <h1><i data-lucide="kanban-square"></i> Task Manager</h1>
+            <div class="header-controls">
+                <button class="btn btn-primary" id="add-task-btn">
+                    <i data-lucide="plus"></i> Add Task
+                </button>
+                <button class="btn" id="back-to-terminal-btn">
+                    <i data-lucide="terminal"></i> Back to Terminals
+                </button>
+            </div>
+        </header>
+
+        <main class="kanban-board">
+            <div class="kanban-column" data-status="pending">
+                <div class="column-header">
+                    <h2><i data-lucide="clock"></i> Pending</h2>
+                    <span class="task-count" id="pending-count">0</span>
+                </div>
+                <div class="task-list" id="pending-tasks">
+                    <!-- Tasks will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="kanban-column" data-status="in_progress">
+                <div class="column-header">
+                    <h2><i data-lucide="play"></i> In Progress</h2>
+                    <span class="task-count" id="in_progress-count">0</span>
+                </div>
+                <div class="task-list" id="in_progress-tasks">
+                    <!-- Tasks will be dynamically added here -->
+                </div>
+            </div>
+
+            <div class="kanban-column" data-status="completed">
+                <div class="column-header">
+                    <h2><i data-lucide="check-circle"></i> Completed</h2>
+                    <span class="task-count" id="completed-count">0</span>
+                </div>
+                <div class="task-list" id="completed-tasks">
+                    <!-- Tasks will be dynamically added here -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Task Creation Modal -->
+    <div class="modal" id="task-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modal-title">Create New Task</h3>
+                <button class="modal-close" id="modal-close-btn">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="task-form">
+                    <div class="form-group">
+                        <label for="task-title">Title *</label>
+                        <input type="text" id="task-title" required maxlength="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="task-description">Description</label>
+                        <textarea id="task-description" rows="4" maxlength="500"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-terminal">Terminal (optional)</label>
+                        <select id="task-terminal">
+                            <option value="">No specific terminal</option>
+                            <option value="0">Terminal 1</option>
+                            <option value="1">Terminal 2</option>
+                            <option value="2">Terminal 3</option>
+                            <option value="3">Terminal 4</option>
+                        </select>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
+                <button type="submit" class="btn btn-primary" id="save-task-btn">Save Task</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Details Modal -->
+    <div class="modal" id="task-details-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Task Details</h3>
+                <button class="modal-close" id="details-modal-close-btn">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="task-info">
+                    <h4 id="details-title"></h4>
+                    <p id="details-description"></p>
+                    <div class="task-meta">
+                        <span id="details-status"></span>
+                        <span id="details-terminal"></span>
+                        <span id="details-created"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-danger" id="delete-task-btn">Delete</button>
+                <button type="button" class="btn btn-secondary" id="edit-task-btn">Edit</button>
+                <button type="button" class="btn btn-primary" id="close-details-btn">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="kanban.js"></script>
+</body>
+</html>

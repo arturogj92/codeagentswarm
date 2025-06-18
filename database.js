@@ -1,11 +1,35 @@
 const Database = require('better-sqlite3');
 const path = require('path');
-const { app } = require('electron');
+
+// Try to import electron app, but handle gracefully if not available
+let app;
+try {
+    app = require('electron').app;
+} catch (e) {
+    // Running outside Electron (e.g., as MCP server)
+    app = null;
+}
 
 class DatabaseManager {
     constructor() {
         // Store database in user data directory
-        const dbPath = path.join(app.getPath('userData'), 'codeagentswarm.db');
+        let dbPath;
+        
+        // Check if running as MCP server (outside Electron)
+        if (process.env.CODEAGENTSWARM_DB_PATH) {
+            dbPath = process.env.CODEAGENTSWARM_DB_PATH;
+        } else if (app && app.getPath) {
+            dbPath = path.join(app.getPath('userData'), 'codeagentswarm.db');
+        } else {
+            // Fallback for MCP server mode
+            const os = require('os');
+            const dataDir = path.join(os.homedir(), '.codeagentswarm');
+            if (!require('fs').existsSync(dataDir)) {
+                require('fs').mkdirSync(dataDir, { recursive: true });
+            }
+            dbPath = path.join(dataDir, 'codeagentswarm.db');
+        }
+        
         this.db = new Database(dbPath);
         this.initialize();
     }
@@ -25,6 +49,19 @@ class DatabaseManager {
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value TEXT,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+
+        // Create tasks table for MCP task management
+        this.db.exec(`
+            CREATE TABLE IF NOT EXISTS tasks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                title TEXT NOT NULL,
+                description TEXT,
+                status TEXT CHECK(status IN ('pending', 'in_progress', 'completed')) DEFAULT 'pending',
+                terminal_id INTEGER,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -113,6 +150,111 @@ class DatabaseManager {
             return row ? JSON.parse(row.value) : null;
         } catch (err) {
             return null;
+        }
+    }
+
+    // Task management methods
+    
+    // Create a new task
+    createTask(title, description, terminalId = null) {
+        try {
+            const stmt = this.db.prepare(`
+                INSERT INTO tasks (title, description, terminal_id, status)
+                VALUES (?, ?, ?, 'pending')
+            `);
+            
+            const result = stmt.run(title, description, terminalId);
+            return { success: true, taskId: result.lastInsertRowid };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Update task status
+    updateTaskStatus(taskId, status) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET status = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(status, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Get all tasks
+    getAllTasks() {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM tasks 
+                ORDER BY created_at DESC
+            `);
+            
+            return stmt.all();
+        } catch (err) {
+            return [];
+        }
+    }
+
+    // Get tasks by status
+    getTasksByStatus(status) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM tasks 
+                WHERE status = ?
+                ORDER BY created_at DESC
+            `);
+            
+            return stmt.all(status);
+        } catch (err) {
+            return [];
+        }
+    }
+
+    // Get current task for a terminal (in_progress status)
+    getCurrentTask(terminalId) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM tasks 
+                WHERE terminal_id = ? AND status = 'in_progress'
+                ORDER BY updated_at DESC
+                LIMIT 1
+            `);
+            
+            return stmt.get(terminalId);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    // Delete a task
+    deleteTask(taskId) {
+        try {
+            const stmt = this.db.prepare(`DELETE FROM tasks WHERE id = ?`);
+            stmt.run(taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Update task details
+    updateTask(taskId, title, description) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET title = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(title, description, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
         }
     }
 

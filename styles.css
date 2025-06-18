@@ -308,10 +308,11 @@ body::before {
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   padding: 0 12px;
   border-radius: 16px 16px 0 0;
   position: relative;
+  gap: 8px;
 }
 
 .terminal-title {
@@ -322,13 +323,42 @@ body::before {
   text-transform: uppercase;
 }
 
+.current-task {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: rgba(44, 182, 125, 0.1);
+  border: 1px solid rgba(44, 182, 125, 0.3);
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  color: #2cb67d;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.current-task i {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+}
+
+.current-task .task-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1;
+}
+
+.current-task:hover {
+  background: rgba(44, 182, 125, 0.15);
+  border-color: rgba(44, 182, 125, 0.5);
+}
+
 .terminal-controls {
   display: flex;
   gap: 8px;
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
+  position: relative;
 }
 
 .terminal-control-btn {
