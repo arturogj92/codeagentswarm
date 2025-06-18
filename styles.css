@@ -123,6 +123,10 @@ body::before {
   gap: 10px;
 }
 
+#git-status-btn {
+  display: none; /* Hidden by default, shown only when terminals are active */
+}
+
 .btn {
   padding: 10px 20px;
   border: 1px solid var(--border);
@@ -1126,9 +1130,17 @@ body::before {
 
 .tab-buttons {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--border);
+}
+
+.tab-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .tab-btn {

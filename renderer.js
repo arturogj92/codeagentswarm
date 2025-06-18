@@ -75,6 +75,7 @@ class TerminalManager {
     init() {
         this.setupEventListeners();
         this.setupResizeHandlers();
+        this.updateGitButtonVisibility(); // Initialize git button visibility
     }
 
     setupEventListeners() {
@@ -86,10 +87,6 @@ class TerminalManager {
 
         document.getElementById('git-status-btn').addEventListener('click', () => {
             this.showGitStatus();
-        });
-
-        document.getElementById('repair-terminals-btn').addEventListener('click', () => {
-            this.repairTerminalControls();
         });
 
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
@@ -555,6 +552,9 @@ class TerminalManager {
         // Add scroll to bottom button
         this.addScrollToBottomButton(terminalDiv, terminal, quadrant);
 
+        // Update git button visibility
+        this.updateGitButtonVisibility();
+
         this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
 
@@ -911,22 +911,38 @@ class TerminalManager {
             quadrantElement.classList.add('fullscreen');
             this.fullscreenTerminal = quadrant;
             
+            // Force multiple resize attempts with delays to ensure proper sizing
             setTimeout(() => {
-                this.resizeTerminal(quadrant);
+                this.forceTerminalResize(quadrant);
+            }, 100);
+            setTimeout(() => {
+                this.forceTerminalResize(quadrant);
             }, 300);
+            setTimeout(() => {
+                this.forceTerminalResize(quadrant);
+            }, 500);
         }
     }
 
     exitFullscreen() {
         if (this.fullscreenTerminal !== null) {
             const quadrantElement = document.querySelector(`[data-quadrant="${this.fullscreenTerminal}"]`);
+            const quadrant = this.fullscreenTerminal;
+            
             quadrantElement.classList.remove('fullscreen');
             
+            // Force multiple resize attempts with delays to ensure proper sizing when exiting fullscreen
             setTimeout(() => {
-                this.resizeTerminal(this.fullscreenTerminal);
+                this.forceTerminalResize(quadrant);
                 // Reparar controles automáticamente después de salir del fullscreen
                 this.repairTerminalControls();
+            }, 100);
+            setTimeout(() => {
+                this.forceTerminalResize(quadrant);
             }, 300);
+            setTimeout(() => {
+                this.forceTerminalResize(quadrant);
+            }, 500);
             
             this.fullscreenTerminal = null;
         }
@@ -956,6 +972,9 @@ class TerminalManager {
             });
             
             this.updateTerminalTitle(quadrant, `Terminal ${quadrant + 1}`);
+            
+            // Update git button visibility
+            this.updateGitButtonVisibility();
         }
     }
 
@@ -993,6 +1012,53 @@ class TerminalManager {
                         console.error(`Retry failed for terminal ${quadrant}:`, retryError);
                     }
                 }, 100);
+            }
+        }
+    }
+
+    forceTerminalResize(quadrant) {
+        const terminal = this.terminals.get(quadrant);
+        if (terminal && terminal.fitAddon && terminal.terminal) {
+            try {
+                // Force refresh of terminal viewport
+                const terminalElement = terminal.element;
+                if (terminalElement) {
+                    // Temporarily hide and show to force recalculation
+                    const originalDisplay = terminalElement.style.display;
+                    terminalElement.style.display = 'none';
+                    terminalElement.offsetHeight; // Force reflow
+                    terminalElement.style.display = originalDisplay;
+                }
+                
+                // Clear any existing viewport styles that might be causing issues
+                const viewport = terminal.element.querySelector('.xterm-viewport');
+                if (viewport) {
+                    viewport.style.width = '';
+                    viewport.style.height = '';
+                }
+                
+                // Force fit multiple times
+                terminal.fitAddon.fit();
+                
+                // Force terminal to refresh its buffer and scrolling
+                terminal.terminal.refresh(0, terminal.terminal.rows - 1);
+                
+                // Ensure scroll position is maintained
+                setTimeout(() => {
+                    terminal.terminal.scrollToBottom();
+                }, 50);
+                
+                // Send resize signal to PTY
+                const cols = terminal.terminal.cols;
+                const rows = terminal.terminal.rows;
+                ipcRenderer.send('terminal-resize', quadrant, cols, rows);
+                
+                console.log(`Force resized terminal ${quadrant} to: ${cols}x${rows}`);
+                
+            } catch (error) {
+                console.error(`Error force resizing terminal ${quadrant}:`, error);
+                // Fallback to regular resize
+                this.resizeTerminal(quadrant);
             }
         }
     }
@@ -1192,7 +1258,17 @@ class TerminalManager {
                     <div class="tab-buttons">
                         <button class="tab-btn active" data-tab="changes"><i data-lucide="file-diff"></i> Changes</button>
                         <button class="tab-btn" data-tab="commits"><i data-lucide="history"></i> Commits</button>
-                        <button class="tab-btn" data-tab="actions"><i data-lucide="settings"></i> Actions</button>
+                        <div class="tab-actions">
+                            <button class="btn btn-small" id="git-pull" title="Pull - Descargar cambios del repositorio remoto">
+                                <i data-lucide="download"></i>
+                            </button>
+                            <button class="btn btn-small btn-primary" id="git-push" title="Push - Subir cambios al repositorio remoto">
+                                <i data-lucide="upload"></i>
+                            </button>
+                            <button class="btn btn-small" id="refresh-git-status" title="Refresh - Actualizar el estado del repositorio">
+                                <i data-lucide="refresh-cw"></i>
+                            </button>
+                        </div>
                     </div>
                     
                     <div class="tab-content">
@@ -1252,16 +1328,6 @@ class TerminalManager {
                                 `).join('') : '<div class="no-commits">No commits found</div>'}
                             </div>
                         </div>
-                        
-                        <!-- Actions Tab -->
-                        <div class="tab-panel" id="actions-tab">
-                            <div class="git-action-buttons">
-                                <button class="btn btn-success" id="git-pull"><i data-lucide="download"></i> Pull</button>
-                                <button class="btn btn-primary" id="git-push"><i data-lucide="upload"></i> Push</button>
-                                <button class="btn" id="refresh-git-status"><i data-lucide="refresh-cw"></i> Refresh</button>
-                                <button class="btn btn-secondary" id="close-git-modal-btn">Close</button>
-                            </div>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1291,7 +1357,6 @@ class TerminalManager {
 
         // Git action handlers
         modal.querySelector('#close-git-modal').addEventListener('click', closeModal);
-        modal.querySelector('#close-git-modal-btn').addEventListener('click', closeModal);
         modal.querySelector('#refresh-git-status').addEventListener('click', () => {
             modal.remove();
             this.showGitStatus();
@@ -1529,6 +1594,15 @@ class TerminalManager {
                 }
             }, 300);
         }, 3000);
+    }
+
+    updateGitButtonVisibility() {
+        const gitButton = document.getElementById('git-status-btn');
+        if (gitButton) {
+            // Show git button only if there are active terminals
+            const hasActiveTerminals = this.terminals.size > 0;
+            gitButton.style.display = hasActiveTerminals ? 'block' : 'none';
+        }
     }
 }
 
