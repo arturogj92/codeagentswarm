@@ -1,6 +1,6 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0618.2330",
+  "version": "2025.0619.1213",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
@@ -46,11 +46,19 @@
       "kanban.js",
       "kanban.css",
       "package.json",
+      "logo_prod.png",
       "node_modules/**/*"
     ],
     "extraResources": [],
     "mac": {
-      "category": "public.app-category.developer-tools"
+      "category": "public.app-category.developer-tools",
+      "icon": "logo_prod.png"
+    },
+    "win": {
+      "icon": "logo_prod.png"
+    },
+    "linux": {
+      "icon": "logo_prod.png"
     }
   }
 }
