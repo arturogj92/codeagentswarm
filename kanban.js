@@ -91,6 +91,17 @@ class KanbanManager {
             list.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 list.classList.add('drag-over');
+                
+                // Handle reordering within the same column
+                const draggingCard = document.querySelector('.dragging');
+                if (draggingCard) {
+                    const afterElement = this.getDragAfterElement(list, e.clientY);
+                    if (afterElement == null) {
+                        list.appendChild(draggingCard);
+                    } else {
+                        list.insertBefore(draggingCard, afterElement);
+                    }
+                }
             });
 
             list.addEventListener('dragleave', (e) => {
@@ -105,10 +116,61 @@ class KanbanManager {
                 
                 const taskId = e.dataTransfer.getData('text/plain');
                 const newStatus = list.id.replace('-tasks', '');
+                const draggedTask = this.tasks.find(t => t.id == taskId);
                 
-                await this.updateTaskStatus(taskId, newStatus);
+                // Check if the status changed or just reordered
+                if (draggedTask && draggedTask.status !== newStatus) {
+                    // Status changed - update task status
+                    await this.updateTaskStatus(taskId, newStatus);
+                } else {
+                    // Just reordered within the same column - update order
+                    await this.updateTaskOrder(list, newStatus);
+                }
             });
         });
+    }
+
+    getDragAfterElement(container, y) {
+        const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+        
+        return draggableElements.reduce((closest, child) => {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            } else {
+                return closest;
+            }
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    async updateTaskOrder(list, status) {
+        try {
+            const taskCards = [...list.querySelectorAll('.task-card')];
+            const taskOrders = taskCards.map((card, index) => ({
+                taskId: parseInt(card.dataset.taskId),
+                sortOrder: index
+            }));
+            
+            // Update only tasks with the same status to avoid conflicts
+            const tasksInStatus = this.tasks.filter(t => t.status === status);
+            const filteredOrders = taskOrders.filter(order => 
+                tasksInStatus.some(task => task.id === order.taskId)
+            );
+            
+            if (filteredOrders.length > 0) {
+                const result = await ipcRenderer.invoke('task-update-order', filteredOrders);
+                if (!result.success) {
+                    console.error('Failed to update task order:', result.error);
+                    // Reload tasks to reset the UI
+                    await this.loadTasks();
+                }
+            }
+        } catch (error) {
+            console.error('Error updating task order:', error);
+            await this.loadTasks();
+        }
     }
 
     async loadTasks() {

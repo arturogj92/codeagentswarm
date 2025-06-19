@@ -636,6 +636,16 @@ ipcMain.handle('task-update', async (event, taskId, title, description) => {
   }
 });
 
+ipcMain.handle('task-update-order', async (event, taskOrders) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = await db.updateTasksOrder(taskOrders);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('get-mcp-port', async () => {
   try {
     if (!mcpServer) return { success: false, error: 'MCP server not started' };
@@ -940,6 +950,41 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
   }
 });
 
+// Task notification file checker
+ipcMain.handle('check-task-notifications', async () => {
+  try {
+    const notificationDir = path.join(os.homedir(), '.codeagentswarm');
+    const notificationFile = path.join(notificationDir, 'task_notifications.json');
+    
+    // If file doesn't exist, no notifications
+    if (!fs.existsSync(notificationFile)) {
+      return { success: true, notifications: [] };
+    }
+    
+    // Read and parse notifications
+    const content = fs.readFileSync(notificationFile, 'utf8');
+    let notifications = JSON.parse(content);
+    
+    // Filter unprocessed notifications
+    const unprocessed = notifications.filter(n => !n.processed);
+    
+    if (unprocessed.length > 0) {
+      // Mark all notifications as processed
+      notifications = notifications.map(n => ({ ...n, processed: true }));
+      
+      // Write back to file
+      fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
+      
+      return { success: true, notifications: unprocessed };
+    }
+    
+    return { success: true, notifications: [] };
+  } catch (error) {
+    console.error('Error checking task notifications:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Git operations helpers
 function getGitWorkingDirectory() {
   // Get current working directory from the first terminal or use process.cwd()
@@ -954,6 +999,19 @@ function getGitWorkingDirectory() {
   }
   
   return cwd;
+}
+
+function getTerminalWorkingDirectory(terminalId) {
+  // Get working directory from specific terminal
+  if (terminals.has(terminalId)) {
+    const terminal = terminals.get(terminalId);
+    if (terminal && terminal.cwd) {
+      return terminal.cwd;
+    }
+  }
+  
+  // Fallback to process.cwd()
+  return process.cwd();
 }
 
 // Git status handler
@@ -1183,6 +1241,112 @@ ipcMain.handle('git-diff', async (event, fileName) => {
   }
 });
 
+// Get all Git branches
+ipcMain.handle('git-get-branches', async (event, terminalId = null) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = terminalId !== null ? getTerminalWorkingDirectory(terminalId) : getGitWorkingDirectory();
+    
+    // Check if directory is a git repository
+    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
+      cwd, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim() === 'true';
+    
+    if (!isGitRepo) {
+      return { 
+        success: false, 
+        error: 'Not a git repository'
+      };
+    }
+    
+    // Get all branches
+    const localBranches = execSync('git branch', { cwd, encoding: 'utf8' })
+      .split('\n')
+      .map(branch => branch.replace('*', '').trim())
+      .filter(branch => branch.length > 0);
+    
+    // Get current branch
+    const currentBranch = execSync('git branch --show-current', { 
+      cwd, 
+      encoding: 'utf8' 
+    }).trim();
+    
+    return { 
+      success: true, 
+      branches: localBranches,
+      currentBranch 
+    };
+    
+  } catch (error) {
+    console.error('Git get branches error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to get branches'
+    };
+  }
+});
+
+// Create new Git branch
+ipcMain.handle('git-create-branch', async (event, branchName, switchToBranch = true, terminalId = null) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = terminalId !== null ? getTerminalWorkingDirectory(terminalId) : getGitWorkingDirectory();
+    
+    // Validate branch name
+    if (!branchName || branchName.trim().length === 0) {
+      throw new Error('Branch name cannot be empty');
+    }
+    
+    const sanitizedName = branchName.trim().replace(/[^a-zA-Z0-9\-_\/]/g, '-');
+    
+    if (switchToBranch) {
+      // Create and switch to new branch
+      execSync(`git checkout -b "${sanitizedName}"`, { cwd });
+    } else {
+      // Just create branch without switching
+      execSync(`git branch "${sanitizedName}"`, { cwd });
+    }
+    
+    return { 
+      success: true, 
+      branchName: sanitizedName,
+      switched: switchToBranch
+    };
+    
+  } catch (error) {
+    console.error('Git create branch error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to create branch'
+    };
+  }
+});
+
+// Switch to existing Git branch
+ipcMain.handle('git-switch-branch', async (event, branchName, terminalId = null) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = terminalId !== null ? getTerminalWorkingDirectory(terminalId) : getGitWorkingDirectory();
+    
+    // Switch to branch
+    execSync(`git checkout "${branchName}"`, { cwd });
+    
+    return { 
+      success: true, 
+      branchName 
+    };
+    
+  } catch (error) {
+    console.error('Git switch branch error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to switch branch'
+    };
+  }
+});
+
 app.on('before-quit', (event) => {
   console.log('App is quitting, cleaning up processes...');
   
@@ -1224,3 +1388,95 @@ app.on('before-quit', (event) => {
     app.exit(0);
   }, 500);
 });
+
+// Function to ensure CLAUDE.md is configured with MCP Task Manager
+function ensureClaudeMdConfiguration(projectPath) {
+  const fs = require('fs');
+  const path = require('path');
+  
+  const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
+  const projectName = path.basename(projectPath);
+  
+  const claudeMdContent = `# ${projectName} Project Configuration
+
+This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model Context Protocol) integration.
+
+## MCP Servers
+
+### Task Manager
+
+- **Command**: \`node mcp-stdio-server.js\`
+- **Description**: Task management system for CodeAgentSwarm with project organization
+- **Tools**: create_task, start_task, complete_task, list_tasks, create_project, get_project_tasks
+- **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
+- **Projects**: Tasks are now organized by projects based on terminal working directory
+
+_Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
+
+## Gestión de Tareas - IMPORTANTE
+
+### Uso obligatorio del sistema de tareas
+
+**SIEMPRE** que comiences a trabajar en una nueva tarea, debes:
+
+1. **Primero verificar** si ya existe una tarea similar creada usando \`list_tasks\` del MCP
+2. Si no existe una tarea similar, **crear una nueva tarea** usando \`create_task\` del MCP
+3. **Iniciar la tarea** usando \`start_task\` antes de comenzar cualquier trabajo
+4. **Completar la tarea** usando \`complete_task\` cuando termines
+5. **Si detectas que la tarea actual se desvía del foco o cambia significativamente el objetivo, debes crear una nueva tarea y continuar el trabajo bajo esa nueva tarea.**
+
+### Flujo de trabajo
+
+1. **Al recibir una solicitud del usuario:**
+
+   - Revisar las tareas existentes con \`list_tasks\`
+   - Si existe una tarea relacionada, usarla
+   - Si no existe, crear una nueva tarea descriptiva
+
+2. **Durante el trabajo:**
+
+   - La tarea actual se mostrará en la barra del terminal
+   - Mantener actualizado el estado de la tarea
+   - Una sola tarea activa por terminal
+
+3. **Al finalizar:**
+   - Marcar la tarea como completada
+   - Esto actualiza automáticamente la interfaz
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+`;
+
+  try {
+    // Check if CLAUDE.md already exists
+    if (fs.existsSync(claudeMdPath)) {
+      // Read existing content
+      const existingContent = fs.readFileSync(claudeMdPath, 'utf8');
+      
+      // Only update if it doesn't contain MCP configuration
+      if (!existingContent.includes('Task Manager') || !existingContent.includes('mcp-stdio-server.js')) {
+        // Backup existing content if it has custom content
+        if (existingContent.trim() && !existingContent.includes('CodeAgentSwarm')) {
+          const backupContent = `${claudeMdContent}
+
+## Previous Content (Backup)
+
+${existingContent}`;
+          fs.writeFileSync(claudeMdPath, backupContent, 'utf8');
+        } else {
+          fs.writeFileSync(claudeMdPath, claudeMdContent, 'utf8');
+        }
+        console.log(`Updated CLAUDE.md configuration for project: ${projectName}`);
+      }
+    } else {
+      // Create new CLAUDE.md
+      fs.writeFileSync(claudeMdPath, claudeMdContent, 'utf8');
+      console.log(`Created CLAUDE.md configuration for project: ${projectName}`);
+    }
+  } catch (error) {
+    console.error('Failed to configure CLAUDE.md:', error);
+  }
+}

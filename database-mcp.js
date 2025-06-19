@@ -53,12 +53,24 @@ class DatabaseManagerMCP {
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
+            CREATE TABLE IF NOT EXISTS projects (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                path TEXT UNIQUE NOT NULL,
+                description TEXT,
+                color TEXT DEFAULT '#2cb67d',
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE TABLE IF NOT EXISTS tasks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 description TEXT,
                 status TEXT DEFAULT 'pending',
                 terminal_id INTEGER,
+                project_id INTEGER REFERENCES projects(id),
+                sort_order INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
@@ -76,7 +88,51 @@ class DatabaseManagerMCP {
         this.db.exec(createTables, (err) => {
             if (err) {
                 console.error('Failed to initialize database:', err);
+            } else {
+                // Check if sort_order column exists and add it if not
+                this.addSortOrderColumnIfNeeded();
             }
+        });
+    }
+
+    addSortOrderColumnIfNeeded() {
+        // Check if sort_order column exists
+        this.db.all("PRAGMA table_info(tasks)", (err, columns) => {
+            if (err) {
+                console.error('Failed to check table info:', err);
+                return;
+            }
+            
+            const hasSortOrder = columns.some(col => col.name === 'sort_order');
+            if (!hasSortOrder) {
+                this.db.run("ALTER TABLE tasks ADD COLUMN sort_order INTEGER DEFAULT 0", (err) => {
+                    if (err) {
+                        console.error('Failed to add sort_order column:', err);
+                    } else {
+                        console.log('Added sort_order column to tasks table');
+                        // Initialize sort_order values for existing tasks
+                        this.initializeSortOrder();
+                    }
+                });
+            }
+        });
+    }
+
+    initializeSortOrder() {
+        // Set sort_order based on existing order (by creation date)
+        this.db.all("SELECT id FROM tasks ORDER BY created_at ASC", (err, rows) => {
+            if (err) {
+                console.error('Failed to get tasks for sort order initialization:', err);
+                return;
+            }
+            
+            rows.forEach((row, index) => {
+                this.db.run("UPDATE tasks SET sort_order = ? WHERE id = ?", [index, row.id], (err) => {
+                    if (err) {
+                        console.error('Failed to set sort_order for task:', row.id, err);
+                    }
+                });
+            });
         });
     }
 
@@ -177,7 +233,7 @@ class DatabaseManagerMCP {
         // sqlite3 doesn't support synchronous operations like better-sqlite3
         // We need to use a different approach or make it async
         return new Promise((resolve, reject) => {
-            this.db.all("SELECT * FROM tasks ORDER BY created_at DESC", (err, rows) => {
+            this.db.all("SELECT * FROM tasks ORDER BY sort_order ASC, created_at DESC", (err, rows) => {
                 if (err) {
                     console.error('Error getting all tasks:', err);
                     resolve([]);
@@ -193,7 +249,7 @@ class DatabaseManagerMCP {
             this.db.all(
                 `SELECT * FROM tasks 
                 WHERE status = ? 
-                ORDER BY created_at DESC`,
+                ORDER BY sort_order ASC, created_at DESC`,
                 [status],
                 (err, rows) => {
                     if (err) {
@@ -220,6 +276,20 @@ class DatabaseManagerMCP {
             return task || null;
         } catch (error) {
             console.error('Error getting current task:', error);
+            return null;
+        }
+    }
+
+    getTaskById(taskId) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM tasks WHERE id = ?
+            `);
+            const task = stmt.get(taskId);
+            stmt.finalize();
+            return task || null;
+        } catch (error) {
+            console.error('Error getting task by ID:', error);
             return null;
         }
     }
@@ -299,6 +369,116 @@ class DatabaseManagerMCP {
         } catch (error) {
             console.error('Error logging task action:', error);
         }
+    }
+
+    updateTasksOrder(taskOrders) {
+        return new Promise((resolve, reject) => {
+            this.db.serialize(() => {
+                this.db.run("BEGIN TRANSACTION");
+                
+                let hasError = false;
+                let completed = 0;
+                const total = taskOrders.length;
+                
+                if (total === 0) {
+                    this.db.run("COMMIT");
+                    resolve({ success: true });
+                    return;
+                }
+                
+                taskOrders.forEach((order, index) => {
+                    this.db.run(
+                        "UPDATE tasks SET sort_order = ? WHERE id = ?",
+                        [order.sortOrder, order.taskId],
+                        (err) => {
+                            if (err && !hasError) {
+                                hasError = true;
+                                this.db.run("ROLLBACK");
+                                resolve({ success: false, error: err.message });
+                                return;
+                            }
+                            
+                            completed++;
+                            if (completed === total && !hasError) {
+                                this.db.run("COMMIT");
+                                resolve({ success: true });
+                            }
+                        }
+                    );
+                });
+            });
+        });
+    }
+
+    // ===== PROJECT METHODS =====
+
+    async createProject(name, path, description = null, color = '#2cb67d') {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `INSERT INTO projects (name, path, description, color) 
+                VALUES (?, ?, ?, ?)`,
+                [name, path, description, color],
+                function(err) {
+                    if (err) {
+                        console.error('Error creating project:', err);
+                        resolve({ success: false, error: err.message });
+                    } else {
+                        resolve({ success: true, projectId: this.lastID });
+                    }
+                }
+            );
+        });
+    }
+
+    async getProjectByPath(path) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                `SELECT * FROM projects WHERE path = ?`,
+                [path],
+                (err, row) => {
+                    if (err) {
+                        console.error('Error getting project by path:', err);
+                        resolve(null);
+                    } else {
+                        resolve(row);
+                    }
+                }
+            );
+        });
+    }
+
+    async getAllProjects() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM projects ORDER BY name ASC`,
+                [],
+                (err, rows) => {
+                    if (err) {
+                        console.error('Error getting all projects:', err);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
+    }
+
+    async getProjectTasks(projectId) {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC`,
+                [projectId],
+                (err, rows) => {
+                    if (err) {
+                        console.error('Error getting project tasks:', err);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
     }
 
     close() {

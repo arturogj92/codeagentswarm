@@ -61,10 +61,43 @@ class DatabaseManager {
                 description TEXT,
                 status TEXT CHECK(status IN ('pending', 'in_progress', 'completed')) DEFAULT 'pending',
                 terminal_id INTEGER,
+                sort_order INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
+        
+        // Add sort_order column if it doesn't exist (migration)
+        this.addSortOrderColumnIfNeeded();
+    }
+
+    addSortOrderColumnIfNeeded() {
+        try {
+            // Check if sort_order column exists
+            const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+            const hasSortOrder = columns.some(col => col.name === 'sort_order');
+            
+            if (!hasSortOrder) {
+                this.db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER DEFAULT 0");
+                console.log('Added sort_order column to tasks table');
+                
+                // Initialize sort_order values for existing tasks
+                this.initializeSortOrder();
+            }
+        } catch (error) {
+            console.error('Error checking/adding sort_order column:', error);
+        }
+    }
+
+    initializeSortOrder() {
+        try {
+            const tasks = this.db.prepare("SELECT id FROM tasks ORDER BY created_at ASC").all();
+            tasks.forEach((task, index) => {
+                this.db.prepare("UPDATE tasks SET sort_order = ? WHERE id = ?").run(index, task.id);
+            });
+        } catch (error) {
+            console.error('Error initializing sort order:', error);
+        }
     }
 
     // Save or update directory for a terminal
@@ -191,7 +224,7 @@ class DatabaseManager {
         try {
             const stmt = this.db.prepare(`
                 SELECT * FROM tasks 
-                ORDER BY created_at DESC
+                ORDER BY sort_order ASC, created_at DESC
             `);
             
             return stmt.all();
@@ -206,7 +239,7 @@ class DatabaseManager {
             const stmt = this.db.prepare(`
                 SELECT * FROM tasks 
                 WHERE status = ?
-                ORDER BY created_at DESC
+                ORDER BY sort_order ASC, created_at DESC
             `);
             
             return stmt.all(status);
@@ -252,6 +285,23 @@ class DatabaseManager {
             `);
             
             stmt.run(title, description, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Update task order
+    updateTasksOrder(taskOrders) {
+        try {
+            const updateStmt = this.db.prepare("UPDATE tasks SET sort_order = ? WHERE id = ?");
+            
+            this.db.transaction(() => {
+                for (const order of taskOrders) {
+                    updateStmt.run(order.sortOrder, order.taskId);
+                }
+            })();
+            
             return { success: true };
         } catch (err) {
             return { success: false, error: err.message };

@@ -7,9 +7,10 @@ This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model
 ### Task Manager
 
 - **Command**: `node mcp-stdio-server.js`
-- **Description**: Task management system for CodeAgentSwarm
-- **Tools**: create_task, start_task, complete_task, list_tasks
-- **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks
+- **Description**: Task management system for CodeAgentSwarm with project organization
+- **Tools**: create_task, start_task, complete_task, list_tasks, create_project, get_project_tasks
+- **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
+- **Projects**: Tasks are now organized by projects based on terminal working directory
 
 _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
 

@@ -115,6 +115,10 @@ class MCPStdioServer {
                     result = await this.updateTask(params);
                     break;
                     
+                case 'tasks/update_order':
+                    result = await this.updateTasksOrder(params);
+                    break;
+                    
                 case 'tools/list':
                     result = this.listTools();
                     break;
@@ -216,6 +220,11 @@ class MCPStdioServer {
             throw new Error(result.error);
         }
         
+        // Notify the Electron app when a task is completed
+        if (status === 'completed') {
+            this.notifyTaskCompletion(task_id);
+        }
+        
         return {
             task_id,
             status,
@@ -276,6 +285,25 @@ class MCPStdioServer {
             title,
             description,
             updated: true
+        };
+    }
+
+    async updateTasksOrder(params) {
+        const { taskOrders } = params;
+        
+        if (!taskOrders || !Array.isArray(taskOrders)) {
+            throw new Error('taskOrders array is required');
+        }
+        
+        const result = await this.db.updateTasksOrder(taskOrders);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            updated: true,
+            taskCount: taskOrders.length
         };
     }
 
@@ -502,6 +530,59 @@ class MCPStdioServer {
                 
             default:
                 throw new Error(`Unknown prompt: ${name}`);
+        }
+    }
+
+    // Notify the Electron app when a task is completed
+    notifyTaskCompletion(taskId) {
+        try {
+            // Get the task details to include in the notification
+            const task = this.db.getTaskById(taskId);
+            if (!task) return;
+            
+            // Create a notification file that the Electron app can monitor
+            const os = require('os');
+            const fs = require('fs');
+            const notificationDir = path.join(os.homedir(), '.codeagentswarm');
+            const notificationFile = path.join(notificationDir, 'task_notifications.json');
+            
+            // Ensure the directory exists
+            if (!fs.existsSync(notificationDir)) {
+                fs.mkdirSync(notificationDir, { recursive: true });
+            }
+            
+            // Read existing notifications or create new array
+            let notifications = [];
+            if (fs.existsSync(notificationFile)) {
+                try {
+                    const content = fs.readFileSync(notificationFile, 'utf8');
+                    notifications = JSON.parse(content);
+                } catch (e) {
+                    // If file is corrupted, start fresh
+                    notifications = [];
+                }
+            }
+            
+            // Add new notification
+            notifications.push({
+                type: 'task_completed',
+                taskId: taskId,
+                taskTitle: task.title,
+                timestamp: new Date().toISOString(),
+                processed: false
+            });
+            
+            // Keep only last 50 notifications to prevent file from growing too large
+            if (notifications.length > 50) {
+                notifications = notifications.slice(-50);
+            }
+            
+            // Write notifications back to file
+            fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
+            
+            this.logError(`Task completion notification written for task: ${task.title}`);
+        } catch (error) {
+            this.logError('Failed to notify task completion:', error.message);
         }
     }
 

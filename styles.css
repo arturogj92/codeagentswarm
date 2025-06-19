@@ -118,6 +118,55 @@ body::before {
   }
 }
 
+.git-branch-display {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(44, 182, 125, 0.1);
+  border: 1px solid rgba(44, 182, 125, 0.3);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--secondary);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+  margin-left: 8px;
+}
+
+.git-branch-display:hover {
+  background: rgba(44, 182, 125, 0.15);
+  border-color: rgba(44, 182, 125, 0.5);
+  transform: translateY(-1px);
+}
+
+.git-branch-display i {
+  font-size: 14px;
+}
+
+.branch-switch-btn {
+  background: none;
+  border: none;
+  color: var(--secondary);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.branch-switch-btn:hover {
+  background: rgba(44, 182, 125, 0.2);
+  transform: rotate(180deg);
+}
+
+.branch-switch-btn i {
+  font-size: 12px;
+}
+
 .header-controls {
   display: flex;
   gap: 10px;
@@ -1492,6 +1541,194 @@ body::before {
   justify-content: flex-end;
   padding-top: 16px;
   border-top: 1px solid var(--border);
+}
+
+/* Branch Selector Modal */
+.branch-selector-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.branch-selector-modal.show {
+  opacity: 1;
+}
+
+.branch-selector-content {
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  width: 500px;
+  max-height: 600px;
+  overflow-y: auto;
+  transform: scale(0.95);
+  transition: transform 0.3s ease;
+}
+
+.branch-selector-modal.show .branch-selector-content {
+  transform: scale(1);
+}
+
+.branch-selector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.branch-selector-header h3 {
+  color: var(--text-primary);
+  font-size: 1.2rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.branch-current {
+  background: rgba(44, 182, 125, 0.1);
+  border: 1px solid rgba(44, 182, 125, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 24px;
+}
+
+.branch-current .branch-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.branch-label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.branch-name {
+  font-family: monospace;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.branch-name.current {
+  color: var(--secondary);
+}
+
+.branch-create {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 24px;
+}
+
+.branch-create h4 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.branch-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.branch-input-group input {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  transition: border-color 0.2s ease;
+}
+
+.branch-input-group input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+.branch-options {
+  display: flex;
+  align-items: center;
+}
+
+.branch-options label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.branch-options input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+}
+
+.branch-list h4 {
+  color: var(--text-primary);
+  font-size: 1rem;
+  margin-bottom: 12px;
+}
+
+.branches {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.branch-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  transition: background-color 0.2s ease;
+}
+
+.branch-item:hover {
+  background: var(--surface-hover);
+}
+
+.branch-item.current {
+  background: rgba(44, 182, 125, 0.1);
+  border-color: rgba(44, 182, 125, 0.3);
+}
+
+.branch-item .branch-name {
+  color: var(--text-primary);
+}
+
+.branch-item.current .branch-name {
+  color: var(--secondary);
+}
+
+.current-indicator {
+  color: var(--secondary);
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 0.8rem;
 }
 
 /* Inline Notifications */

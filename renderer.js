@@ -1618,6 +1618,199 @@ class TerminalManager {
         return div.innerHTML;
     }
     
+    // Update branch display for specific terminal
+    async updateBranchDisplay(terminalId = null) {
+        try {
+            // If no terminalId provided, update all terminals
+            if (terminalId === null) {
+                for (let i = 0; i < 4; i++) {
+                    if (this.terminals.has(i)) {
+                        await this.updateBranchDisplay(i);
+                    }
+                }
+                return;
+            }
+            
+            const result = await ipcRenderer.invoke('git-get-branches', terminalId);
+            const branchDisplay = document.getElementById(`git-branch-display-${terminalId}`);
+            const branchName = branchDisplay?.querySelector('.current-branch-name');
+            
+            if (result.success && result.currentBranch && branchDisplay && branchName) {
+                branchName.textContent = result.currentBranch;
+                branchDisplay.style.display = 'flex';
+                
+                // Setup click event for this terminal's branch button if not already setup
+                const branchBtn = branchDisplay.querySelector('.branch-switch-btn');
+                if (branchBtn && !branchBtn.hasAttribute('data-listener-set')) {
+                    branchBtn.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        this.showBranchSelector(terminalId);
+                    });
+                    branchBtn.setAttribute('data-listener-set', 'true');
+                }
+            } else if (branchDisplay) {
+                branchDisplay.style.display = 'none';
+            }
+        } catch (error) {
+            console.error('Error updating branch display:', error);
+            const branchDisplay = document.getElementById(`git-branch-display-${terminalId}`);
+            if (branchDisplay) {
+                branchDisplay.style.display = 'none';
+            }
+        }
+    }
+    
+    // Show branch selector modal
+    async showBranchSelector(terminalId) {
+        try {
+            const result = await ipcRenderer.invoke('git-get-branches', terminalId);
+            
+            if (result.success) {
+                this.displayBranchSelectorModal(result, terminalId);
+            } else {
+                this.showNotification(result.error || 'Failed to get branches', 'warning');
+            }
+        } catch (error) {
+            console.error('Error getting branches:', error);
+            this.showNotification('Error getting branches', 'error');
+        }
+    }
+    
+    displayBranchSelectorModal(branchData, terminalId) {
+        // Remove existing modal if present
+        const existingModal = document.querySelector('.branch-selector-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'branch-selector-modal';
+        modal.innerHTML = `
+            <div class="branch-selector-content">
+                <div class="branch-selector-header">
+                    <h3><i data-lucide="git-branch"></i> Git Branches - Terminal ${terminalId + 1}</h3>
+                    <button class="close-btn" id="close-branch-modal">×</button>
+                </div>
+                
+                <div class="branch-current">
+                    <div class="branch-info">
+                        <span class="branch-label">Current Branch:</span>
+                        <span class="branch-name current">${branchData.currentBranch}</span>
+                    </div>
+                </div>
+                
+                <div class="branch-create">
+                    <h4>Create New Branch</h4>
+                    <div class="branch-input-group">
+                        <input type="text" id="new-branch-name" placeholder="Enter branch name..." />
+                        <div class="branch-options">
+                            <label>
+                                <input type="checkbox" id="switch-to-branch" checked />
+                                Switch to new branch
+                            </label>
+                        </div>
+                        <button class="btn btn-primary" id="create-branch-btn">Create Branch</button>
+                    </div>
+                </div>
+                
+                <div class="branch-list">
+                    <h4>Switch to Existing Branch</h4>
+                    <div class="branches">
+                        ${branchData.branches.map(branch => `
+                            <div class="branch-item ${branch === branchData.currentBranch ? 'current' : ''}">
+                                <span class="branch-name">${branch}</span>
+                                ${branch !== branchData.currentBranch ? 
+                                    `<button class="btn btn-sm switch-branch-btn" data-branch="${branch}">Switch</button>` : 
+                                    '<span class="current-indicator">Current</span>'
+                                }
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Event listeners
+        const closeModal = () => {
+            modal.remove();
+        };
+        
+        modal.querySelector('#close-branch-modal').addEventListener('click', closeModal);
+        
+        // Create branch functionality
+        const createBranchBtn = modal.querySelector('#create-branch-btn');
+        const branchNameInput = modal.querySelector('#new-branch-name');
+        const switchToBranchCheckbox = modal.querySelector('#switch-to-branch');
+        
+        createBranchBtn.addEventListener('click', async () => {
+            const branchName = branchNameInput.value.trim();
+            if (!branchName) {
+                this.showNotification('Please enter a branch name', 'warning');
+                return;
+            }
+            
+            try {
+                const result = await ipcRenderer.invoke('git-create-branch', branchName, switchToBranchCheckbox.checked, terminalId);
+                
+                if (result.success) {
+                    this.showNotification(`Branch '${result.branchName}' created successfully`, 'success');
+                    closeModal();
+                    await this.updateBranchDisplay(terminalId);
+                } else {
+                    this.showNotification(result.error || 'Failed to create branch', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating branch:', error);
+                this.showNotification('Error creating branch', 'error');
+            }
+        });
+        
+        // Switch branch functionality
+        modal.querySelectorAll('.switch-branch-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const branchName = btn.dataset.branch;
+                
+                try {
+                    const result = await ipcRenderer.invoke('git-switch-branch', branchName, terminalId);
+                    
+                    if (result.success) {
+                        this.showNotification(`Switched to branch '${result.branchName}'`, 'success');
+                        closeModal();
+                        await this.updateBranchDisplay(terminalId);
+                    } else {
+                        this.showNotification(result.error || 'Failed to switch branch', 'error');
+                    }
+                } catch (error) {
+                    console.error('Error switching branch:', error);
+                    this.showNotification('Error switching branch', 'error');
+                }
+            });
+        });
+        
+        // Enter key for creating branch
+        branchNameInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                createBranchBtn.click();
+            }
+        });
+        
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) closeModal();
+        });
+        
+        setTimeout(() => {
+            modal.classList.add('show');
+            branchNameInput.focus();
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 10);
+    }
+    
     showInlineNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `inline-notification ${type}`;
@@ -1645,6 +1838,11 @@ class TerminalManager {
             // Show git button only if there are active terminals
             const hasActiveTerminals = this.terminals.size > 0;
             gitButton.style.display = hasActiveTerminals ? 'block' : 'none';
+            
+            // Also update branch display when terminals are active
+            if (hasActiveTerminals) {
+                this.updateBranchDisplay();
+            }
         }
     }
 
@@ -1733,6 +1931,39 @@ class TerminalManager {
         setInterval(() => {
             this.updateCurrentTaskIndicators();
         }, 30000); // 30 seconds
+        
+        // Set up notification file monitoring for immediate task completion alerts
+        this.startNotificationFileMonitoring();
+    }
+
+    // Monitor notification file for immediate task completion alerts
+    startNotificationFileMonitoring() {
+        // Check for notifications every 2 seconds for immediate feedback
+        setInterval(() => {
+            this.checkForTaskCompletionNotifications();
+        }, 2000);
+    }
+
+    async checkForTaskCompletionNotifications() {
+        try {
+            const result = await ipcRenderer.invoke('check-task-notifications');
+            if (result.success && result.notifications && result.notifications.length > 0) {
+                result.notifications.forEach(notification => {
+                    if (notification.type === 'task_completed') {
+                        this.showDesktopNotification(
+                            'Task Completed',
+                            `Task "${notification.taskTitle}" has been completed!`
+                        );
+                        
+                        // Immediately update task indicators to reflect the change
+                        this.updateCurrentTaskIndicators();
+                    }
+                });
+            }
+        } catch (error) {
+            // Silently fail - this is just for notifications
+            console.log('Notification check failed:', error);
+        }
     }
 }
 
