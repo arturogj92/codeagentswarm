@@ -82,7 +82,11 @@ class SimpleShell {
     this.historyIndex = -1;
     this.ready = true;
     
-    this.sendOutput(`\r\n🚀 Terminal ${quadrant + 1} ready!\r\n`);
+    // Set environment variables for this quadrant globally (1-based)
+    process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
+    process.env.CODEAGENTSWARM_CURRENT_QUADRANT = (quadrant + 1).toString();
+    
+    this.sendOutput(`\r\n🚀 Terminal ${quadrant + 1} ready! (Quadrant: ${quadrant})\r\n`);
     this.sendPrompt();
   }
   
@@ -178,6 +182,20 @@ class SimpleShell {
       return;
     }
     
+    // Handle environment variable queries
+    if (command.startsWith('echo $CODEAGENTSWARM')) {
+      const varName = command.replace('echo $', '');
+      if (varName === 'CODEAGENTSWARM_CURRENT_QUADRANT') {
+        this.sendOutput(`${this.quadrant + 1}\r\n`);
+      } else if (varName === `CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`) {
+        this.sendOutput(`true\r\n`);
+      } else {
+        this.sendOutput(`\r\n`);
+      }
+      if (!silent) this.sendPrompt();
+      return;
+    }
+    
     
     // Execute real commands
     this.executeRealCommand(command);
@@ -223,6 +241,10 @@ class SimpleShell {
         env.PATH = [...additionalPaths, currentPath].join(':');
       }
 
+      // Add quadrant identification to environment (1-based)
+      env[`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`] = 'true';
+      env.CODEAGENTSWARM_CURRENT_QUADRANT = (this.quadrant + 1).toString();
+
       childProcess = pty.spawn(userShell, ['-l', '-c', fullCommand], {
         name: 'xterm-color',
         cwd: this.cwd,
@@ -243,6 +265,8 @@ class SimpleShell {
           TERM: 'xterm-256color',
           SHELL: userShell,
           HOME: process.env.HOME,
+          [`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`]: 'true',
+          CODEAGENTSWARM_CURRENT_QUADRANT: (this.quadrant + 1).toString(),
           USER: process.env.USER,
           FORCE_COLOR: '1',
           CLICOLOR: '1',
@@ -348,6 +372,10 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
     const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
     
     // Creating terminal ${quadrant}
+    
+    // Set environment variable to identify the quadrant (1-based)
+    process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
+    process.env.CODEAGENTSWARM_CURRENT_QUADRANT = (quadrant + 1).toString();
     
     // Fix PATH for packaged apps before creating shell
     if (app.isPackaged) {
@@ -657,7 +685,7 @@ ipcMain.handle('get-mcp-port', async () => {
 });
 
 // Open Kanban window
-ipcMain.on('open-kanban-window', () => {
+ipcMain.on('open-kanban-window', (event, options = {}) => {
   const kanbanWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -666,17 +694,26 @@ ipcMain.on('open-kanban-window', () => {
       nodeIntegration: true,
       contextIsolation: false
     },
-    parent: mainWindow,
+    // Remove parent relationship to prevent minimizing main window
     modal: false,
     show: true,
     autoHideMenuBar: true,
     resizable: true,
     minimizable: true,
     maximizable: true,
-    closable: true
+    closable: true,
+    // Add icon to make it look like a separate app
+    icon: path.join(__dirname, 'assets', 'icon.png')
   });
 
   kanbanWindow.loadFile('kanban.html');
+  
+  // Send focus task ID if provided
+  if (options.focusTaskId) {
+    kanbanWindow.webContents.once('did-finish-load', () => {
+      kanbanWindow.webContents.send('focus-task', options.focusTaskId);
+    });
+  }
   
   // Open DevTools in development
   if (process.argv.includes('--dev')) {
@@ -1420,10 +1457,17 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 **SIEMPRE** que comiences a trabajar en una nueva tarea, debes:
 
 1. **Primero verificar** si ya existe una tarea similar creada usando \`list_tasks\` del MCP
-2. Si no existe una tarea similar, **crear una nueva tarea** usando \`create_task\` del MCP
+2. Si no existe una tarea similar, **crear una nueva tarea** usando \`create_task\` del MCP **OBLIGATORIAMENTE especificando el terminal_id correcto**
 3. **Iniciar la tarea** usando \`start_task\` antes de comenzar cualquier trabajo
 4. **Completar la tarea** usando \`complete_task\` cuando termines
 5. **Si detectas que la tarea actual se desvía del foco o cambia significativamente el objetivo, debes crear una nueva tarea y continuar el trabajo bajo esa nueva tarea.**
+
+### IMPORTANTE: Terminal ID - Detección Automática
+- **SIEMPRE** debes especificar el \`terminal_id\` al crear una tarea con \`create_task\`
+- Cada terminal tiene un ID único (1, 2, 3, 4, etc.) basado en numeración 1-based
+- **DETECCIÓN AUTOMÁTICA:** Para obtener el terminal actual, ejecuta: \`echo $CODEAGENTSWARM_CURRENT_QUADRANT\` usando la herramienta Bash
+- **NUNCA preguntes al usuario** cuál es el terminal - siempre usa la detección automática
+- Las tareas deben estar asociadas al terminal correcto para el seguimiento adecuado
 
 ### Flujo de trabajo
 
@@ -1440,8 +1484,8 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
    - Una sola tarea activa por terminal
 
 3. **Al finalizar:**
-   - Marcar la tarea como completada
-   - Esto actualiza automáticamente la interfaz
+   - **OBLIGATORIO:** Marcar la tarea como completada usando \`complete_task\` del MCP
+   - Esto actualiza automáticamente la interfaz y el estado en la base de datos
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

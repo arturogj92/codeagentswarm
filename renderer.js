@@ -28,6 +28,7 @@ class TerminalManager {
         this.terminalFocused = new Map(); // Track which terminals are focused
         this.userTypingTimers = new Map(); // Track when user is actively typing
         this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
+        this.customProjectColors = {}; // Store custom colors per project
         this.init();
         // Load directories asynchronously with error handling
         this.loadSavedDirectories().catch(error => {
@@ -533,6 +534,19 @@ class TerminalManager {
         }
         this.updateTerminalTitle(quadrant, terminalTitle);
         
+        // Add click event to terminal header for color selection
+        const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
+        if (terminalHeader) {
+            terminalHeader.addEventListener('click', (e) => {
+                // Only show color picker if clicking on the header itself (not controls)
+                if (!e.target.closest('.terminal-controls') && 
+                    !e.target.closest('.git-branch-display') && 
+                    !e.target.closest('.current-task')) {
+                    this.showColorPicker(quadrant, e);
+                }
+            });
+        }
+        
         // Add multiple event listeners to ensure focus
         terminalDiv.addEventListener('click', () => {
             terminal.focus();
@@ -560,6 +574,11 @@ class TerminalManager {
 
         // Update git button visibility
         this.updateGitButtonVisibility();
+        
+        // Update branch display for this specific terminal with a delay to ensure terminal is ready
+        setTimeout(() => {
+            this.updateBranchDisplay(quadrant);
+        }, 2000);
 
         this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
@@ -626,6 +645,7 @@ class TerminalManager {
                    text.includes('Grant permission') ||
                    text.includes('Enable MCP') ||
                    text.includes('Trust this') ||
+                   text.includes('make this edit') ||
                    text.includes('Confirm')) {
             this.handleConfirmationRequest(text, quadrant);
         } else if (text.includes('Starting task') || text.includes('Processing...')) {
@@ -702,7 +722,8 @@ class TerminalManager {
                               text.includes('Enable MCP') || 
                               text.includes('Trust this') ||
                               text.includes('Waiting for confirmation') ||
-                              text.includes('Do you trust the files');
+                              text.includes('Do you trust the files') ||
+                              text.includes('make this edit');
         
         if (!hasConfirmation) {
             return;
@@ -756,7 +777,8 @@ class TerminalManager {
                 line.includes('Continue?') || line.includes('Would you like to') ||
                 line.includes('Allow access to') || line.includes('Grant permission') ||
                 line.includes('Enable MCP') || line.includes('Trust this') ||
-                line.includes('Waiting for confirmation') || line.includes('Do you trust the files')) {
+                line.includes('Waiting for confirmation') || line.includes('Do you trust the files') ||
+                line.includes('make this edit')) {
                 confirmationQuestion = line.trim().replace(/[│]/g, '').trim();
                 break;
             }
@@ -934,6 +956,372 @@ class TerminalManager {
         if (titleElement) {
             titleElement.textContent = title;
         }
+        
+        // Update terminal header color based on project
+        this.updateTerminalHeaderColor(quadrant);
+    }
+
+    // Generate a unique color based on project name
+    generateProjectColor(projectName) {
+        if (!projectName) {
+            return null; // Return null for default color
+        }
+        
+        // Check if there's a custom color for this project
+        if (this.customProjectColors[projectName]) {
+            return this.customProjectColors[projectName];
+        }
+        
+        // Predefined beautiful color palettes that match the app design
+        const colorPalettes = [
+            // Purple/Violet theme (matches app primary)
+            { primary: '#7f5af0', light: '#9171f8', dark: '#6d47e8', name: 'purple' },
+            // Teal/Cyan theme
+            { primary: '#06b6d4', light: '#22d3ee', dark: '#0891b2', name: 'cyan' },
+            // Green theme (matches app secondary)
+            { primary: '#2cb67d', light: '#34d399', dark: '#10b981', name: 'green' },
+            // Orange theme (matches app accent)
+            { primary: '#ff8906', light: '#fbbf24', dark: '#f59e0b', name: 'orange' },
+            // Pink theme
+            { primary: '#ec4899', light: '#f472b6', dark: '#db2777', name: 'pink' },
+            // Blue theme
+            { primary: '#3b82f6', light: '#60a5fa', dark: '#2563eb', name: 'blue' },
+            // Indigo theme
+            { primary: '#6366f1', light: '#818cf8', dark: '#4f46e5', name: 'indigo' },
+            // Red theme
+            { primary: '#ef4444', light: '#f87171', dark: '#dc2626', name: 'red' },
+            // Emerald theme
+            { primary: '#059669', light: '#10b981', dark: '#047857', name: 'emerald' },
+            // Yellow theme
+            { primary: '#eab308', light: '#facc15', dark: '#ca8a04', name: 'yellow' },
+            // Violet theme
+            { primary: '#8b5cf6', light: '#a78bfa', dark: '#7c3aed', name: 'violet' },
+            // Rose theme
+            { primary: '#f43f5e', light: '#fb7185', dark: '#e11d48', name: 'rose' }
+        ];
+        
+        // Generate a hash from the project name
+        let hash = 0;
+        for (let i = 0; i < projectName.length; i++) {
+            const char = projectName.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
+        }
+        
+        // Select a color palette based on the hash
+        const paletteIndex = Math.abs(hash) % colorPalettes.length;
+        const palette = colorPalettes[paletteIndex];
+        
+        return {
+            name: palette.name,
+            primary: palette.primary,
+            light: palette.light,
+            dark: palette.dark,
+            transparent: `${palette.primary}20`, // 20% opacity
+            glow: `${palette.primary}40` // 40% opacity for glow effects
+        };
+    }
+
+    // Update terminal header color based on project
+    updateTerminalHeaderColor(quadrant) {
+        const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
+        if (!terminalHeader) return;
+        
+        // Only apply colors if terminal is actually running
+        if (!this.terminals.has(quadrant)) {
+            // Reset to default colors for inactive terminals
+            terminalHeader.style.background = 'rgba(255, 255, 255, 0.03)';
+            terminalHeader.style.borderBottomColor = 'var(--border)';
+            terminalHeader.style.borderBottomWidth = '1px';
+            terminalHeader.style.boxShadow = '';
+            
+            const titleElement = terminalHeader.querySelector('.terminal-title');
+            if (titleElement) {
+                titleElement.style.background = '';
+                titleElement.style.webkitBackgroundClip = '';
+                titleElement.style.webkitTextFillColor = '';
+                titleElement.style.backgroundClip = '';
+                titleElement.style.color = 'var(--text-secondary)';
+                titleElement.style.fontWeight = '600';
+                titleElement.style.textShadow = '';
+                titleElement.style.filter = '';
+            }
+            return;
+        }
+        
+        // Get the project name for this terminal
+        const projectName = this.getTerminalProjectName(quadrant);
+        
+        if (projectName) {
+            const colors = this.generateProjectColor(projectName);
+            if (colors) {
+                // Apply beautiful gradient background with project color
+                terminalHeader.style.background = `linear-gradient(135deg, ${colors.transparent}, rgba(255, 255, 255, 0.02))`;
+                terminalHeader.style.borderBottomColor = colors.primary;
+                terminalHeader.style.borderBottomWidth = '2px';
+                terminalHeader.style.boxShadow = `
+                    inset 0 1px 0 ${colors.glow},
+                    0 1px 0 rgba(0, 0, 0, 0.2),
+                    0 0 20px ${colors.transparent}
+                `;
+                
+                // Update the terminal title with gradient text effect
+                const titleElement = terminalHeader.querySelector('.terminal-title');
+                if (titleElement) {
+                    titleElement.style.background = `linear-gradient(135deg, ${colors.primary}, ${colors.light})`;
+                    titleElement.style.webkitBackgroundClip = 'text';
+                    titleElement.style.webkitTextFillColor = 'transparent';
+                    titleElement.style.backgroundClip = 'text';
+                    titleElement.style.fontWeight = '700';
+                    titleElement.style.textShadow = '';
+                    titleElement.style.filter = `drop-shadow(0 0 8px ${colors.glow})`;
+                }
+                
+                // Apply subtle color to git branch display if present
+                const gitBranchDisplay = terminalHeader.querySelector('.git-branch-display');
+                if (gitBranchDisplay) {
+                    gitBranchDisplay.style.background = colors.transparent;
+                    gitBranchDisplay.style.borderColor = colors.primary;
+                    gitBranchDisplay.style.color = colors.primary;
+                }
+                
+                // Apply subtle color to task indicator if present (only color, no background/border)
+                const taskIndicator = terminalHeader.querySelector('.current-task');
+                if (taskIndicator) {
+                    taskIndicator.style.color = colors.light;
+                }
+            }
+        } else {
+            // Reset to default colors when no project
+            terminalHeader.style.background = 'rgba(255, 255, 255, 0.03)';
+            terminalHeader.style.borderBottomColor = 'var(--border)';
+            terminalHeader.style.borderBottomWidth = '1px';
+            terminalHeader.style.boxShadow = '';
+            
+            // Reset title to default styling
+            const titleElement = terminalHeader.querySelector('.terminal-title');
+            if (titleElement) {
+                titleElement.style.background = '';
+                titleElement.style.webkitBackgroundClip = '';
+                titleElement.style.webkitTextFillColor = '';
+                titleElement.style.backgroundClip = '';
+                titleElement.style.color = 'var(--text-secondary)';
+                titleElement.style.fontWeight = '600';
+                titleElement.style.textShadow = '';
+                titleElement.style.filter = '';
+            }
+            
+            // Reset git branch display
+            const gitBranchDisplay = terminalHeader.querySelector('.git-branch-display');
+            if (gitBranchDisplay) {
+                gitBranchDisplay.style.background = 'rgba(44, 182, 125, 0.1)';
+                gitBranchDisplay.style.borderColor = 'rgba(44, 182, 125, 0.3)';
+                gitBranchDisplay.style.color = 'var(--secondary)';
+            }
+            
+            // Reset task indicator
+            const taskIndicator = terminalHeader.querySelector('.current-task');
+            if (taskIndicator) {
+                taskIndicator.style.color = 'rgba(255, 255, 255, 0.7)';
+            }
+        }
+    }
+
+    // Get the project name for a specific terminal
+    getTerminalProjectName(quadrant) {
+        // Get the directory for this terminal
+        const directory = this.lastSelectedDirectories[quadrant];
+        if (!directory) return null;
+        
+        // Extract project name from directory path
+        return directory.split('/').pop() || directory.split('\\').pop() || null;
+    }
+
+    // Show color picker for terminal header
+    showColorPicker(quadrant, event) {
+        // Get the project name
+        const projectName = this.getTerminalProjectName(quadrant);
+        if (!projectName) {
+            this.showNotification('No project selected for this terminal', 'warning');
+            return;
+        }
+
+        // Remove any existing color picker
+        const existingPicker = document.querySelector('.color-picker-modal');
+        if (existingPicker) {
+            existingPicker.remove();
+        }
+
+        // Create color picker modal
+        const modal = document.createElement('div');
+        modal.className = 'color-picker-modal';
+        modal.innerHTML = `
+            <div class="color-picker-content">
+                <div class="color-picker-header">
+                    <h3><i data-lucide="palette"></i> Choose Color for "${projectName}"</h3>
+                    <button class="close-btn" id="close-color-picker">×</button>
+                </div>
+                <div class="color-picker-body">
+                    <div class="color-options">
+                        <div class="color-option" data-color="purple" style="background: linear-gradient(135deg, #7f5af0, #9171f8)">
+                            <span class="color-name">Purple</span>
+                        </div>
+                        <div class="color-option" data-color="cyan" style="background: linear-gradient(135deg, #06b6d4, #22d3ee)">
+                            <span class="color-name">Cyan</span>
+                        </div>
+                        <div class="color-option" data-color="green" style="background: linear-gradient(135deg, #2cb67d, #34d399)">
+                            <span class="color-name">Green</span>
+                        </div>
+                        <div class="color-option" data-color="orange" style="background: linear-gradient(135deg, #ff8906, #fbbf24)">
+                            <span class="color-name">Orange</span>
+                        </div>
+                        <div class="color-option" data-color="pink" style="background: linear-gradient(135deg, #ec4899, #f472b6)">
+                            <span class="color-name">Pink</span>
+                        </div>
+                        <div class="color-option" data-color="blue" style="background: linear-gradient(135deg, #3b82f6, #60a5fa)">
+                            <span class="color-name">Blue</span>
+                        </div>
+                        <div class="color-option" data-color="indigo" style="background: linear-gradient(135deg, #6366f1, #818cf8)">
+                            <span class="color-name">Indigo</span>
+                        </div>
+                        <div class="color-option" data-color="red" style="background: linear-gradient(135deg, #ef4444, #f87171)">
+                            <span class="color-name">Red</span>
+                        </div>
+                        <div class="color-option" data-color="emerald" style="background: linear-gradient(135deg, #059669, #10b981)">
+                            <span class="color-name">Emerald</span>
+                        </div>
+                        <div class="color-option" data-color="yellow" style="background: linear-gradient(135deg, #eab308, #facc15)">
+                            <span class="color-name">Yellow</span>
+                        </div>
+                        <div class="color-option" data-color="violet" style="background: linear-gradient(135deg, #8b5cf6, #a78bfa)">
+                            <span class="color-name">Violet</span>
+                        </div>
+                        <div class="color-option" data-color="rose" style="background: linear-gradient(135deg, #f43f5e, #fb7185)">
+                            <span class="color-name">Rose</span>
+                        </div>
+                    </div>
+                    <div class="color-actions">
+                        <button class="btn btn-small" id="reset-color">Reset to Auto</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Position the modal near the clicked element
+        const rect = event.currentTarget.getBoundingClientRect();
+        const modalContent = modal.querySelector('.color-picker-content');
+        modalContent.style.position = 'fixed';
+        modalContent.style.top = `${rect.bottom + 10}px`;
+        modalContent.style.left = `${Math.min(rect.left, window.innerWidth - 350)}px`;
+
+        // Add event listeners
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        // Close button
+        modal.querySelector('#close-color-picker').addEventListener('click', closeModal);
+
+        // Color options
+        modal.querySelectorAll('.color-option').forEach(option => {
+            option.addEventListener('click', () => {
+                const colorName = option.dataset.color;
+                this.setProjectColor(projectName, colorName);
+                closeModal();
+            });
+        });
+
+        // Reset color button
+        modal.querySelector('#reset-color').addEventListener('click', () => {
+            this.resetProjectColor(projectName);
+            closeModal();
+        });
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Show modal with animation
+        setTimeout(() => {
+            modal.classList.add('show');
+            // Initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 10);
+    }
+
+    // Set custom color for a project
+    setProjectColor(projectName, colorName) {
+        // Find the color palette
+        const colorPalettes = [
+            { primary: '#7f5af0', light: '#9171f8', dark: '#6d47e8', name: 'purple' },
+            { primary: '#06b6d4', light: '#22d3ee', dark: '#0891b2', name: 'cyan' },
+            { primary: '#2cb67d', light: '#34d399', dark: '#10b981', name: 'green' },
+            { primary: '#ff8906', light: '#fbbf24', dark: '#f59e0b', name: 'orange' },
+            { primary: '#ec4899', light: '#f472b6', dark: '#db2777', name: 'pink' },
+            { primary: '#3b82f6', light: '#60a5fa', dark: '#2563eb', name: 'blue' },
+            { primary: '#6366f1', light: '#818cf8', dark: '#4f46e5', name: 'indigo' },
+            { primary: '#ef4444', light: '#f87171', dark: '#dc2626', name: 'red' },
+            { primary: '#059669', light: '#10b981', dark: '#047857', name: 'emerald' },
+            { primary: '#eab308', light: '#facc15', dark: '#ca8a04', name: 'yellow' },
+            { primary: '#8b5cf6', light: '#a78bfa', dark: '#7c3aed', name: 'violet' },
+            { primary: '#f43f5e', light: '#fb7185', dark: '#e11d48', name: 'rose' }
+        ];
+
+        const palette = colorPalettes.find(p => p.name === colorName);
+        if (palette) {
+            this.customProjectColors[projectName] = {
+                name: palette.name,
+                primary: palette.primary,
+                light: palette.light,
+                dark: palette.dark,
+                transparent: `${palette.primary}20`,
+                glow: `${palette.primary}40`
+            };
+
+            // Update all terminals with this project
+            this.updateAllTerminalsWithProject(projectName);
+            
+            this.showNotification(`Color set to ${colorName} for project "${projectName}"`, 'success');
+        }
+    }
+
+    // Reset project color to auto-generated
+    resetProjectColor(projectName) {
+        delete this.customProjectColors[projectName];
+        
+        // Update all terminals with this project
+        this.updateAllTerminalsWithProject(projectName);
+        
+        this.showNotification(`Color reset to auto for project "${projectName}"`, 'success');
+    }
+
+    // Update all terminals that belong to the same project
+    updateAllTerminalsWithProject(projectName) {
+        for (let i = 0; i < 4; i++) {
+            // Only update if terminal is actually active (has a terminal running)
+            if (this.terminals.has(i)) {
+                const terminalProjectName = this.getTerminalProjectName(i);
+                if (terminalProjectName === projectName) {
+                    this.updateTerminalHeaderColor(i);
+                }
+            }
+        }
     }
 
     toggleFullscreen(quadrant) {
@@ -1010,6 +1398,9 @@ class TerminalManager {
             });
             
             this.updateTerminalTitle(quadrant, `Terminal ${quadrant + 1}`);
+            
+            // Reset terminal header color
+            this.updateTerminalHeaderColor(quadrant);
             
             // Update git button visibility
             this.updateGitButtonVisibility();
@@ -1639,21 +2030,25 @@ class TerminalManager {
                 branchName.textContent = result.currentBranch;
                 branchDisplay.style.display = 'flex';
                 
-                // Setup click event for this terminal's branch button if not already setup
-                const branchBtn = branchDisplay.querySelector('.branch-switch-btn');
-                if (branchBtn && !branchBtn.hasAttribute('data-listener-set')) {
-                    branchBtn.addEventListener('click', (e) => {
+                // Set tooltip with branch name
+                branchDisplay.title = `Current branch: ${result.currentBranch}\nClick to switch branches`;
+                
+                // Setup click event for the entire branch display (not just the button)
+                if (!branchDisplay.hasAttribute('data-listener-set')) {
+                    branchDisplay.addEventListener('click', (e) => {
                         e.preventDefault();
                         e.stopPropagation();
                         this.showBranchSelector(terminalId);
                     });
-                    branchBtn.setAttribute('data-listener-set', 'true');
+                    branchDisplay.setAttribute('data-listener-set', 'true');
                 }
-            } else if (branchDisplay) {
-                branchDisplay.style.display = 'none';
+            } else {
+                if (branchDisplay) {
+                    branchDisplay.style.display = 'none';
+                }
             }
         } catch (error) {
-            console.error('Error updating branch display:', error);
+            console.error(`Error updating branch display for terminal ${terminalId}:`, error);
             const branchDisplay = document.getElementById(`git-branch-display-${terminalId}`);
             if (branchDisplay) {
                 branchDisplay.style.display = 'none';
@@ -1841,7 +2236,10 @@ class TerminalManager {
             
             // Also update branch display when terminals are active
             if (hasActiveTerminals) {
-                this.updateBranchDisplay();
+                // Update branch display for all active terminals
+                this.terminals.forEach((terminal, terminalId) => {
+                    this.updateBranchDisplay(terminalId);
+                });
             }
         }
     }
@@ -1851,14 +2249,17 @@ class TerminalManager {
     async updateCurrentTaskIndicators() {
         // Update task indicators for all terminals
         for (let i = 0; i < 4; i++) {
-            await this.updateTerminalTaskIndicator(i);
+            // Convert quadrant (0-3) to terminal_id (1-4)
+            await this.updateTerminalTaskIndicator(i + 1);
         }
     }
 
     async updateTerminalTaskIndicator(terminalId) {
         try {
             const result = await ipcRenderer.invoke('task-get-current', terminalId);
-            const taskIndicator = document.getElementById(`current-task-${terminalId}`);
+            // Convert terminal_id (1-4) back to quadrant (0-3) for DOM element lookup
+            const quadrant = terminalId - 1;
+            const taskIndicator = document.getElementById(`current-task-${quadrant}`);
             
             if (!taskIndicator) return;
 
@@ -1869,7 +2270,17 @@ class TerminalManager {
                 if (taskText) {
                     taskText.textContent = task.title;
                     taskIndicator.style.display = 'flex';
-                    taskIndicator.title = `Task: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                    taskIndicator.title = `Click to open Task: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                    
+                    // Remove any existing click listener and add new one
+                    const newTaskIndicator = taskIndicator.cloneNode(true);
+                    taskIndicator.parentNode.replaceChild(newTaskIndicator, taskIndicator);
+                    
+                    // Add click event to open task manager with this task
+                    newTaskIndicator.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.openTaskInKanban(task.id);
+                    });
                 }
             } else {
                 taskIndicator.style.display = 'none';
@@ -1877,6 +2288,12 @@ class TerminalManager {
         } catch (error) {
             console.error(`Error updating task indicator for terminal ${terminalId}:`, error);
         }
+    }
+
+    // Open task manager and focus on specific task
+    openTaskInKanban(taskId) {
+        // Open the kanban window
+        ipcRenderer.send('open-kanban-window', { focusTaskId: taskId });
     }
 
     async createTaskForTerminal(terminalId, title, description) {
@@ -1922,15 +2339,15 @@ class TerminalManager {
         }
     }
 
-    // Periodically update task indicators (every 30 seconds)
+    // Periodically update task indicators (every 5 seconds)
     startTaskIndicatorUpdates() {
         // Initial update
         this.updateCurrentTaskIndicators();
         
-        // Set up periodic updates
+        // Set up periodic updates (more frequent for better UX)
         setInterval(() => {
             this.updateCurrentTaskIndicators();
-        }, 30000); // 30 seconds
+        }, 5000); // 5 seconds instead of 30
         
         // Set up notification file monitoring for immediate task completion alerts
         this.startNotificationFileMonitoring();

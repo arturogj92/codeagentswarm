@@ -254,7 +254,7 @@ class DatabaseManager {
             const stmt = this.db.prepare(`
                 SELECT * FROM tasks 
                 WHERE terminal_id = ? AND status = 'in_progress'
-                ORDER BY updated_at DESC
+                ORDER BY created_at ASC
                 LIMIT 1
             `);
             

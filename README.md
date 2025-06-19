@@ -51,6 +51,27 @@ npm run build
 
 Built for efficient Claude Code workflow management with beautiful, functional design.
 
+## Database Access
+
+To query the tasks database directly:
+
+```bash
+sqlite3 "/Users/vzgb9jp/Library/Application Support/codeagentswarm/codeagentswarm.db" "SELECT * FROM tasks;"
+```
+
+### Common Database Queries
+
+```bash
+# List all tasks with their terminal assignments
+sqlite3 "/Users/vzgb9jp/Library/Application Support/codeagentswarm/codeagentswarm.db" "SELECT id, title, terminal_id, status FROM tasks;"
+
+# Check specific task by title
+sqlite3 "/Users/vzgb9jp/Library/Application Support/codeagentswarm/codeagentswarm.db" "SELECT id, title, terminal_id FROM tasks WHERE title = 'task_name';"
+
+# View database schema
+sqlite3 "/Users/vzgb9jp/Library/Application Support/codeagentswarm/codeagentswarm.db" ".schema"
+```
+
 ### Note
 
 This version uses **node-pty** for more stable terminal sessions. Run `npm install` after updating to ensure all dependencies are installed.

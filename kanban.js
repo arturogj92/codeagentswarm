@@ -101,6 +101,9 @@ class KanbanManager {
                     } else {
                         list.insertBefore(draggingCard, afterElement);
                     }
+                    
+                    // Auto-scroll when dragging near the edges
+                    this.handleAutoScroll(list, e.clientY);
                 }
             });
 
@@ -143,6 +146,22 @@ class KanbanManager {
                 return closest;
             }
         }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
+    handleAutoScroll(list, clientY) {
+        const scrollThreshold = 50; // pixels from edge to trigger scroll
+        const scrollSpeed = 10; // pixels per scroll
+        const listRect = list.getBoundingClientRect();
+        
+        // Check if we're near the top of the list
+        if (clientY - listRect.top < scrollThreshold) {
+            list.scrollTop = Math.max(0, list.scrollTop - scrollSpeed);
+        }
+        
+        // Check if we're near the bottom of the list
+        if (listRect.bottom - clientY < scrollThreshold) {
+            list.scrollTop = Math.min(list.scrollHeight - list.clientHeight, list.scrollTop + scrollSpeed);
+        }
     }
 
     async updateTaskOrder(list, status) {
@@ -241,7 +260,7 @@ class KanbanManager {
         taskCard.dataset.taskId = task.id;
 
         const terminalInfo = task.terminal_id !== null ? 
-            `<span class="task-terminal">Terminal ${parseInt(task.terminal_id) + 1}</span>` : '';
+            `<span class="task-terminal">Terminal ${parseInt(task.terminal_id)}</span>` : '';
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
 
@@ -354,7 +373,7 @@ class KanbanManager {
         document.getElementById('details-description').textContent = task.description || 'No description';
         
         const statusText = task.status.replace('_', ' ').toUpperCase();
-        const terminalText = task.terminal_id !== null ? `Terminal ${parseInt(task.terminal_id) + 1}` : 'No specific terminal';
+        const terminalText = task.terminal_id !== null ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
         const createdText = new Date(task.created_at).toLocaleString();
         
         document.getElementById('details-status').textContent = `Status: ${statusText}`;
@@ -375,8 +394,9 @@ class KanbanManager {
 
     editCurrentTask() {
         if (this.currentTask) {
+            const taskToEdit = this.currentTask; // Store reference before hiding modal
             this.hideTaskDetailsModal();
-            this.showEditTaskModal(this.currentTask);
+            this.showEditTaskModal(taskToEdit);
         }
     }
 
