@@ -9,8 +9,8 @@ const readline = require('readline');
 const path = require('path');
 const fs = require('fs');
 
-// Import our database manager
-const DatabaseManager = require('./database');
+// Import our MCP-compatible database manager
+const DatabaseManagerMCP = require('./database-mcp');
 
 class MCPStdioServer {
     constructor() {
@@ -38,15 +38,13 @@ class MCPStdioServer {
 
     initDatabase() {
         try {
-            // Try to find the database in the app directory
-            const appDir = __dirname;
-            const dbPath = path.join(appDir, 'codeagentswarm.db');
+            // Force MCP to use the same database path as Electron app
+            const os = require('os');
+            const electronDbPath = path.join(os.homedir(), 'Library', 'Application Support', 'codeagentswarm', 'codeagentswarm.db');
+            process.env.CODEAGENTSWARM_DB_PATH = electronDbPath;
             
-            // Use a custom path for the database when running as MCP
-            process.env.CODEAGENTSWARM_DB_PATH = dbPath;
-            
-            this.db = new DatabaseManager();
-            this.logError('Database initialized successfully');
+            this.db = new DatabaseManagerMCP();
+            this.logError('Database initialized successfully using Electron database:', electronDbPath);
         } catch (error) {
             this.logError('Failed to initialize database:', error.message);
             process.exit(1);
@@ -165,20 +163,11 @@ class MCPStdioServer {
 
     handleInitialize(params) {
         return {
+            protocolVersion: '2024-11-05',
             capabilities: {
                 tools: {},
                 resources: {},
-                prompts: {},
-                experimental: {
-                    tasks: {
-                        create: true,
-                        update_status: true,
-                        get_all: true,
-                        get_current: true,
-                        delete: true,
-                        update: true
-                    }
-                }
+                prompts: {}
             },
             serverInfo: {
                 name: 'CodeAgentSwarm Task Manager',
@@ -346,27 +335,43 @@ class MCPStdioServer {
     async callTool(params) {
         const { name, arguments: args } = params;
         
+        let result;
         switch (name) {
             case 'create_task':
-                return await this.createTask(args);
+                result = await this.createTask(args);
+                break;
                 
             case 'start_task':
-                return await this.updateTaskStatus({ task_id: args.task_id, status: 'in_progress' });
+                result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_progress' });
+                break;
                 
             case 'complete_task':
-                return await this.updateTaskStatus({ task_id: args.task_id, status: 'completed' });
+                result = await this.updateTaskStatus({ task_id: args.task_id, status: 'completed' });
+                break;
                 
             case 'list_tasks':
                 if (args.status) {
                     const tasks = this.db.getTasksByStatus(args.status);
-                    return { tasks };
+                    result = { tasks };
                 } else {
-                    return await this.getAllTasks({});
+                    const tasks = await this.db.getAllTasks();
+                    result = { tasks };
                 }
+                break;
                 
             default:
                 throw new Error(`Unknown tool: ${name}`);
         }
+        
+        // Return in MCP tool call result format
+        return {
+            content: [
+                {
+                    type: 'text',
+                    text: JSON.stringify(result, null, 2)
+                }
+            ]
+        };
     }
 
     // MCP Resources

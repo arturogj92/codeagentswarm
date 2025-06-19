@@ -454,48 +454,75 @@ ipcMain.handle('check-claude-code', async () => {
   });
 });
 
-// Auto-configure CLAUDE.md for MCP Task Manager
-function ensureClaudeMdConfiguration(directoryPath) {
+// Start MCP server as child process and register with Claude Code
+let mcpServerProcess = null;
+
+function startMCPServerAndRegister() {
   try {
-    const claudeMdPath = path.join(directoryPath, 'CLAUDE.md');
-    const mcpConfig = `
-## MCP Servers
+    // Start MCP server as child process
+    const serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+    mcpServerProcess = spawn('node', [serverPath], {
+      cwd: __dirname,
+      stdio: 'pipe'
+    });
 
-### Task Manager
-- **Command**: \`node mcp-stdio-server.js\`
-- **Description**: Task management system for CodeAgentSwarm
-- **Tools**: create_task, start_task, complete_task, list_tasks
-- **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks
+    console.log('🚀 Started MCP server as child process:', mcpServerProcess.pid);
 
-*Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality.*
-`;
+    // Handle server output
+    mcpServerProcess.stdout.on('data', (data) => {
+      console.log('MCP Server:', data.toString());
+    });
 
-    if (fs.existsSync(claudeMdPath)) {
-      // File exists, check if it has MCP configuration
-      const content = fs.readFileSync(claudeMdPath, 'utf8');
-      
-      if (!content.includes('### Task Manager') || !content.includes('mcp-stdio-server.js')) {
-        // Missing MCP config, append it
-        fs.appendFileSync(claudeMdPath, mcpConfig);
-        console.log('✅ Added MCP Task Manager configuration to existing CLAUDE.md');
-      } else {
-        console.log('✅ CLAUDE.md already has MCP Task Manager configuration');
-      }
-    } else {
-      // File doesn't exist, create it with MCP configuration
-      const initialContent = `# CodeAgentSwarm Project Configuration
+    mcpServerProcess.stderr.on('data', (data) => {
+      console.error('MCP Server Error:', data.toString());
+    });
 
-This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model Context Protocol) integration.
-${mcpConfig}`;
-      
-      fs.writeFileSync(claudeMdPath, initialContent);
-      console.log('✅ Created CLAUDE.md with MCP Task Manager configuration');
-    }
-    
+    mcpServerProcess.on('close', (code) => {
+      console.log('MCP server process exited with code:', code);
+    });
+
+    // Wait a moment for server to start, then register with Claude Code
+    setTimeout(() => {
+      registerWithClaude();
+    }, 1000);
+
     return true;
   } catch (error) {
-    console.error('❌ Failed to configure CLAUDE.md:', error.message);
+    console.error('❌ Failed to start MCP server:', error.message);
     return false;
+  }
+}
+
+function registerWithClaude() {
+  try {
+    // Use claude mcp add to register our server
+    const serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+    const registerProcess = spawn('claude', [
+      'mcp', 'add', 
+      'codeagentswarm-tasks',  // Server name
+      'node', serverPath       // Command and args
+    ], {
+      cwd: __dirname,
+      stdio: 'pipe'
+    });
+
+    registerProcess.on('close', (code) => {
+      if (code === 0) {
+        console.log('✅ Successfully registered MCP server with Claude Code');
+        console.log('💡 Use /mcp in Claude Code to see available tools');
+      } else {
+        console.error('❌ Failed to register MCP server with Claude Code (exit code:', code, ')');
+        console.log('💡 You can manually register with: claude mcp add codeagentswarm-tasks node', serverPath);
+      }
+    });
+
+    registerProcess.stderr.on('data', (data) => {
+      console.error('Claude registration error:', data.toString());
+    });
+
+  } catch (error) {
+    console.error('❌ Failed to register with Claude Code:', error.message);
+    console.log('💡 Make sure Claude Code is installed and accessible via "claude" command');
   }
 }
 
@@ -677,6 +704,13 @@ app.whenReady().then(async () => {
   
   createWindow();
   
+  // Start MCP server and register with Claude Code
+  try {
+    startMCPServerAndRegister();
+  } catch (error) {
+    console.error('Failed to start MCP server and register:', error);
+  }
+  
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
       createWindow();
@@ -690,9 +724,15 @@ app.on('window-all-closed', () => {
   });
   terminals.clear();
   
-  // Stop MCP server
+  // Stop MCP servers
   if (mcpServer) {
     mcpServer.stop();
+  }
+  
+  // Stop MCP child process
+  if (mcpServerProcess) {
+    mcpServerProcess.kill();
+    mcpServerProcess = null;
   }
   
   if (process.platform !== 'darwin') {
