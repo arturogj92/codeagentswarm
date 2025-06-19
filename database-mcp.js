@@ -175,27 +175,36 @@ class DatabaseManagerMCP {
 
     // Task management methods - same interface as main DatabaseManager
     createTask(title, description, terminalId) {
-        try {
-            const stmt = this.db.prepare(`
-                INSERT INTO tasks (title, description, terminal_id)
-                VALUES (?, ?, ?)
-            `);
-            const result = stmt.run(title, description || '', terminalId || 0);
-            stmt.finalize();
-            
-            // Log the action
-            this.logTaskAction(result.lastID, 'created', `Task created: ${title}`);
-            
-            return {
-                success: true,
-                taskId: result.lastID
-            };
-        } catch (error) {
-            return {
-                success: false,
-                error: error.message
-            };
-        }
+        const db = this.db; // Capture db reference for use in callback
+        return new Promise((resolve) => {
+            db.run(
+                `INSERT INTO tasks (title, description, terminal_id) VALUES (?, ?, ?)`,
+                [title, description || '', terminalId || 0],
+                function(err) {
+                    if (err) {
+                        resolve({
+                            success: false,
+                            error: err.message
+                        });
+                    } else {
+                        // In sqlite3, 'this' in the callback refers to the statement object
+                        const taskId = this.lastID;
+                        
+                        // Log the action
+                        db.run(
+                            `INSERT INTO task_history (task_id, action, details) VALUES (?, ?, ?)`,
+                            [taskId, 'created', `Task created: ${title}`],
+                            () => {} // Ignore errors in logging
+                        );
+                        
+                        resolve({
+                            success: true,
+                            taskId: taskId
+                        });
+                    }
+                }
+            );
+        });
     }
 
     updateTaskStatus(taskId, status) {

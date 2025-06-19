@@ -188,14 +188,14 @@ class MCPStdioServer {
             throw new Error('Title is required');
         }
         
-        const result = this.db.createTask(title, description, terminal_id);
+        const result = await this.db.createTask(title, description, terminal_id);
         
         if (!result.success) {
             throw new Error(result.error);
         }
         
         return {
-            task_id: result.taskId,
+            id: result.taskId,
             title,
             description,
             terminal_id,
