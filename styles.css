@@ -330,16 +330,17 @@ body::before {
   background: rgba(44, 182, 125, 0.1);
   border: 1px solid rgba(44, 182, 125, 0.3);
   border-radius: 12px;
-  padding: 4px 8px;
-  font-size: 0.7rem;
+  padding: 2px 6px;
+  font-size: 0.65rem;
   color: #2cb67d;
-  max-width: 180px;
+  max-width: 120px;
   overflow: hidden;
+  margin-left: 8px;
 }
 
 .current-task i {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   flex-shrink: 0;
 }
 
@@ -348,6 +349,7 @@ body::before {
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1;
+  font-weight: 500;
 }
 
 .current-task:hover {

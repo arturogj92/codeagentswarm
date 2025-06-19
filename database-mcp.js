@@ -189,19 +189,22 @@ class DatabaseManagerMCP {
     }
 
     getTasksByStatus(status) {
-        try {
-            const stmt = this.db.prepare(`
-                SELECT * FROM tasks 
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM tasks 
                 WHERE status = ? 
-                ORDER BY created_at DESC
-            `);
-            const tasks = stmt.all(status);
-            stmt.finalize();
-            return tasks;
-        } catch (error) {
-            console.error('Error getting tasks by status:', error);
-            return [];
-        }
+                ORDER BY created_at DESC`,
+                [status],
+                (err, rows) => {
+                    if (err) {
+                        console.error('Error getting tasks by status:', err);
+                        resolve([]);
+                    } else {
+                        resolve(rows || []);
+                    }
+                }
+            );
+        });
     }
 
     getCurrentTask(terminalId) {

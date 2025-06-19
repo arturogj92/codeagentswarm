@@ -351,7 +351,7 @@ class MCPStdioServer {
                 
             case 'list_tasks':
                 if (args.status) {
-                    const tasks = this.db.getTasksByStatus(args.status);
+                    const tasks = await this.db.getTasksByStatus(args.status);
                     result = { tasks };
                 } else {
                     const tasks = await this.db.getAllTasks();
