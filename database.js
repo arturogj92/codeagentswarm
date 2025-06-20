@@ -35,6 +35,7 @@ class DatabaseManager {
     }
 
     initialize() {
+        console.log('🚀 Initializing DatabaseManager...');
         // Create tables if they don't exist
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS terminal_directories (
@@ -76,6 +77,11 @@ class DatabaseManager {
         
         // Add implementation column if it doesn't exist (migration)
         this.addImplementationColumnIfNeeded();
+        
+        // Update status constraint to include in_testing (migration)
+        this.updateStatusConstraintIfNeeded();
+        
+        console.log('✅ DatabaseManager initialization completed');
     }
 
     addSortOrderColumnIfNeeded() {
@@ -134,6 +140,148 @@ class DatabaseManager {
             }
         } catch (error) {
             console.error('Error checking/adding implementation column:', error);
+        }
+    }
+
+    updateStatusConstraintIfNeeded() {
+        console.log('🔍 Checking if status constraint supports in_testing...');
+        try {
+            // Always try to insert a test record to check if constraint allows in_testing
+            try {
+                // Test if we can insert in_testing status
+                const testStmt = this.db.prepare("INSERT INTO tasks (title, status) VALUES (?, ?)");
+                const testResult = testStmt.run('__TEST_STATUS__', 'in_testing');
+                
+                // If successful, delete the test record and we're good
+                this.db.prepare("DELETE FROM tasks WHERE id = ?").run(testResult.lastInsertRowid);
+                console.log('✅ Status constraint already supports in_testing');
+            } catch (constraintError) {
+                // If it fails, we need to recreate the table using a simpler approach
+                console.log('❌ Status constraint needs updating. Error:', constraintError.message);
+                console.log('🔄 Attempting simple table recreation...');
+                this.simpleTableRecreation();
+                console.log('✅ Table recreation completed');
+            }
+        } catch (error) {
+            console.error('❌ Error checking/updating status constraint:', error);
+        }
+    }
+
+    recreateTasksTableWithNewConstraint() {
+        try {
+            console.log('  📦 Beginning transaction...');
+            this.db.exec('BEGIN TRANSACTION');
+            
+            console.log('  🔓 Disabling foreign key constraints...');
+            this.db.exec('PRAGMA foreign_keys = OFF');
+            
+            console.log('  🏗️  Creating new table with updated constraint...');
+            this.db.exec(`
+                CREATE TABLE tasks_new (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    plan TEXT,
+                    status TEXT CHECK(status IN ('pending', 'in_progress', 'in_testing', 'completed')) DEFAULT 'pending',
+                    terminal_id INTEGER,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    implementation TEXT
+                )
+            `);
+            
+            console.log('  📋 Copying existing data...');
+            this.db.exec(`
+                INSERT INTO tasks_new (id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation)
+                SELECT id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation
+                FROM tasks
+            `);
+            
+            console.log('  🔄 Replacing old table...');
+            this.db.exec('DROP TABLE tasks');
+            this.db.exec('ALTER TABLE tasks_new RENAME TO tasks');
+            
+            console.log('  🔒 Re-enabling foreign key constraints...');
+            this.db.exec('PRAGMA foreign_keys = ON');
+            
+            console.log('  💾 Committing transaction...');
+            this.db.exec('COMMIT');
+            
+            console.log('✅ Successfully updated tasks table with in_testing status constraint');
+        } catch (error) {
+            console.log('  ❌ Rolling back transaction due to error...');
+            this.db.exec('ROLLBACK');
+            this.db.exec('PRAGMA foreign_keys = ON'); // Re-enable foreign keys even on error
+            console.error('❌ Failed to update status constraint:', error);
+            throw error;
+        }
+    }
+
+    simpleTableRecreation() {
+        try {
+            // First, disable foreign keys
+            this.db.exec('PRAGMA foreign_keys = OFF');
+            
+            console.log('  📋 Backing up existing data...');
+            // Get all existing data
+            const existingTasks = this.db.prepare("SELECT * FROM tasks").all();
+            
+            console.log('  🗑️  Dropping old table...');
+            // Drop the old table
+            this.db.exec('DROP TABLE IF EXISTS tasks');
+            
+            console.log('  🏗️  Creating new table...');
+            // Create new table with correct constraint
+            this.db.exec(`
+                CREATE TABLE tasks (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    title TEXT NOT NULL,
+                    description TEXT,
+                    plan TEXT,
+                    status TEXT CHECK(status IN ('pending', 'in_progress', 'in_testing', 'completed')) DEFAULT 'pending',
+                    terminal_id INTEGER,
+                    sort_order INTEGER DEFAULT 0,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    implementation TEXT
+                )
+            `);
+            
+            console.log('  📤 Restoring data...');
+            // Restore data
+            if (existingTasks.length > 0) {
+                const insertStmt = this.db.prepare(`
+                    INSERT INTO tasks (id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `);
+                
+                for (const task of existingTasks) {
+                    insertStmt.run(
+                        task.id,
+                        task.title,
+                        task.description,
+                        task.plan,
+                        task.status,
+                        task.terminal_id,
+                        task.sort_order,
+                        task.created_at,
+                        task.updated_at,
+                        task.implementation
+                    );
+                }
+            }
+            
+            console.log('  🔒 Re-enabling foreign keys...');
+            // Re-enable foreign keys
+            this.db.exec('PRAGMA foreign_keys = ON');
+            
+            console.log('✅ Simple table recreation completed successfully');
+        } catch (error) {
+            console.log('  ❌ Simple recreation failed, re-enabling foreign keys...');
+            this.db.exec('PRAGMA foreign_keys = ON');
+            console.error('❌ Simple table recreation failed:', error);
+            throw error;
         }
     }
 
