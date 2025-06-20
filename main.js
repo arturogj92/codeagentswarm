@@ -684,6 +684,26 @@ ipcMain.handle('task-update-order', async (event, taskOrders) => {
   }
 });
 
+ipcMain.handle('task-update-plan', async (event, taskId, plan) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTaskPlan(taskId, plan);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-update-implementation', async (event, taskId, implementation) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTaskImplementation(taskId, implementation);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('get-mcp-port', async () => {
   try {
     if (!mcpServer) return { success: false, error: 'MCP server not started' };
@@ -713,17 +733,24 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
     maximizable: true,
     closable: true,
     // Add icon to make it look like a separate app
-    icon: path.join(__dirname, 'assets', 'icon.png')
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    // Focus the window when it opens
+    alwaysOnTop: false,
+    focusable: true
   });
 
   kanbanWindow.loadFile('kanban.html');
   
-  // Send focus task ID if provided
-  if (options.focusTaskId) {
-    kanbanWindow.webContents.once('did-finish-load', () => {
+  // Focus the window after loading
+  kanbanWindow.webContents.once('did-finish-load', () => {
+    kanbanWindow.focus();
+    kanbanWindow.show();
+    
+    // Send focus task ID if provided
+    if (options.focusTaskId) {
       kanbanWindow.webContents.send('focus-task', options.focusTaskId);
-    });
-  }
+    }
+  });
   
   // Open DevTools in development
   if (process.argv.includes('--dev')) {
@@ -1288,6 +1315,46 @@ ipcMain.handle('git-diff', async (event, fileName) => {
   }
 });
 
+// Git discard file changes handler
+ipcMain.handle('git-discard-file', async (event, fileName) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Discard changes to specific file
+    const output = execSync(`git checkout HEAD -- "${fileName}"`, { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: `Changes to ${fileName} discarded`, output };
+    
+  } catch (error) {
+    console.error('Git discard file error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to discard file changes'
+    };
+  }
+});
+
+// Git discard all changes handler
+ipcMain.handle('git-discard-all', async (event) => {
+  const { execSync } = require('child_process');
+  try {
+    const cwd = getGitWorkingDirectory();
+    
+    // Discard all changes to tracked files
+    const output = execSync('git checkout HEAD -- .', { cwd, encoding: 'utf8' });
+    
+    return { success: true, message: 'All changes discarded', output };
+    
+  } catch (error) {
+    console.error('Git discard all error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to discard all changes'
+    };
+  }
+});
+
 // Get all Git branches
 ipcMain.handle('git-get-branches', async (event, terminalId = null) => {
   const { execSync } = require('child_process');
@@ -1454,7 +1521,7 @@ This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model
 
 - **Command**: \`node mcp-stdio-server.js\`
 - **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, list_tasks, create_project, get_project_tasks
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, create_project, get_project_tasks
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
 - **Projects**: Tasks are now organized by projects based on terminal working directory
 
@@ -1469,8 +1536,9 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 1. **Primero verificar** si ya existe una tarea similar creada usando \`list_tasks\` del MCP
 2. Si no existe una tarea similar, **crear una nueva tarea** usando \`create_task\` del MCP **OBLIGATORIAMENTE especificando el terminal_id correcto**
 3. **Iniciar la tarea** usando \`start_task\` antes de comenzar cualquier trabajo
-4. **Completar la tarea** usando \`complete_task\` cuando termines
-5. **Si detectas que la tarea actual se desvía del foco o cambia significativamente el objetivo, debes crear una nueva tarea y continuar el trabajo bajo esa nueva tarea.**
+4. **OBLIGATORIO: Actualizar el plan** usando \`update_task_plan\` al comenzar una tarea con un plan detallado de los pasos a seguir
+5. **Completar la tarea** usando \`complete_task\` cuando termines (va directo a "completed") o \`submit_for_testing\` si necesita testing
+6. **Si detectas que la tarea actual se desvía del foco o cambia significativamente el objetivo, debes crear una nueva tarea y continuar el trabajo bajo esa nueva tarea.**
 
 ### IMPORTANTE: Terminal ID - Detección Automática
 - **SIEMPRE** debes especificar el \`terminal_id\` al crear una tarea con \`create_task\`
@@ -1478,6 +1546,49 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 - **DETECCIÓN AUTOMÁTICA:** Para obtener el terminal actual, ejecuta: \`echo $CODEAGENTSWARM_CURRENT_QUADRANT\` usando la herramienta Bash
 - **NUNCA preguntes al usuario** cuál es el terminal - siempre usa la detección automática
 - Las tareas deben estar asociadas al terminal correcto para el seguimiento adecuado
+
+### OBLIGATORIO: Gestión del campo PLAN
+
+**Cada tarea DEBE tener un plan detallado** que se actualiza cuando el agente la toma:
+
+1. **Al iniciar una tarea existente:**
+   - Usar \`update_task_plan\` para establecer un plan claro y detallado
+   - El plan debe incluir los pasos específicos que vas a seguir
+   - Formato sugerido: lista numerada de acciones concretas
+
+2. **Contenido del plan:**
+   - Desglose paso a paso de la implementación
+   - Archivos que se van a modificar o crear
+   - Dependencias o prerequisitos
+   - Criterios de éxito/finalización
+
+3. **Ejemplo de plan bien estructurado:**
+   \`\`\`
+   1. Revisar la estructura actual del código en src/components/
+   2. Crear nuevo componente UserProfile.jsx
+   3. Implementar la lógica de estado usando React hooks
+   4. Añadir estilos CSS en UserProfile.module.css
+   5. Integrar el componente en la página principal
+   6. Escribir tests unitarios para el componente
+   7. Verificar que la funcionalidad funciona correctamente
+   \`\`\`
+
+4. **Actualización del plan:**
+   - Si el plan cambia durante la ejecución, actualízalo usando \`update_task_plan\`
+   - Mantén el plan actualizado para que otros agentes puedan continuarlo si es necesario
+
+5. **CRÍTICO: Verificación antes de completar:**
+   - **ANTES** de usar \`complete_task\`, revisar OBLIGATORIAMENTE cada punto del plan
+   - Verificar que cada paso se ha completado exitosamente
+   - **OBLIGATORIO: Documentar la implementación** usando \`update_task_implementation\` con:
+     - Lista de archivos modificados/creados
+     - Resumen de los cambios realizados
+     - Descripción del flujo implementado
+   - Si faltan puntos por completar:
+     - Opción A: Continuar trabajando hasta completar todo el plan
+     - Opción B: Actualizar el plan eliminando los puntos completados y crear nueva tarea para lo pendiente
+     - Opción C: Actualizar el plan marcando explícitamente qué se completó y qué no
+   - **NUNCA completar una tarea sin verificar el cumplimiento del plan Y documentar la implementación**
 
 ### Flujo de trabajo
 
@@ -1490,12 +1601,21 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 2. **Durante el trabajo:**
 
    - La tarea actual se mostrará en la barra del terminal
+   - **Actualizar el plan** usando \`update_task_plan\` al comenzar con un plan detallado
    - Mantener actualizado el estado de la tarea
+   - Si el plan cambia significativamente, actualízalo nuevamente
    - Una sola tarea activa por terminal
 
 3. **Al finalizar:**
-   - **OBLIGATORIO:** Marcar la tarea como completada usando \`complete_task\` del MCP
+   - **OBLIGATORIO: Verificar cumplimiento del plan** - Antes de completar, revisar que se han cumplido todos los puntos del plan establecido
+   - **OBLIGATORIO: Documentar implementación** usando \`update_task_implementation\`:
+     - Lista de archivos modificados: \`database.js, mcp-stdio-server.js, CLAUDE.md\`
+     - Resumen: descripción clara de los cambios realizados
+     - Flujo: explicación del funcionamiento implementado
+   - Si el plan no se completó totalmente, actualizar el plan con lo que falta o crear una nueva tarea para lo pendiente
+   - **SOLO DESPUÉS de verificar Y documentar:** Marcar la tarea como completada usando \`complete_task\` del MCP
    - Esto actualiza automáticamente la interfaz y el estado en la base de datos
+   - El plan e implementación quedan documentados para referencia futura
 
 ### Manejo de múltiples tareas pendientes
 
@@ -1513,6 +1633,33 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
    
    ¿Cuál de estas tareas te gustaría que empiece?
    \`\`\`
+
+### Herramientas MCP disponibles para tareas
+
+Las siguientes herramientas MCP están disponibles para la gestión de tareas:
+
+- **\`create_task\`**: Crear una nueva tarea (requiere terminal_id)
+- **\`start_task\`**: Marcar tarea como "in_progress" 
+- **\`complete_task\`**: Marcar tarea como "completed"
+- **\`submit_for_testing\`**: Marcar tarea como "in_testing"
+- **\`list_tasks\`**: Listar todas las tareas (opcional: filtrar por status)
+- **\`update_task_plan\`**: Actualizar el plan de una tarea específica
+- **\`update_task_implementation\`**: **NUEVA** - Actualizar la implementación de una tarea específica
+
+**Parámetros de \`update_task_plan\`:**
+- \`task_id\` (número, requerido): ID de la tarea
+- \`plan\` (string, requerido): Texto del plan detallado
+
+**Parámetros de \`update_task_implementation\`:**
+- \`task_id\` (número, requerido): ID de la tarea
+- \`implementation\` (string, requerido): Detalles de implementación incluyendo archivos modificados y resumen
+
+**Ejemplo de uso:**
+\`\`\`
+update_task_plan(task_id=123, plan="1. Revisar código existente\\n2. Implementar nueva funcionalidad\\n3. Escribir tests")
+
+update_task_implementation(task_id=123, implementation="Archivos modificados: database.js, mcp-server.js\\nResumen: Se añadió campo implementation a la tabla tasks\\nFlujo: Nuevo campo permite documentar cambios realizados durante la implementación")
+\`\`\`
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.

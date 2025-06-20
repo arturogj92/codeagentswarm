@@ -1715,6 +1715,7 @@ class TerminalManager {
                                         <div class="file-selection-controls">
                                             <button class="btn-small" id="select-all-files">Select All</button>
                                             <button class="btn-small" id="deselect-all-files">Deselect All</button>
+                                            <button class="btn-small btn-danger" id="discard-all-changes"><i data-lucide="trash-2"></i> Discard All Changes</button>
                                         </div>
                                     ` : ''}
                                 </div>
@@ -1730,6 +1731,7 @@ class TerminalManager {
                                                 </div>
                                                 <div class="file-actions">
                                                     <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}')"><i data-lucide="eye"></i> Diff</button>
+                                                    <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}')"><i data-lucide="x"></i> Discard</button>
                                                 </div>
                                             </div>
                                         `).join('')
@@ -1820,6 +1822,11 @@ class TerminalManager {
         modal.querySelector('#deselect-all-files')?.addEventListener('click', () => {
             const checkboxes = modal.querySelectorAll('.file-checkbox');
             checkboxes.forEach(cb => cb.checked = false);
+        });
+        
+        // Discard all changes handler
+        modal.querySelector('#discard-all-changes')?.addEventListener('click', () => {
+            this.discardAllChanges();
         });
 
         // Close on background click
@@ -2007,6 +2014,54 @@ class TerminalManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    async discardFileChanges(fileName) {
+        const confirmMessage = `Are you sure you want to discard all changes to '${fileName}'? This action cannot be undone.`;
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        try {
+            this.showInlineNotification(`🔄 Discarding changes to ${fileName}...`, 'info');
+            const result = await ipcRenderer.invoke('git-discard-file', fileName);
+            
+            if (result.success) {
+                this.showInlineNotification(`✅ Changes to ${fileName} discarded`, 'success');
+                // Refresh the git status
+                setTimeout(() => this.showGitStatus(), 1000);
+            } else {
+                this.showInlineNotification(`❌ Failed to discard changes: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error discarding file changes:', error);
+            this.showInlineNotification('❌ Error discarding file changes', 'error');
+        }
+    }
+    
+    async discardAllChanges() {
+        const confirmMessage = 'Are you sure you want to discard ALL changes? This action cannot be undone and will remove all modifications to tracked files.';
+        
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+        
+        try {
+            this.showInlineNotification('🔄 Discarding all changes...', 'info');
+            const result = await ipcRenderer.invoke('git-discard-all');
+            
+            if (result.success) {
+                this.showInlineNotification('✅ All changes discarded', 'success');
+                // Refresh the git status
+                setTimeout(() => this.showGitStatus(), 1000);
+            } else {
+                this.showInlineNotification(`❌ Failed to discard changes: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error discarding all changes:', error);
+            this.showInlineNotification('❌ Error discarding all changes', 'error');
+        }
     }
     
     // Update branch display for specific terminal

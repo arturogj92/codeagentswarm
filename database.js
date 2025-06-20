@@ -59,7 +59,8 @@ class DatabaseManager {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 description TEXT,
-                status TEXT CHECK(status IN ('pending', 'in_progress', 'completed')) DEFAULT 'pending',
+                plan TEXT,
+                status TEXT CHECK(status IN ('pending', 'in_progress', 'in_testing', 'completed')) DEFAULT 'pending',
                 terminal_id INTEGER,
                 sort_order INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -69,6 +70,12 @@ class DatabaseManager {
         
         // Add sort_order column if it doesn't exist (migration)
         this.addSortOrderColumnIfNeeded();
+        
+        // Add plan column if it doesn't exist (migration)
+        this.addPlanColumnIfNeeded();
+        
+        // Add implementation column if it doesn't exist (migration)
+        this.addImplementationColumnIfNeeded();
     }
 
     addSortOrderColumnIfNeeded() {
@@ -97,6 +104,36 @@ class DatabaseManager {
             });
         } catch (error) {
             console.error('Error initializing sort order:', error);
+        }
+    }
+
+    addPlanColumnIfNeeded() {
+        try {
+            // Check if plan column exists
+            const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+            const hasPlan = columns.some(col => col.name === 'plan');
+            
+            if (!hasPlan) {
+                this.db.exec("ALTER TABLE tasks ADD COLUMN plan TEXT");
+                console.log('Added plan column to tasks table');
+            }
+        } catch (error) {
+            console.error('Error checking/adding plan column:', error);
+        }
+    }
+
+    addImplementationColumnIfNeeded() {
+        try {
+            // Check if implementation column exists
+            const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+            const hasImplementation = columns.some(col => col.name === 'implementation');
+            
+            if (!hasImplementation) {
+                this.db.exec("ALTER TABLE tasks ADD COLUMN implementation TEXT");
+                console.log('Added implementation column to tasks table');
+            }
+        } catch (error) {
+            console.error('Error checking/adding implementation column:', error);
         }
     }
 
@@ -301,6 +338,38 @@ class DatabaseManager {
             `);
             
             stmt.run(terminalId, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Update task plan
+    updateTaskPlan(taskId, plan) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET plan = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(plan || '', taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Update task implementation
+    updateTaskImplementation(taskId, implementation) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET implementation = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(implementation || '', taskId);
             return { success: true };
         } catch (err) {
             return { success: false, error: err.message };

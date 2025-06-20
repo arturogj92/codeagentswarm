@@ -67,6 +67,7 @@ class DatabaseManagerMCP {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
                 description TEXT,
+                plan TEXT,
                 status TEXT DEFAULT 'pending',
                 terminal_id INTEGER,
                 project_id INTEGER REFERENCES projects(id),
@@ -91,6 +92,12 @@ class DatabaseManagerMCP {
             } else {
                 // Check if sort_order column exists and add it if not
                 this.addSortOrderColumnIfNeeded();
+                // Check if plan column exists and add it if not
+                this.addPlanColumnIfNeeded();
+                // Check if implementation column exists and add it if not
+                this.addImplementationColumnIfNeeded();
+                // Update status constraint to include in_testing
+                this.updateStatusConstraintIfNeeded();
             }
         });
     }
@@ -134,6 +141,55 @@ class DatabaseManagerMCP {
                 });
             });
         });
+    }
+
+    addPlanColumnIfNeeded() {
+        // Check if plan column exists
+        this.db.all("PRAGMA table_info(tasks)", (err, columns) => {
+            if (err) {
+                console.error('Failed to check table info:', err);
+                return;
+            }
+            
+            const hasPlan = columns.some(col => col.name === 'plan');
+            if (!hasPlan) {
+                this.db.run("ALTER TABLE tasks ADD COLUMN plan TEXT", (err) => {
+                    if (err) {
+                        console.error('Failed to add plan column:', err);
+                    } else {
+                        console.log('Added plan column to tasks table');
+                    }
+                });
+            }
+        });
+    }
+
+    addImplementationColumnIfNeeded() {
+        // Check if implementation column exists
+        this.db.all("PRAGMA table_info(tasks)", (err, columns) => {
+            if (err) {
+                console.error('Failed to check table info:', err);
+                return;
+            }
+            
+            const hasImplementation = columns.some(col => col.name === 'implementation');
+            if (!hasImplementation) {
+                this.db.run("ALTER TABLE tasks ADD COLUMN implementation TEXT", (err) => {
+                    if (err) {
+                        console.error('Failed to add implementation column:', err);
+                    } else {
+                        console.log('Added implementation column to tasks table');
+                    }
+                });
+            }
+        });
+    }
+
+    updateStatusConstraintIfNeeded() {
+        // SQLite doesn't allow modifying CHECK constraints directly
+        // But since database-mcp.js doesn't have CHECK constraints, this is mainly informational
+        // The main database.js already has the constraint updated
+        console.log('Status constraint includes in_testing support');
     }
 
     // Promisify database operations for async/await support
@@ -355,6 +411,68 @@ class DatabaseManagerMCP {
             
             // Log the action
             this.logTaskAction(taskId, 'updated', `Task updated: ${title}`);
+            
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    updateTaskPlan(taskId, plan) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET plan = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            `);
+            const result = stmt.run(plan || '', taskId);
+            stmt.finalize();
+            
+            if (result.changes === 0) {
+                return {
+                    success: false,
+                    error: 'Task not found'
+                };
+            }
+            
+            // Log the action
+            this.logTaskAction(taskId, 'plan_updated', `Task plan updated`);
+            
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    updateTaskImplementation(taskId, implementation) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET implementation = ?, updated_at = CURRENT_TIMESTAMP 
+                WHERE id = ?
+            `);
+            const result = stmt.run(implementation || '', taskId);
+            stmt.finalize();
+            
+            if (result.changes === 0) {
+                return {
+                    success: false,
+                    error: 'Task not found'
+                };
+            }
+            
+            // Log the action
+            this.logTaskAction(taskId, 'implementation_updated', `Task implementation updated`);
             
             return {
                 success: true

@@ -41,6 +41,16 @@
                 </div>
             </div>
 
+            <div class="kanban-column" data-status="in_testing">
+                <div class="column-header">
+                    <h2><i data-lucide="flask-conical"></i> In Testing</h2>
+                    <span class="task-count" id="in_testing-count">0</span>
+                </div>
+                <div class="task-list" id="in_testing-tasks">
+                    <!-- Tasks will be dynamically added here -->
+                </div>
+            </div>
+
             <div class="kanban-column" data-status="completed">
                 <div class="column-header">
                     <h2><i data-lucide="check-circle"></i> Completed</h2>
@@ -71,6 +81,14 @@
                     <div class="form-group">
                         <label for="task-description">Description</label>
                         <textarea id="task-description" rows="4" maxlength="500"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-plan">Plan</label>
+                        <textarea id="task-plan" rows="3" maxlength="1000" placeholder="Enter your plan for this task..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-implementation">Implementation</label>
+                        <textarea id="task-implementation" rows="3" maxlength="1000" placeholder="Files modified, summary and implementation details..."></textarea>
                     </div>
                     <div class="form-group">
                         <label for="task-terminal">Terminal (optional)</label>
@@ -104,6 +122,38 @@
                 <div class="task-info">
                     <h4 id="details-title"></h4>
                     <p id="details-description"></p>
+                    <div class="task-plan-section">
+                        <h5>Plan:</h5>
+                        <div id="details-plan-content">
+                            <p id="details-plan"></p>
+                            <button type="button" class="btn btn-small" id="edit-plan-btn">
+                                <i data-lucide="edit-3"></i> Edit Plan
+                            </button>
+                        </div>
+                        <div id="edit-plan-section" style="display: none;">
+                            <textarea id="edit-plan-textarea" rows="4" maxlength="1000"></textarea>
+                            <div class="plan-actions">
+                                <button type="button" class="btn btn-primary btn-small" id="save-plan-btn">Save</button>
+                                <button type="button" class="btn btn-secondary btn-small" id="cancel-plan-btn">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="task-implementation-section">
+                        <h5>Implementation:</h5>
+                        <div id="details-implementation-content">
+                            <p id="details-implementation"></p>
+                            <button type="button" class="btn btn-small" id="edit-implementation-btn">
+                                <i data-lucide="edit-3"></i> Edit Implementation
+                            </button>
+                        </div>
+                        <div id="edit-implementation-section" style="display: none;">
+                            <textarea id="edit-implementation-textarea" rows="4" maxlength="1000"></textarea>
+                            <div class="implementation-actions">
+                                <button type="button" class="btn btn-primary btn-small" id="save-implementation-btn">Save</button>
+                                <button type="button" class="btn btn-secondary btn-small" id="cancel-implementation-btn">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
                     <div class="task-meta">
                         <span id="details-status"></span>
                         <span id="details-terminal"></span>

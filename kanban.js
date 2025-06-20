@@ -61,6 +61,32 @@ class KanbanManager {
             this.deleteCurrentTask();
         });
 
+        // Plan editing controls
+        document.getElementById('edit-plan-btn').addEventListener('click', () => {
+            this.showPlanEditMode();
+        });
+
+        document.getElementById('save-plan-btn').addEventListener('click', () => {
+            this.savePlan();
+        });
+
+        document.getElementById('cancel-plan-btn').addEventListener('click', () => {
+            this.hidePlanEditMode();
+        });
+
+        // Implementation editing controls
+        document.getElementById('edit-implementation-btn').addEventListener('click', () => {
+            this.showImplementationEditMode();
+        });
+
+        document.getElementById('save-implementation-btn').addEventListener('click', () => {
+            this.saveImplementation();
+        });
+
+        document.getElementById('cancel-implementation-btn').addEventListener('click', () => {
+            this.hideImplementationEditMode();
+        });
+
         // Form submission
         document.getElementById('task-form').addEventListener('submit', (e) => {
             e.preventDefault();
@@ -217,6 +243,7 @@ class KanbanManager {
         const tasksByStatus = {
             pending: [],
             in_progress: [],
+            in_testing: [],
             completed: []
         };
 
@@ -228,9 +255,18 @@ class KanbanManager {
 
         // Render tasks in each column
         Object.keys(tasksByStatus).forEach(status => {
-            const tasks = tasksByStatus[status];
+            let tasks = tasksByStatus[status];
             const container = document.getElementById(`${status}-tasks`);
             const count = document.getElementById(`${status}-count`);
+            
+            // Sort completed tasks by updated_at (most recent first)
+            if (status === 'completed') {
+                tasks = tasks.sort((a, b) => {
+                    const dateA = new Date(a.updated_at);
+                    const dateB = new Date(b.updated_at);
+                    return dateB - dateA; // Descending order (most recent first)
+                });
+            }
             
             count.textContent = tasks.length;
 
@@ -303,6 +339,8 @@ class KanbanManager {
         document.getElementById('modal-title').textContent = 'Create New Task';
         document.getElementById('task-title').value = '';
         document.getElementById('task-description').value = '';
+        document.getElementById('task-plan').value = '';
+        document.getElementById('task-implementation').value = '';
         document.getElementById('task-terminal').value = '';
         document.getElementById('save-task-btn').textContent = 'Save Task';
         document.getElementById('task-modal').classList.add('show');
@@ -314,6 +352,8 @@ class KanbanManager {
         document.getElementById('modal-title').textContent = 'Edit Task';
         document.getElementById('task-title').value = task.title;
         document.getElementById('task-description').value = task.description || '';
+        document.getElementById('task-plan').value = task.plan || '';
+        document.getElementById('task-implementation').value = task.implementation || '';
         document.getElementById('task-terminal').value = task.terminal_id || '';
         document.getElementById('save-task-btn').textContent = 'Update Task';
         document.getElementById('task-modal').classList.add('show');
@@ -328,6 +368,8 @@ class KanbanManager {
     async saveTask() {
         const title = document.getElementById('task-title').value.trim();
         const description = document.getElementById('task-description').value.trim();
+        const plan = document.getElementById('task-plan').value.trim();
+        const implementation = document.getElementById('task-implementation').value.trim();
         const terminalIdValue = document.getElementById('task-terminal').value;
         let terminalId = null;
         if (terminalIdValue !== '') {
@@ -351,6 +393,22 @@ class KanbanManager {
                 // Update existing task
                 result = await ipcRenderer.invoke('task-update', this.editingTaskId, title, description);
                 
+                // Update plan separately
+                if (result.success) {
+                    const planResult = await ipcRenderer.invoke('task-update-plan', this.editingTaskId, plan);
+                    if (!planResult.success) {
+                        console.error('Failed to update plan:', planResult.error);
+                    }
+                }
+
+                // Update implementation separately
+                if (result.success) {
+                    const implementationResult = await ipcRenderer.invoke('task-update-implementation', this.editingTaskId, implementation);
+                    if (!implementationResult.success) {
+                        console.error('Failed to update implementation:', implementationResult.error);
+                    }
+                }
+                
                 // If terminal ID was provided and the update was successful, update terminal separately
                 if (result.success && terminalId !== undefined) {
                     const terminalResult = await ipcRenderer.invoke('task-update-terminal', this.editingTaskId, terminalId);
@@ -361,6 +419,22 @@ class KanbanManager {
             } else {
                 // Create new task
                 result = await ipcRenderer.invoke('task-create', title, description, terminalId);
+                
+                // Update plan for new task
+                if (result.success && plan) {
+                    const planResult = await ipcRenderer.invoke('task-update-plan', result.taskId, plan);
+                    if (!planResult.success) {
+                        console.error('Failed to update plan for new task:', planResult.error);
+                    }
+                }
+
+                // Update implementation for new task
+                if (result.success && implementation) {
+                    const implementationResult = await ipcRenderer.invoke('task-update-implementation', result.taskId, implementation);
+                    if (!implementationResult.success) {
+                        console.error('Failed to update implementation for new task:', implementationResult.error);
+                    }
+                }
             }
 
             if (result.success) {
@@ -388,6 +462,8 @@ class KanbanManager {
 
         document.getElementById('details-title').textContent = task.title;
         document.getElementById('details-description').textContent = task.description || 'No description';
+        document.getElementById('details-plan').textContent = task.plan || 'No plan set';
+        document.getElementById('details-implementation').textContent = task.implementation || 'No implementation details';
         
         const statusText = task.status.replace('_', ' ').toUpperCase();
         const terminalText = task.terminal_id !== null && task.terminal_id > 0 ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
@@ -397,11 +473,20 @@ class KanbanManager {
         document.getElementById('details-terminal').textContent = terminalText;
         document.getElementById('details-created').textContent = `Created: ${createdText}`;
 
+        // Reset plan and implementation editing modes
+        this.hidePlanEditMode();
+        this.hideImplementationEditMode();
+
         // Show/hide delete button based on status
         const deleteBtn = document.getElementById('delete-task-btn');
         deleteBtn.style.display = task.status === 'in_progress' ? 'none' : 'block';
 
         document.getElementById('task-details-modal').classList.add('show');
+    }
+
+    // Focus on a specific task (called from IPC)
+    async focusTask(taskId) {
+        await this.showTaskDetails(taskId);
     }
 
     hideTaskDetailsModal() {
@@ -451,7 +536,9 @@ class KanbanManager {
                 
                 const task = this.tasks.find(t => t.id === parseInt(taskId));
                 if (task) {
-                    if (newStatus === 'completed') {
+                    if (newStatus === 'in_testing') {
+                        this.showNotification(`Task "${task.title}" ready for testing!`, 'success');
+                    } else if (newStatus === 'completed') {
                         this.showNotification(`Task "${task.title}" completed!`, 'success');
                     }
                 }
@@ -481,6 +568,78 @@ class KanbanManager {
         div.textContent = text;
         return div.innerHTML;
     }
+
+    showPlanEditMode() {
+        if (!this.currentTask) return;
+        
+        document.getElementById('details-plan-content').style.display = 'none';
+        document.getElementById('edit-plan-section').style.display = 'block';
+        document.getElementById('edit-plan-textarea').value = this.currentTask.plan || '';
+        document.getElementById('edit-plan-textarea').focus();
+    }
+
+    hidePlanEditMode() {
+        document.getElementById('details-plan-content').style.display = 'block';
+        document.getElementById('edit-plan-section').style.display = 'none';
+    }
+
+    async savePlan() {
+        if (!this.currentTask) return;
+        
+        const plan = document.getElementById('edit-plan-textarea').value.trim();
+        
+        try {
+            const result = await ipcRenderer.invoke('task-update-plan', this.currentTask.id, plan);
+            if (result.success) {
+                this.currentTask.plan = plan;
+                document.getElementById('details-plan').textContent = plan || 'No plan set';
+                this.hidePlanEditMode();
+                await this.loadTasks(); // Refresh the task list
+                this.showNotification('Plan updated successfully', 'success');
+            } else {
+                alert(`Failed to update plan: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Error updating plan:', error);
+            alert('Error updating plan');
+        }
+    }
+
+    showImplementationEditMode() {
+        if (!this.currentTask) return;
+        
+        document.getElementById('details-implementation-content').style.display = 'none';
+        document.getElementById('edit-implementation-section').style.display = 'block';
+        document.getElementById('edit-implementation-textarea').value = this.currentTask.implementation || '';
+        document.getElementById('edit-implementation-textarea').focus();
+    }
+
+    hideImplementationEditMode() {
+        document.getElementById('details-implementation-content').style.display = 'block';
+        document.getElementById('edit-implementation-section').style.display = 'none';
+    }
+
+    async saveImplementation() {
+        if (!this.currentTask) return;
+        
+        const implementation = document.getElementById('edit-implementation-textarea').value.trim();
+        
+        try {
+            const result = await ipcRenderer.invoke('task-update-implementation', this.currentTask.id, implementation);
+            if (result.success) {
+                this.currentTask.implementation = implementation;
+                document.getElementById('details-implementation').textContent = implementation || 'No implementation details';
+                this.hideImplementationEditMode();
+                await this.loadTasks(); // Refresh the task list
+                this.showNotification('Implementation updated successfully', 'success');
+            } else {
+                alert(`Failed to update implementation: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('Error updating implementation:', error);
+            alert('Error updating implementation');
+        }
+    }
 }
 
 // Initialize Kanban when page loads
@@ -506,6 +665,19 @@ document.addEventListener('keydown', (e) => {
     
     if (e.key === 'Escape') {
         const modals = document.querySelectorAll('.modal.show');
-        modals.forEach(modal => modal.classList.remove('show'));
+        if (modals.length > 0) {
+            // If there are open modals, close them
+            modals.forEach(modal => modal.classList.remove('show'));
+        } else {
+            // If no modals are open, close the task manager window
+            window.close();
+        }
+    }
+});
+
+// Handle focus-task IPC message from main window
+ipcRenderer.on('focus-task', (event, taskId) => {
+    if (kanban) {
+        kanban.focusTask(taskId);
     }
 });

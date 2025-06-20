@@ -119,6 +119,14 @@ class MCPStdioServer {
                     result = await this.updateTasksOrder(params);
                     break;
                     
+                case 'tasks/update_plan':
+                    result = await this.updateTaskPlan(params);
+                    break;
+                    
+                case 'tasks/update_implementation':
+                    result = await this.updateTaskImplementation(params);
+                    break;
+                    
                 case 'tools/list':
                     result = this.listTools();
                     break;
@@ -210,8 +218,8 @@ class MCPStdioServer {
             throw new Error('task_id and status are required');
         }
         
-        if (!['pending', 'in_progress', 'completed'].includes(status)) {
-            throw new Error('Invalid status. Must be pending, in_progress, or completed');
+        if (!['pending', 'in_progress', 'in_testing', 'completed'].includes(status)) {
+            throw new Error('Invalid status. Must be pending, in_progress, in_testing, or completed');
         }
         
         const result = this.db.updateTaskStatus(task_id, status);
@@ -220,8 +228,8 @@ class MCPStdioServer {
             throw new Error(result.error);
         }
         
-        // Notify the Electron app when a task is completed
-        if (status === 'completed') {
+        // Notify the Electron app when a task is completed or moved to testing
+        if (status === 'completed' || status === 'in_testing') {
             this.notifyTaskCompletion(task_id);
         }
         
@@ -307,6 +315,46 @@ class MCPStdioServer {
         };
     }
 
+    async updateTaskPlan(params) {
+        const { task_id, plan } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        const result = this.db.updateTaskPlan(task_id, plan);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            plan,
+            updated: true
+        };
+    }
+
+    async updateTaskImplementation(params) {
+        const { task_id, implementation } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        const result = this.db.updateTaskImplementation(task_id, implementation);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            implementation,
+            updated: true
+        };
+    }
+
     // MCP Tools
     listTools() {
         return {
@@ -347,13 +395,48 @@ class MCPStdioServer {
                     }
                 },
                 {
+                    name: 'submit_for_testing',
+                    description: 'Submit a task for testing (mark as in_testing)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' }
+                        },
+                        required: ['task_id']
+                    }
+                },
+                {
                     name: 'list_tasks',
                     description: 'List all tasks',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            status: { type: 'string', enum: ['pending', 'in_progress', 'completed'], description: 'Filter by status' }
+                            status: { type: 'string', enum: ['pending', 'in_progress', 'in_testing', 'completed'], description: 'Filter by status' }
                         }
+                    }
+                },
+                {
+                    name: 'update_task_plan',
+                    description: 'Update the plan for a task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' },
+                            plan: { type: 'string', description: 'Task plan' }
+                        },
+                        required: ['task_id', 'plan']
+                    }
+                },
+                {
+                    name: 'update_task_implementation',
+                    description: 'Update the implementation details for a task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' },
+                            implementation: { type: 'string', description: 'Implementation details including modified files and summary' }
+                        },
+                        required: ['task_id', 'implementation']
                     }
                 }
             ]
@@ -377,6 +460,10 @@ class MCPStdioServer {
                 result = await this.updateTaskStatus({ task_id: args.task_id, status: 'completed' });
                 break;
                 
+            case 'submit_for_testing':
+                result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_testing' });
+                break;
+                
             case 'list_tasks':
                 if (args.status) {
                     const tasks = await this.db.getTasksByStatus(args.status);
@@ -385,6 +472,14 @@ class MCPStdioServer {
                     const tasks = await this.db.getAllTasks();
                     result = { tasks };
                 }
+                break;
+                
+            case 'update_task_plan':
+                result = await this.updateTaskPlan({ task_id: args.task_id, plan: args.plan });
+                break;
+                
+            case 'update_task_implementation':
+                result = await this.updateTaskImplementation({ task_id: args.task_id, implementation: args.implementation });
                 break;
                 
             default:
@@ -422,6 +517,12 @@ class MCPStdioServer {
                     uri: 'task://in_progress',
                     name: 'In Progress Tasks',
                     description: 'List of tasks currently in progress',
+                    mimeType: 'application/json'
+                },
+                {
+                    uri: 'task://in_testing',
+                    name: 'In Testing Tasks',
+                    description: 'List of tasks in testing',
                     mimeType: 'application/json'
                 },
                 {
@@ -513,6 +614,7 @@ class MCPStdioServer {
                 const allTasks = this.db.getAllTasks();
                 const pending = allTasks.filter(t => t.status === 'pending').length;
                 const inProgress = allTasks.filter(t => t.status === 'in_progress').length;
+                const inTesting = allTasks.filter(t => t.status === 'in_testing').length;
                 const completed = allTasks.filter(t => t.status === 'completed').length;
                 
                 return {
@@ -522,7 +624,7 @@ class MCPStdioServer {
                             role: 'user',
                             content: {
                                 type: 'text',
-                                text: `Here's my current task summary:\n\n📋 Pending: ${pending}\n🚀 In Progress: ${inProgress}\n✅ Completed: ${completed}\n\nPlease show me what I should work on next.`
+                                text: `Here's my current task summary:\n\n📋 Pending: ${pending}\n🚀 In Progress: ${inProgress}\n🧪 In Testing: ${inTesting}\n✅ Completed: ${completed}\n\nPlease show me what I should work on next.`
                             }
                         }
                     ]

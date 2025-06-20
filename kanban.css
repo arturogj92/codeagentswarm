@@ -461,3 +461,60 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* Task Plan Section */
+.task-plan-section {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #1e1e1e;
+    border-radius: 6px;
+    border: 1px solid #404040;
+}
+
+.task-plan-section h5 {
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+}
+
+#details-plan {
+    color: #cccccc;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+    white-space: pre-wrap;
+}
+
+.btn-small {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+}
+
+#edit-plan-textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    background: #2d2d2d;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    color: #ffffff;
+    font-family: inherit;
+    font-size: 0.875rem;
+    line-height: 1.5;
+    resize: vertical;
+    margin-bottom: 0.5rem;
+}
+
+#edit-plan-textarea:focus {
+    outline: none;
+    border-color: #007acc;
+}
+
+.plan-actions {
+    display: flex;
+    gap: 0.5rem;
+    justify-content: flex-end;
+}
