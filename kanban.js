@@ -259,7 +259,7 @@ class KanbanManager {
         taskCard.draggable = true;
         taskCard.dataset.taskId = task.id;
 
-        const terminalInfo = task.terminal_id !== null ? 
+        const terminalInfo = task.terminal_id !== null && task.terminal_id > 0 ? 
             `<span class="task-terminal">Terminal ${parseInt(task.terminal_id)}</span>` : '';
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
@@ -328,7 +328,16 @@ class KanbanManager {
     async saveTask() {
         const title = document.getElementById('task-title').value.trim();
         const description = document.getElementById('task-description').value.trim();
-        const terminalId = document.getElementById('task-terminal').value || null;
+        const terminalIdValue = document.getElementById('task-terminal').value;
+        let terminalId = null;
+        if (terminalIdValue !== '') {
+            terminalId = parseInt(terminalIdValue);
+            // Validate terminal ID (must be between 1 and 4)
+            if (isNaN(terminalId) || terminalId < 1 || terminalId > 4) {
+                alert('Terminal ID must be between 1 and 4');
+                return;
+            }
+        }
 
         if (!title) {
             alert('Task title is required');
@@ -341,6 +350,14 @@ class KanbanManager {
             if (this.editingTaskId) {
                 // Update existing task
                 result = await ipcRenderer.invoke('task-update', this.editingTaskId, title, description);
+                
+                // If terminal ID was provided and the update was successful, update terminal separately
+                if (result.success && terminalId !== undefined) {
+                    const terminalResult = await ipcRenderer.invoke('task-update-terminal', this.editingTaskId, terminalId);
+                    if (!terminalResult.success) {
+                        console.error('Failed to update terminal ID:', terminalResult.error);
+                    }
+                }
             } else {
                 // Create new task
                 result = await ipcRenderer.invoke('task-create', title, description, terminalId);
@@ -373,7 +390,7 @@ class KanbanManager {
         document.getElementById('details-description').textContent = task.description || 'No description';
         
         const statusText = task.status.replace('_', ' ').toUpperCase();
-        const terminalText = task.terminal_id !== null ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
+        const terminalText = task.terminal_id !== null && task.terminal_id > 0 ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
         const createdText = new Date(task.created_at).toLocaleString();
         
         document.getElementById('details-status').textContent = `Status: ${statusText}`;

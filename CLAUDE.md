@@ -27,6 +27,7 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 5. **Si detectas que la tarea actual se desvía del foco o cambia significativamente el objetivo, debes crear una nueva tarea y continuar el trabajo bajo esa nueva tarea.**
 
 ### IMPORTANTE: Terminal ID - Detección Automática
+
 - **SIEMPRE** debes especificar el `terminal_id` al crear una tarea con `create_task`
 - Cada terminal tiene un ID único (1, 2, 3, 4, etc.) basado en numeración 1-based
 - **DETECCIÓN AUTOMÁTICA:** Para obtener el terminal actual, ejecuta: `echo $CODEAGENTSWARM_CURRENT_QUADRANT` usando la herramienta Bash
@@ -50,3 +51,20 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 3. **Al finalizar:**
    - **OBLIGATORIO:** Marcar la tarea como completada usando `complete_task` del MCP
    - Esto actualiza automáticamente la interfaz y el estado en la base de datos
+
+### Manejo de múltiples tareas pendientes
+
+**IMPORTANTE:** Cuando el usuario te pida trabajar en una tarea pendiente y existan múltiples tareas pendientes para el terminal actual:
+
+1. **Lista las tareas disponibles:** Muestra al usuario las tareas pendientes relevantes con su ID y título
+2. **Pregunta cuál empezar:** Solicita al usuario que especifique qué tarea desea que comiences
+3. **No asumas:** NUNCA elijas automáticamente una tarea sin confirmación del usuario
+4. **Ejemplo de respuesta:**
+   ```
+   Encontré varias tareas pendientes para este terminal:
+   - ID 70: Arreglar todo esto
+   - ID 58: hacer que el terminal vaya documentando la tarea
+   - ID 41: Tarea dummy de prueba corregida
+   
+   ¿Cuál de estas tareas te gustaría que empiece?
+   ```

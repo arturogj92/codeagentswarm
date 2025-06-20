@@ -291,6 +291,22 @@ class DatabaseManager {
         }
     }
 
+    // Update task terminal_id
+    updateTaskTerminal(taskId, terminalId) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET terminal_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(terminalId, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
     // Update task order
     updateTasksOrder(taskOrders) {
         try {

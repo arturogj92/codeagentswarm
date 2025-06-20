@@ -664,6 +664,16 @@ ipcMain.handle('task-update', async (event, taskId, title, description) => {
   }
 });
 
+ipcMain.handle('task-update-terminal', async (event, taskId, terminalId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTaskTerminal(taskId, terminalId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('task-update-order', async (event, taskOrders) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
@@ -1486,6 +1496,23 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 3. **Al finalizar:**
    - **OBLIGATORIO:** Marcar la tarea como completada usando \`complete_task\` del MCP
    - Esto actualiza automáticamente la interfaz y el estado en la base de datos
+
+### Manejo de múltiples tareas pendientes
+
+**IMPORTANTE:** Cuando el usuario te pida trabajar en una tarea pendiente y existan múltiples tareas pendientes para el terminal actual:
+
+1. **Lista las tareas disponibles:** Muestra al usuario las tareas pendientes relevantes con su ID y título
+2. **Pregunta cuál empezar:** Solicita al usuario que especifique qué tarea desea que comiences
+3. **No asumas:** NUNCA elijas automáticamente una tarea sin confirmación del usuario
+4. **Ejemplo de respuesta:**
+   \`\`\`
+   Encontré varias tareas pendientes para este terminal:
+   - ID 70: Arreglar todo esto
+   - ID 58: hacer que el terminal vaya documentando la tarea
+   - ID 41: Tarea dummy de prueba corregida
+   
+   ¿Cuál de estas tareas te gustaría que empiece?
+   \`\`\`
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
