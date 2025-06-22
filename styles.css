@@ -490,10 +490,11 @@ body::before {
   opacity: 0;
 }
 
-.resizer:hover::before {
-  background: var(--gradient-primary);
-  box-shadow: 0 0 20px rgba(127, 90, 240, 0.5);
-  opacity: 1;
+.resizer:hover::before,
+.resizer.dragging::before {
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
 }
 
 .vertical-resizer {

@@ -163,12 +163,13 @@ class TerminalManager {
                 const leftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
                 const rightWidth = 100 - leftWidth;
                 
-                if (leftWidth > 20 && rightWidth > 20) {
+                // Increased minimum size to prevent too small terminals
+                if (leftWidth > 25 && rightWidth > 25) {
                     // Update CSS custom properties for dynamic resizing
                     container.style.setProperty('--left-width', `${leftWidth}%`);
                     container.style.setProperty('--right-width', `${rightWidth}%`);
                     
-                    // Update vertical resizer position to match new split
+                    // Keep resizer at the border between terminals (where left terminal ends)
                     const vResizer = container.querySelector('.vertical-resizer');
                     if (vResizer) {
                         vResizer.style.left = `${leftWidth}%`;
@@ -178,11 +179,12 @@ class TerminalManager {
                 const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
                 const bottomHeight = 100 - topHeight;
                 
-                if (topHeight > 20 && bottomHeight > 20) {
+                // Increased minimum size to prevent too small terminals  
+                if (topHeight > 25 && bottomHeight > 25) {
                     container.style.setProperty('--top-height', `${topHeight}%`);
                     container.style.setProperty('--bottom-height', `${bottomHeight}%`);
                     
-                    // Update horizontal resizer position to match new split
+                    // Keep resizer at the border between terminals (where top terminal ends)
                     const hResizer = container.querySelector('.horizontal-resizer');
                     if (hResizer) {
                         hResizer.style.top = `${topHeight}%`;
@@ -201,6 +203,19 @@ class TerminalManager {
                 isResizing = false;
                 resizeDirection = null;
                 document.body.style.cursor = 'default';
+                
+                // Hide resizer lines when not resizing
+                const allResizers = container.querySelectorAll('.resizer');
+                allResizers.forEach(resizer => {
+                    resizer.classList.remove('dragging');
+                });
+            }
+        });
+        
+        // Show resizer line when dragging starts
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('resizer')) {
+                e.target.classList.add('dragging');
             }
         });
     }
