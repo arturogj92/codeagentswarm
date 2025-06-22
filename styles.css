@@ -300,35 +300,42 @@ body::before {
   max-height: calc(100vh - 80px);
 }
 
-/* Dynamic grid layouts based on terminal count */
+/* Dynamic grid layouts based on terminal count with resizers */
+.terminals-container {
+  --left-width: 50%;
+  --right-width: 50%;
+  --top-height: 50%;
+  --bottom-height: 50%;
+}
+
 .terminals-container.count-1 {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
 }
 
 .terminals-container.count-2 {
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--left-width) var(--right-width);
   grid-template-rows: 1fr;
 }
 
 .terminals-container.count-3 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-columns: var(--left-width) var(--right-width);
+  grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
 .terminals-container.count-4 {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-columns: var(--left-width) var(--right-width);
+  grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
 .terminals-container.count-5 {
   grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
 .terminals-container.count-6 {
   grid-template-columns: 1fr 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
+  grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
 /* Empty state */
@@ -466,7 +473,75 @@ body::before {
   font-size: 0.875rem;
 }
 
-/* Resizers removed for dynamic layout */
+/* Resizers for dynamic layout - positioned absolutely */
+.resizer {
+  position: absolute;
+  background: transparent;
+  transition: all 0.3s ease;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.resizer::before {
+  content: '';
+  position: absolute;
+  background: var(--border);
+  transition: all 0.3s ease;
+  opacity: 0;
+}
+
+.resizer:hover::before {
+  background: var(--gradient-primary);
+  box-shadow: 0 0 20px rgba(127, 90, 240, 0.5);
+  opacity: 1;
+}
+
+.vertical-resizer {
+  cursor: col-resize;
+  width: 8px;
+  height: 100%;
+  left: var(--left-width, 50%);
+  top: 0;
+  transform: translateX(-50%);
+}
+
+.vertical-resizer::before {
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+}
+
+.vertical-resizer:hover::before {
+  width: 4px;
+}
+
+.horizontal-resizer {
+  cursor: row-resize;
+  height: 8px;
+  width: 100%;
+  left: 0;
+  top: var(--top-height, 50%);
+  transform: translateY(-50%);
+}
+
+.horizontal-resizer::before {
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 2px;
+  transform: translateY(-50%);
+}
+
+.horizontal-resizer:hover::before {
+  height: 4px;
+}
+
+/* Make sure terminals container is positioned relative for absolute resizers */
+.terminals-container {
+  position: relative;
+}
 
 .terminal-quadrant {
   background: rgba(20, 20, 20, 0.6);

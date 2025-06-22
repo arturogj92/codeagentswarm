@@ -131,9 +131,78 @@ class TerminalManager {
     }
 
     setupResizeHandlers() {
-        // Resize handlers are no longer needed for dynamic layout
-        // This function is kept for compatibility but does nothing
-        console.log('Dynamic layout initialized - resize handlers not needed');
+        // Setup dynamic resize handlers
+        this.setupDynamicResizeHandlers();
+    }
+
+    setupDynamicResizeHandlers() {
+        const container = document.getElementById('terminals-container');
+        let isResizing = false;
+        let resizeDirection = null;
+        
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.classList.contains('vertical-resizer')) {
+                isResizing = true;
+                resizeDirection = 'vertical';
+                document.body.style.cursor = 'col-resize';
+                e.preventDefault();
+            } else if (e.target.classList.contains('horizontal-resizer')) {
+                isResizing = true;
+                resizeDirection = 'horizontal';
+                document.body.style.cursor = 'row-resize';
+                e.preventDefault();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const containerRect = container.getBoundingClientRect();
+            
+            if (resizeDirection === 'vertical') {
+                const leftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
+                const rightWidth = 100 - leftWidth;
+                
+                if (leftWidth > 20 && rightWidth > 20) {
+                    // Update CSS custom properties for dynamic resizing
+                    container.style.setProperty('--left-width', `${leftWidth}%`);
+                    container.style.setProperty('--right-width', `${rightWidth}%`);
+                    
+                    // Update vertical resizer position to match new split
+                    const vResizer = container.querySelector('.vertical-resizer');
+                    if (vResizer) {
+                        vResizer.style.left = `${leftWidth}%`;
+                    }
+                }
+            } else if (resizeDirection === 'horizontal') {
+                const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+                const bottomHeight = 100 - topHeight;
+                
+                if (topHeight > 20 && bottomHeight > 20) {
+                    container.style.setProperty('--top-height', `${topHeight}%`);
+                    container.style.setProperty('--bottom-height', `${bottomHeight}%`);
+                    
+                    // Update horizontal resizer position to match new split
+                    const hResizer = container.querySelector('.horizontal-resizer');
+                    if (hResizer) {
+                        hResizer.style.top = `${topHeight}%`;
+                    }
+                }
+            }
+            
+            // Resize all active terminals
+            setTimeout(() => {
+                this.resizeAllTerminals();
+            }, 50);
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizeDirection = null;
+                document.body.style.cursor = 'default';
+            }
+        });
     }
 
     showDirectorySelector(quadrant) {
@@ -2517,13 +2586,9 @@ class TerminalManager {
                 return;
             }
 
-            console.log('🏗️ Creating terminal elements...');
-            // Create terminal elements
-            activeTerminals.forEach(terminalId => {
-                console.log(`Creating terminal ${terminalId}`);
-                const terminalElement = this.createTerminalElement(terminalId);
-                container.appendChild(terminalElement);
-            });
+            console.log('🏗️ Creating terminal elements with resizers...');
+            // Create terminal elements with resizers
+            this.createTerminalLayoutWithResizers(container, activeTerminals);
 
             console.log('🎨 Re-initializing Lucide icons...');
             // Re-initialize Lucide icons
@@ -2645,6 +2710,39 @@ class TerminalManager {
             console.error('Error adding terminal silently:', error);
             return false;
         }
+    }
+
+    createTerminalLayoutWithResizers(container, activeTerminals) {
+        const terminalCount = activeTerminals.length;
+        
+        // Add all terminals first
+        activeTerminals.forEach(terminalId => {
+            const terminalElement = this.createTerminalElement(terminalId);
+            container.appendChild(terminalElement);
+        });
+        
+        // Add resizers as absolutely positioned elements
+        if (terminalCount === 2) {
+            // Single vertical resizer for 2 terminals
+            const vResizer = this.createResizer('vertical');
+            container.appendChild(vResizer);
+        } else if (terminalCount >= 3 && terminalCount <= 4) {
+            // Vertical and horizontal resizers for 2x2 grid
+            const vResizer = this.createResizer('vertical');
+            const hResizer = this.createResizer('horizontal');
+            container.appendChild(vResizer);
+            container.appendChild(hResizer);
+        } else if (terminalCount >= 5) {
+            // Only horizontal resizer for 3x2 grid (vertical resizing between rows)
+            const hResizer = this.createResizer('horizontal');
+            container.appendChild(hResizer);
+        }
+    }
+
+    createResizer(direction, extraClass = '') {
+        const resizer = document.createElement('div');
+        resizer.className = `resizer ${direction}-resizer ${extraClass}`.trim();
+        return resizer;
     }
 
     showNotification(title, message, type = 'info') {
