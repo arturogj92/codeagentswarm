@@ -270,6 +270,11 @@ body::before {
   background: rgba(255, 255, 255, 0.05);
 }
 
+.layout-group {
+  display: flex;
+  gap: 4px;
+}
+
 .btn-layout {
   padding: 6px 8px;
   font-size: 0.75rem;
@@ -367,6 +372,7 @@ body::before {
   grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
+/* Base 3 terminals layout - Default: 1 top + 2 bottom horizontal */
 .terminals-container.count-3 {
   display: flex;
   flex-direction: column;
@@ -386,6 +392,58 @@ body::before {
   gap: 20px;
   height: var(--bottom-height);
   position: relative;
+}
+
+/* Layout: 2 top horizontal + 1 bottom */
+.terminals-container.count-3.layout-3-top2-horiz .terminal-row-top {
+  grid-template-columns: var(--left-width) var(--right-width);
+  gap: 20px;
+}
+
+.terminals-container.count-3.layout-3-top2-horiz .terminal-row-bottom {
+  grid-template-columns: 1fr;
+}
+
+/* Layout: 2 left vertical + 1 right */
+.terminals-container.count-3.layout-3-left2 {
+  display: grid;
+  grid-template-columns: var(--left-width) var(--right-width);
+  grid-template-rows: 1fr;
+  gap: 20px;
+}
+
+.terminals-container.count-3.layout-3-left2 .terminal-column-left {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: var(--top-height) var(--bottom-height);
+  gap: 20px;
+}
+
+.terminals-container.count-3.layout-3-left2 .terminal-column-right {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+/* Layout: 1 left + 2 right vertical */
+.terminals-container.count-3.layout-3-right2 {
+  display: grid;
+  grid-template-columns: var(--left-width) var(--right-width);
+  grid-template-rows: 1fr;
+  gap: 20px;
+}
+
+.terminals-container.count-3.layout-3-right2 .terminal-column-left {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+
+.terminals-container.count-3.layout-3-right2 .terminal-column-right {
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: var(--top-height) var(--bottom-height);
+  gap: 20px;
 }
 
 .terminals-container.count-4 {

@@ -17,8 +17,19 @@
                 <button class="btn" id="kanban-btn"><i data-lucide="kanban-square"></i> Tasks</button>
                 <div class="terminal-management">
                     <div class="layout-selector" id="layout-selector" style="display: none;">
-                        <button class="btn btn-layout" id="layout-horizontal-btn" title="Horizontal Layout"><i data-lucide="columns-2"></i></button>
-                        <button class="btn btn-layout" id="layout-vertical-btn" title="Vertical Layout"><i data-lucide="rows-2"></i></button>
+                        <!-- 2 terminals layouts -->
+                        <div class="layout-group" id="layout-2-terminals" style="display: none;">
+                            <button class="btn btn-layout" id="layout-horizontal-btn" title="Horizontal Layout"><i data-lucide="columns-2"></i></button>
+                            <button class="btn btn-layout" id="layout-vertical-btn" title="Vertical Layout"><i data-lucide="rows-2"></i></button>
+                        </div>
+                        
+                        <!-- 3 terminals layouts -->
+                        <div class="layout-group" id="layout-3-terminals" style="display: none;">
+                            <button class="btn btn-layout" id="layout-3-top1-btn" title="1 Top + 2 Bottom Horizontal"><i data-lucide="layout-panel-top"></i></button>
+                            <button class="btn btn-layout" id="layout-3-top2-horiz-btn" title="2 Top Horizontal + 1 Bottom"><i data-lucide="layout-panel-bottom"></i></button>
+                            <button class="btn btn-layout" id="layout-3-left2-btn" title="2 Left Vertical + 1 Right"><i data-lucide="layout-panel-left"></i></button>
+                            <button class="btn btn-layout" id="layout-3-right2-btn" title="1 Left + 2 Right Vertical"><i data-lucide="layout-panel-right"></i></button>
+                        </div>
                     </div>
                     <button class="btn btn-success" id="add-terminal-btn" title="Add Terminal"><i data-lucide="plus"></i></button>
                 </div>

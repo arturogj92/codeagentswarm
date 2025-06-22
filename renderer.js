@@ -87,13 +87,30 @@ class TerminalManager {
             this.addTerminal();
         });
 
-        // Layout selector event listeners
+        // Layout selector event listeners for 2 terminals
         document.getElementById('layout-horizontal-btn').addEventListener('click', () => {
             this.setLayout('horizontal');
         });
 
         document.getElementById('layout-vertical-btn').addEventListener('click', () => {
             this.setLayout('vertical');
+        });
+
+        // Layout selector event listeners for 3 terminals
+        document.getElementById('layout-3-top1-btn').addEventListener('click', () => {
+            this.setLayout('3-top1');
+        });
+
+        document.getElementById('layout-3-top2-horiz-btn').addEventListener('click', () => {
+            this.setLayout('3-top2-horiz');
+        });
+
+        document.getElementById('layout-3-left2-btn').addEventListener('click', () => {
+            this.setLayout('3-left2');
+        });
+
+        document.getElementById('layout-3-right2-btn').addEventListener('click', () => {
+            this.setLayout('3-right2');
         });
 
         document.getElementById('settings-btn').addEventListener('click', () => {
@@ -2623,9 +2640,11 @@ class TerminalManager {
             // Update container class for layout while preserving existing layout classes
             container.className = `terminals-container count-${activeTerminals.length}`;
             
-            // Re-apply layout class if set (for 2 terminals)
+            // Re-apply layout class if set
             if (activeTerminals.length === 2 && this.currentLayout === 'vertical') {
                 container.classList.add('layout-vertical');
+            } else if (activeTerminals.length === 3 && this.currentLayout.startsWith('3-')) {
+                container.classList.add(`layout-${this.currentLayout}`);
             }
             
             // Clear existing content
@@ -2742,9 +2761,18 @@ class TerminalManager {
             // Disable add button if we have max terminals (6)
             addBtn.disabled = activeCount >= 6;
             
-            // Show/hide layout selector for 2 terminals
-            if (activeCount === 2) {
+            // Show/hide layout selector for 2 or 3 terminals
+            if (activeCount === 2 || activeCount === 3) {
                 layoutSelector.style.display = 'flex';
+                this.updateLayoutButtonGroups(activeCount);
+                
+                // Set default layout if current layout doesn't match terminal count
+                const defaultLayout = this.getDefaultLayout(activeCount);
+                if ((activeCount === 2 && this.currentLayout.startsWith('3-')) ||
+                    (activeCount === 3 && !this.currentLayout.startsWith('3-'))) {
+                    this.currentLayout = defaultLayout;
+                }
+                
                 this.updateLayoutButtons();
             } else {
                 layoutSelector.style.display = 'none';
@@ -2757,19 +2785,24 @@ class TerminalManager {
 
     setLayout(layout) {
         console.log('setLayout called with:', layout);
-        if (layout !== 'horizontal' && layout !== 'vertical') return;
+        
+        const validLayouts = ['horizontal', 'vertical', '3-top1', '3-top2-horiz', '3-left2', '3-right2'];
+        if (!validLayouts.includes(layout)) return;
         
         this.currentLayout = layout;
         const container = document.getElementById('terminals-container');
         console.log('Container found:', container);
         
-        // Update container classes
+        // Remove all layout classes first
+        container.classList.remove('layout-vertical', 'layout-3-top1', 'layout-3-top2-horiz', 'layout-3-left2', 'layout-3-right2');
+        
+        // Update container classes based on layout
         if (layout === 'vertical') {
             container.classList.add('layout-vertical');
             console.log('Added layout-vertical class');
-        } else {
-            container.classList.remove('layout-vertical');
-            console.log('Removed layout-vertical class');
+        } else if (layout.startsWith('3-')) {
+            container.classList.add(`layout-${layout}`);
+            console.log(`Added layout-${layout} class`);
         }
         
         // Update button states
@@ -2779,13 +2812,54 @@ class TerminalManager {
         this.renderTerminals();
     }
 
+    updateLayoutButtonGroups(terminalCount) {
+        const layout2Group = document.getElementById('layout-2-terminals');
+        const layout3Group = document.getElementById('layout-3-terminals');
+        
+        if (terminalCount === 2) {
+            layout2Group.style.display = 'flex';
+            layout3Group.style.display = 'none';
+        } else if (terminalCount === 3) {
+            layout2Group.style.display = 'none';
+            layout3Group.style.display = 'flex';
+        }
+    }
+
     updateLayoutButtons() {
+        // Update 2-terminal buttons
         const horizontalBtn = document.getElementById('layout-horizontal-btn');
         const verticalBtn = document.getElementById('layout-vertical-btn');
         
-        // Update active states
-        horizontalBtn.classList.toggle('active', this.currentLayout === 'horizontal');
-        verticalBtn.classList.toggle('active', this.currentLayout === 'vertical');
+        if (horizontalBtn && verticalBtn) {
+            horizontalBtn.classList.toggle('active', this.currentLayout === 'horizontal');
+            verticalBtn.classList.toggle('active', this.currentLayout === 'vertical');
+        }
+        
+        // Update 3-terminal buttons
+        const layout3Buttons = [
+            { id: 'layout-3-top1-btn', layout: '3-top1' },
+            { id: 'layout-3-top2-horiz-btn', layout: '3-top2-horiz' },
+            { id: 'layout-3-left2-btn', layout: '3-left2' },
+            { id: 'layout-3-right2-btn', layout: '3-right2' }
+        ];
+        
+        layout3Buttons.forEach(({ id, layout }) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.classList.toggle('active', this.currentLayout === layout);
+            }
+        });
+    }
+
+    getDefaultLayout(terminalCount) {
+        switch (terminalCount) {
+            case 2:
+                return 'horizontal';
+            case 3:
+                return '3-top1'; // Default: 1 top + 2 bottom horizontal
+            default:
+                return 'horizontal';
+        }
     }
 
     async initializeDynamicTerminals() {
@@ -2795,6 +2869,17 @@ class TerminalManager {
             // Add 2 terminals by default
             await this.addTerminalSilent();
             await this.addTerminalSilent();
+        } else if (activeResult.success) {
+            // Set the appropriate default layout based on terminal count
+            const terminalCount = activeResult.terminals.length;
+            // For 3 terminals, ensure we're using a 3-terminal layout
+            if (terminalCount === 3 && !this.currentLayout.startsWith('3-')) {
+                this.currentLayout = this.getDefaultLayout(terminalCount);
+            }
+            // For 2 terminals, ensure we're not using a 3-terminal layout
+            else if (terminalCount === 2 && this.currentLayout.startsWith('3-')) {
+                this.currentLayout = this.getDefaultLayout(terminalCount);
+            }
         }
         
         await this.renderTerminals();
@@ -2811,39 +2896,185 @@ class TerminalManager {
         }
     }
 
+    create3TerminalLayout(container, activeTerminals) {
+        const layout = this.currentLayout;
+        console.log('Creating 3-terminal layout:', layout);
+        
+        switch (layout) {
+            case '3-top1':
+                this.create3TerminalTop1Layout(container, activeTerminals);
+                break;
+            case '3-top2-horiz':
+                this.create3TerminalTop2HorizLayout(container, activeTerminals);
+                break;
+            case '3-left2':
+                this.create3TerminalLeft2Layout(container, activeTerminals);
+                break;
+            case '3-right2':
+                this.create3TerminalRight2Layout(container, activeTerminals);
+                break;
+            default:
+                // Default to top1 layout
+                this.create3TerminalTop1Layout(container, activeTerminals);
+                break;
+        }
+    }
+
+    create3TerminalTop1Layout(container, activeTerminals) {
+        // Reset CSS variables to ensure 50-50 split for bottom terminals
+        const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.setProperty('--left-width', '50%');
+        mainContainer.style.setProperty('--right-width', '50%');
+        
+        // Create 1+2 grid with separate rows
+        const rowTop = document.createElement('div');
+        rowTop.className = 'terminal-row-top';
+        
+        const rowBottom = document.createElement('div');
+        rowBottom.className = 'terminal-row-bottom';
+        
+        // Add first terminal to top row (full width)
+        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        rowTop.appendChild(terminal1);
+        
+        // Add remaining two terminals to bottom row
+        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        rowBottom.appendChild(terminal2);
+        rowBottom.appendChild(terminal3);
+        
+        // Add vertical resizer for horizontal bottom layout
+        const vResizer = this.createResizer('vertical', 'bottom-row');
+        rowBottom.appendChild(vResizer);
+        
+        // Append rows to container
+        container.appendChild(rowTop);
+        container.appendChild(rowBottom);
+        
+        // Add horizontal resizer between rows
+        const hResizer = this.createResizer('horizontal');
+        container.appendChild(hResizer);
+    }
+
+    create3TerminalTop2HorizLayout(container, activeTerminals) {
+        // Reset CSS variables to ensure 50-50 split for top terminals
+        const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.setProperty('--left-width', '50%');
+        mainContainer.style.setProperty('--right-width', '50%');
+        
+        // Create 2+1 grid with separate rows
+        const rowTop = document.createElement('div');
+        rowTop.className = 'terminal-row-top';
+        
+        const rowBottom = document.createElement('div');
+        rowBottom.className = 'terminal-row-bottom';
+        
+        // Add first two terminals to top row
+        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        rowTop.appendChild(terminal1);
+        rowTop.appendChild(terminal2);
+        
+        // Add vertical resizer to top row
+        const vResizerTop = this.createResizer('vertical', 'top-row');
+        rowTop.appendChild(vResizerTop);
+        
+        // Add third terminal to bottom row (full width)
+        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        rowBottom.appendChild(terminal3);
+        
+        // Append rows to container
+        container.appendChild(rowTop);
+        container.appendChild(rowBottom);
+        
+        // Add horizontal resizer between rows
+        const hResizer = this.createResizer('horizontal');
+        container.appendChild(hResizer);
+    }
+
+    create3TerminalLeft2Layout(container, activeTerminals) {
+        // Reset CSS variables to ensure 50-50 split
+        const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.setProperty('--left-width', '50%');
+        mainContainer.style.setProperty('--right-width', '50%');
+        mainContainer.style.setProperty('--top-height', '50%');
+        mainContainer.style.setProperty('--bottom-height', '50%');
+        
+        // Create left column with 2 terminals vertically
+        const columnLeft = document.createElement('div');
+        columnLeft.className = 'terminal-column-left';
+        
+        // Create right column with 1 terminal
+        const columnRight = document.createElement('div');
+        columnRight.className = 'terminal-column-right';
+        
+        // Add first two terminals to left column
+        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        columnLeft.appendChild(terminal1);
+        columnLeft.appendChild(terminal2);
+        
+        // Add horizontal resizer between left terminals
+        const hResizerLeft = this.createResizer('horizontal', 'left-column');
+        columnLeft.appendChild(hResizerLeft);
+        
+        // Add third terminal to right column
+        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        columnRight.appendChild(terminal3);
+        
+        // Append columns to container
+        container.appendChild(columnLeft);
+        container.appendChild(columnRight);
+        
+        // Add vertical resizer between columns
+        const vResizer = this.createResizer('vertical', 'main-columns');
+        container.appendChild(vResizer);
+    }
+
+    create3TerminalRight2Layout(container, activeTerminals) {
+        // Reset CSS variables to ensure 50-50 split
+        const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.setProperty('--left-width', '50%');
+        mainContainer.style.setProperty('--right-width', '50%');
+        mainContainer.style.setProperty('--top-height', '50%');
+        mainContainer.style.setProperty('--bottom-height', '50%');
+        
+        // Create left column with 1 terminal
+        const columnLeft = document.createElement('div');
+        columnLeft.className = 'terminal-column-left';
+        
+        // Create right column with 2 terminals vertically
+        const columnRight = document.createElement('div');
+        columnRight.className = 'terminal-column-right';
+        
+        // Add first terminal to left column
+        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        columnLeft.appendChild(terminal1);
+        
+        // Add remaining two terminals to right column
+        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        columnRight.appendChild(terminal2);
+        columnRight.appendChild(terminal3);
+        
+        // Add horizontal resizer between right terminals
+        const hResizerRight = this.createResizer('horizontal', 'right-column');
+        columnRight.appendChild(hResizerRight);
+        
+        // Append columns to container
+        container.appendChild(columnLeft);
+        container.appendChild(columnRight);
+        
+        // Add vertical resizer between columns
+        const vResizer = this.createResizer('vertical', 'main-columns');
+        container.appendChild(vResizer);
+    }
+
     createTerminalLayoutWithResizers(container, activeTerminals) {
         const terminalCount = activeTerminals.length;
         
         if (terminalCount === 3) {
-            // Create 1+2 grid with separate rows
-            const rowTop = document.createElement('div');
-            rowTop.className = 'terminal-row-top';
-            
-            const rowBottom = document.createElement('div');
-            rowBottom.className = 'terminal-row-bottom';
-            
-            // Add first terminal to top row (full width)
-            const terminal1 = this.createTerminalElement(activeTerminals[0]);
-            rowTop.appendChild(terminal1);
-            
-            // Add remaining two terminals to bottom row
-            const terminal2 = this.createTerminalElement(activeTerminals[1]);
-            const terminal3 = this.createTerminalElement(activeTerminals[2]);
-            rowBottom.appendChild(terminal2);
-            rowBottom.appendChild(terminal3);
-            
-            // Add vertical resizer only to bottom row
-            const vResizer = this.createResizer('vertical', 'bottom-row');
-            rowBottom.appendChild(vResizer);
-            
-            // Append rows to container
-            container.appendChild(rowTop);
-            container.appendChild(rowBottom);
-            
-            // Add horizontal resizer between rows
-            const hResizer = this.createResizer('horizontal');
-            container.appendChild(hResizer);
-            
+            this.create3TerminalLayout(container, activeTerminals);
         } else if (terminalCount === 4) {
             // Create independent row structure for 4 terminals
             const row1 = document.createElement('div');
