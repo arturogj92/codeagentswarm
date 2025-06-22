@@ -86,10 +86,6 @@ class TerminalManager {
             this.addTerminal();
         });
 
-        document.getElementById('remove-terminal-btn').addEventListener('click', () => {
-            this.removeLastTerminal();
-        });
-
         document.getElementById('settings-btn').addEventListener('click', () => {
             this.showSettings();
         });
@@ -2382,13 +2378,13 @@ class TerminalManager {
             if (result.success) {
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
-                this.showNotification('Success', `Terminal ${result.terminalId + 1} added`, 'success');
+                // Sin notificación al añadir terminal
             } else {
-                this.showNotification('Error', result.error, 'error');
+                // Solo mostrar error si es crítico
+                console.error('Error adding terminal:', result.error);
             }
         } catch (error) {
             console.error('Error adding terminal:', error);
-            this.showNotification('Error', 'Failed to add terminal', 'error');
         }
     }
 
@@ -2457,7 +2453,7 @@ class TerminalManager {
 
             // Get the highest terminal ID (last one added)
             const lastTerminalId = Math.max(...activeResult.terminals);
-            await this.removeTerminal(lastTerminalId);
+            await this.removeTerminal(lastTerminalId, true); // silent = true
         } catch (error) {
             console.error('Error removing last terminal:', error);
         }
@@ -2615,7 +2611,6 @@ class TerminalManager {
 
     async updateTerminalManagementButtons() {
         const addBtn = document.getElementById('add-terminal-btn');
-        const removeBtn = document.getElementById('remove-terminal-btn');
         
         try {
             const activeResult = await ipcRenderer.invoke('get-active-terminals');
@@ -2623,11 +2618,9 @@ class TerminalManager {
             
             // Disable add button if we have max terminals (6)
             addBtn.disabled = activeCount >= 6;
-            removeBtn.disabled = activeCount === 0;
         } catch (error) {
             console.error('Error updating terminal management buttons:', error);
             addBtn.disabled = false;
-            removeBtn.disabled = false;
         }
     }
 
