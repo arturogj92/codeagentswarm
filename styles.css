@@ -286,6 +286,17 @@ body::before {
   cursor: pointer;
 }
 
+/* Icon rotation classes for creating left/right panel effects */
+.icon-rotate-90 {
+  transform: rotate(90deg);
+  display: inline-block;
+}
+
+.icon-rotate-neg90 {
+  transform: rotate(-90deg);
+  display: inline-block;
+}
+
 .btn-layout:hover {
   background: rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
