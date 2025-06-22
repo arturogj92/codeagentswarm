@@ -82,7 +82,13 @@ class TerminalManager {
     }
 
     setupEventListeners() {
+        document.getElementById('add-terminal-btn').addEventListener('click', () => {
+            this.addTerminal();
+        });
 
+        document.getElementById('remove-terminal-btn').addEventListener('click', () => {
+            this.removeLastTerminal();
+        });
 
         document.getElementById('settings-btn').addEventListener('click', () => {
             this.showSettings();
@@ -112,7 +118,7 @@ class TerminalManager {
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
                 } else if (action === 'close') {
-                    this.closeTerminal(quadrant);
+                    this.closeTerminal(quadrant);  // async pero no necesita await aquí
                 }
             });
         });
@@ -129,59 +135,9 @@ class TerminalManager {
     }
 
     setupResizeHandlers() {
-        const verticalResizer = document.getElementById('vertical-resizer');
-        const horizontalResizer = document.getElementById('horizontal-resizer');
-        const container = document.getElementById('terminals-container');
-        
-        let isResizing = false;
-        
-        // Vertical resizer (left/right)
-        verticalResizer.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            document.body.style.cursor = 'col-resize';
-            e.preventDefault();
-        });
-        
-        // Horizontal resizer (top/bottom)
-        horizontalResizer.addEventListener('mousedown', (e) => {
-            isResizing = true;
-            document.body.style.cursor = 'row-resize';
-            e.preventDefault();
-        });
-        
-        document.addEventListener('mousemove', (e) => {
-            if (!isResizing) return;
-            
-            const containerRect = container.getBoundingClientRect();
-            
-            if (document.body.style.cursor === 'col-resize') {
-                const leftWidth = ((e.clientX - containerRect.left) / containerRect.width) * 100;
-                const rightWidth = 100 - leftWidth;
-                
-                if (leftWidth > 20 && rightWidth > 20) {
-                    container.style.gridTemplateColumns = `${leftWidth}% 4px ${rightWidth}%`;
-                }
-            } else if (document.body.style.cursor === 'row-resize') {
-                const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
-                const bottomHeight = 100 - topHeight;
-                
-                if (topHeight > 20 && bottomHeight > 20) {
-                    container.style.gridTemplateRows = `${topHeight}% 4px ${bottomHeight}%`;
-                }
-            }
-            
-            // Resize all active terminals
-            setTimeout(() => {
-                this.resizeAllTerminals();
-            }, 50);
-        });
-        
-        document.addEventListener('mouseup', () => {
-            if (isResizing) {
-                isResizing = false;
-                document.body.style.cursor = 'default';
-            }
-        });
+        // Resize handlers are no longer needed for dynamic layout
+        // This function is kept for compatibility but does nothing
+        console.log('Dynamic layout initialized - resize handlers not needed');
     }
 
     showDirectorySelector(quadrant) {
@@ -1374,37 +1330,18 @@ class TerminalManager {
         }
     }
 
-    closeTerminal(quadrant) {
+    async closeTerminal(quadrant) {
         const terminal = this.terminals.get(quadrant);
-        if (terminal) {
+        if (terminal && terminal.terminal) {
             terminal.terminal.dispose();
             ipcRenderer.send('kill-terminal', quadrant);
-            this.terminals.delete(quadrant);
-            // Note: We keep the directory in memory so it's remembered next time
-            
-            const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
-            const wrapper = quadrantElement.querySelector('.terminal-wrapper');
-            wrapper.innerHTML = `
-                <div class="terminal-placeholder" data-quadrant="${quadrant}">
-                    <div class="terminal-placeholder-icon">⚡</div>
-                    <div>Click to start Claude Code</div>
-                </div>
-            `;
-            
-            // Re-add event listener
-            wrapper.querySelector('.terminal-placeholder').addEventListener('click', (e) => {
-                const quadrant = parseInt(e.currentTarget.dataset.quadrant);
-                this.showDirectorySelector(quadrant);
-            });
-            
-            this.updateTerminalTitle(quadrant, `Terminal ${quadrant + 1}`);
-            
-            // Reset terminal header color
-            this.updateTerminalHeaderColor(quadrant);
-            
-            // Update git button visibility
-            this.updateGitButtonVisibility();
         }
+        
+        // Use the dynamic terminal removal system (silent = true para no mostrar notificación)
+        await this.removeTerminal(quadrant, true);
+        
+        // Update git button visibility
+        this.updateGitButtonVisibility();
     }
 
     resizeTerminal(quadrant) {
@@ -2437,6 +2374,312 @@ class TerminalManager {
             console.log('Notification check failed:', error);
         }
     }
+
+    // Dynamic terminal management
+    async addTerminal() {
+        try {
+            const result = await ipcRenderer.invoke('add-terminal');
+            if (result.success) {
+                await this.renderTerminals();
+                await this.updateTerminalManagementButtons();
+                this.showNotification('Success', `Terminal ${result.terminalId + 1} added`, 'success');
+            } else {
+                this.showNotification('Error', result.error, 'error');
+            }
+        } catch (error) {
+            console.error('Error adding terminal:', error);
+            this.showNotification('Error', 'Failed to add terminal', 'error');
+        }
+    }
+
+    async showRemoveTerminalModal() {
+        try {
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            if (!activeResult.success || activeResult.terminals.length === 0) {
+                this.showNotification('Info', 'No terminals to remove', 'info');
+                return;
+            }
+
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>Remove Terminal</h3>
+                    <p>Select a terminal to remove:</p>
+                    <div class="terminal-list">
+                        ${activeResult.terminals.map(id => `
+                            <button class="terminal-option" data-terminal="${id}">
+                                Terminal ${id + 1}
+                            </button>
+                        `).join('')}
+                    </div>
+                    <div class="modal-actions">
+                        <button class="btn" id="cancel-remove">Cancel</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Handle terminal selection
+            modal.querySelectorAll('.terminal-option').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const terminalId = parseInt(btn.dataset.terminal);
+                    await this.removeTerminal(terminalId);
+                    document.body.removeChild(modal);
+                });
+            });
+
+            // Handle cancel
+            modal.querySelector('#cancel-remove').addEventListener('click', () => {
+                document.body.removeChild(modal);
+            });
+
+            // Close on overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                }
+            });
+
+        } catch (error) {
+            console.error('Error showing remove terminal modal:', error);
+        }
+    }
+
+    async removeLastTerminal() {
+        try {
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            if (!activeResult.success || activeResult.terminals.length === 0) {
+                // Silently do nothing if no terminals to remove
+                return;
+            }
+
+            // Get the highest terminal ID (last one added)
+            const lastTerminalId = Math.max(...activeResult.terminals);
+            await this.removeTerminal(lastTerminalId);
+        } catch (error) {
+            console.error('Error removing last terminal:', error);
+        }
+    }
+
+    async removeTerminal(terminalId, silent = false) {
+        try {
+            const result = await ipcRenderer.invoke('remove-terminal', terminalId);
+            if (result.success) {
+                // Remove from local terminals map
+                this.terminals.delete(terminalId);
+                await this.renderTerminals();
+                await this.updateTerminalManagementButtons();
+                if (!silent) {
+                    this.showNotification('Success', `Terminal ${terminalId + 1} removed`, 'success');
+                }
+            } else {
+                if (!silent) {
+                    this.showNotification('Error', result.error, 'error');
+                }
+            }
+        } catch (error) {
+            console.error('Error removing terminal:', error);
+            if (!silent) {
+                this.showNotification('Error', 'Failed to remove terminal', 'error');
+            }
+        }
+    }
+
+    async renderTerminals() {
+        try {
+            console.log('🔄 Rendering terminals...');
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            console.log('📊 Active terminals result:', activeResult);
+            
+            if (!activeResult.success) {
+                console.error('Failed to get active terminals');
+                return;
+            }
+
+            const container = document.getElementById('terminals-container');
+            const activeTerminals = activeResult.terminals;
+
+            console.log(`📋 Found ${activeTerminals.length} active terminals:`, activeTerminals);
+
+            // Update container class for layout
+            container.className = `terminals-container count-${activeTerminals.length}`;
+            
+            // Clear existing content
+            container.innerHTML = '';
+
+            if (activeTerminals.length === 0) {
+                console.log('📭 No terminals - showing empty state');
+                // Show empty state
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No Terminals Active</h2>
+                        <p>Click the + button to add your first terminal</p>
+                    </div>
+                `;
+                return;
+            }
+
+            console.log('🏗️ Creating terminal elements...');
+            // Create terminal elements
+            activeTerminals.forEach(terminalId => {
+                console.log(`Creating terminal ${terminalId}`);
+                const terminalElement = this.createTerminalElement(terminalId);
+                container.appendChild(terminalElement);
+            });
+
+            console.log('🎨 Re-initializing Lucide icons...');
+            // Re-initialize Lucide icons
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+
+            console.log('🔗 Re-attaching event listeners...');
+            // Re-attach event listeners
+            this.attachTerminalEventListeners();
+            
+            // Resize all terminals after rendering
+            setTimeout(() => {
+                this.resizeAllTerminals();
+            }, 100);
+
+            console.log('✅ Terminal rendering completed');
+
+        } catch (error) {
+            console.error('❌ Error rendering terminals:', error);
+        }
+    }
+
+    createTerminalElement(terminalId) {
+        const element = document.createElement('div');
+        element.className = 'terminal-quadrant';
+        element.dataset.quadrant = terminalId;
+        
+        element.innerHTML = `
+            <div class="terminal-header">
+                <div style="display: flex; align-items: center; flex: 1;">
+                    <span class="terminal-title">Terminal ${terminalId + 1}</span>
+                    <div class="current-task" id="current-task-${terminalId}" style="display: none;">
+                        <i data-lucide="play-circle"></i>
+                        <span class="task-text"></span>
+                    </div>
+                    <div class="git-branch-display" id="git-branch-display-${terminalId}" style="display: none;">
+                        <i data-lucide="git-branch"></i>
+                        <span class="current-branch-name">main</span>
+                        <button class="branch-switch-btn" data-terminal="${terminalId}" title="Switch/Create Branch">
+                            <i data-lucide="chevron-down"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="terminal-controls">
+                    <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
+                    <button class="terminal-control-btn" data-action="close" title="Close">×</button>
+                </div>
+            </div>
+            <div class="terminal-wrapper">
+                <div class="terminal-placeholder" data-quadrant="${terminalId}">
+                    <div class="terminal-placeholder-icon">⚡</div>
+                    <div>Click to start Claude Code</div>
+                </div>
+            </div>
+        `;
+
+        return element;
+    }
+
+    attachTerminalEventListeners() {
+        // Re-attach placeholder listeners
+        document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
+            placeholder.addEventListener('click', (e) => {
+                const quadrant = parseInt(e.currentTarget.dataset.quadrant);
+                this.showDirectorySelector(quadrant);
+            });
+        });
+
+        // Re-attach control button listeners
+        document.querySelectorAll('.terminal-control-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = e.target.dataset.action;
+                const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
+                
+                if (action === 'fullscreen') {
+                    this.toggleFullscreen(quadrant);
+                } else if (action === 'close') {
+                    this.closeTerminal(quadrant);  // async pero no necesita await aquí
+                }
+            });
+        });
+    }
+
+    async updateTerminalManagementButtons() {
+        const addBtn = document.getElementById('add-terminal-btn');
+        const removeBtn = document.getElementById('remove-terminal-btn');
+        
+        try {
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            const activeCount = activeResult.success ? activeResult.terminals.length : 0;
+            
+            // Disable add button if we have max terminals (6)
+            addBtn.disabled = activeCount >= 6;
+            removeBtn.disabled = activeCount === 0;
+        } catch (error) {
+            console.error('Error updating terminal management buttons:', error);
+            addBtn.disabled = false;
+            removeBtn.disabled = false;
+        }
+    }
+
+    async initializeDynamicTerminals() {
+        // Check if there are any existing terminals, if not create default ones
+        const activeResult = await ipcRenderer.invoke('get-active-terminals');
+        if (activeResult.success && activeResult.terminals.length === 0) {
+            // Add 2 terminals by default
+            await this.addTerminalSilent();
+            await this.addTerminalSilent();
+        }
+        
+        await this.renderTerminals();
+        await this.updateTerminalManagementButtons();
+    }
+
+    async addTerminalSilent() {
+        try {
+            const result = await ipcRenderer.invoke('add-terminal');
+            return result.success;
+        } catch (error) {
+            console.error('Error adding terminal silently:', error);
+            return false;
+        }
+    }
+
+    showNotification(title, message, type = 'info') {
+        // Simple notification system
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <strong>${title}</strong>
+                <p>${message}</p>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+        
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                if (notification.parentNode) {
+                    document.body.removeChild(notification);
+                }
+            }, 300);
+        }, 3000);
+    }
 }
 
 // Listen for dev mode status from main process
@@ -2450,8 +2693,11 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
 });
 
 // Initialize the terminal manager when the DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     window.terminalManager = new TerminalManager();
+    
+    // Initialize dynamic terminals
+    await window.terminalManager.initializeDynamicTerminals();
     
     // Initialize Lucide icons
     if (typeof lucide !== 'undefined') {

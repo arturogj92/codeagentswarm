@@ -15,130 +15,16 @@
             <div class="header-controls">
                 <button class="btn" id="git-status-btn"><i data-lucide="git-branch"></i> Git</button>
                 <button class="btn" id="kanban-btn"><i data-lucide="kanban-square"></i> Tasks</button>
+                <div class="terminal-management">
+                    <button class="btn btn-success" id="add-terminal-btn" title="Add Terminal"><i data-lucide="plus"></i></button>
+                    <button class="btn btn-danger" id="remove-terminal-btn" title="Remove Terminal">×</button>
+                </div>
                 <button class="btn btn-primary" id="settings-btn">⚙️</button>
             </div>
         </header>
 
         <main class="terminals-container" id="terminals-container">
-            <div class="terminal-quadrant" data-quadrant="0">
-                <div class="terminal-header">
-                    <div style="display: flex; align-items: center; flex: 1;">
-                        <span class="terminal-title">Terminal 1</span>
-                        <div class="current-task" id="current-task-0" style="display: none;">
-                            <i data-lucide="play-circle"></i>
-                            <span class="task-text"></span>
-                        </div>
-                        <div class="git-branch-display" id="git-branch-display-0" style="display: none;">
-                            <i data-lucide="git-branch"></i>
-                            <span class="current-branch-name">main</span>
-                            <button class="branch-switch-btn" data-terminal="0" title="Switch/Create Branch">
-                                <i data-lucide="chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="terminal-controls">
-                        <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
-                        <button class="terminal-control-btn" data-action="close" title="Close">×</button>
-                    </div>
-                </div>
-                <div class="terminal-wrapper">
-                    <div class="terminal-placeholder" data-quadrant="0">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="vertical-resizer" id="vertical-resizer"></div>
-
-            <div class="terminal-quadrant" data-quadrant="1">
-                <div class="terminal-header">
-                    <div style="display: flex; align-items: center; flex: 1;">
-                        <span class="terminal-title">Terminal 2</span>
-                        <div class="current-task" id="current-task-1" style="display: none;">
-                            <i data-lucide="play-circle"></i>
-                            <span class="task-text"></span>
-                        </div>
-                        <div class="git-branch-display" id="git-branch-display-1" style="display: none;">
-                            <i data-lucide="git-branch"></i>
-                            <span class="current-branch-name">main</span>
-                            <button class="branch-switch-btn" data-terminal="1" title="Switch/Create Branch">
-                                <i data-lucide="chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="terminal-controls">
-                        <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
-                        <button class="terminal-control-btn" data-action="close" title="Close">×</button>
-                    </div>
-                </div>
-                <div class="terminal-wrapper">
-                    <div class="terminal-placeholder" data-quadrant="1">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="horizontal-resizer" id="horizontal-resizer"></div>
-
-            <div class="terminal-quadrant" data-quadrant="2">
-                <div class="terminal-header">
-                    <div style="display: flex; align-items: center; flex: 1;">
-                        <span class="terminal-title">Terminal 3</span>
-                        <div class="current-task" id="current-task-2" style="display: none;">
-                            <i data-lucide="play-circle"></i>
-                            <span class="task-text"></span>
-                        </div>
-                        <div class="git-branch-display" id="git-branch-display-2" style="display: none;">
-                            <i data-lucide="git-branch"></i>
-                            <span class="current-branch-name">main</span>
-                            <button class="branch-switch-btn" data-terminal="2" title="Switch/Create Branch">
-                                <i data-lucide="chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="terminal-controls">
-                        <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
-                        <button class="terminal-control-btn" data-action="close" title="Close">×</button>
-                    </div>
-                </div>
-                <div class="terminal-wrapper">
-                    <div class="terminal-placeholder" data-quadrant="2">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="terminal-quadrant" data-quadrant="3">
-                <div class="terminal-header">
-                    <div style="display: flex; align-items: center; flex: 1;">
-                        <span class="terminal-title">Terminal 4</span>
-                        <div class="current-task" id="current-task-3" style="display: none;">
-                            <i data-lucide="play-circle"></i>
-                            <span class="task-text"></span>
-                        </div>
-                        <div class="git-branch-display" id="git-branch-display-3" style="display: none;">
-                            <i data-lucide="git-branch"></i>
-                            <span class="current-branch-name">main</span>
-                            <button class="branch-switch-btn" data-terminal="3" title="Switch/Create Branch">
-                                <i data-lucide="chevron-down"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="terminal-controls">
-                        <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
-                        <button class="terminal-control-btn" data-action="close" title="Close">×</button>
-                    </div>
-                </div>
-                <div class="terminal-wrapper">
-                    <div class="terminal-placeholder" data-quadrant="3">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
-                    </div>
-                </div>
-            </div>
+            <!-- Terminals will be dynamically generated here -->
         </main>
     </div>
 

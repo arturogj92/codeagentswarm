@@ -465,6 +465,93 @@ ipcMain.on('kill-terminal', (event, quadrant) => {
   }
 });
 
+// Handle adding new terminal
+ipcMain.handle('add-terminal', async () => {
+  try {
+    // Find the next available terminal ID (max 6 terminals)
+    const existingTerminals = Array.from(terminals.keys());
+    const maxTerminals = 6;
+    
+    if (existingTerminals.length >= maxTerminals) {
+      return { success: false, error: 'Maximum number of terminals (6) reached' };
+    }
+    
+    // Find the first available ID (0-5)
+    let newTerminalId = null;
+    for (let i = 0; i < maxTerminals; i++) {
+      if (!existingTerminals.includes(i)) {
+        newTerminalId = i;
+        break;
+      }
+    }
+    
+    if (newTerminalId === null) {
+      return { success: false, error: 'No available terminal slots' };
+    }
+
+    // Create a placeholder terminal object to mark this slot as occupied
+    // The actual terminal will be created when the user selects a directory
+    terminals.set(newTerminalId, {
+      id: newTerminalId,
+      placeholder: true,
+      created: new Date()
+    });
+    
+    return { success: true, terminalId: newTerminalId };
+  } catch (error) {
+    console.error('Error adding terminal:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle removing terminal
+ipcMain.handle('remove-terminal', async (event, terminalId) => {
+  try {
+    const shell = terminals.get(terminalId);
+    if (shell) {
+      console.log(`Removing terminal ${terminalId}...`);
+      
+      // If it's a real shell (not just a placeholder), kill it
+      if (shell.kill && typeof shell.kill === 'function') {
+        shell.kill();
+      }
+      
+      terminals.delete(terminalId);
+      
+      // Cleanup orphaned processes only if it was a real shell
+      if (!shell.placeholder) {
+        setTimeout(() => {
+          if (process.platform === 'darwin') {
+            try {
+              require('child_process').execSync(`ps aux | grep -E "claude.*${terminalId}" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        }, 100);
+      }
+      
+      return { success: true };
+    } else {
+      return { success: false, error: 'Terminal not found' };
+    }
+  } catch (error) {
+    console.error('Error removing terminal:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get active terminals count
+ipcMain.handle('get-active-terminals', async () => {
+  try {
+    const activeTerminals = Array.from(terminals.keys()).sort((a, b) => a - b);
+    return { success: true, terminals: activeTerminals };
+  } catch (error) {
+    console.error('Error getting active terminals:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('check-claude-code', async () => {
   return new Promise((resolve) => {
     const checkProcess = spawn('which', ['claude-code'], {
