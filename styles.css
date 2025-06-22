@@ -311,6 +311,15 @@ body::before {
   --row1-right-width: 50%;
   --row2-left-width: 50%;
   --row2-right-width: 50%;
+  /* Independent cell sizing for 4-terminal grid */
+  --cell-1-width: 50%;
+  --cell-2-width: 50%;
+  --cell-3-width: 50%;
+  --cell-4-width: 50%;
+  --cell-1-height: 50%;
+  --cell-2-height: 50%;
+  --cell-3-height: 50%;
+  --cell-4-height: 50%;
 }
 
 .terminals-container.count-1 {
@@ -345,8 +354,25 @@ body::before {
 }
 
 .terminals-container.count-4 {
-  grid-template-columns: var(--left-width) var(--right-width);
-  grid-template-rows: var(--top-height) var(--bottom-height);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.terminals-container.count-4 .terminal-row-1 {
+  display: grid;
+  grid-template-columns: var(--row1-left-width) var(--row1-right-width);
+  height: var(--top-height);
+  gap: 20px;
+  position: relative;
+}
+
+.terminals-container.count-4 .terminal-row-2 {
+  display: grid;
+  grid-template-columns: var(--row2-left-width) var(--row2-right-width);
+  height: var(--bottom-height);
+  gap: 20px;
+  position: relative;
 }
 
 .terminals-container.count-5 {
@@ -633,16 +659,30 @@ body::before {
   z-index: 10;
 }
 
-/* Horizontal resizer for 4-terminal layout between rows */
-.horizontal-resizer.row-divider {
-  cursor: row-resize;
-  height: 8px;
-  width: 100%;
-  left: 0;
-  top: var(--top-height, 50%);
-  transform: translateY(-50%);
+/* Independent row resizers for 4-terminal layout */
+
+/* Vertical resizer for row 1 (between Terminal 1-2) */
+.terminals-container.count-4 .terminal-row-1 .vertical-resizer.row-1 {
+  cursor: col-resize;
+  width: 8px;
+  height: 100%;
+  left: var(--row1-left-width);
+  top: 0;
+  transform: translateX(-50%);
   position: absolute;
-  z-index: 100;
+  z-index: 10;
+}
+
+/* Vertical resizer for row 2 (between Terminal 3-4) */
+.terminals-container.count-4 .terminal-row-2 .vertical-resizer.row-2 {
+  cursor: col-resize;
+  width: 8px;
+  height: 100%;
+  left: var(--row2-left-width);
+  top: 0;
+  transform: translateX(-50%);
+  position: absolute;
+  z-index: 10;
 }
 
 .horizontal-resizer.row-divider::before {

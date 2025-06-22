@@ -163,7 +163,6 @@ class TerminalManager {
             const containerRect = container.getBoundingClientRect();
             
             if (resizeDirection === 'vertical') {
-                // Check if this is a row-specific resizer (for 4-terminal layout)
                 const isRow1 = currentResizer.classList.contains('row-1');
                 const isRow2 = currentResizer.classList.contains('row-2');
                 const isBottomRow = currentResizer.classList.contains('bottom-row');
@@ -208,26 +207,14 @@ class TerminalManager {
                     }
                 }
             } else if (resizeDirection === 'horizontal') {
-                // Check if this is a row divider (for 4-terminal layout)
-                if (currentResizer.classList.contains('row-divider')) {
-                    const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
-                    const bottomHeight = 100 - topHeight;
-                    
-                    if (topHeight > 25 && bottomHeight > 25) {
-                        container.style.setProperty('--top-height', `${topHeight}%`);
-                        container.style.setProperty('--bottom-height', `${bottomHeight}%`);
-                        currentResizer.style.top = `${topHeight}%`;
-                    }
-                } else {
-                    // Handle regular horizontal resizing
-                    const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
-                    const bottomHeight = 100 - topHeight;
-                    
-                    if (topHeight > 25 && bottomHeight > 25) {
-                        container.style.setProperty('--top-height', `${topHeight}%`);
-                        container.style.setProperty('--bottom-height', `${bottomHeight}%`);
-                        currentResizer.style.top = `${topHeight}%`;
-                    }
+                // Handle horizontal resizing between rows
+                const topHeight = ((e.clientY - containerRect.top) / containerRect.height) * 100;
+                const bottomHeight = 100 - topHeight;
+                
+                if (topHeight > 25 && bottomHeight > 25) {
+                    container.style.setProperty('--top-height', `${topHeight}%`);
+                    container.style.setProperty('--bottom-height', `${bottomHeight}%`);
+                    currentResizer.style.top = `${topHeight}%`;
                 }
             }
             
@@ -2800,6 +2787,40 @@ class TerminalManager {
             const hResizer = this.createResizer('horizontal');
             container.appendChild(hResizer);
             
+        } else if (terminalCount === 4) {
+            // Create independent row structure for 4 terminals
+            const row1 = document.createElement('div');
+            row1.className = 'terminal-row-1';
+            
+            const row2 = document.createElement('div');
+            row2.className = 'terminal-row-2';
+            
+            // Add first two terminals to row 1
+            const terminal1 = this.createTerminalElement(activeTerminals[0]);
+            const terminal2 = this.createTerminalElement(activeTerminals[1]);
+            row1.appendChild(terminal1);
+            row1.appendChild(terminal2);
+            
+            // Add last two terminals to row 2
+            const terminal3 = this.createTerminalElement(activeTerminals[2]);
+            const terminal4 = this.createTerminalElement(activeTerminals[3]);
+            row2.appendChild(terminal3);
+            row2.appendChild(terminal4);
+            
+            // Add resizers to each row
+            const vResizer1 = this.createResizer('vertical', 'row-1'); // Row 1 vertical resizer
+            const vResizer2 = this.createResizer('vertical', 'row-2'); // Row 2 vertical resizer
+            row1.appendChild(vResizer1);
+            row2.appendChild(vResizer2);
+            
+            // Add rows to container
+            container.appendChild(row1);
+            container.appendChild(row2);
+            
+            // Add horizontal resizer between rows
+            const hResizer = this.createResizer('horizontal');
+            container.appendChild(hResizer);
+            
         } else {
             // Original logic for other terminal counts
             activeTerminals.forEach(terminalId => {
@@ -2812,12 +2833,6 @@ class TerminalManager {
                 // Single vertical resizer for 2 terminals
                 const vResizer = this.createResizer('vertical');
                 container.appendChild(vResizer);
-            } else if (terminalCount === 4) {
-                // Vertical and horizontal resizers for 2x2 grid
-                const vResizer = this.createResizer('vertical');
-                const hResizer = this.createResizer('horizontal');
-                container.appendChild(vResizer);
-                container.appendChild(hResizer);
             } else if (terminalCount >= 5) {
                 // Only horizontal resizer for 3x2 grid (vertical resizing between rows)
                 const hResizer = this.createResizer('horizontal');
