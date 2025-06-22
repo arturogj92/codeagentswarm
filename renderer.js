@@ -18,6 +18,7 @@ class TerminalManager {
         this.terminals = new Map();
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
+        this.currentLayout = 'horizontal'; // Default layout for 2 terminals
         this.lastSelectedDirectories = {}; // Initialize empty, will load async
         this.lastConfirmationMessages = new Map(); // Track last confirmation per terminal
         this.confirmationDebounce = new Map(); // Debounce confirmations
@@ -84,6 +85,15 @@ class TerminalManager {
     setupEventListeners() {
         document.getElementById('add-terminal-btn').addEventListener('click', () => {
             this.addTerminal();
+        });
+
+        // Layout selector event listeners
+        document.getElementById('layout-horizontal-btn').addEventListener('click', () => {
+            this.setLayout('horizontal');
+        });
+
+        document.getElementById('layout-vertical-btn').addEventListener('click', () => {
+            this.setLayout('vertical');
         });
 
         document.getElementById('settings-btn').addEventListener('click', () => {
@@ -2610,8 +2620,13 @@ class TerminalManager {
 
             console.log(`📋 Found ${activeTerminals.length} active terminals:`, activeTerminals);
 
-            // Update container class for layout
+            // Update container class for layout while preserving existing layout classes
             container.className = `terminals-container count-${activeTerminals.length}`;
+            
+            // Re-apply layout class if set (for 2 terminals)
+            if (activeTerminals.length === 2 && this.currentLayout === 'vertical') {
+                container.classList.add('layout-vertical');
+            }
             
             // Clear existing content
             container.innerHTML = '';
@@ -2718,6 +2733,7 @@ class TerminalManager {
 
     async updateTerminalManagementButtons() {
         const addBtn = document.getElementById('add-terminal-btn');
+        const layoutSelector = document.getElementById('layout-selector');
         
         try {
             const activeResult = await ipcRenderer.invoke('get-active-terminals');
@@ -2725,10 +2741,51 @@ class TerminalManager {
             
             // Disable add button if we have max terminals (6)
             addBtn.disabled = activeCount >= 6;
+            
+            // Show/hide layout selector for 2 terminals
+            if (activeCount === 2) {
+                layoutSelector.style.display = 'flex';
+                this.updateLayoutButtons();
+            } else {
+                layoutSelector.style.display = 'none';
+            }
         } catch (error) {
             console.error('Error updating terminal management buttons:', error);
             addBtn.disabled = false;
         }
+    }
+
+    setLayout(layout) {
+        console.log('setLayout called with:', layout);
+        if (layout !== 'horizontal' && layout !== 'vertical') return;
+        
+        this.currentLayout = layout;
+        const container = document.getElementById('terminals-container');
+        console.log('Container found:', container);
+        
+        // Update container classes
+        if (layout === 'vertical') {
+            container.classList.add('layout-vertical');
+            console.log('Added layout-vertical class');
+        } else {
+            container.classList.remove('layout-vertical');
+            console.log('Removed layout-vertical class');
+        }
+        
+        // Update button states
+        this.updateLayoutButtons();
+        
+        // Re-render terminals with new layout
+        this.renderTerminals();
+    }
+
+    updateLayoutButtons() {
+        const horizontalBtn = document.getElementById('layout-horizontal-btn');
+        const verticalBtn = document.getElementById('layout-vertical-btn');
+        
+        // Update active states
+        horizontalBtn.classList.toggle('active', this.currentLayout === 'horizontal');
+        verticalBtn.classList.toggle('active', this.currentLayout === 'vertical');
     }
 
     async initializeDynamicTerminals() {
@@ -2830,9 +2887,16 @@ class TerminalManager {
             
             // Add resizers as absolutely positioned elements
             if (terminalCount === 2) {
-                // Single vertical resizer for 2 terminals
-                const vResizer = this.createResizer('vertical');
-                container.appendChild(vResizer);
+                // Add resizer based on current layout
+                if (this.currentLayout === 'vertical') {
+                    // Horizontal resizer for vertical layout
+                    const hResizer = this.createResizer('horizontal');
+                    container.appendChild(hResizer);
+                } else {
+                    // Vertical resizer for horizontal layout (default)
+                    const vResizer = this.createResizer('vertical');
+                    container.appendChild(vResizer);
+                }
             } else if (terminalCount >= 5) {
                 // Only horizontal resizer for 3x2 grid (vertical resizing between rows)
                 const hResizer = this.createResizer('horizontal');

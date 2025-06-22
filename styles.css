@@ -261,6 +261,36 @@ body::before {
   align-items: center;
 }
 
+.layout-selector {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.btn-layout {
+  padding: 6px 8px;
+  font-size: 0.75rem;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-layout:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary);
+}
+
+.btn-layout.active {
+  background: var(--primary);
+  color: white;
+}
+
 .terminal-management .btn {
   padding: 8px 12px;
   font-size: 0.875rem;
@@ -330,6 +360,11 @@ body::before {
 .terminals-container.count-2 {
   grid-template-columns: var(--left-width) var(--right-width);
   grid-template-rows: 1fr;
+}
+
+.terminals-container.count-2.layout-vertical {
+  grid-template-columns: 1fr;
+  grid-template-rows: var(--top-height) var(--bottom-height);
 }
 
 .terminals-container.count-3 {
