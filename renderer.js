@@ -3006,42 +3006,53 @@ class TerminalManager {
         // Check if we're in a 3-terminal layout
         const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
         const terminalCount = allTerminals.length;
+        console.log('🔄 Detected terminal count:', terminalCount);
         
-        if ((terminalCount === 3 && this.currentLayout.startsWith('3-')) || terminalCount === 4) {
-            // For 3-terminal and 4-terminal layouts, swap content to preserve structure
-            this.swapTerminalContent(element1, element2);
-        } else {
-            // For 2 terminals, swap DOM positions
-            this.swapTerminalPositions(element1, element2);
-        }
+        // Use content swap for all terminal counts - it works universally
+        console.log('🔄 Using content swap for', terminalCount, 'terminals');
+        this.swapTerminalContent(element1, element2);
     }
 
     swapTerminalPositions(element1, element2) {
-        console.log('🔄 Swapping DOM positions');
+        console.log('🔄 Swapping DOM positions for 2 terminals');
         
-        // Get parent container
+        // Get parent container (should be the same for both in 2-terminal layout)
         const container = element1.parentNode;
+        
+        if (element1.parentNode !== element2.parentNode) {
+            console.error('🔄 Elements have different parents - using content swap instead');
+            this.swapTerminalContent(element1, element2);
+            return;
+        }
         
         // Create temporary placeholder
         const temp = document.createElement('div');
         
-        // Insert temp before element1
-        container.insertBefore(temp, element1);
-        
-        // Move element1 to element2's position
-        container.insertBefore(element1, element2);
-        
-        // Move element2 to temp's position
-        container.insertBefore(element2, temp);
-        
-        // Remove temporary placeholder
-        container.removeChild(temp);
-        
-        // Update terminal data and fit
-        setTimeout(() => {
-            this.reattachTerminalsAfterSwap();
-            this.fitTerminalsToNewSizes();
-        }, 50);
+        try {
+            // Insert temp before element1
+            container.insertBefore(temp, element1);
+            
+            // Move element1 to element2's position
+            container.insertBefore(element1, element2);
+            
+            // Move element2 to temp's position
+            container.insertBefore(element2, temp);
+            
+            // Remove temporary placeholder
+            container.removeChild(temp);
+            
+            console.log('🔄 DOM positions swapped successfully');
+            
+            // Update terminal data and fit
+            setTimeout(() => {
+                this.reattachTerminalsAfterSwap();
+                this.fitTerminalsToNewSizes();
+            }, 50);
+        } catch (error) {
+            console.error('🔄 Error swapping DOM positions:', error);
+            // Fallback to content swap
+            this.swapTerminalContent(element1, element2);
+        }
     }
 
     swapTerminalContent(element1, element2) {
