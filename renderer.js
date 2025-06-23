@@ -3007,8 +3007,8 @@ class TerminalManager {
         const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
         const terminalCount = allTerminals.length;
         
-        if (terminalCount === 3 && this.currentLayout.startsWith('3-')) {
-            // For 3-terminal layouts, swap content to preserve structure
+        if ((terminalCount === 3 && this.currentLayout.startsWith('3-')) || terminalCount === 4) {
+            // For 3-terminal and 4-terminal layouts, swap content to preserve structure
             this.swapTerminalContent(element1, element2);
         } else {
             // For 2 terminals, swap DOM positions
