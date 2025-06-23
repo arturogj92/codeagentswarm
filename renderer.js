@@ -2814,18 +2814,17 @@ class TerminalManager {
         try {
             const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
             
+            // Show all buttons for circular navigation (wrap-around)
             allTerminals.forEach((terminal, index) => {
                 const leftBtn = terminal.querySelector('.terminal-reorder-btn[data-action="move-left"]');
                 const rightBtn = terminal.querySelector('.terminal-reorder-btn[data-action="move-right"]');
                 
                 if (leftBtn) {
-                    // Hide left button if at leftmost position
-                    leftBtn.style.display = index === 0 ? 'none' : 'flex';
+                    leftBtn.style.display = 'flex';
                 }
                 
                 if (rightBtn) {
-                    // Hide right button if at rightmost position
-                    rightBtn.style.display = index === allTerminals.length - 1 ? 'none' : 'flex';
+                    rightBtn.style.display = 'flex';
                 }
             });
         } catch (error) {
@@ -2985,18 +2984,30 @@ class TerminalManager {
         const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
         const totalTerminals = allTerminals.length;
         
-        if (direction === 'left' && position > 0) {
-            // Swap with left terminal
-            const currentElement = allTerminals[position];
-            const leftElement = allTerminals[position - 1];
-            this.swapTerminalElements(currentElement, leftElement);
-        } else if (direction === 'right' && position < totalTerminals - 1) {
-            // Swap with right terminal
-            const currentElement = allTerminals[position];
-            const rightElement = allTerminals[position + 1];
-            this.swapTerminalElements(currentElement, rightElement);
-        } else {
-            console.log('🔄 Cannot move - already at edge');
+        if (direction === 'left') {
+            if (position > 0) {
+                // Normal case: swap with left terminal
+                const currentElement = allTerminals[position];
+                const leftElement = allTerminals[position - 1];
+                this.swapTerminalElements(currentElement, leftElement);
+            } else {
+                // At leftmost position: wrap around to rightmost
+                const currentElement = allTerminals[0];
+                const rightmostElement = allTerminals[totalTerminals - 1];
+                this.swapTerminalElements(currentElement, rightmostElement);
+            }
+        } else if (direction === 'right') {
+            if (position < totalTerminals - 1) {
+                // Normal case: swap with right terminal
+                const currentElement = allTerminals[position];
+                const rightElement = allTerminals[position + 1];
+                this.swapTerminalElements(currentElement, rightElement);
+            } else {
+                // At rightmost position: wrap around to leftmost
+                const currentElement = allTerminals[totalTerminals - 1];
+                const leftmostElement = allTerminals[0];
+                this.swapTerminalElements(currentElement, leftmostElement);
+            }
         }
     }
 
