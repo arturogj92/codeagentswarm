@@ -2676,6 +2676,10 @@ class TerminalManager {
             // Re-attach event listeners
             this.attachTerminalEventListeners();
             
+            // Restore task indicators and git branch displays
+            this.updateCurrentTaskIndicators();
+            this.updateGitButtonVisibility();
+            
             // Resize all terminals after rendering
             setTimeout(() => {
                 this.resizeAllTerminals();
@@ -2692,6 +2696,10 @@ class TerminalManager {
         const element = document.createElement('div');
         element.className = 'terminal-quadrant';
         element.dataset.quadrant = terminalId;
+        
+        // Check if terminal already exists
+        const existingTerminal = this.terminals.get(terminalId);
+        const hasActiveTerminal = existingTerminal && existingTerminal.terminal;
         
         element.innerHTML = `
             <div class="terminal-header">
@@ -2715,12 +2723,31 @@ class TerminalManager {
                 </div>
             </div>
             <div class="terminal-wrapper">
-                <div class="terminal-placeholder" data-quadrant="${terminalId}">
-                    <div class="terminal-placeholder-icon">⚡</div>
-                    <div>Click to start Claude Code</div>
-                </div>
+                ${hasActiveTerminal ? 
+                    `<div class="terminal" id="terminal-${terminalId}"></div>` :
+                    `<div class="terminal-placeholder" data-quadrant="${terminalId}">
+                        <div class="terminal-placeholder-icon">⚡</div>
+                        <div>Click to start Claude Code</div>
+                    </div>`
+                }
             </div>
         `;
+
+        // If terminal exists, reattach it after element is in DOM
+        if (hasActiveTerminal) {
+            setTimeout(() => {
+                const terminalDiv = element.querySelector(`#terminal-${terminalId}`);
+                if (terminalDiv && existingTerminal.terminal) {
+                    // Make sure the terminal div is visible
+                    terminalDiv.style.display = 'block';
+                    // Reopen the terminal in the new element
+                    existingTerminal.terminal.open(terminalDiv);
+                    if (existingTerminal.fitAddon) {
+                        existingTerminal.fitAddon.fit();
+                    }
+                }
+            }, 0);
+        }
 
         return element;
     }
