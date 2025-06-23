@@ -19,6 +19,7 @@ class TerminalManager {
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
         this.currentLayout = 'horizontal'; // Default layout for 2 terminals
+        this.visualOrder = null; // Track visual order after swaps
         this.lastSelectedDirectories = {}; // Initialize empty, will load async
         this.lastConfirmationMessages = new Map(); // Track last confirmation per terminal
         this.confirmationDebounce = new Map(); // Debounce confirmations
@@ -2696,6 +2697,7 @@ class TerminalManager {
         const element = document.createElement('div');
         element.className = 'terminal-quadrant';
         element.dataset.quadrant = terminalId;
+        element.dataset.terminalId = terminalId;
         
         // Check if terminal already exists
         const existingTerminal = this.terminals.get(terminalId);
@@ -2718,6 +2720,14 @@ class TerminalManager {
                     </div>
                 </div>
                 <div class="terminal-controls">
+                    <div class="terminal-reorder-controls">
+                        <button class="terminal-reorder-btn" data-action="move-left" data-terminal="${terminalId}" title="Move Left">
+                            ◀
+                        </button>
+                        <button class="terminal-reorder-btn" data-action="move-right" data-terminal="${terminalId}" title="Move Right">
+                            ▶
+                        </button>
+                    </div>
                     <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
                     <button class="terminal-control-btn" data-action="close" title="Close">×</button>
                 </div>
@@ -2775,6 +2785,52 @@ class TerminalManager {
                 }
             });
         });
+
+        // Re-attach reorder button listeners
+        document.querySelectorAll('.terminal-reorder-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = e.target.dataset.action || e.target.closest('.terminal-reorder-btn').dataset.action;
+                
+                // Get the terminal element that contains this button
+                const terminalElement = e.target.closest('.terminal-quadrant');
+                const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
+                const currentPosition = allTerminals.indexOf(terminalElement);
+                
+                if (action === 'move-left') {
+                    this.moveTerminalByPosition(currentPosition, 'left');
+                } else if (action === 'move-right') {
+                    this.moveTerminalByPosition(currentPosition, 'right');
+                }
+            });
+        });
+
+
+        // Update reorder button states
+        this.updateReorderButtonStates();
+    }
+
+    updateReorderButtonStates() {
+        try {
+            const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
+            
+            allTerminals.forEach((terminal, index) => {
+                const leftBtn = terminal.querySelector('.terminal-reorder-btn[data-action="move-left"]');
+                const rightBtn = terminal.querySelector('.terminal-reorder-btn[data-action="move-right"]');
+                
+                if (leftBtn) {
+                    // Hide left button if at leftmost position
+                    leftBtn.style.display = index === 0 ? 'none' : 'flex';
+                }
+                
+                if (rightBtn) {
+                    // Hide right button if at rightmost position
+                    rightBtn.style.display = index === allTerminals.length - 1 ? 'none' : 'flex';
+                }
+            });
+        } catch (error) {
+            console.error('Error updating reorder button states:', error);
+        }
     }
 
     async updateTerminalManagementButtons() {
@@ -2920,6 +2976,267 @@ class TerminalManager {
         } catch (error) {
             console.error('Error adding terminal silently:', error);
             return false;
+        }
+    }
+
+    moveTerminalByPosition(position, direction) {
+        console.log(`🔄 moveTerminalByPosition: position ${position} direction ${direction}`);
+        
+        const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
+        const totalTerminals = allTerminals.length;
+        
+        if (direction === 'left' && position > 0) {
+            // Swap with left terminal
+            const currentElement = allTerminals[position];
+            const leftElement = allTerminals[position - 1];
+            this.swapTerminalElements(currentElement, leftElement);
+        } else if (direction === 'right' && position < totalTerminals - 1) {
+            // Swap with right terminal
+            const currentElement = allTerminals[position];
+            const rightElement = allTerminals[position + 1];
+            this.swapTerminalElements(currentElement, rightElement);
+        } else {
+            console.log('🔄 Cannot move - already at edge');
+        }
+    }
+
+    swapTerminalElements(element1, element2) {
+        console.log('🔄 Swapping elements');
+        
+        // Check if we're in a 3-terminal layout
+        const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
+        const terminalCount = allTerminals.length;
+        
+        if (terminalCount === 3 && this.currentLayout.startsWith('3-')) {
+            // For 3-terminal layouts, swap content to preserve structure
+            this.swapTerminalContent(element1, element2);
+        } else {
+            // For 2 terminals, swap DOM positions
+            this.swapTerminalPositions(element1, element2);
+        }
+    }
+
+    swapTerminalPositions(element1, element2) {
+        console.log('🔄 Swapping DOM positions');
+        
+        // Get parent container
+        const container = element1.parentNode;
+        
+        // Create temporary placeholder
+        const temp = document.createElement('div');
+        
+        // Insert temp before element1
+        container.insertBefore(temp, element1);
+        
+        // Move element1 to element2's position
+        container.insertBefore(element1, element2);
+        
+        // Move element2 to temp's position
+        container.insertBefore(element2, temp);
+        
+        // Remove temporary placeholder
+        container.removeChild(temp);
+        
+        // Update terminal data and fit
+        setTimeout(() => {
+            this.reattachTerminalsAfterSwap();
+            this.fitTerminalsToNewSizes();
+        }, 50);
+    }
+
+    swapTerminalContent(element1, element2) {
+        console.log('🔄 Swapping content only (3-terminal layout)');
+        
+        // Store complete innerHTML of both elements
+        const tempHTML = element1.innerHTML;
+        const tempDataQuadrant = element1.dataset.quadrant;
+        const tempDataTerminalId = element1.dataset.terminalId;
+        
+        // Swap complete content
+        element1.innerHTML = element2.innerHTML;
+        element1.dataset.quadrant = element2.dataset.quadrant;
+        element1.dataset.terminalId = element2.dataset.terminalId;
+        
+        element2.innerHTML = tempHTML;
+        element2.dataset.quadrant = tempDataQuadrant;
+        element2.dataset.terminalId = tempDataTerminalId;
+        
+        // Re-attach terminals after content swap
+        setTimeout(() => {
+            this.reattachTerminalsAfterSwap();
+            this.fitTerminalsToNewSizes();
+        }, 50);
+    }
+
+    async swapTerminals(terminalId1, terminalId2) {
+        try {
+            
+            // Store the terminal data temporarily
+            const terminal1Data = this.terminals.get(terminalId1);
+            const terminal2Data = this.terminals.get(terminalId2);
+            
+            // Swap the terminal data in our Map
+            if (terminal1Data && terminal2Data) {
+                this.terminals.set(terminalId1, terminal2Data);
+                this.terminals.set(terminalId2, terminal1Data);
+            } else if (terminal1Data) {
+                this.terminals.delete(terminalId1);
+                this.terminals.set(terminalId2, terminal1Data);
+            } else if (terminal2Data) {
+                this.terminals.delete(terminalId2);
+                this.terminals.set(terminalId1, terminal2Data);
+            }
+            
+            // Check if we're in a 3-terminal layout
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            const terminalCount = activeResult.success ? activeResult.terminals.length : 0;
+            
+            if (terminalCount === 3 && this.currentLayout.startsWith('3-')) {
+                // For 3-terminal layouts, use complete content swap to preserve structure
+                this.swapCompleteContent(terminalId1, terminalId2);
+            } else {
+                // For 2 terminals and other simple layouts, use DOM position swap
+                this.swapTerminalPositions(terminalId1, terminalId2);
+            }
+            
+        } catch (error) {
+            console.error('Error swapping terminals:', error);
+        }
+    }
+
+    getCurrentDOMOrder() {
+        // Get the actual order of terminals as they appear in the DOM
+        const terminalElements = document.querySelectorAll('.terminal-quadrant');
+        const currentOrder = [];
+        
+        terminalElements.forEach((element, index) => {
+            // Get terminal ID from the title content, not the dataset
+            const titleElement = element.querySelector('.terminal-title');
+            if (titleElement) {
+                const titleText = titleElement.textContent; // e.g., "Terminal 1"
+                const match = titleText.match(/Terminal (\d+)/);
+                if (match) {
+                    const terminalId = parseInt(match[1]) - 1; // Convert to 0-based
+                    currentOrder.push(terminalId);
+                    console.log(`🔄 Position ${index}: Terminal ${terminalId} (${titleText})`);
+                }
+            }
+        });
+        
+        console.log('🔄 Current DOM order:', currentOrder);
+        return currentOrder;
+    }
+
+    swapTerminalPositions(terminalId1, terminalId2) {
+        // Get DOM elements to swap their complete positions
+        const element1 = document.querySelector(`.terminal-quadrant[data-quadrant="${terminalId1}"]`);
+        const element2 = document.querySelector(`.terminal-quadrant[data-quadrant="${terminalId2}"]`);
+        
+        if (element1 && element2) {
+            // Get parent container
+            const container = element1.parentNode;
+            
+            // Create temporary placeholder to maintain position
+            const temp = document.createElement('div');
+            
+            // Insert temp before element1
+            container.insertBefore(temp, element1);
+            
+            // Move element1 to element2's position
+            container.insertBefore(element1, element2);
+            
+            // Move element2 to temp's position (which was element1's position)
+            container.insertBefore(element2, temp);
+            
+            // Remove temporary placeholder
+            container.removeChild(temp);
+            
+            // Re-attach terminals and fit to new sizes
+            setTimeout(() => {
+                this.reattachTerminalsAfterSwap();
+                this.fitTerminalsToNewSizes();
+            }, 50);
+        }
+    }
+
+
+    async updateReorderButtonStatesAfterSwap() {
+        // Wait a bit for the DOM to update, then update button states
+        setTimeout(async () => {
+            await this.updateReorderButtonStates();
+        }, 100);
+    }
+
+    reattachTerminalsAfterSwap() {
+        this.terminals.forEach((terminalData, terminalId) => {
+            if (terminalData && terminalData.terminal) {
+                const terminalDiv = document.querySelector(`#terminal-${terminalId}`);
+                if (terminalDiv) {
+                    terminalData.terminal.open(terminalDiv);
+                    if (terminalData.fitAddon) {
+                        terminalData.fitAddon.fit();
+                    }
+                }
+            }
+        });
+    }
+
+    swapCompleteContent(terminalId1, terminalId2) {
+        // Get DOM elements
+        const element1 = document.querySelector(`.terminal-quadrant[data-quadrant="${terminalId1}"]`);
+        const element2 = document.querySelector(`.terminal-quadrant[data-quadrant="${terminalId2}"]`);
+        
+        if (element1 && element2) {
+            // Store complete innerHTML of both elements
+            const tempHTML = element1.innerHTML;
+            const tempDataQuadrant = element1.dataset.quadrant;
+            const tempDataTerminalId = element1.dataset.terminalId;
+            
+            // Swap complete content
+            element1.innerHTML = element2.innerHTML;
+            element1.dataset.quadrant = element2.dataset.quadrant;
+            element1.dataset.terminalId = element2.dataset.terminalId;
+            
+            element2.innerHTML = tempHTML;
+            element2.dataset.quadrant = tempDataQuadrant;
+            element2.dataset.terminalId = tempDataTerminalId;
+            
+            // Re-attach terminals after content swap
+            setTimeout(() => {
+                this.reattachTerminalsAfterSwap();
+                // Just fit terminals to their new containers (no re-render)
+                setTimeout(() => {
+                    this.fitTerminalsToNewSizes();
+                }, 100);
+            }, 50);
+        }
+    }
+
+    fitTerminalsToNewSizes() {
+        // Fit all terminals to their current container sizes without re-rendering
+        this.terminals.forEach((terminalData, terminalId) => {
+            if (terminalData && terminalData.fitAddon) {
+                try {
+                    terminalData.fitAddon.fit();
+                } catch (e) {
+                    console.warn('Could not fit terminal after swap:', terminalId);
+                }
+            }
+        });
+        
+        // Also re-attach event listeners for the new content
+        this.attachTerminalEventListeners();
+    }
+
+
+    adaptTerminalSizesToNewPositions() {
+        // Force re-render to make terminals adapt to their new positions
+        const container = document.getElementById('terminals-container');
+        if (container) {
+            // Trigger a complete re-render which will apply correct CSS based on new positions
+            setTimeout(async () => {
+                await this.renderTerminals();
+            }, 100);
         }
     }
 

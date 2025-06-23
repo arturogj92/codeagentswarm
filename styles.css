@@ -2445,3 +2445,38 @@ h3 i {
 .terminal-header:hover {
   background: rgba(255, 255, 255, 0.05) !important;
 }
+
+/* Terminal Reordering Styles */
+.terminal-reorder-controls {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.terminal-reorder-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.terminal-reorder-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+  color: var(--text-primary);
+}
+
+
+.terminal-reorder-btn i {
+  width: 12px;
+  height: 12px;
+}
+
