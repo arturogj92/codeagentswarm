@@ -2823,6 +2823,7 @@ class TerminalManager {
 
         // Re-attach reorder button listeners
         document.querySelectorAll('.terminal-reorder-btn').forEach(btn => {
+            // Click handler
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const action = e.target.dataset.action || e.target.closest('.terminal-reorder-btn').dataset.action;
@@ -2837,6 +2838,23 @@ class TerminalManager {
                 } else if (action === 'move-right') {
                     this.moveTerminalByPosition(currentPosition, 'right');
                 }
+            });
+
+            // Hover effect to show which terminals will be swapped
+            btn.addEventListener('mouseenter', (e) => {
+                const action = e.target.dataset.action || e.target.closest('.terminal-reorder-btn').dataset.action;
+                const terminalElement = e.target.closest('.terminal-quadrant');
+                const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
+                const currentPosition = allTerminals.indexOf(terminalElement);
+                
+                const swapTargets = this.getSwapTargets(currentPosition, action, allTerminals);
+                if (swapTargets) {
+                    this.highlightSwapPreview(swapTargets.current, swapTargets.target);
+                }
+            });
+
+            btn.addEventListener('mouseleave', (e) => {
+                this.clearSwapPreview();
             });
         });
 
@@ -3574,6 +3592,68 @@ class TerminalManager {
                 }
             }, 300);
         }, 3000);
+    }
+
+    // Get which terminals will be swapped for hover preview
+    getSwapTargets(currentPosition, action, allTerminals) {
+        const totalTerminals = allTerminals.length;
+        
+        if (action === 'move-left') {
+            if (currentPosition > 0) {
+                // Normal case: swap with left terminal
+                return {
+                    current: allTerminals[currentPosition],
+                    target: allTerminals[currentPosition - 1]
+                };
+            } else {
+                // At leftmost position: wrap around to rightmost
+                return {
+                    current: allTerminals[0],
+                    target: allTerminals[totalTerminals - 1]
+                };
+            }
+        } else if (action === 'move-right') {
+            if (currentPosition < totalTerminals - 1) {
+                // Normal case: swap with right terminal
+                return {
+                    current: allTerminals[currentPosition],
+                    target: allTerminals[currentPosition + 1]
+                };
+            } else {
+                // At rightmost position: wrap around to leftmost
+                return {
+                    current: allTerminals[totalTerminals - 1],
+                    target: allTerminals[0]
+                };
+            }
+        }
+        
+        return null;
+    }
+
+    // Highlight the terminals that will be swapped
+    highlightSwapPreview(currentElement, targetElement) {
+        console.log('🎨 Highlighting swap preview');
+        
+        // Add preview class to both terminals
+        currentElement.classList.add('swap-preview-current');
+        targetElement.classList.add('swap-preview-target');
+        
+        // Store reference for cleanup
+        this.previewElements = { current: currentElement, target: targetElement };
+    }
+
+    // Clear the swap preview highlighting
+    clearSwapPreview() {
+        console.log('🎨 Clearing swap preview');
+        
+        // Remove preview classes from all terminals
+        document.querySelectorAll('.terminal-quadrant').forEach(terminal => {
+            terminal.classList.remove('swap-preview-current', 'swap-preview-target');
+        });
+        
+        // Clear stored reference
+        this.previewElements = null;
     }
 }
 

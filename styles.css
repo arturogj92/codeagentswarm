@@ -2480,3 +2480,36 @@ h3 i {
   height: 12px;
 }
 
+/* Swap Preview Styles */
+.swap-preview-current {
+  border: 2px solid var(--primary) !important;
+  box-shadow: 
+    0 0 20px rgba(127, 90, 240, 0.3),
+    inset 0 1px 0 rgba(127, 90, 240, 0.1) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+  z-index: 10;
+  position: relative;
+}
+
+.swap-preview-target {
+  border: 2px solid var(--accent) !important;
+  box-shadow: 
+    0 0 20px rgba(255, 137, 6, 0.3),
+    inset 0 1px 0 rgba(255, 137, 6, 0.1) !important;
+  transform: scale(1.02);
+  transition: all 0.2s ease;
+  z-index: 10;
+  position: relative;
+}
+
+.swap-preview-current .terminal-header {
+  background: linear-gradient(135deg, rgba(127, 90, 240, 0.1), rgba(255, 255, 255, 0.02)) !important;
+  border-bottom-color: var(--primary) !important;
+}
+
+.swap-preview-target .terminal-header {
+  background: linear-gradient(135deg, rgba(255, 137, 6, 0.1), rgba(255, 255, 255, 0.02)) !important;
+  border-bottom-color: var(--accent) !important;
+}
+
