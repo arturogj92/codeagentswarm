@@ -75,20 +75,33 @@ body::before {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 24px;
+  padding: 0 16px;
   z-index: 1000;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
 }
 
-.header h1 {
-  font-size: 1.4rem;
-  font-weight: 700;
-  background: var(--gradient-primary);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  letter-spacing: -0.5px;
-  text-shadow: 0 0 40px rgba(127, 90, 240, 0.5);
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.logo-container {
+  display: flex;
+  align-items: center;
+}
+
+.app-logo {
+  height: 36px;
+  width: 36px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.4));
+  transition: all 0.3s ease;
+}
+
+.app-logo:hover {
+  transform: scale(1.05);
+  filter: drop-shadow(0 0 30px rgba(127, 90, 240, 0.6));
 }
 
 .dev-indicator {
@@ -167,7 +180,34 @@ body::before {
 
 .header-controls {
   display: flex;
-  gap: 10px;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.05);
+  margin-left: 8px;
+}
+
+/* Special styling for git button when there are changes */
+#git-status-btn.has-changes {
+  color: var(--accent);
+}
+
+#git-status-btn.has-changes:hover {
+  background: rgba(255, 137, 6, 0.15);
+  color: var(--accent);
+}
+
+/* Active state for kanban button */
+#kanban-btn.active {
+  background: rgba(127, 90, 240, 0.15);
+  color: var(--primary);
 }
 
 #git-status-btn {

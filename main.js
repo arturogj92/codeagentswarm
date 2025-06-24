@@ -1828,6 +1828,29 @@ update_task_plan(task_id=123, plan="1. Revisar código existente\\n2. Implementa
 update_task_implementation(task_id=123, implementation="Archivos modificados: database.js, mcp-server.js\\nResumen: Se añadió campo implementation a la tabla tasks\\nFlujo: Nuevo campo permite documentar cambios realizados durante la implementación")
 \`\`\`
 
+## IMPORTANTE: Límites de tokens en MCP
+
+### Problema conocido con list_tasks
+Cuando hay muchas tareas en la base de datos (30+), el comando \`list_tasks\` del MCP puede exceder el límite de tokens permitidos (25000 tokens).
+
+### Solución recomendada:
+1. **SIEMPRE usar filtros por status** al listar tareas:
+   - \`mcp__codeagentswarm-tasks__list_tasks\` con parámetro \`status: "pending"\` 
+   - \`mcp__codeagentswarm-tasks__list_tasks\` con parámetro \`status: "in_progress"\`
+   - Esto reduce significativamente el número de tareas devueltas
+
+2. **NO intentar listar todas las tareas sin filtro** cuando hay muchas tareas en la base de datos
+
+3. **Para implementar paginación futura:**
+   - La paginación debe implementarse en la interfaz gráfica (kanban.js)
+   - El MCP debe mantener métodos simples y eficientes
+   - Considerar límites por defecto en getAllTasks()
+
+### Notas técnicas:
+- El MCP server tiene múltiples rutas (\`tasks/get_all\` y \`tools/call\`) que deben mantenerse sincronizadas
+- Los cambios en el MCP server requieren reiniciar el servidor para aplicarse
+- Claude Code puede mantener conexiones MCP en caché
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.

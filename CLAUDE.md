@@ -148,3 +148,82 @@ update_task_plan(task_id=123, plan="1. Revisar código existente\n2. Implementar
 
 update_task_implementation(task_id=123, implementation="Archivos modificados: database.js, mcp-server.js\nResumen: Se añadió campo implementation a la tabla tasks\nFlujo: Nuevo campo permite documentar cambios realizados durante la implementación")
 ```
+
+## IMPORTANTE: Documentación en Notion - OBLIGATORIO
+
+### Actualización de Documentación en Notion
+
+**Para este proyecto CodeAgentSwarm, TODA modificación, nueva funcionalidad o decisión técnica DEBE ser documentada en la base de datos específica de CodeAgentSwarm en Notion:**
+
+1. **Proyecto en Notion:** CodeAgentSwarm (ID: `21cb613a-e92d-8048-b227-de9960f4c66c`)
+2. **Base de datos de documentación:** Database "Documentación CodeAgentSwarm" (ID: `21cb613a-e92d-81f4-8bd3-c4671d9ce033`)
+3. **IMPORTANTE:** No documentar en Creator0x ni en otros proyectos - usar siempre la sección de CodeAgentSwarm
+4. **Proceso OBLIGATORIO al completar cualquier tarea:**
+
+#### Cuándo actualizar la documentación:
+
+- **Nuevas funcionalidades implementadas**
+- **Cambios en la arquitectura del sistema**  
+- **Modificaciones en la base de datos o esquemas**
+- **Nuevos comandos SQL o scripts**
+- **Cambios en APIs o endpoints**
+- **Actualizaciones del stack tecnológico**
+- **Corrección de errores importantes**
+- **Nuevas integraciones MCP**
+- **Cambios en configuraciones**
+
+#### Cómo actualizar la documentación:
+
+1. **Identificar la sección afectada:** Determinar qué página(s) de la base de datos necesitan actualización
+2. **Usar herramientas MCP de Notion:**
+   - `mcp__notion__update-page`: Para actualizar páginas existentes
+   - `mcp__notion__append-block-children`: Para añadir contenido nuevo
+   - `mcp__notion__create-page`: Solo si se necesita una nueva categoría
+3. **Mantener consistencia:** Seguir el formato y estructura existente
+4. **Incluir ejemplos:** Añadir ejemplos de código, comandos SQL, o configuraciones
+
+#### Ejemplo de proceso:
+
+```
+1. Completar implementación técnica
+2. Documentar en update_task_implementation
+3. Identificar páginas de Notion a actualizar:
+   - "🗄️ Base de Datos y Consultas SQL" si hay cambios en BD
+   - "📁 Estructura de Archivos" si hay nuevos archivos
+   - "⚙️ Herramientas MCP" si hay nuevas herramientas
+4. Actualizar páginas usando mcp__notion__update-page o append-block-children
+5. Completar la tarea con complete_task
+```
+
+#### Herramientas MCP de Notion disponibles:
+
+- **`mcp__notion__query-database`**: Consultar la base de datos de documentación
+- **`mcp__notion__get-page`**: Obtener contenido de una página específica
+- **`mcp__notion__update-page`**: Actualizar propiedades de páginas
+- **`mcp__notion__append-block-children`**: Añadir contenido a páginas existentes
+- **`mcp__notion__create-page`**: Crear nuevas páginas (usar solo si es necesario)
+
+**Esta documentación es CRÍTICA para mantener la base de conocimiento actualizada y facilitar el trabajo de otros desarrolladores.**
+
+## IMPORTANTE: Límites de tokens en MCP
+
+### Problema conocido con list_tasks
+Cuando hay muchas tareas en la base de datos (30+), el comando `list_tasks` del MCP puede exceder el límite de tokens permitidos (25000 tokens).
+
+### Solución recomendada:
+1. **SIEMPRE usar filtros por status** al listar tareas:
+   - `mcp__codeagentswarm-tasks__list_tasks` con parámetro `status: "pending"` 
+   - `mcp__codeagentswarm-tasks__list_tasks` con parámetro `status: "in_progress"`
+   - Esto reduce significativamente el número de tareas devueltas
+
+2. **NO intentar listar todas las tareas sin filtro** cuando hay muchas tareas en la base de datos
+
+3. **Para implementar paginación futura:**
+   - La paginación debe implementarse en la interfaz gráfica (kanban.js)
+   - El MCP debe mantener métodos simples y eficientes
+   - Considerar límites por defecto en getAllTasks()
+
+### Notas técnicas:
+- El MCP server tiene múltiples rutas (`tasks/get_all` y `tools/call`) que deben mantenerse sincronizadas
+- Los cambios en el MCP server requieren reiniciar el servidor para aplicarse
+- Claude Code puede mantener conexiones MCP en caché

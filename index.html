@@ -10,11 +10,21 @@
 <body>
     <div class="app-container">
         <header class="header">
-            <h1>CodeAgentSwarm</h1>
+            <div class="header-left">
+                <div class="logo-container">
+                    <img src="logo_prod.png" alt="CodeAgentSwarm" class="app-logo">
+                </div>
+                <div class="action-buttons">
+                    <button class="btn-layout" id="git-status-btn" title="Git Status">
+                        <i data-lucide="git-branch-plus"></i>
+                    </button>
+                    <button class="btn-layout" id="kanban-btn" title="Task Manager">
+                        <i data-lucide="list-checks"></i>
+                    </button>
+                </div>
+            </div>
             <div class="dev-indicator" id="dev-indicator" style="display: none;">DEV</div>
             <div class="header-controls">
-                <button class="btn" id="git-status-btn"><i data-lucide="git-branch"></i> Git</button>
-                <button class="btn" id="kanban-btn"><i data-lucide="kanban-square"></i> Tasks</button>
                 <div class="terminal-management">
                     <div class="layout-selector" id="layout-selector" style="display: none;">
                         <!-- 2 terminals layouts -->
