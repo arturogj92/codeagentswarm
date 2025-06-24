@@ -79,6 +79,7 @@ class TerminalManager {
     init() {
         this.setupEventListeners();
         this.setupResizeHandlers();
+        this.setupGlobalTerminalFocusDetection(); // Add global focus detection
         this.updateGitButtonVisibility(); // Initialize git button visibility
         this.startTaskIndicatorUpdates(); // Initialize task indicators with periodic updates
     }
@@ -156,6 +157,84 @@ class TerminalManager {
         window.addEventListener('resize', () => {
             this.resizeAllTerminals();
         });
+    }
+
+    setupGlobalTerminalFocusDetection() {
+        // Global mousedown listener to detect clicks anywhere in terminals
+        // This captures clicks even in terminal content, spans, and xterm elements
+        document.addEventListener('mousedown', (e) => {
+            const terminalQuadrant = this.findTerminalQuadrantFromClick(e.target);
+            
+            if (terminalQuadrant) {
+                const quadrantId = parseInt(terminalQuadrant.dataset.quadrant);
+                
+                // Skip if clicking on controls, placeholders, or certain interactive elements
+                if (e.target.closest('.terminal-control-btn') || 
+                    e.target.closest('.terminal-reorder-btn') ||
+                    e.target.closest('.terminal-placeholder') ||
+                    e.target.closest('.git-branch-display') ||
+                    e.target.closest('.current-task') ||
+                    e.target.closest('.color-picker-modal')) {
+                    return;
+                }
+                
+                // Only set focus if this terminal has an active terminal instance
+                const terminal = this.terminals.get(quadrantId);
+                if (terminal && terminal.terminal) {
+                    // Only update if this isn't already the active terminal to avoid unnecessary updates
+                    if (this.activeTerminal !== quadrantId) {
+                        console.log(`🎯 Setting active terminal to ${quadrantId} from mousedown on:`, e.target);
+                        this.setActiveTerminal(quadrantId);
+                    }
+                }
+            }
+        }, true); // Use capture phase to ensure we get the event before it's consumed
+    }
+
+    // Helper function to find which terminal quadrant a click belongs to
+    findTerminalQuadrantFromClick(element) {
+        // First try direct lookup
+        let quadrant = element.closest('.terminal-quadrant');
+        if (quadrant) return quadrant;
+        
+        // Check if element is inside a terminal div
+        const terminalDiv = element.closest('.terminal');
+        if (terminalDiv) {
+            quadrant = terminalDiv.closest('.terminal-quadrant');
+            if (quadrant) return quadrant;
+        }
+        
+        // Check if element has xterm classes or is inside xterm elements
+        if (element.classList && (
+            element.classList.contains('xterm') ||
+            element.classList.contains('xterm-screen') ||
+            element.classList.contains('xterm-viewport') ||
+            element.classList.contains('xterm-rows') ||
+            Array.from(element.classList).some(cls => cls.startsWith('xterm-'))
+        )) {
+            quadrant = element.closest('.terminal-quadrant');
+            if (quadrant) return quadrant;
+        }
+        
+        // Walk up the DOM tree looking for xterm elements or terminal quadrants
+        let current = element.parentElement;
+        while (current && current !== document.body) {
+            if (current.classList && current.classList.contains('terminal-quadrant')) {
+                return current;
+            }
+            
+            if (current.classList && (
+                current.classList.contains('xterm') ||
+                Array.from(current.classList).some(cls => cls.startsWith('xterm-'))
+            )) {
+                quadrant = current.closest('.terminal-quadrant');
+                if (quadrant) return quadrant;
+            }
+            
+            current = current.parentElement;
+        }
+        
+        return null;
     }
 
     setupResizeHandlers() {
@@ -638,12 +717,11 @@ class TerminalManager {
             });
         }
         
-        // Add multiple event listeners to ensure focus
+        
+        // Ensure terminal gets DOM focus when clicked directly
         terminalDiv.addEventListener('click', () => {
             terminal.focus();
-            this.setActiveTerminal(quadrant);
-            
-            // Focus will be handled by setActiveTerminal automatically
+            // setActiveTerminal will be handled by global click listener
         });
         
         terminalDiv.addEventListener('mousedown', () => {
@@ -2888,6 +2966,7 @@ class TerminalManager {
                 this.showDirectorySelector(quadrant);
             });
         });
+
 
         // Re-attach control button listeners
         document.querySelectorAll('.terminal-control-btn').forEach(btn => {
