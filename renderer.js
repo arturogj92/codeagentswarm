@@ -2638,6 +2638,24 @@ class TerminalManager {
 
             console.log(`📋 Found ${activeTerminals.length} active terminals:`, activeTerminals);
 
+            // Preserve existing terminal information before clearing
+            const preservedInfo = {};
+            activeTerminals.forEach(terminalId => {
+                const existingElement = document.querySelector(`[data-quadrant="${terminalId}"]`);
+                if (existingElement) {
+                    const titleElement = existingElement.querySelector('.terminal-title');
+                    const headerElement = existingElement.querySelector('.terminal-header');
+                    
+                    preservedInfo[terminalId] = {
+                        title: titleElement ? titleElement.textContent : `Terminal ${terminalId + 1}`,
+                        directory: this.lastSelectedDirectories[terminalId] || null,
+                        // Preserve header styling info if any
+                        hasProjectStyling: headerElement && headerElement.style.background && headerElement.style.background !== ''
+                    };
+                }
+            });
+            console.log('💾 Preserved terminal info:', preservedInfo);
+
             // Update container class for layout while preserving existing layout classes
             container.className = `terminals-container count-${activeTerminals.length}`;
             
@@ -2666,6 +2684,23 @@ class TerminalManager {
             console.log('🏗️ Creating terminal elements with resizers...');
             // Create terminal elements with resizers
             this.createTerminalLayoutWithResizers(container, activeTerminals);
+
+            // Restore preserved terminal information
+            console.log('🔄 Restoring terminal information...');
+            activeTerminals.forEach(terminalId => {
+                const info = preservedInfo[terminalId];
+                if (info) {
+                    // Restore title
+                    if (info.title !== `Terminal ${terminalId + 1}`) {
+                        this.updateTerminalTitle(terminalId, info.title);
+                    }
+                    
+                    // Restore project styling if it existed
+                    if (info.directory && info.hasProjectStyling) {
+                        this.updateTerminalHeaderColor(terminalId);
+                    }
+                }
+            });
 
             console.log('🎨 Re-initializing Lucide icons...');
             // Re-initialize Lucide icons
