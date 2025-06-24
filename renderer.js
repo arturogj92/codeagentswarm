@@ -3067,27 +3067,77 @@ class TerminalManager {
     }
 
     swapTerminalContent(element1, element2) {
-        console.log('🔄 Swapping content only (3-terminal layout)');
+        console.log('🔄 Swapping terminals by moving DOM elements physically');
         
-        // Store complete innerHTML of both elements
-        const tempHTML = element1.innerHTML;
-        const tempDataQuadrant = element1.dataset.quadrant;
-        const tempDataTerminalId = element1.dataset.terminalId;
+        // Get terminal IDs BEFORE any changes
+        const terminalId1 = element1.dataset.terminalId;
+        const terminalId2 = element2.dataset.terminalId;
         
-        // Swap complete content
-        element1.innerHTML = element2.innerHTML;
-        element1.dataset.quadrant = element2.dataset.quadrant;
-        element1.dataset.terminalId = element2.dataset.terminalId;
+        // Get the actual terminal wrapper divs (that contain everything)
+        const wrapper1 = element1.querySelector('.terminal-wrapper');
+        const wrapper2 = element2.querySelector('.terminal-wrapper');
         
-        element2.innerHTML = tempHTML;
-        element2.dataset.quadrant = tempDataQuadrant;
-        element2.dataset.terminalId = tempDataTerminalId;
+        const header1 = element1.querySelector('.terminal-header');
+        const header2 = element2.querySelector('.terminal-header');
         
-        // Re-attach terminals after content swap
-        setTimeout(() => {
-            this.reattachTerminalsAfterSwap();
-            this.fitTerminalsToNewSizes();
-        }, 50);
+        if (wrapper1 && wrapper2 && header1 && header2) {
+            // Remove wrappers from their current containers
+            const parent1 = wrapper1.parentNode;
+            const parent2 = wrapper2.parentNode;
+            
+            // Create temporary placeholders
+            const placeholder1 = document.createElement('div');
+            const placeholder2 = document.createElement('div');
+            
+            // Insert placeholders
+            parent1.insertBefore(placeholder1, wrapper1);
+            parent2.insertBefore(placeholder2, wrapper2);
+            
+            // Remove wrappers
+            wrapper1.remove();
+            wrapper2.remove();
+            
+            // Also swap headers
+            const tempHeaderHTML = header1.innerHTML;
+            header1.innerHTML = header2.innerHTML;
+            header2.innerHTML = tempHeaderHTML;
+            
+            // Put wrappers in each other's places
+            parent1.insertBefore(wrapper2, placeholder1);
+            parent2.insertBefore(wrapper1, placeholder2);
+            
+            // Remove placeholders
+            placeholder1.remove();
+            placeholder2.remove();
+            
+            // Update container data attributes
+            const tempDataQuadrant = element1.dataset.quadrant;
+            const tempDataTerminalId = element1.dataset.terminalId;
+            
+            element1.dataset.quadrant = element2.dataset.quadrant;
+            element1.dataset.terminalId = element2.dataset.terminalId;
+            
+            element2.dataset.quadrant = tempDataQuadrant;
+            element2.dataset.terminalId = tempDataTerminalId;
+            
+            // CRITICAL: Swap terminal data in internal map
+            if (terminalId1 && terminalId2 && this.terminals.has(terminalId1) && this.terminals.has(terminalId2)) {
+                const terminal1Data = this.terminals.get(terminalId1);
+                const terminal2Data = this.terminals.get(terminalId2);
+                this.terminals.set(terminalId1, terminal2Data);
+                this.terminals.set(terminalId2, terminal1Data);
+                console.log('🔄 Terminal data swapped in internal map');
+            }
+            
+            // Just fit, no reattach needed since we moved real DOM elements
+            setTimeout(() => {
+                this.fitTerminalsToNewSizes();
+            }, 50);
+            
+            console.log('🔄 Terminal wrappers physically moved while preserving all content');
+        } else {
+            console.warn('🔄 Could not find terminal wrappers or headers');
+        }
     }
 
     async swapTerminals(terminalId1, terminalId2) {
