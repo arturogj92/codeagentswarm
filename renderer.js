@@ -1466,17 +1466,100 @@ class TerminalManager {
     }
 
     async closeTerminal(quadrant) {
+        // Check if Claude Code is running in this terminal
+        const isClaudeActive = this.claudeCodeReady && this.claudeCodeReady[quadrant];
         const terminal = this.terminals.get(quadrant);
-        if (terminal && terminal.terminal) {
-            terminal.terminal.dispose();
-            ipcRenderer.send('kill-terminal', quadrant);
+        
+        // Show confirmation only if Claude is active
+        if (isClaudeActive) {
+            const confirmed = await this.showCloseTerminalConfirmation(quadrant, isClaudeActive);
+            if (!confirmed) {
+                return; // User cancelled
+            }
         }
         
-        // Use the dynamic terminal removal system (silent = true para no mostrar notificación)
+        console.log(`🗑️ Closing terminal ${quadrant}...`);
+        
+        // Clean up Claude Code state
+        if (this.claudeCodeReady) {
+            this.claudeCodeReady[quadrant] = false;
+        }
+        
+        // Dispose xterm.js terminal first
+        if (terminal && terminal.terminal) {
+            console.log(`🗑️ Disposing xterm.js terminal ${quadrant}`);
+            terminal.terminal.dispose();
+        }
+        
+        // If Claude was active, send force kill to ensure cleanup
+        if (isClaudeActive) {
+            console.log(`🗑️ Sending force kill signal for Claude session in terminal ${quadrant}`);
+            ipcRenderer.send('kill-terminal', quadrant, true);
+        }
+        
+        // Use the standard terminal removal system (like terminals without sessions)
         await this.removeTerminal(quadrant, true);
         
         // Update git button visibility
         this.updateGitButtonVisibility();
+        
+        console.log(`✅ Terminal ${quadrant} closed completely`);
+    }
+
+    async showCloseTerminalConfirmation(quadrant, isClaudeActive) {
+        return new Promise((resolve) => {
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <h3>⚠️ Close Terminal</h3>
+                    <p>
+                        ${isClaudeActive 
+                            ? `Terminal ${quadrant + 1} has an active Claude Code session running.` 
+                            : `Terminal ${quadrant + 1} may have active processes.`}
+                    </p>
+                    <p>Are you sure you want to close this terminal? This will terminate all running processes.</p>
+                    <div class="modal-buttons">
+                        <button id="confirm-close" class="btn btn-danger">Yes, Close Terminal</button>
+                        <button id="cancel-close" class="btn">Cancel</button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Handle confirm
+            modal.querySelector('#confirm-close').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(true);
+            });
+            
+            // Handle cancel
+            modal.querySelector('#cancel-close').addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve(false);
+            });
+            
+            // Close on overlay click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    document.body.removeChild(modal);
+                    resolve(false);
+                }
+            });
+            
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    if (document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                        resolve(false);
+                    }
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
     }
 
     resizeTerminal(quadrant) {

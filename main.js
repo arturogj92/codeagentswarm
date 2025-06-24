@@ -443,25 +443,105 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
   }
 });
 
-ipcMain.on('kill-terminal', (event, quadrant) => {
+ipcMain.on('kill-terminal', (event, quadrant, force = false) => {
   const shell = terminals.get(quadrant);
   if (shell) {
-    console.log(`Killing terminal ${quadrant} and all child processes...`);
-    shell.kill();
+    console.log(`Killing terminal ${quadrant} and all child processes... ${force ? '(FORCE)' : ''}`);
+    
+    try {
+      // Kill the shell process - check if method exists first
+      if (shell.kill && typeof shell.kill === 'function') {
+        console.log(`Calling shell.kill() for terminal ${quadrant}`);
+        shell.kill();
+      } else if (shell.activeInteractiveProcess && shell.activeInteractiveProcess.kill) {
+        console.log(`Calling activeInteractiveProcess.kill() for terminal ${quadrant}`);
+        shell.activeInteractiveProcess.kill('SIGTERM');
+        // Try SIGKILL after a delay if SIGTERM doesn't work
+        setTimeout(() => {
+          if (shell.activeInteractiveProcess && !shell.activeInteractiveProcess.killed) {
+            shell.activeInteractiveProcess.kill('SIGKILL');
+          }
+        }, 1000);
+      } else {
+        console.log(`No kill method available for terminal ${quadrant}, will rely on cleanup`);
+      }
+    } catch (error) {
+      console.error(`Error killing terminal ${quadrant}:`, error.message);
+      // Don't crash the app, continue with cleanup
+    }
+    
     terminals.delete(quadrant);
     
-    // Additional cleanup for hanging processes
-    setTimeout(() => {
-      // Try to clean up any orphaned processes
-      if (process.platform === 'darwin') {
-        try {
-          // Kill any Python processes started by this terminal
-          require('child_process').execSync(`ps aux | grep -E "claude.*${quadrant}" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
-        } catch (e) {
-          // Ignore errors
+    // More aggressive cleanup for force kills
+    const cleanupDelay = force ? 50 : 100;
+    const maxRetries = force ? 3 : 1;
+    
+    let retryCount = 0;
+    const cleanup = () => {
+      retryCount++;
+      console.log(`Cleanup attempt ${retryCount} for terminal ${quadrant}`);
+      
+      try {
+        if (process.platform === 'darwin') {
+          // Get the shell PID to be more specific
+          let shellPid = null;
+          if (shell && shell.activeInteractiveProcess && shell.activeInteractiveProcess.pid) {
+            shellPid = shell.activeInteractiveProcess.pid;
+          }
+          
+          if (shellPid) {
+            // Kill specific shell and its children only
+            console.log(`Killing shell ${shellPid} and its children...`);
+            require('child_process').execSync(`pkill -P ${shellPid} 2>/dev/null || true`);
+            require('child_process').execSync(`kill -9 ${shellPid} 2>/dev/null || true`);
+          }
+          
+          // Only look for Claude processes that are NOT part of this main application
+          // Exclude our main Electron process and focus on claude CLI processes
+          try {
+            const { execSync } = require('child_process');
+            // Be very specific: only kill claude CLI processes, not our Electron app
+            execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -TERM 2>/dev/null || true`);
+            
+            // If force is enabled, try SIGKILL after a brief delay
+            if (force) {
+              setTimeout(() => {
+                try {
+                  execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
+                } catch (e) {
+                  // Ignore errors
+                }
+              }, 1000);
+            }
+          } catch (e) {
+            console.warn(`Error during Claude cleanup:`, e.message);
+          }
+        } else if (process.platform === 'linux') {
+          // Similar approach for Linux with more specificity
+          let shellPid = null;
+          if (shell && shell.activeInteractiveProcess && shell.activeInteractiveProcess.pid) {
+            shellPid = shell.activeInteractiveProcess.pid;
+          }
+          
+          if (shellPid) {
+            require('child_process').execSync(`pkill -P ${shellPid} 2>/dev/null || true`);
+            require('child_process').execSync(`kill -9 ${shellPid} 2>/dev/null || true`);
+          }
+          
+          // Kill only standalone claude processes, not our app
+          require('child_process').execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -TERM 2>/dev/null || true`);
         }
+      } catch (e) {
+        console.warn(`Cleanup error for terminal ${quadrant}:`, e.message);
       }
-    }, 100);
+      
+      // Retry if this was a force kill and we haven't exceeded max retries
+      if (force && retryCount < maxRetries) {
+        setTimeout(cleanup, cleanupDelay);
+      }
+    };
+    
+    setTimeout(cleanup, cleanupDelay);
   }
 });
 

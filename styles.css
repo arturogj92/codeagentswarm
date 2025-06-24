@@ -2513,3 +2513,17 @@ h3 i {
   border-bottom-color: var(--accent) !important;
 }
 
+/* Close Terminal Confirmation Modal */
+.btn-danger {
+  background: linear-gradient(135deg, #dc2626, #b91c1c);
+  color: white;
+  border: 1px solid #991b1b;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #b91c1c, #991b1b);
+  border-color: #7f1d1d;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 38, 38, 0.3);
+}
+
