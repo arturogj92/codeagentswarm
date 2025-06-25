@@ -655,9 +655,21 @@ let mcpServerProcess = null;
 function startMCPServerAndRegister() {
   try {
     // Start MCP server as child process
-    const serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+    // In production, files are in the app.asar archive
+    const serverPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+      : path.join(__dirname, 'mcp-stdio-server.js');
+    
+    const workingDir = app.isPackaged
+      ? path.join(process.resourcesPath, 'app.asar')
+      : __dirname;
+    
+    console.log('MCP Server path:', serverPath);
+    console.log('Working directory:', workingDir);
+    console.log('Is packaged:', app.isPackaged);
+    
     mcpServerProcess = spawn('node', [serverPath], {
-      cwd: __dirname,
+      cwd: workingDir,
       stdio: 'pipe'
     });
 
@@ -691,7 +703,10 @@ function startMCPServerAndRegister() {
 function registerWithClaude() {
   try {
     // Use claude mcp add to register our server
-    const serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+    const serverPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+      : path.join(__dirname, 'mcp-stdio-server.js');
+      
     const registerProcess = spawn('claude', [
       'mcp', 'add', 
       'codeagentswarm-tasks',  // Server name

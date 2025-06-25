@@ -132,7 +132,8 @@ Las siguientes herramientas MCP están disponibles para la gestión de tareas:
 - **`submit_for_testing`**: Marcar tarea como "in_testing"
 - **`list_tasks`**: Listar todas las tareas (opcional: filtrar por status)
 - **`update_task_plan`**: Actualizar el plan de una tarea específica
-- **`update_task_implementation`**: **NUEVA** - Actualizar la implementación de una tarea específica
+- **`update_task_implementation`**: Actualizar la implementación de una tarea específica
+- **`update_task_terminal`**: **NUEVA** - Actualizar el terminal_id asociado a una tarea
 
 **Parámetros de `update_task_plan`:**
 - `task_id` (número, requerido): ID de la tarea
@@ -142,11 +143,18 @@ Las siguientes herramientas MCP están disponibles para la gestión de tareas:
 - `task_id` (número, requerido): ID de la tarea
 - `implementation` (string, requerido): Detalles de implementación incluyendo archivos modificados y resumen
 
+**Parámetros de `update_task_terminal`:**
+- `task_id` (número, requerido): ID de la tarea
+- `terminal_id` (string, requerido): ID del terminal (1, 2, 3, 4, etc.) o cadena vacía para desasignar
+
 **Ejemplo de uso:**
 ```
 update_task_plan(task_id=123, plan="1. Revisar código existente\n2. Implementar nueva funcionalidad\n3. Escribir tests")
 
 update_task_implementation(task_id=123, implementation="Archivos modificados: database.js, mcp-server.js\nResumen: Se añadió campo implementation a la tabla tasks\nFlujo: Nuevo campo permite documentar cambios realizados durante la implementación")
+
+update_task_terminal(task_id=123, terminal_id="2")  # Asignar a terminal 2
+update_task_terminal(task_id=123, terminal_id="")   # Desasignar de cualquier terminal
 ```
 
 ## IMPORTANTE: Documentación en Notion - OBLIGATORIO

@@ -355,6 +355,30 @@ class MCPStdioServer {
         };
     }
 
+    async updateTaskTerminal(params) {
+        const { task_id, terminal_id } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        if (terminal_id === undefined || terminal_id === null) {
+            throw new Error('terminal_id is required (use empty string to unassign)');
+        }
+        
+        const result = this.db.updateTaskTerminal(task_id, terminal_id);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            terminal_id,
+            updated: true
+        };
+    }
+
     // MCP Tools
     listTools() {
         return {
@@ -438,6 +462,18 @@ class MCPStdioServer {
                         },
                         required: ['task_id', 'implementation']
                     }
+                },
+                {
+                    name: 'update_task_terminal',
+                    description: 'Update the terminal ID associated with a task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' },
+                            terminal_id: { type: 'string', description: 'Terminal ID (1, 2, 3, 4, etc.) or empty string to unassign' }
+                        },
+                        required: ['task_id', 'terminal_id']
+                    }
                 }
             ]
         };
@@ -480,6 +516,10 @@ class MCPStdioServer {
                 
             case 'update_task_implementation':
                 result = await this.updateTaskImplementation({ task_id: args.task_id, implementation: args.implementation });
+                break;
+                
+            case 'update_task_terminal':
+                result = await this.updateTaskTerminal({ task_id: args.task_id, terminal_id: args.terminal_id });
                 break;
                 
             default:

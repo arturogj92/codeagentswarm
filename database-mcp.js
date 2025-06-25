@@ -454,6 +454,37 @@ class DatabaseManagerMCP {
         }
     }
 
+    updateTaskTerminal(taskId, terminalId) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET terminal_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            const result = stmt.run(terminalId === '' ? null : terminalId, taskId);
+            stmt.finalize();
+            
+            if (result.changes === 0) {
+                return {
+                    success: false,
+                    error: 'Task not found'
+                };
+            }
+            
+            // Log the action
+            this.logTaskAction(taskId, 'terminal_updated', `Task terminal changed to ${terminalId || 'none'}`);
+            
+            return {
+                success: true
+            };
+        } catch (error) {
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
     updateTaskImplementation(taskId, implementation) {
         try {
             const stmt = this.db.prepare(`
