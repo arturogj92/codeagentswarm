@@ -1491,6 +1491,8 @@ ipcMain.handle('git-discard-file', async (event, fileName) => {
   try {
     const cwd = getGitWorkingDirectory();
     
+    console.log(`[Git Discard] Processing file: ${fileName}`);
+    
     // First check if the file is tracked by git
     let isTracked = true;
     try {
@@ -1499,9 +1501,11 @@ ipcMain.handle('git-discard-file', async (event, fileName) => {
         encoding: 'utf8',
         stdio: ['pipe', 'pipe', 'ignore'] // Suppress stderr
       });
+      console.log(`[Git Discard] File ${fileName} is tracked`);
     } catch (e) {
       // File is not tracked by git
       isTracked = false;
+      console.log(`[Git Discard] File ${fileName} is untracked`);
     }
     
     let output = '';
