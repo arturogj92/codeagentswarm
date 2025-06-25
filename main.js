@@ -688,9 +688,20 @@ function startMCPServerAndRegister() {
       console.log('MCP server process exited with code:', code);
     });
 
-    // Wait a moment for server to start, then register with Claude Code
+    // Wait a moment for server to start and window to be ready, then register with Claude Code
+    console.log('⏰ Setting timeout to call registerWithClaude...');
     setTimeout(() => {
-      registerWithClaude();
+      console.log('⏰ First timeout reached. Window visible?', mainWindow && mainWindow.isVisible());
+      if (mainWindow && mainWindow.isVisible()) {
+        registerWithClaude();
+      } else {
+        // Wait a bit more if window isn't ready
+        console.log('⏰ Window not ready, waiting 2 more seconds...');
+        setTimeout(() => {
+          console.log('⏰ Second timeout reached, calling registerWithClaude anyway');
+          registerWithClaude();
+        }, 2000);
+      }
     }, 1000);
 
     return true;
@@ -701,20 +712,73 @@ function startMCPServerAndRegister() {
 }
 
 function registerWithClaude() {
-  try {
-    // Use claude mcp add to register our server
-    const serverPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
-      : path.join(__dirname, 'mcp-stdio-server.js');
+  console.log('🔍 registerWithClaude called - checking for Claude Code...');
+  
+  // First check if Claude Code is installed
+  const checkClaude = spawn('which', ['claude'], {
+    shell: true
+  });
+  
+  checkClaude.on('close', (code) => {
+    console.log('🔍 which claude returned code:', code);
+    
+    if (code !== 0) {
+      // Claude Code is not installed
+      console.log('⚠️ Claude Code not found');
       
-    const registerProcess = spawn('claude', [
-      'mcp', 'add', 
-      'codeagentswarm-tasks',  // Server name
-      'node', serverPath       // Command and args
-    ], {
-      cwd: __dirname,
-      stdio: 'pipe'
-    });
+      // Show notification to user
+      if (Notification.isSupported()) {
+        const notification = new Notification({
+          title: 'Claude Code no detectado',
+          body: 'Para usar las funciones MCP, instala Claude Code desde claude.ai/code',
+          icon: app.isPackaged 
+            ? path.join(process.resourcesPath, 'app.asar', 'logo_prod_512.png')
+            : path.join(__dirname, 'logo_prod_512.png')
+        });
+        notification.show();
+      }
+      
+      // Also show dialog for more visibility
+      console.log('Showing Claude Code not installed dialog...');
+      
+      // Make sure window is focused
+      if (mainWindow) {
+        mainWindow.focus();
+      }
+      
+      dialog.showMessageBox(mainWindow, {
+        type: 'warning',
+        title: 'Claude Code no instalado',
+        message: 'Claude Code no está instalado en tu sistema',
+        detail: 'Para aprovechar todas las funciones de gestión de tareas con MCP, necesitas instalar Claude Code.\n\nVisita: https://claude.ai/code',
+        buttons: ['OK', 'Abrir página de descarga'],
+        defaultId: 0,
+        cancelId: 0
+      }).then(result => {
+        if (result.response === 1) {
+          // Open download page
+          require('electron').shell.openExternal('https://claude.ai/code');
+        }
+      });
+      
+      return;
+    }
+    
+    // Claude is installed, proceed with registration
+    try {
+      // Use claude mcp add to register our server
+      const serverPath = app.isPackaged 
+        ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+        : path.join(__dirname, 'mcp-stdio-server.js');
+        
+      const registerProcess = spawn('claude', [
+        'mcp', 'add', 
+        'codeagentswarm-tasks',  // Server name
+        'node', serverPath       // Command and args
+      ], {
+        cwd: __dirname,
+        stdio: 'pipe'
+      });
 
     registerProcess.on('close', (code) => {
       if (code === 0) {
@@ -726,14 +790,15 @@ function registerWithClaude() {
       }
     });
 
-    registerProcess.stderr.on('data', (data) => {
-      console.error('Claude registration error:', data.toString());
-    });
+      registerProcess.stderr.on('data', (data) => {
+        console.error('Claude registration error:', data.toString());
+      });
 
-  } catch (error) {
-    console.error('❌ Failed to register with Claude Code:', error.message);
-    console.log('💡 Make sure Claude Code is installed and accessible via "claude" command');
-  }
+    } catch (error) {
+      console.error('❌ Failed to register with Claude Code:', error.message);
+      console.log('💡 Make sure Claude Code is installed and accessible via "claude" command');
+    }
+  });
 }
 
 // Handle directory selection
