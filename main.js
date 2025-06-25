@@ -1485,13 +1485,40 @@ ipcMain.handle('git-diff', async (event, fileName) => {
 // Git discard file changes handler
 ipcMain.handle('git-discard-file', async (event, fileName) => {
   const { execSync } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  
   try {
     const cwd = getGitWorkingDirectory();
     
-    // Discard changes to specific file
-    const output = execSync(`git checkout HEAD -- "${fileName}"`, { cwd, encoding: 'utf8' });
+    // First check if the file is tracked by git
+    let isTracked = true;
+    try {
+      execSync(`git ls-files --error-unmatch "${fileName}"`, { 
+        cwd, 
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore'] // Suppress stderr
+      });
+    } catch (e) {
+      // File is not tracked by git
+      isTracked = false;
+    }
     
-    return { success: true, message: `Changes to ${fileName} discarded`, output };
+    let output = '';
+    let message = '';
+    
+    if (isTracked) {
+      // Discard changes to tracked file
+      output = execSync(`git checkout HEAD -- "${fileName}"`, { cwd, encoding: 'utf8' });
+      message = `Changes to ${fileName} discarded`;
+    } else {
+      // Remove untracked file
+      const filePath = path.join(cwd, fileName);
+      fs.unlinkSync(filePath);
+      message = `Untracked file ${fileName} deleted`;
+    }
+    
+    return { success: true, message, output };
     
   } catch (error) {
     console.error('Git discard file error:', error);

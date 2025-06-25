@@ -1964,7 +1964,7 @@ class TerminalManager {
                                                 </div>
                                                 <div class="file-actions">
                                                     <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}')"><i data-lucide="eye"></i> Diff</button>
-                                                    <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}')"><i data-lucide="x"></i> Discard</button>
+                                                    <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}', '${file.status}')"><i data-lucide="x"></i> Discard</button>
                                                 </div>
                                             </div>
                                         `).join('')
@@ -2249,27 +2249,30 @@ class TerminalManager {
         return div.innerHTML;
     }
     
-    async discardFileChanges(fileName) {
-        const confirmMessage = `Are you sure you want to discard all changes to '${fileName}'? This action cannot be undone.`;
+    async discardFileChanges(fileName, fileStatus = 'Modified') {
+        const isUntracked = fileStatus === 'Untracked';
+        const action = isUntracked ? 'delete' : 'discard all changes to';
+        const confirmMessage = `Are you sure you want to ${action} '${fileName}'? This action cannot be undone.`;
         
         if (!confirm(confirmMessage)) {
             return;
         }
         
         try {
-            this.showInlineNotification(`🔄 Discarding changes to ${fileName}...`, 'info');
+            const actionText = isUntracked ? 'Deleting' : 'Discarding changes to';
+            this.showInlineNotification(`🔄 ${actionText} ${fileName}...`, 'info');
             const result = await ipcRenderer.invoke('git-discard-file', fileName);
             
             if (result.success) {
-                this.showInlineNotification(`✅ Changes to ${fileName} discarded`, 'success');
+                this.showInlineNotification(`✅ ${result.message}`, 'success');
                 // Refresh the git status
                 setTimeout(() => this.showGitStatus(), 1000);
             } else {
-                this.showInlineNotification(`❌ Failed to discard changes: ${result.error}`, 'error');
+                this.showInlineNotification(`❌ Failed: ${result.error}`, 'error');
             }
         } catch (error) {
             console.error('Error discarding file changes:', error);
-            this.showInlineNotification('❌ Error discarding file changes', 'error');
+            this.showInlineNotification('❌ Error processing file', 'error');
         }
     }
     
