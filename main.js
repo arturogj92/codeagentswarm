@@ -1503,13 +1503,20 @@ ipcMain.handle('git-discard-file', async (event, fileName) => {
 });
 
 // Git discard all changes handler
-ipcMain.handle('git-discard-all', async (event) => {
+ipcMain.handle('git-discard-all', async (event, includeUntracked = false) => {
   const { execSync } = require('child_process');
   try {
     const cwd = getGitWorkingDirectory();
+    let output = '';
     
     // Discard all changes to tracked files
-    const output = execSync('git checkout HEAD -- .', { cwd, encoding: 'utf8' });
+    output += execSync('git checkout HEAD -- .', { cwd, encoding: 'utf8' });
+    
+    // Remove untracked files if requested
+    if (includeUntracked) {
+      // -f: force, -d: remove directories too
+      output += '\n' + execSync('git clean -fd', { cwd, encoding: 'utf8' });
+    }
     
     return { success: true, message: 'All changes discarded', output };
     

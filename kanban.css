@@ -175,16 +175,14 @@ body {
 }
 
 .task-card.dragging {
-    opacity: 0.5;
-    transform: rotate(5deg);
-    z-index: 1000;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    opacity: 0.6;
+    cursor: grabbing !important;
+    transition: opacity 0.2s ease;
+    pointer-events: auto !important;
 }
 
 .task-list.drag-over {
-    background: rgba(0, 122, 204, 0.1);
-    border: 2px dashed #007acc;
-    border-radius: 8px;
+    background: rgba(0, 122, 204, 0.05);
 }
 
 .task-title {
@@ -267,11 +265,22 @@ body {
     color: #28a745;
 }
 
-/* Drop zones */
-.task-list.drag-over {
-    background: rgba(0, 122, 204, 0.1);
-    border: 2px dashed #007acc;
-    border-radius: 6px;
+/* Drop placeholder */
+.task-card.placeholder {
+    background: rgba(0, 122, 204, 0.05);
+    border: 1px dashed rgba(0, 122, 204, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: none;
+    cursor: default;
+    animation: none;
+}
+
+.task-card.placeholder:hover {
+    transform: none;
+    box-shadow: none;
+    border-color: rgba(0, 122, 204, 0.5);
 }
 
 /* Modal Styles */

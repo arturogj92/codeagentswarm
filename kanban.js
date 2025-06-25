@@ -112,83 +112,154 @@ class KanbanManager {
 
     setupDragAndDrop() {
         const taskLists = document.querySelectorAll('.task-list');
+        this.placeholder = null;
+        this.draggingElement = null;
+        this.originalNextSibling = null;
+        this.originalParent = null;
+        this.lastPlaceholderPosition = null;
+        this.dragoverThrottle = null;
         
         taskLists.forEach(list => {
             list.addEventListener('dragover', (e) => {
                 e.preventDefault();
-                list.classList.add('drag-over');
+                e.dataTransfer.dropEffect = 'move';
                 
-                // Handle reordering within the same column
-                const draggingCard = document.querySelector('.dragging');
-                if (draggingCard) {
-                    const afterElement = this.getDragAfterElement(list, e.clientY);
-                    if (afterElement == null) {
-                        list.appendChild(draggingCard);
-                    } else {
-                        list.insertBefore(draggingCard, afterElement);
+                // Throttle dragover events
+                if (this.dragoverThrottle) return;
+                
+                this.dragoverThrottle = setTimeout(() => {
+                    this.dragoverThrottle = null;
+                }, 100); // 100ms throttle
+                
+                if (this.draggingElement && this.placeholder) {
+                    // First time - insert placeholder at original position
+                    if (!this.placeholder.parentNode) {
+                        this.originalParent.insertBefore(this.placeholder, this.originalNextSibling);
                     }
                     
-                    // Auto-scroll when dragging near the edges
-                    this.handleAutoScroll(list, e.clientY);
+                    const afterElement = this.getDragAfterElement(list, e.clientY);
+                    const newPosition = {
+                        parent: list,
+                        afterElement: afterElement,
+                        nextSibling: afterElement || null
+                    };
+                    
+                    // Only move if position actually changed
+                    if (!this.isSamePosition(this.lastPlaceholderPosition, newPosition)) {
+                        this.lastPlaceholderPosition = newPosition;
+                        
+                        // Ensure we insert in the correct position
+                        if (afterElement == null) {
+                            // Append at the end
+                            if (list.lastElementChild !== this.placeholder) {
+                                list.appendChild(this.placeholder);
+                            }
+                        } else {
+                            // Insert before the afterElement
+                            if (this.placeholder.nextSibling !== afterElement) {
+                                list.insertBefore(this.placeholder, afterElement);
+                            }
+                        }
+                    }
                 }
             });
 
             list.addEventListener('dragleave', (e) => {
-                if (!list.contains(e.relatedTarget)) {
-                    list.classList.remove('drag-over');
+                // Only remove visual cue if we're truly leaving the list
+                if (e.relatedTarget && !list.contains(e.relatedTarget)) {
+                    // Optional: Add visual feedback when leaving
                 }
             });
 
             list.addEventListener('drop', async (e) => {
                 e.preventDefault();
-                list.classList.remove('drag-over');
                 
-                const taskId = e.dataTransfer.getData('text/plain');
-                const newStatus = list.id.replace('-tasks', '');
-                const draggedTask = this.tasks.find(t => t.id == taskId);
-                
-                // Check if the status changed or just reordered
-                if (draggedTask && draggedTask.status !== newStatus) {
-                    // Status changed - update task status
-                    await this.updateTaskStatus(taskId, newStatus);
-                } else {
-                    // Just reordered within the same column - update order
-                    await this.updateTaskOrder(list, newStatus);
+                if (this.placeholder && this.draggingElement) {
+                    const taskId = parseInt(e.dataTransfer.getData('text/plain'));
+                    const draggedTask = this.tasks.find(t => t.id === taskId);
+                    
+                    // Check if placeholder is in DOM
+                    if (this.placeholder.parentNode) {
+                        // Get the final position from placeholder
+                        const targetParent = this.placeholder.parentNode;
+                        const targetNextSibling = this.placeholder.nextSibling;
+                        const newStatus = targetParent.id.replace('-tasks', '');
+                        
+                        // Remove placeholder first
+                        this.placeholder.parentNode.removeChild(this.placeholder);
+                        
+                        // Now move the dragging element to where placeholder was
+                        if (targetNextSibling) {
+                            targetParent.insertBefore(this.draggingElement, targetNextSibling);
+                        } else {
+                            targetParent.appendChild(this.draggingElement);
+                        }
+                        
+                        // Update database
+                        if (draggedTask && draggedTask.status !== newStatus) {
+                            // Status changed - update task status
+                            await this.updateTaskStatus(taskId, newStatus);
+                        } else {
+                            // Just reordered within the same column - update order
+                            await this.updateTaskOrder(targetParent, newStatus);
+                        }
+                    }
                 }
+                
+                // Clean up
+                this.placeholder = null;
+                this.draggingElement = null;
+                this.originalNextSibling = null;
+                this.originalParent = null;
+                this.lastPlaceholderPosition = null;
+                this.dragoverThrottle = null;
             });
         });
     }
 
+
     getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.task-card:not(.dragging)')];
+        const draggableElements = [...container.querySelectorAll('.task-card:not(.placeholder)')];
         
-        return draggableElements.reduce((closest, child) => {
+        // Filter out dragging element and find the element we should insert before
+        const validElements = draggableElements.filter(child => child !== this.draggingElement);
+        
+        let closestElement = null;
+        let closestOffset = Number.NEGATIVE_INFINITY;
+        
+        for (const child of validElements) {
             const box = child.getBoundingClientRect();
             const offset = y - box.top - box.height / 2;
             
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
-            } else {
-                return closest;
+            // If we're above the middle of this element
+            if (offset < 0 && offset > closestOffset) {
+                closestOffset = offset;
+                closestElement = child;
             }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
+        }
+        
+        return closestElement;
     }
 
-    handleAutoScroll(list, clientY) {
-        const scrollThreshold = 50; // pixels from edge to trigger scroll
-        const scrollSpeed = 10; // pixels per scroll
-        const listRect = list.getBoundingClientRect();
-        
-        // Check if we're near the top of the list
-        if (clientY - listRect.top < scrollThreshold) {
-            list.scrollTop = Math.max(0, list.scrollTop - scrollSpeed);
-        }
-        
-        // Check if we're near the bottom of the list
-        if (listRect.bottom - clientY < scrollThreshold) {
-            list.scrollTop = Math.min(list.scrollHeight - list.clientHeight, list.scrollTop + scrollSpeed);
-        }
+    isSamePosition(pos1, pos2) {
+        if (!pos1 || !pos2) return false;
+        return pos1.parent === pos2.parent && 
+               pos1.afterElement === pos2.afterElement &&
+               pos1.nextSibling === pos2.nextSibling;
     }
+
+    updateColumnCounts() {
+        const statuses = ['pending', 'in_progress', 'in_testing', 'completed'];
+        
+        statuses.forEach(status => {
+            const count = this.tasks.filter(t => t.status === status).length;
+            const countElement = document.getElementById(`${status}-count`);
+            if (countElement) {
+                countElement.textContent = count;
+            }
+        });
+    }
+
 
     async updateTaskOrder(list, status) {
         try {
@@ -210,6 +281,14 @@ class KanbanManager {
                     console.error('Failed to update task order:', result.error);
                     // Reload tasks to reset the UI
                     await this.loadTasks();
+                } else {
+                    // Update local sort orders without reloading
+                    filteredOrders.forEach(order => {
+                        const task = this.tasks.find(t => t.id === order.taskId);
+                        if (task) {
+                            task.sort_order = order.sortOrder;
+                        }
+                    });
                 }
             }
         } catch (error) {
@@ -317,11 +396,41 @@ class KanbanManager {
         // Add drag event listeners
         taskCard.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('text/plain', task.id);
+            e.dataTransfer.effectAllowed = 'move';
+            
+            // Store references
+            this.draggingElement = taskCard;
+            this.originalNextSibling = taskCard.nextSibling;
+            this.originalParent = taskCard.parentNode;
+            
+            // Create placeholder
+            this.placeholder = document.createElement('div');
+            this.placeholder.className = 'task-card placeholder';
+            this.placeholder.style.height = taskCard.offsetHeight + 'px';
+            this.placeholder.style.marginBottom = '0.75rem';
+            this.placeholder.innerHTML = '';
+            
+            // Don't insert placeholder yet - wait for first dragover
+            
+            // Add dragging class immediately
             taskCard.classList.add('dragging');
         });
 
-        taskCard.addEventListener('dragend', () => {
+        taskCard.addEventListener('dragend', (e) => {
             taskCard.classList.remove('dragging');
+            
+            // Clean up placeholder if still exists
+            if (this.placeholder && this.placeholder.parentNode) {
+                this.placeholder.parentNode.removeChild(this.placeholder);
+            }
+            
+            // Reset all references
+            this.placeholder = null;
+            this.draggingElement = null;
+            this.originalNextSibling = null;
+            this.originalParent = null;
+            this.lastPlaceholderPosition = null;
+            this.dragoverThrottle = null;
         });
 
         // Add click listener
@@ -532,10 +641,16 @@ class KanbanManager {
         try {
             const result = await ipcRenderer.invoke('task-update-status', parseInt(taskId), newStatus);
             if (result.success) {
-                await this.loadTasks();
-                
+                // Update local data without reloading
                 const task = this.tasks.find(t => t.id === parseInt(taskId));
                 if (task) {
+                    const oldStatus = task.status;
+                    task.status = newStatus;
+                    task.updated_at = new Date().toISOString();
+                    
+                    // Update counts
+                    this.updateColumnCounts();
+                    
                     if (newStatus === 'in_testing') {
                         this.showNotification(`Task "${task.title}" ready for testing!`, 'success');
                     } else if (newStatus === 'completed') {

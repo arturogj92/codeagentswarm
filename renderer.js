@@ -2274,18 +2274,37 @@ class TerminalManager {
     }
     
     async discardAllChanges() {
-        const confirmMessage = 'Are you sure you want to discard ALL changes? This action cannot be undone and will remove all modifications to tracked files.';
+        // First, get git status to check if there are untracked files
+        const gitStatus = await ipcRenderer.invoke('get-git-status');
+        const hasUntrackedFiles = gitStatus.success && gitStatus.files.some(f => f.status === 'Untracked');
         
-        if (!confirm(confirmMessage)) {
-            return;
+        let includeUntracked = false;
+        
+        if (hasUntrackedFiles) {
+            // Create a custom dialog for three options
+            const confirmMessage = 'You have untracked files. What would you like to do?\n\n' +
+                '• Click OK to discard ALL changes INCLUDING untracked files (⚠️ untracked files will be permanently deleted)\n' +
+                '• Click Cancel to discard ONLY changes to tracked files (untracked files will remain)\n\n' +
+                'Close this dialog to cancel the operation.';
+            
+            includeUntracked = confirm(confirmMessage);
+        } else {
+            const confirmMessage = 'Are you sure you want to discard ALL changes? This action cannot be undone and will remove all modifications to tracked files.';
+            
+            if (!confirm(confirmMessage)) {
+                return;
+            }
         }
         
         try {
-            this.showInlineNotification('🔄 Discarding all changes...', 'info');
-            const result = await ipcRenderer.invoke('git-discard-all');
+            this.showInlineNotification('🔄 Discarding changes...', 'info');
+            const result = await ipcRenderer.invoke('git-discard-all', includeUntracked);
             
             if (result.success) {
-                this.showInlineNotification('✅ All changes discarded', 'success');
+                const message = includeUntracked ? 
+                    '✅ All changes and untracked files discarded' : 
+                    '✅ All changes to tracked files discarded';
+                this.showInlineNotification(message, 'success');
                 // Refresh the git status
                 setTimeout(() => this.showGitStatus(), 1000);
             } else {
