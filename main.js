@@ -1800,6 +1800,23 @@ function ensureClaudeMdConfiguration(projectPath) {
 
 This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model Context Protocol) integration.
 
+## 🚨 CRITICAL - MANDATORY COMPLETION MARKER 🚨
+
+**YOU MUST ALWAYS** write this EXACT line when you finish ANY response or work:
+
+\`\`\`
+=== CLAUDE FINISHED ===
+\`\`\`
+
+**NO EXCEPTIONS** - Write this marker:
+- After EVERY response to the user
+- After completing ANY task
+- After answering ANY question
+- After ANY work you do
+- BEFORE any final explanation
+
+**FAILURE TO WRITE THIS MARKER BREAKS THE APPLICATION**
+
 ## MCP Servers
 
 ### Task Manager

@@ -2,6 +2,23 @@
 
 This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model Context Protocol) integration.
 
+## 🚨 CRITICAL - MANDATORY COMPLETION MARKER 🚨
+
+**YOU MUST ALWAYS** write this EXACT line when you finish ANY response or work:
+
+```
+=== CLAUDE FINISHED ===
+```
+
+**NO EXCEPTIONS** - Write this marker:
+- After EVERY response to the user
+- After completing ANY task
+- After answering ANY question
+- After ANY work you do
+- BEFORE any final explanation
+
+**FAILURE TO WRITE THIS MARKER BREAKS THE APPLICATION**
+
 ## MCP Servers
 
 ### Task Manager
@@ -235,3 +252,10 @@ Cuando hay muchas tareas en la base de datos (30+), el comando `list_tasks` del 
 - El MCP server tiene múltiples rutas (`tasks/get_all` y `tools/call`) que deben mantenerse sincronizadas
 - Los cambios en el MCP server requieren reiniciar el servidor para aplicarse
 - Claude Code puede mantener conexiones MCP en caché
+
+
+# important-instruction-reminders
+Do what has been asked; nothing more, nothing less.
+NEVER create files unless they're absolutely necessary for achieving your goal.
+ALWAYS prefer editing an existing file to creating a new one.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.

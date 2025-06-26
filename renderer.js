@@ -31,6 +31,7 @@ class TerminalManager {
         this.userTypingTimers = new Map(); // Track when user is actively typing
         this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
         this.customProjectColors = {}; // Store custom colors per project
+        
         this.init();
         // Load directories asynchronously with error handling
         this.loadSavedDirectories().catch(error => {
@@ -668,6 +669,9 @@ class TerminalManager {
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
             this.parseClaudeCodeOutput(data, quadrant);
+            
+            // Update last output time and check for inactivity
+            this.updateActivityAndCheckCompletion(quadrant, data);
         });
 
         // Handle terminal exit
@@ -849,11 +853,11 @@ class TerminalManager {
     }
 
     highlightTerminal(quadrant) {
-        const terminalElement = document.querySelector(`#terminal-${quadrant}`);
+        const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         if (terminalElement) {
-            terminalElement.classList.add('active');
+            terminalElement.classList.add('confirmation-highlight');
             setTimeout(() => {
-                terminalElement.classList.remove('active');
+                terminalElement.classList.remove('confirmation-highlight');
             }, 3000);
         }
     }
@@ -3839,6 +3843,47 @@ class TerminalManager {
         // Clear stored reference
         this.previewElements = null;
     }
+
+
+    // Update activity and check for completion marker
+    updateActivityAndCheckCompletion(terminalId, data) {
+        // Check for completion marker
+        if (data.includes('=== CLAUDE FINISHED ===')) {
+            console.log(`✅ Claude finished marker detected in terminal ${terminalId + 1}`);
+            
+            // Highlight the terminal
+            this.highlightTerminal(terminalId);
+            
+            // Use system notification
+            if (Notification.permission === 'granted') {
+                new Notification('Claude has finished', {
+                    body: `Terminal ${terminalId + 1} - Work completed`,
+                    icon: 'logo_prod_512.png',
+                    silent: false
+                });
+            } else if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification('Claude has finished', {
+                            body: `Terminal ${terminalId + 1} - Work completed`,
+                            icon: 'logo_prod_512.png',
+                            silent: false
+                        });
+                    }
+                });
+            }
+            
+            // Play completion sound
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGBzvLZiTYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                audio.volume = 0.3;
+                audio.play().catch(e => {});
+            } catch (e) {
+                // Ignore audio errors
+            }
+        }
+    }
+
 }
 
 // Listen for dev mode status from main process
