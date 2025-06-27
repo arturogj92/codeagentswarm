@@ -31,6 +31,7 @@ class TerminalManager {
         this.userTypingTimers = new Map(); // Track when user is actively typing
         this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
         this.customProjectColors = {}; // Store custom colors per project
+        this.terminalsNeedingAttention = new Set(); // Track terminals that need user attention
         
         this.init();
         // Load directories asynchronously with error handling
@@ -83,6 +84,14 @@ class TerminalManager {
         this.setupGlobalTerminalFocusDetection(); // Add global focus detection
         this.updateGitButtonVisibility(); // Initialize git button visibility
         this.startTaskIndicatorUpdates(); // Initialize task indicators with periodic updates
+        
+        // Listen for clear waiting states message
+        ipcRenderer.on('clear-waiting-states', () => {
+            this.terminalsNeedingAttention.clear();
+            this.waitingForUserInteraction.forEach((value, key) => {
+                this.waitingForUserInteraction.set(key, false);
+            });
+        });
     }
 
     setupEventListeners() {
@@ -990,6 +999,11 @@ class TerminalManager {
                 // Mark this command as notified
                 this.confirmedCommands.set(`${quadrant}_${commandKey}`, now);
                 
+                // Add terminal to those needing attention
+                console.log(`Terminal ${quadrant} needs attention - adding to badge`);
+                this.terminalsNeedingAttention.add(quadrant);
+                this.updateNotificationBadge();
+                
                 this.showDesktopNotification('Confirmation Required', `Terminal ${quadrant + 1}: Claude Code needs confirmation`);
                 this.highlightTerminalForConfirmation(quadrant);
                 
@@ -1022,6 +1036,10 @@ class TerminalManager {
     unblockNotifications(quadrant) {
         this.notificationBlocked.set(quadrant, false);
         this.waitingForUserInteraction.set(quadrant, false);
+        
+        // Remove terminal from those needing attention
+        this.terminalsNeedingAttention.delete(quadrant);
+        this.updateNotificationBadge();
         
         // Remove highlight animation since user is responding
         const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
@@ -2716,6 +2734,24 @@ class TerminalManager {
         setInterval(() => {
             this.checkForTaskCompletionNotifications();
         }, 2000);
+    }
+
+    async updateNotificationBadge() {
+        try {
+            // Update the main process with terminals needing attention
+            const waitingTerminals = Array.from(this.terminalsNeedingAttention);
+            const count = this.terminalsNeedingAttention.size;
+            
+            console.log(`Updating badge count to: ${count}, terminals: ${waitingTerminals.join(', ')}`);
+            
+            await ipcRenderer.invoke('update-terminals-waiting', waitingTerminals);
+            
+            // Update badge count
+            const result = await ipcRenderer.invoke('update-badge-count', count);
+            console.log('Badge update result:', result);
+        } catch (error) {
+            console.error('Error updating notification badge:', error);
+        }
     }
 
     async checkForTaskCompletionNotifications() {

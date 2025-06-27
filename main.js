@@ -23,6 +23,7 @@ let mainWindow;
 const terminals = new Map();
 let db;
 let mcpServer;
+let terminalsWaitingForResponse = new Set();
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
@@ -64,6 +65,17 @@ function createWindow() {
   mainWindow.webContents.once('did-finish-load', () => {
     const isDevMode = process.argv.includes('--dev');
     mainWindow.webContents.send('dev-mode-status', isDevMode);
+  });
+  
+  // Clear badge when window gets focus
+  mainWindow.on('focus', () => {
+    if (process.platform === 'darwin') {
+      app.badgeCount = 0;
+    }
+    terminalsWaitingForResponse.clear();
+    
+    // Notify renderer to clear waiting states
+    mainWindow.webContents.send('clear-waiting-states');
   });
   
   if (process.env.NODE_ENV === 'development') {
@@ -1302,6 +1314,58 @@ ipcMain.handle('check-task-notifications', async () => {
     return { success: true, notifications: [] };
   } catch (error) {
     console.error('Error checking task notifications:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Update app badge count handler
+ipcMain.handle('update-badge-count', async (event, count) => {
+  try {
+    console.log(`[Main] Updating badge count to: ${count}`);
+    
+    // Set badge count on macOS dock and Windows taskbar
+    if (process.platform === 'darwin') {
+      // macOS: set dock badge
+      app.badgeCount = count;
+      console.log(`[Main] Set app.badgeCount to: ${count}`);
+    } else if (process.platform === 'win32' && mainWindow) {
+      // Windows: use overlay icon or flash frame
+      if (count > 0) {
+        mainWindow.flashFrame(true);
+        // You can also set an overlay icon here if you have badge images
+      } else {
+        mainWindow.flashFrame(false);
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating badge count:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get notification count from terminals waiting for response
+ipcMain.handle('get-notification-count', async () => {
+  try {
+    return { success: true, count: terminalsWaitingForResponse.size };
+  } catch (error) {
+    console.error('Error getting notification count:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Update terminals waiting for response
+ipcMain.handle('update-terminals-waiting', async (event, waitingTerminals) => {
+  try {
+    terminalsWaitingForResponse = new Set(waitingTerminals);
+    // Update badge count
+    if (process.platform === 'darwin') {
+      app.badgeCount = terminalsWaitingForResponse.size;
+    }
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating terminals waiting:', error);
     return { success: false, error: error.message };
   }
 });
