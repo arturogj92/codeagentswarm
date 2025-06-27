@@ -1721,6 +1721,24 @@ class TerminalManager {
                 
                 console.log(`Force resized terminal ${quadrant} to: ${cols}x${rows}`);
                 
+                // Re-check scroll button visibility after resize
+                const terminalDiv = terminal.element;
+                const scrollBtn = terminalDiv.querySelector('.scroll-to-bottom-btn');
+                
+                if (scrollBtn && viewport) {
+                    // Re-check scroll position after resize operations complete
+                    setTimeout(() => {
+                        const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 5);
+                        const hasContent = viewport.scrollHeight > viewport.clientHeight;
+                        
+                        if (!isAtBottom && hasContent) {
+                            scrollBtn.classList.add('show');
+                        } else {
+                            scrollBtn.classList.remove('show');
+                        }
+                    }, 100);
+                }
+                
             } catch (error) {
                 console.error(`Error force resizing terminal ${quadrant}:`, error);
                 // Fallback to regular resize
@@ -1789,10 +1807,26 @@ class TerminalManager {
             
             // También verificar y agregar botón de scroll si falta
             const terminalDiv = quadrantElement.querySelector('.terminal');
-            if (terminalDiv && !terminalDiv.querySelector('.scroll-to-bottom-btn')) {
+            const scrollBtn = terminalDiv?.querySelector('.scroll-to-bottom-btn');
+            
+            if (terminalDiv && !scrollBtn) {
+                // Si no existe el botón, añadirlo
                 const terminal = this.terminals.get(quadrant);
                 if (terminal && terminal.terminal) {
                     this.addScrollToBottomButton(terminalDiv, terminal.terminal, quadrant);
+                }
+            } else if (scrollBtn) {
+                // Si existe el botón, verificar su visibilidad
+                const viewport = terminalDiv.querySelector('.xterm-viewport');
+                if (viewport) {
+                    const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 5);
+                    const hasContent = viewport.scrollHeight > viewport.clientHeight;
+                    
+                    if (!isAtBottom && hasContent) {
+                        scrollBtn.classList.add('show');
+                    } else {
+                        scrollBtn.classList.remove('show');
+                    }
                 }
             }
         }
@@ -1858,8 +1892,17 @@ class TerminalManager {
                 subtree: true
             });
             
-            // Initial check
-            setTimeout(checkScrollPosition, 1000);
+            // Multiple initial checks to ensure proper detection
+            checkScrollPosition(); // Immediate check
+            setTimeout(checkScrollPosition, 100);   // 100ms
+            setTimeout(checkScrollPosition, 500);   // 500ms
+            setTimeout(checkScrollPosition, 1000);  // 1 second
+            setTimeout(checkScrollPosition, 2000);  // 2 seconds
+            
+            // Also check on terminal data events
+            terminal.onData(() => {
+                setTimeout(checkScrollPosition, 50);
+            });
         }
     }
 
