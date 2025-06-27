@@ -32,6 +32,7 @@ class TerminalManager {
         this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
         this.customProjectColors = {}; // Store custom colors per project
         this.terminalsNeedingAttention = new Set(); // Track terminals that need user attention
+        this.claudeFinishedNotified = new Map(); // Track if we already notified about CLAUDE FINISHED for each terminal
         
         this.init();
         // Load directories asynchronously with error handling
@@ -91,6 +92,25 @@ class TerminalManager {
             this.waitingForUserInteraction.forEach((value, key) => {
                 this.waitingForUserInteraction.set(key, false);
             });
+            this.notificationBlocked.forEach((value, key) => {
+                this.notificationBlocked.set(key, false);
+            });
+        });
+        
+        // Listen for task created response
+        ipcRenderer.on('task-created', (event, result) => {
+            if (result.success) {
+                // Only refresh task indicators, no internal notification
+                this.updateTaskIndicators();
+            } else {
+                // Keep error notification as it's important
+                this.showNotification(`Failed to create task: ${result.error}`, 'error');
+            }
+        });
+        
+        // Listen for refresh tasks
+        ipcRenderer.on('refresh-tasks', () => {
+            this.updateTaskIndicators();
         });
     }
 
@@ -135,6 +155,10 @@ class TerminalManager {
 
         document.getElementById('kanban-btn').addEventListener('click', () => {
             this.showKanban();
+        });
+
+        document.getElementById('create-task-btn').addEventListener('click', () => {
+            this.showCreateTaskDialog();
         });
 
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
@@ -191,6 +215,9 @@ class TerminalManager {
                 // Only set focus if this terminal has an active terminal instance
                 const terminal = this.terminals.get(quadrantId);
                 if (terminal && terminal.terminal) {
+                    // Clear badge when clicking on any terminal
+                    this.clearNotificationBadge();
+                    
                     // Only update if this isn't already the active terminal to avoid unnecessary updates
                     if (this.activeTerminal !== quadrantId) {
                         console.log(`🎯 Setting active terminal to ${quadrantId} from mousedown on:`, e.target);
@@ -734,11 +761,15 @@ class TerminalManager {
         // Ensure terminal gets DOM focus when clicked directly
         terminalDiv.addEventListener('click', () => {
             terminal.focus();
+            // Clear badge when clicking on any terminal
+            this.clearNotificationBadge();
             // setActiveTerminal will be handled by global click listener
         });
         
         terminalDiv.addEventListener('mousedown', () => {
             terminal.focus();
+            // Clear badge when clicking on any terminal
+            this.clearNotificationBadge();
         });
         
         // Focus and fit immediately when created
@@ -915,16 +946,31 @@ class TerminalManager {
         const isMenuNavigation = text.includes('❯') && /\s*[0-9]+\./m.test(text);
         
         // Create a content signature to detect reprints of the same menu
+        // Remove all variable parts to detect if it's the same menu structure
         const contentSignature = text
-            .replace(/❯/g, '') // Remove selection arrow
+            .replace(/❯\s*/g, '') // Remove selection arrow and its spacing
             .replace(/\s*[0-9]+\./g, '') // Remove option numbers
             .replace(/\s+/g, ' ') // Normalize whitespace
+            .replace(/shift\+tab/g, '') // Remove keyboard hints that might vary
+            .replace(/esc/g, '') // Remove keyboard hints
+            .replace(/\([^)]+\)/g, '') // Remove parenthetical content
             .trim();
         
         // Check if this is just a reprint of the same menu content
         const lastContent = this.lastMenuContent.get(quadrant);
         if (lastContent === contentSignature) {
             return; // Same menu content, just different selection
+        }
+        
+        // If this is a menu navigation, check if we recently showed a notification for this quadrant
+        if (isMenuNavigation) {
+            const lastNotificationTime = this.confirmedCommands.get(`${quadrant}_menu_notification`);
+            const now = Date.now();
+            if (lastNotificationTime && (now - lastNotificationTime) < 30000) { // 30 second cooldown for menu navigations
+                return; // Don't spam notifications for menu navigation
+            }
+            // Mark that we're about to show a notification for this menu
+            this.confirmedCommands.set(`${quadrant}_menu_notification`, now);
         }
         
         // Update last menu content
@@ -977,7 +1023,12 @@ class TerminalManager {
         // If we already notified for this exact command, skip (unless it's been a while)
         const now = Date.now();
         const lastNotified = this.confirmedCommands.get(`${quadrant}_${commandKey}`);
-        if (lastNotified && (now - lastNotified) < 60000) { // 60 second cooldown per command
+        if (lastNotified && (now - lastNotified) < 300000) { // 5 minute cooldown per command
+            return;
+        }
+        
+        // Also check if this terminal is already in the attention list
+        if (this.terminalsNeedingAttention.has(quadrant)) {
             return;
         }
         
@@ -1000,7 +1051,6 @@ class TerminalManager {
                 this.confirmedCommands.set(`${quadrant}_${commandKey}`, now);
                 
                 // Add terminal to those needing attention
-                console.log(`Terminal ${quadrant} needs attention - adding to badge`);
                 this.terminalsNeedingAttention.add(quadrant);
                 this.updateNotificationBadge();
                 
@@ -1012,9 +1062,12 @@ class TerminalManager {
                 this.waitingForUserInteraction.set(quadrant, true);
                 
                 // Auto-unblock after 15 seconds to prevent permanent blocking
+                // BUT keep the terminal in the attention list if still waiting
                 setTimeout(() => {
                     if (this.notificationBlocked.get(quadrant)) {
-                        this.unblockNotifications(quadrant);
+                        // Only unblock notifications, but keep in attention list
+                        this.notificationBlocked.set(quadrant, false);
+                        // Don't call unblockNotifications here to avoid removing from attention list
                     }
                 }, 15000);
                 
@@ -1958,6 +2011,110 @@ class TerminalManager {
         ipcRenderer.send('open-kanban-window');
     }
 
+    showCreateTaskDialog() {
+        // Remove existing modal if present
+        const existingModal = document.querySelector('.create-task-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Get active terminal
+        const activeTerminalId = this.activeTerminal;
+        const terminalId = activeTerminalId !== null ? activeTerminalId + 1 : null;
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'create-task-modal';
+        modal.innerHTML = `
+            <div class="create-task-content">
+                <div class="create-task-header">
+                    <h3><i data-lucide="plus-square"></i> Create New Task</h3>
+                    <button class="close-btn" id="close-create-task-modal">×</button>
+                </div>
+                <div class="create-task-body">
+                    <div class="form-group">
+                        <label for="task-title">Title *</label>
+                        <input type="text" id="task-title" placeholder="Enter task title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-description">Description</label>
+                        <textarea id="task-description" placeholder="Enter task description (optional)" rows="4"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-terminal">Terminal</label>
+                        <select id="task-terminal">
+                            <option value="">No terminal assigned</option>
+                            ${Array.from(this.terminals.entries()).map(([quadrant, term]) => {
+                                const num = quadrant + 1;
+                                const isActive = activeTerminalId === quadrant;
+                                return `<option value="${num}" ${isActive ? 'selected' : ''}>Terminal ${num}${isActive ? ' (current)' : ''}</option>`;
+                            }).join('')}
+                        </select>
+                    </div>
+                </div>
+                <div class="create-task-footer">
+                    <button class="btn btn-secondary" id="cancel-create-task">Cancel</button>
+                    <button class="btn btn-primary" id="confirm-create-task">Create Task</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        
+        // Initialize Lucide icons
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+
+        // Focus on title input
+        const titleInput = document.getElementById('task-title');
+        titleInput.focus();
+
+        // Event listeners
+        document.getElementById('close-create-task-modal').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        document.getElementById('cancel-create-task').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        document.getElementById('confirm-create-task').addEventListener('click', () => {
+            const title = document.getElementById('task-title').value.trim();
+            const description = document.getElementById('task-description').value.trim();
+            const terminalId = document.getElementById('task-terminal').value;
+
+            if (!title) {
+                alert('Please enter a task title');
+                return;
+            }
+
+            // Send task creation request
+            ipcRenderer.send('create-task', {
+                title,
+                description: description || undefined,
+                terminal_id: terminalId ? parseInt(terminalId) : undefined
+            });
+
+            modal.remove();
+        });
+
+        // Allow Enter key to create task
+        titleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                document.getElementById('confirm-create-task').click();
+            }
+        });
+
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
     displayGitStatusModal(gitData) {
         // Remove existing modal if present
         const existingModal = document.querySelector('.git-status-modal');
@@ -2742,15 +2899,27 @@ class TerminalManager {
             const waitingTerminals = Array.from(this.terminalsNeedingAttention);
             const count = this.terminalsNeedingAttention.size;
             
-            console.log(`Updating badge count to: ${count}, terminals: ${waitingTerminals.join(', ')}`);
-            
             await ipcRenderer.invoke('update-terminals-waiting', waitingTerminals);
             
             // Update badge count
-            const result = await ipcRenderer.invoke('update-badge-count', count);
-            console.log('Badge update result:', result);
+            await ipcRenderer.invoke('update-badge-count', count);
         } catch (error) {
             console.error('Error updating notification badge:', error);
+        }
+    }
+
+    async clearNotificationBadge() {
+        try {
+            // Clear all terminals from attention list
+            this.terminalsNeedingAttention.clear();
+            
+            // Update the main process
+            await ipcRenderer.invoke('update-terminals-waiting', []);
+            
+            // Clear badge count
+            await ipcRenderer.invoke('update-badge-count', 0);
+        } catch (error) {
+            console.error('Error clearing notification badge:', error);
         }
     }
 
@@ -2784,6 +2953,12 @@ class TerminalManager {
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
                 // Sin notificación al añadir terminal
+                
+                // Reparar controles de todos los terminales después de re-renderizar
+                // Esto asegura que los botones de scroll se muestren correctamente
+                setTimeout(() => {
+                    this.repairTerminalControls();
+                }, 200);
             } else {
                 // Solo mostrar error si es crítico
                 console.error('Error adding terminal:', result.error);
@@ -2872,6 +3047,12 @@ class TerminalManager {
                 this.terminals.delete(terminalId);
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
+                
+                // Reparar controles después de eliminar terminal
+                setTimeout(() => {
+                    this.repairTerminalControls();
+                }, 200);
+                
                 if (!silent) {
                     this.showNotification('Success', `Terminal ${terminalId + 1} removed`, 'success');
                 }
@@ -3212,6 +3393,11 @@ class TerminalManager {
         
         // Re-render terminals with new layout
         this.renderTerminals();
+        
+        // Reparar controles después de cambiar layout
+        setTimeout(() => {
+            this.repairTerminalControls();
+        }, 200);
     }
 
     updateLayoutButtonGroups(terminalCount) {
@@ -3928,7 +4114,29 @@ class TerminalManager {
     updateActivityAndCheckCompletion(terminalId, data) {
         // Check for completion marker
         if (data.includes('=== CLAUDE FINISHED ===')) {
+            // Check if we already notified for this marker recently
+            const lastNotified = this.claudeFinishedNotified.get(terminalId);
+            const now = Date.now();
+            
+            // Skip if we notified in the last 30 seconds (prevents spam when user types the marker)
+            if (lastNotified && (now - lastNotified) < 30000) {
+                return;
+            }
+            
+            // Also skip if user is currently typing (prevents notification when copying/pasting)
+            if (this.userTypingTimers.has(terminalId)) {
+                return;
+            }
+            
             console.log(`✅ Claude finished marker detected in terminal ${terminalId + 1}`);
+            
+            // Mark that we notified for this terminal
+            this.claudeFinishedNotified.set(terminalId, now);
+            
+            // Clear the notification flag after 30 seconds
+            setTimeout(() => {
+                this.claudeFinishedNotified.delete(terminalId);
+            }, 30000);
             
             // Highlight the terminal
             this.highlightTerminal(terminalId);

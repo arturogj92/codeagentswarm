@@ -1017,6 +1017,39 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
   }
 });
 
+// Handle task creation from renderer
+ipcMain.on('create-task', async (event, taskData) => {
+  try {
+    const result = await db.createTask(
+      taskData.title,
+      taskData.description || '',
+      taskData.terminal_id
+    );
+    
+    // Notify the renderer of successful creation
+    event.reply('task-created', {
+      success: true,
+      task: result
+    });
+    
+    // Refresh task list in all terminals
+    mainWindow.webContents.send('refresh-tasks');
+    
+    // Show notification
+    new Notification({
+      title: 'Task Created',
+      body: `Task "${taskData.title}" has been created successfully`
+    }).show();
+    
+  } catch (error) {
+    console.error('Error creating task:', error);
+    event.reply('task-created', {
+      success: false,
+      error: error.message
+    });
+  }
+});
+
 app.whenReady().then(async () => {
   // Initialize database
   try {
@@ -1321,13 +1354,10 @@ ipcMain.handle('check-task-notifications', async () => {
 // Update app badge count handler
 ipcMain.handle('update-badge-count', async (event, count) => {
   try {
-    console.log(`[Main] Updating badge count to: ${count}`);
-    
     // Set badge count on macOS dock and Windows taskbar
     if (process.platform === 'darwin') {
       // macOS: set dock badge
       app.badgeCount = count;
-      console.log(`[Main] Set app.badgeCount to: ${count}`);
     } else if (process.platform === 'win32' && mainWindow) {
       // Windows: use overlay icon or flash frame
       if (count > 0) {

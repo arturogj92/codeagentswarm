@@ -132,6 +132,15 @@ class KanbanManager {
                 }, 100); // 100ms throttle
                 
                 if (this.draggingElement && this.placeholder) {
+                    // Only hide empty state if the list is truly empty (no task cards except placeholder)
+                    const realTasks = list.querySelectorAll('.task-card:not(.placeholder):not(.dragging)');
+                    if (realTasks.length === 0) {
+                        const emptyState = list.querySelector('.empty-state');
+                        if (emptyState) {
+                            emptyState.style.display = 'none';
+                        }
+                    }
+                    
                     // First time - insert placeholder at original position
                     if (!this.placeholder.parentNode) {
                         this.originalParent.insertBefore(this.placeholder, this.originalNextSibling);
@@ -165,9 +174,16 @@ class KanbanManager {
             });
 
             list.addEventListener('dragleave', (e) => {
-                // Only remove visual cue if we're truly leaving the list
+                // Only process if we're truly leaving the list
                 if (e.relatedTarget && !list.contains(e.relatedTarget)) {
-                    // Optional: Add visual feedback when leaving
+                    // Show empty state again if the list is truly empty
+                    const realTasks = list.querySelectorAll('.task-card:not(.placeholder):not(.dragging)');
+                    if (realTasks.length === 0) {
+                        const emptyState = list.querySelector('.empty-state');
+                        if (emptyState) {
+                            emptyState.style.display = '';
+                        }
+                    }
                 }
             });
 
@@ -185,6 +201,9 @@ class KanbanManager {
                         const targetNextSibling = this.placeholder.nextSibling;
                         const newStatus = targetParent.id.replace('-tasks', '');
                         
+                        // Store the original status to update empty states
+                        const oldStatus = draggedTask ? draggedTask.status : null;
+                        
                         // Remove placeholder first
                         this.placeholder.parentNode.removeChild(this.placeholder);
                         
@@ -199,6 +218,10 @@ class KanbanManager {
                         if (draggedTask && draggedTask.status !== newStatus) {
                             // Status changed - update task status
                             await this.updateTaskStatus(taskId, newStatus);
+                            
+                            // Update empty states for both columns
+                            this.updateColumnEmptyState(oldStatus);
+                            this.updateColumnEmptyState(newStatus);
                         } else {
                             // Just reordered within the same column - update order
                             await this.updateTaskOrder(targetParent, newStatus);
@@ -258,6 +281,35 @@ class KanbanManager {
                 countElement.textContent = count;
             }
         });
+    }
+
+    updateColumnEmptyState(status) {
+        if (!status) return;
+        
+        const container = document.getElementById(`${status}-tasks`);
+        if (!container) return;
+        
+        const tasksInStatus = container.querySelectorAll('.task-card:not(.placeholder)');
+        
+        if (tasksInStatus.length === 0) {
+            // Show empty state
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i data-lucide="inbox"></i>
+                    <p>No tasks ${status.replace('_', ' ')}</p>
+                </div>
+            `;
+            // Re-initialize icons for the empty state
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        } else {
+            // Remove empty state if it exists
+            const emptyState = container.querySelector('.empty-state');
+            if (emptyState) {
+                emptyState.remove();
+            }
+        }
     }
 
 
@@ -423,6 +475,18 @@ class KanbanManager {
             if (this.placeholder && this.placeholder.parentNode) {
                 this.placeholder.parentNode.removeChild(this.placeholder);
             }
+            
+            // Show empty states again for all truly empty columns
+            const allLists = document.querySelectorAll('.task-list');
+            allLists.forEach(list => {
+                const realTasks = list.querySelectorAll('.task-card:not(.placeholder):not(.dragging)');
+                if (realTasks.length === 0) {
+                    const emptyState = list.querySelector('.empty-state');
+                    if (emptyState) {
+                        emptyState.style.display = '';
+                    }
+                }
+            });
             
             // Reset all references
             this.placeholder = null;
