@@ -797,16 +797,8 @@ async function configureMCPInClaudeCLI() {
     try {
       await execPromise('which claude');
     } catch (error) {
-      console.log('⚠️ Claude CLI not found. User needs to install Claude CLI separately.');
-      
-      // Show helpful notification
-      if (Notification.isSupported()) {
-        new Notification({
-          title: 'Claude CLI Required',
-          body: 'Install Claude CLI to enable task management features',
-          silent: false
-        }).show();
-      }
+      console.log('⚠️ Claude CLI not found. Skipping MCP configuration.');
+      // Don't show notification here - let checkClaudeInstallation handle it
       return;
     }
     
@@ -1058,6 +1050,47 @@ function updateClaudeConfigFile() {
   }
 }
 
+// New function to just check Claude installation without auto-installing
+function checkClaudeInstallation() {
+  console.log('🔍 Checking for Claude Code installation...');
+  
+  // Use the existing findClaudeBinary function which is more robust
+  const claudePath = findClaudeBinary();
+  
+  if (!claudePath) {
+    // Claude Code is not installed - just show a notification
+    console.log('⚠️ Claude Code not found in any location');
+    
+    // Only show notification once per session
+    if (!global.claudeNotificationShown) {
+      global.claudeNotificationShown = true;
+      
+      if (Notification.isSupported()) {
+        const notification = new Notification({
+          title: 'Claude Code no detectado',
+          body: 'Instala Claude Code para habilitar las funciones de gestión de tareas',
+          silent: true
+        });
+        
+        notification.show();
+        
+        notification.on('click', () => {
+          // Open Claude Code installation page
+          require('electron').shell.openExternal('https://claude.ai/code');
+        });
+      }
+    }
+  } else {
+    console.log('✅ Claude Code is installed at:', claudePath);
+    CLAUDE_BINARY_PATH = claudePath;
+    
+    // Configure MCP if needed
+    configureMCPInClaudeCLI().catch(error => {
+      console.error('MCP configuration error:', error);
+    });
+  }
+}
+
 function registerWithClaude() {
   console.log('🔍 registerWithClaude called - checking for Claude Code...');
   
@@ -1066,34 +1099,152 @@ function registerWithClaude() {
     shell: true
   });
   
-  checkClaude.on('close', (code) => {
+  checkClaude.on('close', async (code) => {
     console.log('🔍 which claude returned code:', code);
     
     if (code !== 0) {
       // Claude Code is not installed
-      console.log('⚠️ Claude Code not found');
+      console.log('⚠️ Claude Code not found - starting automatic installation');
       
+      // Create and show progress window immediately
+      const progressWindow = new BrowserWindow({
+        parent: mainWindow,
+        modal: true,
+        width: 450,
+        height: 200,
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        },
+        frame: false,
+        backgroundColor: '#1e1e1e',
+        resizable: false,
+        movable: false,
+        alwaysOnTop: true,
+        center: true
+      });
       
-      // Also show dialog for more visibility
-      console.log('Showing Claude Code not installed dialog...');
+      progressWindow.loadURL(`data:text/html,
+        <html>
+          <head>
+            <style>
+              body {
+                margin: 0;
+                padding: 30px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                background: #1e1e1e;
+                color: #ffffff;
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                box-sizing: border-box;
+              }
+              h2 { 
+                margin: 0 0 20px 0; 
+                font-weight: 500;
+                color: #ffffff;
+              }
+              .spinner {
+                border: 3px solid rgba(255, 255, 255, 0.1);
+                border-top: 3px solid #0084ff;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 20px auto;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              .status {
+                color: #999;
+                font-size: 14px;
+                margin-top: 10px;
+                text-align: center;
+              }
+              .command {
+                font-family: 'Consolas', 'Monaco', monospace;
+                background: rgba(255, 255, 255, 0.1);
+                padding: 5px 10px;
+                border-radius: 4px;
+                font-size: 12px;
+                color: #0084ff;
+                margin-top: 10px;
+              }
+            </style>
+          </head>
+          <body>
+            <h2>Instalando Claude Code</h2>
+            <div class="spinner"></div>
+            <div class="status">Ejecutando instalación con npm...</div>
+            <div class="command">npm install -g @anthropic-ai/claude-code</div>
+          </body>
+        </html>
+      `);
       
-      // Make sure window is focused
-      if (mainWindow) {
-        mainWindow.focus();
-      }
+      // Wait a moment for the window to render
+      await new Promise(resolve => setTimeout(resolve, 500));
       
-      dialog.showMessageBox(mainWindow, {
-        type: 'warning',
-        title: 'Claude Code no instalado',
-        message: 'Claude Code no está instalado en tu sistema',
-        detail: 'Para aprovechar todas las funciones de gestión de tareas con MCP, necesitas instalar Claude Code.\n\nVisita: https://claude.ai/code',
-        buttons: ['OK', 'Abrir página de descarga'],
-        defaultId: 0,
-        cancelId: 0
-      }).then(result => {
-        if (result.response === 1) {
-          // Open download page
-          require('electron').shell.openExternal('https://claude.ai/code');
+      // Run npm install
+      console.log('📦 Running npm install -g @anthropic-ai/claude-code...');
+      const npmInstall = spawn('npm', ['install', '-g', '@anthropic-ai/claude-code'], {
+        shell: true,
+        stdio: 'pipe'
+      });
+      
+      let installOutput = '';
+      let errorOutput = '';
+      
+      npmInstall.stdout.on('data', (data) => {
+        installOutput += data.toString();
+        console.log('npm stdout:', data.toString());
+      });
+      
+      npmInstall.stderr.on('data', (data) => {
+        errorOutput += data.toString();
+        console.log('npm stderr:', data.toString());
+      });
+      
+      npmInstall.on('close', (installCode) => {
+        progressWindow.close();
+        
+        if (installCode === 0) {
+          console.log('✅ Claude Code installed successfully');
+          
+          // Show success notification
+          new Notification({
+            title: 'Claude Code instalado',
+            body: 'Claude Code se ha instalado correctamente. Configurando MCP...',
+            icon: path.join(__dirname, 'icon.png')
+          }).show();
+          
+          // Configure MCP after successful installation
+          setTimeout(() => {
+            console.log('🔧 Configuring MCP after installation...');
+            configureMCPInClaudeCLI();
+            // Also register with the newly installed Claude
+            registerWithClaude();
+          }, 1000);
+          
+        } else {
+          console.error('❌ Failed to install Claude Code:', errorOutput);
+          
+          // Show error dialog with more options
+          dialog.showMessageBox(mainWindow, {
+            type: 'error',
+            title: 'Error de instalación',
+            message: 'No se pudo instalar Claude Code automáticamente',
+            detail: `Esto puede deberse a permisos de npm o problemas de red.\n\nPuedes intentar:\n1. Ejecutar manualmente: npm install -g @anthropic-ai/claude-code\n2. Usar sudo si estás en macOS/Linux\n3. Descargar desde: https://claude.ai/code`,
+            buttons: ['OK', 'Abrir página de descarga'],
+            defaultId: 0
+          }).then(result => {
+            if (result.response === 1) {
+              require('electron').shell.openExternal('https://claude.ai/code');
+            }
+          });
         }
       });
       
@@ -1411,6 +1562,10 @@ app.whenReady().then(async () => {
   try {
     startMCPServerAndRegister();
     
+    // Check and install Claude Code if needed
+    console.log('🔍 Checking Claude Code installation on startup...');
+    checkClaudeInstallation();
+    
     // Auto-configure MCP in Claude CLI (non-blocking)
     configureMCPInClaudeCLI().catch(error => {
       console.error('MCP auto-configuration error:', error);
@@ -1479,12 +1634,37 @@ function findClaudeBinary() {
     console.log('which claude failed, searching manually...');
   }
   
+  // Try to find claude through npm global list
+  try {
+    const npmList = execSync('npm list -g @anthropic-ai/claude-code --depth=0', { encoding: 'utf8', shell: true });
+    if (npmList.includes('@anthropic-ai/claude-code')) {
+      // Get npm global bin directory
+      const npmBin = execSync('npm bin -g', { encoding: 'utf8', shell: true }).trim();
+      const npmClaudePath = path.join(npmBin, 'claude');
+      if (fs.existsSync(npmClaudePath)) {
+        console.log('Found claude via npm global:', npmClaudePath);
+        return npmClaudePath;
+      }
+    }
+  } catch (e) {
+    console.log('npm list check failed, continuing with manual search...');
+  }
+  
   // Search common locations
   const possiblePaths = [
     '/usr/local/bin/claude',
     '/opt/homebrew/bin/claude',
     '/usr/bin/claude',
-    path.join(os.homedir(), '.local/bin/claude')
+    path.join(os.homedir(), '.local/bin/claude'),
+    // Additional paths for different installation methods
+    path.join(os.homedir(), 'bin/claude'),
+    '/Applications/Claude.app/Contents/MacOS/claude',
+    '/Applications/Claude Code.app/Contents/MacOS/claude',
+    // Homebrew on Apple Silicon
+    '/opt/homebrew/opt/claude/bin/claude',
+    // Common npm global paths
+    '/usr/local/lib/node_modules/@anthropic-ai/claude-code/bin/claude',
+    '/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/bin/claude'
   ];
   
   // Search all nvm node versions
