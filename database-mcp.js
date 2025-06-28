@@ -346,17 +346,20 @@ class DatabaseManagerMCP {
     }
 
     getTaskById(taskId) {
-        try {
-            const stmt = this.db.prepare(`
-                SELECT * FROM tasks WHERE id = ?
-            `);
-            const task = stmt.get(taskId);
-            stmt.finalize();
-            return task || null;
-        } catch (error) {
-            console.error('Error getting task by ID:', error);
-            return null;
-        }
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                `SELECT * FROM tasks WHERE id = ?`,
+                [taskId],
+                (err, row) => {
+                    if (err) {
+                        console.error('Error getting task by ID:', err);
+                        resolve(null);
+                    } else {
+                        resolve(row || null);
+                    }
+                }
+            );
+        });
     }
 
     deleteTask(taskId) {

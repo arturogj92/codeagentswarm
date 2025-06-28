@@ -663,9 +663,20 @@ ipcMain.handle('check-claude-code', async () => {
 
 // Start MCP server as child process and register with Claude Code
 let mcpServerProcess = null;
+let mcpServerRestartCount = 0;
+let mcpServerRestartTimer = null;
+let mcpServerHealthCheckInterval = null;
+const MAX_RESTART_ATTEMPTS = 5;
+const RESTART_DELAY_BASE = 1000; // Base delay for exponential backoff
 
 function startMCPServerAndRegister() {
   try {
+    // Clear any existing restart timer
+    if (mcpServerRestartTimer) {
+      clearTimeout(mcpServerRestartTimer);
+      mcpServerRestartTimer = null;
+    }
+
     // Start MCP server as child process
     // In production, files are in the app.asar archive
     const serverPath = app.isPackaged 
@@ -676,13 +687,25 @@ function startMCPServerAndRegister() {
       ? path.join(process.resourcesPath, 'app.asar')
       : __dirname;
     
-    console.log('MCP Server path:', serverPath);
-    console.log('Working directory:', workingDir);
-    console.log('Is packaged:', app.isPackaged);
+    console.log('🔧 MCP Server Configuration:');
+    console.log('  - Server path:', serverPath);
+    console.log('  - Working directory:', workingDir);
+    console.log('  - Is packaged:', app.isPackaged);
+    console.log('  - Restart attempt:', mcpServerRestartCount);
+    
+    // Kill any existing process
+    if (mcpServerProcess && !mcpServerProcess.killed) {
+      console.log('⚠️ Killing existing MCP server process:', mcpServerProcess.pid);
+      mcpServerProcess.kill();
+    }
     
     mcpServerProcess = spawn('node', [serverPath], {
       cwd: workingDir,
-      stdio: 'pipe'
+      stdio: 'pipe',
+      env: {
+        ...process.env,
+        NODE_ENV: process.env.NODE_ENV || 'production'
+      }
     });
 
     console.log('🚀 Started MCP server as child process:', mcpServerProcess.pid);
@@ -693,11 +716,64 @@ function startMCPServerAndRegister() {
     });
 
     mcpServerProcess.stderr.on('data', (data) => {
-      console.error('MCP Server Error:', data.toString());
+      const errorMsg = data.toString();
+      console.error('MCP Server Error:', errorMsg);
+      
+      // Log detailed errors to help diagnose issues
+      if (errorMsg.includes('EADDRINUSE')) {
+        console.error('⚠️ MCP Server port already in use. Attempting to find free port...');
+      } else if (errorMsg.includes('ENOENT')) {
+        console.error('⚠️ MCP Server file not found. Check file paths.');
+      }
     });
 
-    mcpServerProcess.on('close', (code) => {
-      console.log('MCP server process exited with code:', code);
+    mcpServerProcess.on('error', (error) => {
+      console.error('❌ MCP Server Process Error:', error);
+    });
+
+    mcpServerProcess.on('close', (code, signal) => {
+      console.log(`MCP server process exited with code: ${code}, signal: ${signal}`);
+      mcpServerProcess = null;
+      
+      // Clear health check interval
+      if (mcpServerHealthCheckInterval) {
+        clearInterval(mcpServerHealthCheckInterval);
+        mcpServerHealthCheckInterval = null;
+      }
+      
+      // Attempt to restart if not shutting down
+      if (!app.isQuitting && mcpServerRestartCount < MAX_RESTART_ATTEMPTS) {
+        mcpServerRestartCount++;
+        const delay = RESTART_DELAY_BASE * Math.pow(2, mcpServerRestartCount - 1);
+        
+        console.log(`⚠️ MCP Server crashed. Attempting restart ${mcpServerRestartCount}/${MAX_RESTART_ATTEMPTS} in ${delay}ms...`);
+        
+        mcpServerRestartTimer = setTimeout(() => {
+          startMCPServerAndRegister();
+        }, delay);
+      } else if (mcpServerRestartCount >= MAX_RESTART_ATTEMPTS) {
+        console.error('❌ MCP Server failed to start after maximum attempts. Please check logs.');
+        
+        // Show user notification
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'MCP Server Error',
+            body: 'The MCP server failed to start. Task management features may not work correctly.',
+            urgency: 'critical'
+          }).show();
+        }
+      }
+    });
+
+    // Reset restart count on successful start
+    mcpServerProcess.on('spawn', () => {
+      console.log('✅ MCP Server spawned successfully');
+      mcpServerRestartCount = 0;
+      
+      // Start health check after server is stable
+      setTimeout(() => {
+        startMCPHealthCheck();
+      }, 5000);
     });
 
     // Wait a moment for server to start and window to be ready, then register with Claude Code
@@ -719,6 +795,73 @@ function startMCPServerAndRegister() {
     return true;
   } catch (error) {
     console.error('❌ Failed to start MCP server:', error.message);
+    console.error('Stack trace:', error.stack);
+    return false;
+  }
+}
+
+// Health check function
+function startMCPHealthCheck() {
+  // Clear any existing interval
+  if (mcpServerHealthCheckInterval) {
+    clearInterval(mcpServerHealthCheckInterval);
+  }
+  
+  // Check every 30 seconds
+  mcpServerHealthCheckInterval = setInterval(() => {
+    if (!mcpServerProcess || mcpServerProcess.killed) {
+      console.log('⚠️ MCP Server health check failed: process not running');
+      clearInterval(mcpServerHealthCheckInterval);
+      mcpServerHealthCheckInterval = null;
+      
+      // Attempt restart if not already restarting
+      if (!mcpServerRestartTimer && mcpServerRestartCount < MAX_RESTART_ATTEMPTS) {
+        startMCPServerAndRegister();
+      }
+    } else {
+      // Process is running, could add more sophisticated health checks here
+      console.log('✅ MCP Server health check passed');
+    }
+  }, 30000);
+}
+
+function updateClaudeConfigFile() {
+  try {
+    const configPath = path.join(os.homedir(), '.claude', 'claude_desktop_config.json');
+    let config = {};
+    
+    // Read existing config if it exists
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(configContent);
+    }
+    
+    // Ensure mcpServers object exists
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Update codeagentswarm-tasks configuration
+    const serverPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+      : path.join(__dirname, 'mcp-stdio-server.js');
+    
+    config.mcpServers['codeagentswarm-tasks'] = {
+      command: 'node',
+      args: [serverPath],
+      env: {
+        NODE_ENV: 'production',
+        NODE_OPTIONS: '--unhandled-rejections=strict'
+      }
+    };
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log('✅ Updated Claude Code config file at:', configPath);
+    
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to update Claude config file:', error);
     return false;
   }
 }
@@ -778,6 +921,12 @@ function registerWithClaude() {
     
     // Claude is installed, proceed with registration
     try {
+      // First update the config file
+      const configUpdated = updateClaudeConfigFile();
+      if (!configUpdated) {
+        console.error('Failed to update Claude config file, trying CLI method anyway...');
+      }
+      
       // Use claude mcp add to register our server
       const serverPath = app.isPackaged 
         ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
@@ -796,6 +945,15 @@ function registerWithClaude() {
       if (code === 0) {
         console.log('✅ Successfully registered MCP server with Claude Code');
         console.log('💡 Use /mcp in Claude Code to see available tools');
+        
+        // Show success notification
+        if (Notification.isSupported()) {
+          new Notification({
+            title: 'MCP Server Registrado',
+            body: 'El servidor de tareas se ha registrado correctamente con Claude Code',
+            urgency: 'normal'
+          }).show();
+        }
       } else {
         console.error('❌ Failed to register MCP server with Claude Code (exit code:', code, ')');
         console.log('💡 You can manually register with: claude mcp add codeagentswarm-tasks node', serverPath);
@@ -985,7 +1143,8 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
     },
     // Remove parent relationship to prevent minimizing main window
     modal: false,
-    show: true,
+    show: false, // Start hidden to prevent white flash
+    backgroundColor: '#1a1a1a', // Dark background to match theme
     autoHideMenuBar: true,
     resizable: true,
     minimizable: true,
@@ -1000,10 +1159,10 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
 
   kanbanWindow.loadFile('kanban.html');
   
-  // Focus the window after loading
+  // Show and focus the window after loading
   kanbanWindow.webContents.once('did-finish-load', () => {
-    kanbanWindow.focus();
     kanbanWindow.show();
+    kanbanWindow.focus();
     
     // Send focus task ID if provided
     if (options.focusTaskId) {
@@ -1095,10 +1254,25 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  // Mark app as quitting to prevent restarts
+  app.isQuitting = true;
+  
   terminals.forEach((shell) => {
     shell.kill();
   });
   terminals.clear();
+  
+  // Clear health check interval
+  if (mcpServerHealthCheckInterval) {
+    clearInterval(mcpServerHealthCheckInterval);
+    mcpServerHealthCheckInterval = null;
+  }
+  
+  // Clear restart timer
+  if (mcpServerRestartTimer) {
+    clearTimeout(mcpServerRestartTimer);
+    mcpServerRestartTimer = null;
+  }
   
   // Stop MCP servers
   if (mcpServer) {
@@ -1107,6 +1281,7 @@ app.on('window-all-closed', () => {
   
   // Stop MCP child process
   if (mcpServerProcess) {
+    console.log('Stopping MCP server process...');
     mcpServerProcess.kill();
     mcpServerProcess = null;
   }
@@ -1917,7 +2092,7 @@ This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model
 
 - **Command**: \`node mcp-stdio-server.js\`
 - **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, create_project, get_project_tasks
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, create_project, get_project_tasks
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
 - **Projects**: Tasks are now organized by projects based on terminal working directory
 
@@ -2002,16 +2177,45 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
    - Si el plan cambia significativamente, actualízalo nuevamente
    - Una sola tarea activa por terminal
 
-3. **Al finalizar:**
+3. **Al finalizar el trabajo técnico:**
    - **OBLIGATORIO: Verificar cumplimiento del plan** - Antes de completar, revisar que se han cumplido todos los puntos del plan establecido
    - **OBLIGATORIO: Documentar implementación** usando \`update_task_implementation\`:
      - Lista de archivos modificados: \`database.js, mcp-stdio-server.js, CLAUDE.md\`
      - Resumen: descripción clara de los cambios realizados
      - Flujo: explicación del funcionamiento implementado
    - Si el plan no se completó totalmente, actualizar el plan con lo que falta o crear una nueva tarea para lo pendiente
-   - **SOLO DESPUÉS de verificar Y documentar:** Marcar la tarea como completada usando \`complete_task\` del MCP
+   - **NUEVO FLUJO DE TESTING OBLIGATORIO:**
+     - Primera llamada a \`complete_task\`: mueve la tarea a estado \`in_testing\`
+     - El usuario debe revisar manualmente y aprobar
+     - Segunda llamada a \`complete_task\`: mueve a \`completed\` (requiere que \`implementation\` esté documentado)
+   - **NUNCA se puede ir directamente de \`in_progress\` a \`completed\`**
    - Esto actualiza automáticamente la interfaz y el estado en la base de datos
    - El plan e implementación quedan documentados para referencia futura
+
+### Flujo de Testing Obligatorio
+
+**IMPORTANTE: Todas las tareas DEBEN pasar por una fase de testing antes de ser completadas:**
+
+1. **Transición obligatoria a testing:**
+   - Cuando termines de implementar una tarea, usa \`complete_task\` 
+   - Esto moverá la tarea automáticamente a estado \`in_testing\`
+   - NO se puede ir directamente de \`in_progress\` a \`completed\`
+
+2. **Requisitos para completar desde testing:**
+   - La tarea debe tener el campo \`implementation\` documentado
+   - El usuario debe revisar y aprobar manualmente
+   - Solo entonces se puede usar \`complete_task\` nuevamente para marcar como \`completed\`
+
+3. **Si necesitas enviar directamente a testing:**
+   - Usa \`submit_for_testing\` para mover directamente a \`in_testing\`
+   - Útil cuando otro agente o persona realizará las pruebas
+
+4. **Flujo completo:**
+   \`\`\`
+   pending → in_progress → in_testing → completed
+                     ↑                    ↓
+                     └── (requiere documentación y aprobación manual)
+   \`\`\`
 
 ### Manejo de múltiples tareas pendientes
 
@@ -2036,11 +2240,12 @@ Las siguientes herramientas MCP están disponibles para la gestión de tareas:
 
 - **\`create_task\`**: Crear una nueva tarea (requiere terminal_id)
 - **\`start_task\`**: Marcar tarea como "in_progress" 
-- **\`complete_task\`**: Marcar tarea como "completed"
+- **\`complete_task\`**: Primera llamada: mueve a "in_testing". Segunda llamada (después de aprobación manual): mueve a "completed"
 - **\`submit_for_testing\`**: Marcar tarea como "in_testing"
 - **\`list_tasks\`**: Listar todas las tareas (opcional: filtrar por status)
 - **\`update_task_plan\`**: Actualizar el plan de una tarea específica
 - **\`update_task_implementation\`**: **NUEVA** - Actualizar la implementación de una tarea específica
+- **\`update_task_terminal\`**: **NUEVA** - Actualizar el terminal_id asociado a una tarea
 
 **Parámetros de \`update_task_plan\`:**
 - \`task_id\` (número, requerido): ID de la tarea
@@ -2050,11 +2255,18 @@ Las siguientes herramientas MCP están disponibles para la gestión de tareas:
 - \`task_id\` (número, requerido): ID de la tarea
 - \`implementation\` (string, requerido): Detalles de implementación incluyendo archivos modificados y resumen
 
+**Parámetros de \`update_task_terminal\`:**
+- \`task_id\` (número, requerido): ID de la tarea
+- \`terminal_id\` (string, requerido): ID del terminal (1, 2, 3, 4, etc.) o cadena vacía para desasignar
+
 **Ejemplo de uso:**
 \`\`\`
 update_task_plan(task_id=123, plan="1. Revisar código existente\\n2. Implementar nueva funcionalidad\\n3. Escribir tests")
 
 update_task_implementation(task_id=123, implementation="Archivos modificados: database.js, mcp-server.js\\nResumen: Se añadió campo implementation a la tabla tasks\\nFlujo: Nuevo campo permite documentar cambios realizados durante la implementación")
+
+update_task_terminal(task_id=123, terminal_id="2")  # Asignar a terminal 2
+update_task_terminal(task_id=123, terminal_id="")   # Desasignar de cualquier terminal
 \`\`\`
 
 ## IMPORTANTE: Límites de tokens en MCP

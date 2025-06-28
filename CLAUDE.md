@@ -111,16 +111,52 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
    - Si el plan cambia significativamente, actualízalo nuevamente
    - Una sola tarea activa por terminal
 
-3. **Al finalizar:**
+3. **Al finalizar el trabajo técnico:**
    - **OBLIGATORIO: Verificar cumplimiento del plan** - Antes de completar, revisar que se han cumplido todos los puntos del plan establecido
    - **OBLIGATORIO: Documentar implementación** usando `update_task_implementation`:
      - Lista de archivos modificados: `database.js, mcp-stdio-server.js, CLAUDE.md`
      - Resumen: descripción clara de los cambios realizados
      - Flujo: explicación del funcionamiento implementado
    - Si el plan no se completó totalmente, actualizar el plan con lo que falta o crear una nueva tarea para lo pendiente
-   - **SOLO DESPUÉS de verificar Y documentar:** Marcar la tarea como completada usando `complete_task` del MCP
+   - **NUEVO FLUJO DE TESTING OBLIGATORIO:**
+     - Primera llamada a `complete_task`: mueve la tarea a estado `in_testing`
+     - El usuario debe revisar manualmente y aprobar
+     - Segunda llamada a `complete_task`: mueve a `completed` (requiere que `implementation` esté documentado)
+   - **NUNCA se puede ir directamente de `in_progress` a `completed`**
    - Esto actualiza automáticamente la interfaz y el estado en la base de datos
    - El plan e implementación quedan documentados para referencia futura
+
+### Flujo de Testing Obligatorio
+
+**IMPORTANTE: Todas las tareas DEBEN pasar por una fase de testing antes de ser completadas:**
+
+1. **Transición obligatoria a testing:**
+   - Cuando termines de implementar una tarea, usa `complete_task` 
+   - Esto moverá la tarea automáticamente a estado `in_testing`
+   - NO se puede ir directamente de `in_progress` a `completed`
+
+2. **Requisitos para completar desde testing:**
+   - La tarea debe tener el campo `implementation` documentado
+   - **NUEVO: Debe haber pasado un mínimo de 30 segundos en fase de testing**
+   - El usuario debe revisar y aprobar manualmente durante este tiempo
+   - Solo entonces se puede usar `complete_task` nuevamente para marcar como `completed`
+   - Si intentas completar antes de 30 segundos, recibirás un error indicando cuántos segundos faltan
+
+3. **Si necesitas enviar directamente a testing:**
+   - Usa `submit_for_testing` para mover directamente a `in_testing`
+   - Útil cuando otro agente o persona realizará las pruebas
+
+4. **Flujo completo:**
+   ```
+   pending → in_progress → in_testing → completed
+                     ↑                    ↓
+                     └── (requiere documentación, 30s mínimo, y aprobación manual)
+   ```
+
+5. **Prevención de bypass:**
+   - Los agentes NO pueden saltarse la fase de testing llamando `complete_task` dos veces rápidamente
+   - El sistema enforza un período mínimo de 30 segundos en `in_testing` antes de permitir la transición a `completed`
+   - Esto asegura que hay tiempo suficiente para revisión manual
 
 ### Manejo de múltiples tareas pendientes
 
@@ -145,7 +181,7 @@ Las siguientes herramientas MCP están disponibles para la gestión de tareas:
 
 - **`create_task`**: Crear una nueva tarea (requiere terminal_id)
 - **`start_task`**: Marcar tarea como "in_progress" 
-- **`complete_task`**: Marcar tarea como "completed"
+- **`complete_task`**: Primera llamada: mueve a "in_testing". Segunda llamada (después de 30 segundos mínimo y aprobación manual): mueve a "completed"
 - **`submit_for_testing`**: Marcar tarea como "in_testing"
 - **`list_tasks`**: Listar todas las tareas (opcional: filtrar por status)
 - **`update_task_plan`**: Actualizar el plan de una tarea específica

@@ -16,6 +16,25 @@ class MCPStdioServer {
     constructor() {
         this.db = null;
         this.requestId = 0;
+        this.startTime = Date.now();
+        this.requestCount = 0;
+        this.lastError = null;
+        
+        this.logError('🚀 Starting MCP STDIO Server at', new Date().toISOString());
+        
+        // Setup error handlers BEFORE anything else
+        process.on('uncaughtException', (error) => {
+            this.logError('❌ Uncaught Exception:', error.message);
+            this.logError('Stack:', error.stack);
+            this.lastError = error;
+            // Try to stay alive
+        });
+        
+        process.on('unhandledRejection', (reason, promise) => {
+            this.logError('❌ Unhandled Rejection at:', promise);
+            this.logError('Reason:', reason);
+            this.lastError = reason;
+        });
         
         // Setup readline interface for JSON-RPC communication
         this.rl = readline.createInterface({
@@ -28,12 +47,35 @@ class MCPStdioServer {
             await this.handleMessage(line);
         });
         
+        this.rl.on('error', (error) => {
+            this.logError('❌ Readline error:', error.message);
+            this.lastError = error;
+        });
+        
+        this.rl.on('close', () => {
+            this.logError('⚠️ Readline interface closed');
+            this.shutdown();
+        });
+        
         // Initialize database
         this.initDatabase();
         
         // Handle process termination
-        process.on('SIGINT', () => this.shutdown());
-        process.on('SIGTERM', () => this.shutdown());
+        process.on('SIGINT', () => {
+            this.logError('⚠️ Received SIGINT signal');
+            this.shutdown();
+        });
+        
+        process.on('SIGTERM', () => {
+            this.logError('⚠️ Received SIGTERM signal');
+            this.shutdown();
+        });
+        
+        // Log status periodically
+        this.statusInterval = setInterval(() => {
+            const uptime = Math.floor((Date.now() - this.startTime) / 1000);
+            this.logError(`📊 MCP Server Status: Uptime ${uptime}s, Requests: ${this.requestCount}, Last error: ${this.lastError ? this.lastError.message : 'none'}`);
+        }, 60000); // Every minute
     }
 
     initDatabase() {
@@ -58,21 +100,30 @@ class MCPStdioServer {
 
     async handleMessage(line) {
         try {
+            this.requestCount++;
+            
+            // Log incoming message for debugging (truncate if too long)
+            const truncatedLine = line.length > 200 ? line.substring(0, 200) + '...' : line;
+            this.logError('📥 Received message:', truncatedLine);
+            
             const message = JSON.parse(line);
             const response = await this.processRequest(message);
             
             if (response) {
                 console.log(JSON.stringify(response));
+                this.logError('📤 Sent response for method:', message.method || 'unknown');
             }
         } catch (error) {
-            this.logError('Error handling message:', error);
+            this.logError('❌ Error handling message:', error.message);
+            this.logError('Stack:', error.stack);
+            this.lastError = error;
             
             const errorResponse = {
                 jsonrpc: '2.0',
                 id: null,
                 error: {
                     code: -32700,
-                    message: 'Parse error'
+                    message: 'Parse error: ' + error.message
                 }
             };
             
@@ -409,7 +460,7 @@ class MCPStdioServer {
                 },
                 {
                     name: 'complete_task',
-                    description: 'Mark a task as completed',
+                    description: 'Move task to testing (first call) or to completed (second call after manual approval and 30-second minimum testing period)',
                     inputSchema: {
                         type: 'object',
                         properties: {
@@ -493,7 +544,37 @@ class MCPStdioServer {
                 break;
                 
             case 'complete_task':
-                result = await this.updateTaskStatus({ task_id: args.task_id, status: 'completed' });
+                // First check if task is already in_testing
+                const task = await this.db.getTaskById(args.task_id);
+                if (!task) {
+                    throw new Error('Task not found');
+                }
+                
+                if (task.status === 'in_testing') {
+                    // If already in testing, check if implementation is documented
+                    if (!task.implementation || task.implementation.trim() === '') {
+                        throw new Error('Task must have implementation documented before completing. Use update_task_implementation first.');
+                    }
+                    
+                    // Check if enough time has passed since entering testing phase
+                    const testingStartTime = new Date(task.updated_at).getTime();
+                    const currentTime = new Date().getTime();
+                    const minimumTestingTime = 30000; // 30 seconds minimum in testing phase
+                    
+                    if (currentTime - testingStartTime < minimumTestingTime) {
+                        const remainingTime = Math.ceil((minimumTestingTime - (currentTime - testingStartTime)) / 1000);
+                        throw new Error(`Task must remain in testing phase for at least 30 seconds before completion. Please wait ${remainingTime} more seconds for manual review.`);
+                    }
+                    
+                    // Move to completed
+                    result = await this.updateTaskStatus({ task_id: args.task_id, status: 'completed' });
+                } else if (task.status === 'in_progress') {
+                    // Only allow transition from in_progress to in_testing
+                    result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_testing' });
+                    result.message = 'Task moved to testing phase. Manual review required before completion. Minimum testing time: 30 seconds.';
+                } else {
+                    throw new Error(`Cannot complete task with status '${task.status}'. Task must be 'in_progress' or 'in_testing'.`);
+                }
                 break;
                 
             case 'submit_for_testing':
@@ -729,10 +810,30 @@ class MCPStdioServer {
     }
 
     shutdown() {
-        this.logError('Shutting down MCP server...');
-        if (this.db) {
-            this.db.close();
+        this.logError('🛑 Shutting down MCP server...');
+        this.logError(`Final stats: Uptime ${Math.floor((Date.now() - this.startTime) / 1000)}s, Total requests: ${this.requestCount}`);
+        
+        // Clear status interval
+        if (this.statusInterval) {
+            clearInterval(this.statusInterval);
         }
+        
+        // Close readline interface
+        if (this.rl) {
+            this.rl.close();
+        }
+        
+        // Close database
+        if (this.db) {
+            try {
+                this.db.close();
+                this.logError('✅ Database closed successfully');
+            } catch (error) {
+                this.logError('❌ Error closing database:', error.message);
+            }
+        }
+        
+        this.logError('👋 MCP server shutdown complete');
         process.exit(0);
     }
 }

@@ -902,6 +902,28 @@ class TerminalManager {
         }
     }
 
+    scrollTerminalToBottom(quadrant) {
+        const terminal = this.terminals.get(quadrant);
+        if (terminal && terminal.terminal) {
+            // Use the stored scroll function if available
+            if (terminal.terminal.scrollToBottomFn) {
+                terminal.terminal.scrollToBottomFn();
+            } else {
+                // Fallback: direct scroll
+                terminal.terminal.scrollToBottom();
+                
+                // Also try to scroll the viewport
+                const terminalDiv = terminal.element;
+                if (terminalDiv) {
+                    const viewport = terminalDiv.querySelector('.xterm-viewport');
+                    if (viewport) {
+                        viewport.scrollTop = viewport.scrollHeight;
+                    }
+                }
+            }
+        }
+    }
+
     showNotification(message, type = 'info') {
         // Notificaciones internas deshabilitadas - solo notificaciones externas permitidas
         return;
@@ -910,6 +932,17 @@ class TerminalManager {
     showDesktopNotification(title, message) {
         // Send IPC message to main process to show native notification
         ipcRenderer.send('show-desktop-notification', title, message);
+        
+        // Auto-scroll terminal to bottom when showing any desktop notification
+        // Extract terminal number from message if present
+        const terminalMatch = message.match(/Terminal (\d+)/);
+        if (terminalMatch) {
+            const terminalNumber = parseInt(terminalMatch[1]);
+            const quadrant = terminalNumber - 1; // Convert 1-based to 0-based
+            if (quadrant >= 0 && quadrant < 4) {
+                this.scrollTerminalToBottom(quadrant);
+            }
+        }
         
         // Fallback de notificación interna removido - solo notificaciones externas
     }
@@ -1056,6 +1089,9 @@ class TerminalManager {
                 
                 this.showDesktopNotification('Confirmation Required', `Terminal ${quadrant + 1}: Claude Code needs confirmation`);
                 this.highlightTerminalForConfirmation(quadrant);
+                
+                // Auto-scroll to bottom when notification appears
+                this.scrollTerminalToBottom(quadrant);
                 
                 // Block notifications temporarily (auto-unblock after 15 seconds)
                 this.notificationBlocked.set(quadrant, true);
@@ -1923,6 +1959,9 @@ class TerminalManager {
             // Alternative method using terminal API
             terminal.scrollToBottom();
         };
+        
+        // Store scrollToBottom function for external use
+        terminal.scrollToBottomFn = scrollToBottom;
         
         // Button click handler
         scrollBtn.addEventListener('click', (e) => {
@@ -4140,6 +4179,9 @@ class TerminalManager {
             
             // Highlight the terminal
             this.highlightTerminal(terminalId);
+            
+            // Auto-scroll to bottom when Claude finishes
+            this.scrollTerminalToBottom(terminalId);
             
             // Use system notification
             if (Notification.permission === 'granted') {
