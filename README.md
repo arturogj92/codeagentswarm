@@ -18,7 +18,7 @@ A modern Electron desktop application for managing multiple Claude Code terminal
 npm install
 ```
 
-2. Run the development version:
+2. Run the application:
 ```bash
 npm start
 ```
@@ -26,6 +26,20 @@ npm start
 3. Build for production:
 ```bash
 npm run build
+```
+
+### Automatic MCP Configuration
+
+CodeAgentSwarm automatically configures the MCP (Model Context Protocol) server when you launch the app for the first time. This means:
+
+- ✅ No manual configuration needed
+- ✅ Task management tools available in Claude CLI from any directory
+- ✅ Works immediately after launching the app
+- ✅ Automatic updates when the app is updated
+
+If you need to manually configure the MCP for any reason, you can run:
+```bash
+./install-mcp.sh
 ```
 
 ## How to Use

@@ -793,7 +793,6 @@ class TerminalManager {
             this.updateBranchDisplay(quadrant);
         }, 2000);
 
-        this.showNotification(`Terminal ${quadrant + 1} started!`, 'success');
     }
 
     parseClaudeCodeOutput(data, quadrant) {
@@ -818,7 +817,6 @@ class TerminalManager {
                     // Update status based on specific message
                     if (text.includes('Do you trust the files in this folder?')) {
                         statusElement.textContent = 'Waiting for trust confirmation...';
-                        this.showNotification(`Please confirm trust for Terminal ${quadrant + 1}`, 'warning');
                     } else if (text.includes('Welcome to Claude Code')) {
                         statusElement.textContent = 'Claude Code starting...';
                     } else if (text.includes('I\'ll help you with')) {
@@ -848,7 +846,6 @@ class TerminalManager {
         
         // Parse Claude Code specific outputs for notifications
         if (text.includes('Task completed successfully')) {
-            this.showNotification('Task completed successfully', 'success');
         } else if (text.includes('Waiting for confirmation') || 
                    text.includes('Continue? (y/n)') ||
                    text.includes('Do you want to') ||
@@ -862,7 +859,6 @@ class TerminalManager {
                    text.includes('Confirm')) {
             this.handleConfirmationRequest(text, quadrant);
         } else if (text.includes('Starting task') || text.includes('Processing...')) {
-            this.showNotification('Claude Code is processing', 'info');
         }
 
         // Check for specific Claude Code patterns
@@ -1577,7 +1573,6 @@ class TerminalManager {
             // Update all terminals with this project
             this.updateAllTerminalsWithProject(projectName);
             
-            this.showNotification(`Color set to ${colorName} for project "${projectName}"`, 'success');
         }
     }
 
@@ -1588,7 +1583,6 @@ class TerminalManager {
         // Update all terminals with this project
         this.updateAllTerminalsWithProject(projectName);
         
-        this.showNotification(`Color reset to auto for project "${projectName}"`, 'success');
     }
 
     // Update all terminals that belong to the same project
@@ -2020,14 +2014,12 @@ class TerminalManager {
         const isAvailable = await ipcRenderer.invoke('check-claude-code');
         
         if (isAvailable) {
-            this.showNotification('✅ Claude Code is installed and available', 'success');
         } else {
             this.showNotification('❌ Claude Code not found. Install from claude.ai/code', 'warning');
         }
     }
 
     showSettings() {
-        this.showNotification('Settings panel coming soon...', 'info');
     }
 
     async showGitStatus() {
@@ -2722,7 +2714,6 @@ class TerminalManager {
                 const result = await ipcRenderer.invoke('git-create-branch', branchName, switchToBranchCheckbox.checked, terminalId);
                 
                 if (result.success) {
-                    this.showNotification(`Branch '${result.branchName}' created successfully`, 'success');
                     closeModal();
                     await this.updateBranchDisplay(terminalId);
                 } else {
@@ -2743,7 +2734,6 @@ class TerminalManager {
                     const result = await ipcRenderer.invoke('git-switch-branch', branchName, terminalId);
                     
                     if (result.success) {
-                        this.showNotification(`Switched to branch '${result.branchName}'`, 'success');
                         closeModal();
                         await this.updateBranchDisplay(terminalId);
                     } else {
@@ -2839,9 +2829,9 @@ class TerminalManager {
                 const taskText = taskIndicator.querySelector('.task-text');
                 
                 if (taskText) {
-                    taskText.textContent = task.title;
+                    taskText.textContent = `#${task.id} ${task.title}`;
                     taskIndicator.style.display = 'flex';
-                    taskIndicator.title = `Click to open Task: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                    taskIndicator.title = `Click to open Task #${task.id}: ${task.title}${task.description ? '\n' + task.description : ''}`;
                     
                     // Remove any existing click listener and add new one
                     const newTaskIndicator = taskIndicator.cloneNode(true);
@@ -2898,7 +2888,6 @@ class TerminalManager {
                     await this.updateTerminalTaskIndicator(terminalId);
                     
                     // Show completion notification
-                    this.showNotification(`Task "${result.task.title}" completed!`, 'success');
                     
                     return true;
                 }
@@ -2968,11 +2957,7 @@ class TerminalManager {
             if (result.success && result.notifications && result.notifications.length > 0) {
                 result.notifications.forEach(notification => {
                     if (notification.type === 'task_completed') {
-                        this.showDesktopNotification(
-                            'Task Completed',
-                            `Task "${notification.taskTitle}" has been completed!`
-                        );
-                        
+                        // Desktop notification removed - only update indicators
                         // Immediately update task indicators to reflect the change
                         this.updateCurrentTaskIndicators();
                     }
@@ -3011,7 +2996,6 @@ class TerminalManager {
         try {
             const activeResult = await ipcRenderer.invoke('get-active-terminals');
             if (!activeResult.success || activeResult.terminals.length === 0) {
-                this.showNotification('Info', 'No terminals to remove', 'info');
                 return;
             }
 
@@ -3093,7 +3077,6 @@ class TerminalManager {
                 }, 200);
                 
                 if (!silent) {
-                    this.showNotification('Success', `Terminal ${terminalId + 1} removed`, 'success');
                 }
             } else {
                 if (!silent) {

@@ -437,7 +437,7 @@ class KanbanManager {
                     <i data-lucide="eye"></i>
                 </button>
             </div>
-            <div class="task-title">${this.escapeHtml(task.title)}</div>
+            <div class="task-title"><span class="task-id">#${task.id}</span> ${this.escapeHtml(task.title)}</div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
                 <span>${createdDate}</span>
@@ -715,11 +715,7 @@ class KanbanManager {
                     // Update counts
                     this.updateColumnCounts();
                     
-                    if (newStatus === 'in_testing') {
-                        this.showNotification(`Task "${task.title}" ready for testing!`, 'success');
-                    } else if (newStatus === 'completed') {
-                        this.showNotification(`Task "${task.title}" completed!`, 'success');
-                    }
+                    // Notifications removed for cleaner UX
                 }
             } else {
                 alert(`Failed to update task status: ${result.error}`);

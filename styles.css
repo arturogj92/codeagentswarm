@@ -383,7 +383,9 @@ body::before {
   padding: 20px;
   position: relative;
   overflow: hidden;
-  max-height: calc(100vh - 80px);
+  height: calc(100vh - 60px);
+  max-height: calc(100vh - 60px);
+  box-sizing: border-box;
 }
 
 /* Dynamic grid layouts based on terminal count with resizers */
@@ -461,19 +463,23 @@ body::before {
   grid-template-columns: var(--left-width) var(--right-width);
   grid-template-rows: 1fr;
   gap: 20px;
+  height: 100%;
 }
 
 .terminals-container.count-3.layout-3-left2 .terminal-column-left {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: var(--top-height) var(--bottom-height);
+  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
   gap: 20px;
+  height: 100%;
+  position: relative;
 }
 
 .terminals-container.count-3.layout-3-left2 .terminal-column-right {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  height: 100%;
 }
 
 /* Layout: 1 left + 2 right vertical */
@@ -482,19 +488,29 @@ body::before {
   grid-template-columns: var(--left-width) var(--right-width);
   grid-template-rows: 1fr;
   gap: 20px;
+  height: 100%;
 }
 
 .terminals-container.count-3.layout-3-right2 .terminal-column-left {
   display: grid;
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
+  height: 100%;
 }
 
 .terminals-container.count-3.layout-3-right2 .terminal-column-right {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: var(--top-height) var(--bottom-height);
+  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
   gap: 20px;
+  height: 100%;
+  position: relative;
+}
+
+/* Ensure terminal quadrants in column layouts fill their grid cells */
+.terminals-container.count-3.layout-3-left2 .terminal-quadrant,
+.terminals-container.count-3.layout-3-right2 .terminal-quadrant {
+  min-height: 0; /* Allows proper shrinking in grid */
 }
 
 .terminals-container.count-4 {
@@ -868,6 +884,9 @@ body::before {
   overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 /* Terminal positioning now handled by CSS Grid auto-placement */

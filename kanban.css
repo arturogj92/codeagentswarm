@@ -195,6 +195,12 @@ body {
     overflow-wrap: break-word;
 }
 
+.task-id {
+    color: #888888;
+    font-weight: 400;
+    margin-right: 0.3rem;
+}
+
 .task-description {
     color: #cccccc;
     font-size: 0.85rem;
