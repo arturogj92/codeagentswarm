@@ -7,6 +7,65 @@ const os = require('os');
 const DatabaseManager = require('./database');
 const MCPTaskServer = require('./mcp-server');
 
+// Logging setup
+const logDir = path.join(app.getPath('userData'), 'logs');
+if (!fs.existsSync(logDir)) {
+  fs.mkdirSync(logDir, { recursive: true });
+}
+
+const logFile = path.join(logDir, `codeagentswarm-${new Date().toISOString().split('T')[0]}.log`);
+const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+
+// Store original console methods
+const originalConsole = {
+  log: console.log,
+  error: console.error,
+  warn: console.warn
+};
+
+// Custom logger
+const logger = {
+  log: (...args) => {
+    const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] INFO: ${args.join(' ')}`;
+    originalConsole.log(...args);
+    logStream.write(message + '\n');
+  },
+  error: (...args) => {
+    const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] ERROR: ${args.join(' ')}`;
+    originalConsole.error(...args);
+    logStream.write(message + '\n');
+  },
+  warn: (...args) => {
+    const timestamp = new Date().toISOString();
+    const message = `[${timestamp}] WARN: ${args.join(' ')}`;
+    originalConsole.warn(...args);
+    logStream.write(message + '\n');
+  }
+};
+
+// Override console methods
+console.log = logger.log;
+console.error = logger.error;
+console.warn = logger.warn;
+
+// Log startup info
+console.log('=== CodeAgentSwarm Starting ===');
+console.log('Log file:', logFile);
+console.log('App version:', app.getVersion());
+console.log('Electron version:', process.versions.electron);
+console.log('Node version:', process.versions.node);
+console.log('Platform:', process.platform);
+console.log('Architecture:', process.arch);
+
+// Show log location on macOS
+if (process.platform === 'darwin') {
+  console.log('Log directory:', logDir);
+  console.log('To view logs, run: tail -f "' + logFile + '"');
+  console.log('Or open in Finder: open "' + logDir + '"');
+}
+
 // Enable live reload for Electron in development
 if (process.argv.includes('--dev')) {
     try {
@@ -86,6 +145,7 @@ function createWindow() {
 // Simple shell simulation without external dependencies
 class SimpleShell {
   constructor(quadrant, workingDir) {
+    console.log('SimpleShell constructor called:', { quadrant, workingDir });
     this.quadrant = quadrant;
     this.cwd = workingDir;
     this.buffer = '';
@@ -379,16 +439,21 @@ class SimpleShell {
 
 // IPC handlers for simple shell management
 ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sessionType = 'resume') => {
+  console.log('=== CREATE-TERMINAL HANDLER CALLED ===');
+  console.log('Parameters:', { quadrant, customWorkingDir, sessionType });
+  
   try {
     const userHome = os.homedir();
     const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
+    console.log('Working directory:', workingDir);
     
     // Auto-configure CLAUDE.md for MCP Task Manager when a custom directory is provided
     if (customWorkingDir) {
+      console.log('Configuring CLAUDE.md for:', customWorkingDir);
       ensureClaudeMdConfiguration(customWorkingDir);
     }
     
-    // Creating terminal ${quadrant}
+    console.log(`Creating terminal ${quadrant}`);
     
     // Set environment variable to identify the quadrant (1-based)
     process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
@@ -414,21 +479,25 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
     
     const shell = new SimpleShell(quadrant, workingDir);
     terminals.set(quadrant, shell);
+    console.log(`Terminal ${quadrant} created and added to terminals map`);
     
     // Auto-execute claude code after a delay to ensure terminal is ready
     setTimeout(() => {
+      console.log(`Checking if terminal ${quadrant} exists for auto-execute...`);
       if (terminals.has(quadrant)) {
         // Execute command based on session type
         const command = sessionType === 'new' ? 'claude' : 'claude --resume';
+        console.log(`Auto-executing command: ${command}`);
         shell.executeCommand(command, true);
       }
     }, 1000); // Increased to 1 second to ensure terminal is ready
     
-    // Terminal ${quadrant} created
+    console.log(`Terminal ${quadrant} created successfully`);
     return quadrant;
     
   } catch (error) {
     console.error(`Failed to create terminal ${quadrant}:`, error);
+    console.error('Error stack:', error.stack);
     throw error;
   }
 });
@@ -896,7 +965,9 @@ function startMCPServerAndRegister() {
       }, 5000);
     });
 
-    // Wait a moment for server to start and window to be ready, then register with Claude Code
+    // Only check for Claude Code if explicitly requested or first run
+    // Comment out automatic registration to avoid annoying users
+    /*
     console.log('⏰ Setting timeout to call registerWithClaude...');
     setTimeout(() => {
       console.log('⏰ First timeout reached. Window visible?', mainWindow && mainWindow.isVisible());
@@ -911,6 +982,7 @@ function startMCPServerAndRegister() {
         }, 2000);
       }
     }, 1000);
+    */
 
     return true;
   } catch (error) {
@@ -2221,6 +2293,15 @@ function ensureClaudeMdConfiguration(projectPath) {
       fileContent = `# ${projectName} Project Configuration\n\n` + getCodeAgentSwarmSection();
     }
     
+    // Only write if content has changed
+    if (fs.existsSync(claudeMdPath)) {
+      const currentContent = fs.readFileSync(claudeMdPath, 'utf8');
+      if (currentContent === fileContent) {
+        console.log(`✅ CLAUDE.md already up-to-date for: ${projectName}`);
+        return;
+      }
+    }
+    
     // Write the updated content
     fs.writeFileSync(claudeMdPath, fileContent, 'utf8');
     console.log(`✅ Updated CLAUDE.md with CodeAgentSwarm configuration for: ${projectName}`);
@@ -2229,3 +2310,35 @@ function ensureClaudeMdConfiguration(projectPath) {
     console.error('❌ Failed to configure CLAUDE.md:', error);
   }
 }
+
+// IPC handlers for log management
+ipcMain.handle('get-log-path', () => {
+  return {
+    logFile: logFile,
+    logDir: logDir
+  };
+});
+
+ipcMain.handle('open-log-directory', () => {
+  const { shell } = require('electron');
+  shell.openPath(logDir);
+  return { success: true };
+});
+
+ipcMain.handle('show-log-notification', () => {
+  if (Notification.isSupported()) {
+    const notification = new Notification({
+      title: 'CodeAgentSwarm Logs',
+      body: `Logs are saved in:\n${logDir}`,
+      silent: false
+    });
+    
+    notification.on('click', () => {
+      const { shell } = require('electron');
+      shell.openPath(logDir);
+    });
+    
+    notification.show();
+  }
+  return { logDir, logFile };
+});

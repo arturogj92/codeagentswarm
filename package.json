@@ -1,6 +1,6 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0628.1545",
+  "version": "2025.0628.1841",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
@@ -44,6 +44,7 @@
       "mcp-server.js",
       "mcp-client.js",
       "mcp-stdio-server.js",
+      "claude-md-config.js",
       "kanban.html",
       "kanban.js",
       "kanban.css",
