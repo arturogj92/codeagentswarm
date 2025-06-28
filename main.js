@@ -1317,7 +1317,39 @@ ipcMain.handle('select-directory', async () => {
 ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
+    
+    // Save terminal directory
     const result = db.saveTerminalDirectory(terminalId, directory);
+    
+    // Check if a project exists for this directory
+    if (result.success && directory) {
+      const existingProject = db.getProjectByPath(directory);
+      
+      if (!existingProject) {
+        // Create a new project based on the directory
+        const path = require('path');
+        const projectName = path.basename(directory);
+        
+        // Generate a nice display name from the directory name
+        const displayName = projectName
+          .replace(/[-_]/g, ' ')
+          .replace(/\b\w/g, l => l.toUpperCase());
+        
+        console.log(`Creating new project "${displayName}" for directory: ${directory}`);
+        
+        // Create the project with the directory as its path
+        const projectResult = db.createProject(projectName, null, directory);
+        
+        if (projectResult.success) {
+          // Update display name if different from project name
+          if (displayName !== projectName) {
+            db.updateProjectDisplayName(projectName, displayName);
+          }
+          console.log(`Successfully created project "${displayName}" for new terminal directory`);
+        }
+      }
+    }
+    
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -1345,10 +1377,10 @@ ipcMain.handle('db-get-all-directories', async () => {
 });
 
 // Task management handlers
-ipcMain.handle('task-create', async (event, title, description, terminalId) => {
+ipcMain.handle('task-create', async (event, title, description, terminalId, project) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
-    const result = db.createTask(title, description, terminalId);
+    const result = db.createTask(title, description, terminalId, project);
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -1395,10 +1427,14 @@ ipcMain.handle('task-delete', async (event, taskId) => {
   }
 });
 
-ipcMain.handle('task-update', async (event, taskId, title, description) => {
+ipcMain.handle('task-update', async (event, taskId, title, description, project) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
     const result = db.updateTask(taskId, title, description);
+    // Update project separately if needed
+    if (result.success && project) {
+      db.updateTaskProject(taskId, project);
+    }
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -1439,6 +1475,168 @@ ipcMain.handle('task-update-implementation', async (event, taskId, implementatio
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
     const result = db.updateTaskImplementation(taskId, implementation);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Project management handlers
+ipcMain.handle('project-get-all', async () => {
+  try {
+    if (!db) return { success: true, projects: [] };
+    const projects = db.getProjects();
+    return { success: true, projects };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('select-project-folder', async (event) => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openDirectory', 'createDirectory'],
+    title: 'Select Project Folder',
+    buttonLabel: 'Select Folder'
+  });
+  
+  if (result.canceled) {
+    return null;
+  }
+  
+  return result.filePaths[0];
+});
+
+ipcMain.handle('project-create', async (event, name, color, folderPath) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    
+    // Create project in database with folder path
+    const result = db.createProject(name, color, folderPath);
+    
+    if (result.success && folderPath) {
+      // Create or update CLAUDE.md in the selected folder
+      try {
+        const claudeMdPath = path.join(folderPath, 'CLAUDE.md');
+        const { getCodeAgentSwarmSection, SECTION_START, SECTION_END } = require('./claude-md-config');
+        
+        let content = '';
+        let existingContent = '';
+        
+        // Read existing content if file exists
+        if (fs.existsSync(claudeMdPath)) {
+          existingContent = fs.readFileSync(claudeMdPath, 'utf8');
+          
+          // Check if CodeAgentSwarm section exists
+          const startIndex = existingContent.indexOf(SECTION_START);
+          const endIndex = existingContent.indexOf(SECTION_END);
+          
+          if (startIndex !== -1 && endIndex !== -1) {
+            // Replace existing section
+            content = existingContent.substring(0, startIndex) +
+                     getCodeAgentSwarmSection(name) +
+                     existingContent.substring(endIndex + SECTION_END.length);
+          } else {
+            // Append new section
+            content = existingContent + (existingContent.endsWith('\n') ? '' : '\n') +
+                     getCodeAgentSwarmSection(name);
+          }
+        } else {
+          // Create new file with CodeAgentSwarm section
+          content = getCodeAgentSwarmSection(name);
+        }
+        
+        // Write the file
+        fs.writeFileSync(claudeMdPath, content, 'utf8');
+        console.log(`Updated CLAUDE.md in ${folderPath} with project name: ${name}`);
+        
+      } catch (error) {
+        console.log(`Error updating CLAUDE.md: ${error.message}`);
+        // Don't fail the project creation if CLAUDE.md update fails
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Helper function to update project name in CLAUDE.md
+function updateClaudeMdProjectName(filePath, newProjectName) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.log(`CLAUDE.md not found at: ${filePath}`);
+      return false;
+    }
+    
+    let content = fs.readFileSync(filePath, 'utf8');
+    
+    // Update project name in the Project Configuration section
+    // Look for pattern: **Project Name**: [old name]
+    const projectNameRegex = /(\*\*Project Name\*\*:\s*)(.+?)(?=\n|$)/;
+    
+    if (projectNameRegex.test(content)) {
+      const oldProjectName = content.match(projectNameRegex)[2];
+      content = content.replace(projectNameRegex, `$1${newProjectName}`);
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`Updated project name from "${oldProjectName}" to "${newProjectName}" in ${filePath}`);
+      return true;
+    } else {
+      console.log(`Project name pattern not found in ${filePath}`);
+    }
+    
+    return false;
+  } catch (error) {
+    console.log(`Error updating CLAUDE.md: ${error.message}`);
+    return false;
+  }
+}
+
+ipcMain.handle('project-update-display-name', async (event, name, displayName) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    
+    // Update project display name in database
+    const result = db.updateProjectDisplayName(name, displayName);
+    
+    if (result.success) {
+      // Get all folders associated with this project
+      const folders = db.getProjectFolders(name);
+      console.log(`Found ${folders.length} folders associated with project ${name}: ${folders.join(', ')}`);
+      
+      // Update CLAUDE.md in each folder
+      for (const folderPath of folders) {
+        const claudeMdPath = path.join(folderPath, 'CLAUDE.md');
+        console.log(`Attempting to update CLAUDE.md at: ${claudeMdPath}`);
+        const updated = updateClaudeMdProjectName(claudeMdPath, displayName);
+        if (updated) {
+          console.log(`✅ Successfully updated CLAUDE.md in ${folderPath} with new project name: ${displayName}`);
+        } else {
+          console.log(`❌ Failed to update CLAUDE.md in ${folderPath} - file may not exist or project name not found`);
+        }
+      }
+    }
+    
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('project-update-color', async (event, name, color) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateProjectColor(name, color);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('project-delete', async (event, name) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.deleteProject(name);
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -1506,7 +1704,8 @@ ipcMain.on('create-task', async (event, taskData) => {
     const result = await db.createTask(
       taskData.title,
       taskData.description || '',
-      taskData.terminal_id
+      taskData.terminal_id,
+      taskData.project
     );
     
     // Notify the renderer of successful creation

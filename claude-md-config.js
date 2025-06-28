@@ -2,7 +2,7 @@
 const SECTION_START = '<!-- CODEAGENTSWARM CONFIG START - DO NOT EDIT THIS SECTION -->';
 const SECTION_END = '<!-- CODEAGENTSWARM CONFIG END -->';
 
-const getCodeAgentSwarmSection = () => `${SECTION_START}
+const getCodeAgentSwarmSection = (projectName = null) => `${SECTION_START}
 
 ## 🚨 CRITICAL - MANDATORY COMPLETION MARKER 🚨
 
@@ -21,15 +21,21 @@ const getCodeAgentSwarmSection = () => `${SECTION_START}
 
 **FAILURE TO WRITE THIS MARKER BREAKS THE APPLICATION**
 
-## MCP Servers
+${projectName ? `## Project Configuration
+
+**Project Name**: ${projectName}
+
+_This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
+
+` : ''}## MCP Servers
 
 ### Task Manager
 
 - **Command**: \`node mcp-stdio-server.js\`
 - **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, create_project, get_project_tasks
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, create_project, get_projects, get_project_tasks
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
-- **Projects**: Tasks are now organized by projects based on terminal working directory
+- **Projects**: Tasks are now organized by projects. Each task belongs to a project, and projects are detected automatically based on the terminal working directory
 
 _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
 
@@ -40,7 +46,11 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 **ALWAYS** when starting work on a new task, you must:
 
 1. **First check** if a similar task already exists using \`list_tasks\` from MCP
-2. If no similar task exists, **create a new task** using \`create_task\` from MCP **MANDATORY specifying the correct terminal_id**
+2. If no similar task exists, **create a new task** using \`create_task\` from MCP:
+   - **MANDATORY specify the correct terminal_id**
+   - **MANDATORY: Read the project name from the CLAUDE.md file** in the current directory
+   - Look for the "Project Name:" field in the "Project Configuration" section
+   - If no project name is found in CLAUDE.md, use the directory name as fallback
 3. **Start the task** using \`start_task\` before beginning any work
 4. **MANDATORY: Update the plan** using \`update_task_plan\` when starting a task with a detailed step plan
 5. **Complete the task** using \`complete_task\` when finished (goes to "completed") or \`submit_for_testing\` if testing needed
@@ -171,7 +181,7 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 
 The following MCP tools are available for task management:
 
-- **\`create_task\`**: Create new task (requires terminal_id)
+- **\`create_task\`**: Create new task (requires terminal_id, project is auto-detected)
 - **\`start_task\`**: Mark task as "in_progress"
 - **\`complete_task\`**: First call: moves to "in_testing". Second call (after manual approval): moves to "completed"
 - **\`submit_for_testing\`**: Mark task as "in_testing"
@@ -179,6 +189,9 @@ The following MCP tools are available for task management:
 - **\`update_task_plan\`**: Update specific task plan
 - **\`update_task_implementation\`**: Update task implementation
 - **\`update_task_terminal\`**: Update terminal_id associated with task
+- **\`create_project\`**: Create a new project with name and optional color
+- **\`get_projects\`**: Get list of all projects
+- **\`get_project_tasks\`**: Get all tasks for a specific project
 
 **\`update_task_plan\` parameters:**
 - \`task_id\` (number, required): Task ID
@@ -194,12 +207,47 @@ The following MCP tools are available for task management:
 
 **Usage example:**
 \`\`\`
+# Task management
+create_task(title="Implement new feature", description="Add user authentication", terminal_id=1)
+# Note: project is auto-detected from terminal's working directory
+
 update_task_plan(task_id=123, plan="1. Review existing code\\n2. Implement new functionality\\n3. Write tests")
 
 update_task_implementation(task_id=123, implementation="Modified files: database.js, mcp-server.js\\nSummary: Added implementation field to tasks table\\nFlow: New field allows documenting changes made during implementation")
 
 update_task_terminal(task_id=123, terminal_id="2")  # Assign to terminal 2
 update_task_terminal(task_id=123, terminal_id="")   # Unassign from any terminal
+
+# Project management
+create_project(name="MyNewProject", color="#FF6B6B")  # Create project with custom color
+create_project(name="AnotherProject")  # Color will be auto-assigned
+
+get_projects()  # Returns all projects with their colors
+
+get_project_tasks(project_name="CodeAgentSwarm")  # Get all tasks for a project
+\`\`\`
+
+## Project Organization
+
+Tasks are automatically organized by project based on the CLAUDE.md configuration:
+
+1. **Project Detection**: When creating a task, **ALWAYS** first check the CLAUDE.md file for the project name
+2. **Detection Steps**:
+   - Read the CLAUDE.md file in the current working directory
+   - Look for "**Project Name**: [name]" in the Project Configuration section
+   - Use this name when calling \`create_task\`
+   - If no CLAUDE.md or project name found, use the directory name as fallback
+3. **Visual Identification**: Each project has a unique color for easy identification in the UI
+4. **Project Filtering**: Use \`get_project_tasks\` to see tasks for a specific project
+
+### How to detect the project name (for agents):
+\`\`\`bash
+# 1. First, check if CLAUDE.md exists
+if [ -f "CLAUDE.md" ]; then
+    # 2. Extract project name from CLAUDE.md
+    project_name=$(grep -A1 "## Project Configuration" CLAUDE.md | grep "Project Name:" | sed 's/.*Project Name**: //' | sed 's/^ *//')
+fi
+# 3. Use the project name when creating tasks
 \`\`\`
 
 ## IMPORTANT: MCP Token Limits

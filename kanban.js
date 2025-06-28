@@ -3,14 +3,17 @@ const { ipcRenderer } = require('electron');
 class KanbanManager {
     constructor() {
         this.tasks = [];
+        this.projects = [];
         this.currentTask = null;
         this.editingTaskId = null;
+        this.currentProjectFilter = 'all';
         this.init();
     }
 
     async init() {
         this.setupEventListeners();
         this.initializeLucideIcons();
+        await this.loadProjects();
         await this.loadTasks();
     }
 
@@ -92,6 +95,67 @@ class KanbanManager {
             e.preventDefault();
             this.saveTask();
         });
+        
+        // Project filter
+        document.getElementById('project-filter-select').addEventListener('change', (e) => {
+            this.currentProjectFilter = e.target.value;
+            this.renderTasks();
+            this.updateEditProjectButtonVisibility();
+        });
+        
+        // Create project button
+        document.getElementById('create-project-btn').addEventListener('click', () => {
+            this.showCreateProjectDialog();
+        });
+        
+        // Edit current project button
+        document.getElementById('edit-current-project-btn').addEventListener('click', () => {
+            if (this.currentProjectFilter && this.currentProjectFilter !== 'all') {
+                this.editProjectName(this.currentProjectFilter);
+            }
+        });
+        
+
+        // Project modal controls
+        document.getElementById('project-modal-close-btn').addEventListener('click', () => {
+            this.hideProjectModal();
+        });
+
+        document.getElementById('cancel-project-btn').addEventListener('click', () => {
+            this.hideProjectModal();
+        });
+
+        document.getElementById('save-project-btn').addEventListener('click', () => {
+            this.saveProject();
+        });
+
+        document.getElementById('project-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveProject();
+        });
+
+        // Project edit modal controls
+        document.getElementById('project-edit-modal-close-btn').addEventListener('click', () => {
+            this.hideProjectEditModal();
+        });
+
+        document.getElementById('cancel-project-edit-btn').addEventListener('click', () => {
+            this.hideProjectEditModal();
+        });
+
+        document.getElementById('save-project-edit-btn').addEventListener('click', () => {
+            this.saveProjectEdit();
+        });
+
+        document.getElementById('project-edit-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveProjectEdit();
+        });
+        
+        // Delete project button
+        document.getElementById('delete-project-btn').addEventListener('click', () => {
+            this.deleteProject();
+        });
 
         // Click outside modal to close
         document.getElementById('task-modal').addEventListener('click', (e) => {
@@ -103,6 +167,18 @@ class KanbanManager {
         document.getElementById('task-details-modal').addEventListener('click', (e) => {
             if (e.target.id === 'task-details-modal') {
                 this.hideTaskDetailsModal();
+            }
+        });
+
+        document.getElementById('project-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'project-modal') {
+                this.hideProjectModal();
+            }
+        });
+
+        document.getElementById('project-edit-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'project-edit-modal') {
+                this.hideProjectEditModal();
             }
         });
 
@@ -118,11 +194,45 @@ class KanbanManager {
         this.originalParent = null;
         this.lastPlaceholderPosition = null;
         this.dragoverThrottle = null;
+        this.autoScrollAnimationId = null;
+        this.currentScrollTarget = null;
         
         taskLists.forEach(list => {
             list.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
+                
+                // Auto-scroll functionality
+                const listRect = list.getBoundingClientRect();
+                const scrollThreshold = 60; // Pixels from edge to trigger scroll
+                const maxScrollSpeed = 15; // Maximum pixels to scroll per frame
+                
+                // Check if mouse is near top or bottom of the list
+                const mouseY = e.clientY;
+                const distanceFromTop = mouseY - listRect.top;
+                const distanceFromBottom = listRect.bottom - mouseY;
+                
+                // Calculate scroll speed based on distance from edge (closer = faster)
+                let scrollDirection = 0;
+                let scrollSpeed = 0;
+                
+                if (distanceFromTop < scrollThreshold && list.scrollTop > 0) {
+                    // Scroll up - speed increases as we get closer to the edge
+                    scrollDirection = -1;
+                    scrollSpeed = maxScrollSpeed * (1 - distanceFromTop / scrollThreshold);
+                } else if (distanceFromBottom < scrollThreshold && list.scrollTop < list.scrollHeight - list.clientHeight) {
+                    // Scroll down - speed increases as we get closer to the edge
+                    scrollDirection = 1;
+                    scrollSpeed = maxScrollSpeed * (1 - distanceFromBottom / scrollThreshold);
+                }
+                
+                // Update scroll target
+                if (scrollDirection !== 0) {
+                    this.currentScrollTarget = { list, direction: scrollDirection, speed: scrollSpeed };
+                    this.startAutoScroll();
+                } else if (this.currentScrollTarget && this.currentScrollTarget.list === list) {
+                    this.stopAutoScroll();
+                }
                 
                 // Throttle dragover events
                 if (this.dragoverThrottle) return;
@@ -176,6 +286,11 @@ class KanbanManager {
             list.addEventListener('dragleave', (e) => {
                 // Only process if we're truly leaving the list
                 if (e.relatedTarget && !list.contains(e.relatedTarget)) {
+                    // Stop auto-scroll when leaving the column
+                    if (this.currentScrollTarget && this.currentScrollTarget.list === list) {
+                        this.stopAutoScroll();
+                    }
+                    
                     // Show empty state again if the list is truly empty
                     const realTasks = list.querySelectorAll('.task-card:not(.placeholder):not(.dragging)');
                     if (realTasks.length === 0) {
@@ -230,6 +345,7 @@ class KanbanManager {
                 }
                 
                 // Clean up
+                this.stopAutoScroll();
                 this.placeholder = null;
                 this.draggingElement = null;
                 this.originalNextSibling = null;
@@ -240,6 +356,40 @@ class KanbanManager {
         });
     }
 
+    startAutoScroll() {
+        if (this.autoScrollAnimationId) return; // Already scrolling
+        
+        const animate = () => {
+            if (this.currentScrollTarget) {
+                const { list, direction, speed } = this.currentScrollTarget;
+                
+                // Calculate new scroll position
+                const newScrollTop = list.scrollTop + (direction * speed);
+                
+                // Apply scroll with bounds checking
+                if (direction < 0 && newScrollTop >= 0) {
+                    list.scrollTop = newScrollTop;
+                } else if (direction > 0 && newScrollTop <= list.scrollHeight - list.clientHeight) {
+                    list.scrollTop = newScrollTop;
+                }
+                
+                // Continue animation
+                this.autoScrollAnimationId = requestAnimationFrame(animate);
+            } else {
+                this.stopAutoScroll();
+            }
+        };
+        
+        this.autoScrollAnimationId = requestAnimationFrame(animate);
+    }
+
+    stopAutoScroll() {
+        if (this.autoScrollAnimationId) {
+            cancelAnimationFrame(this.autoScrollAnimationId);
+            this.autoScrollAnimationId = null;
+        }
+        this.currentScrollTarget = null;
+    }
 
     getDragAfterElement(container, y) {
         const draggableElements = [...container.querySelectorAll('.task-card:not(.placeholder)')];
@@ -349,6 +499,67 @@ class KanbanManager {
         }
     }
 
+    async loadProjects() {
+        try {
+            const result = await ipcRenderer.invoke('project-get-all');
+            if (result.success) {
+                this.projects = result.projects;
+                this.updateProjectSelects();
+            } else {
+                console.error('Failed to load projects:', result.error);
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
+        }
+    }
+    
+    updateProjectSelects() {
+        // Update filter select
+        const filterSelect = document.getElementById('project-filter-select');
+        filterSelect.innerHTML = '<option value="all">All Projects</option>';
+        
+        // Update task form select
+        const taskSelect = document.getElementById('task-project');
+        taskSelect.innerHTML = '<option value="">No Project</option>';
+        
+        this.projects.forEach(project => {
+            // Use display_name if available, otherwise fall back to name
+            const displayName = project.display_name || project.name;
+            
+            // Add to filter
+            const filterOption = document.createElement('option');
+            filterOption.value = project.name;
+            filterOption.textContent = displayName;
+            filterOption.style.color = project.color;
+            filterSelect.appendChild(filterOption);
+            
+            // Add to task form
+            const taskOption = document.createElement('option');
+            taskOption.value = project.name;
+            taskOption.textContent = displayName;
+            taskOption.style.color = project.color;
+            taskSelect.appendChild(taskOption);
+        });
+        
+        
+        // Set default project if none selected
+        if (taskSelect.options.length > 1 && !taskSelect.value) {
+            taskSelect.value = 'CodeAgentSwarm';
+        }
+        
+        // Update edit button visibility
+        this.updateEditProjectButtonVisibility();
+    }
+    
+    updateEditProjectButtonVisibility() {
+        const editBtn = document.getElementById('edit-current-project-btn');
+        if (this.currentProjectFilter && this.currentProjectFilter !== 'all') {
+            editBtn.style.display = 'inline-flex';
+        } else {
+            editBtn.style.display = 'none';
+        }
+    }
+
     async loadTasks() {
         try {
             const result = await ipcRenderer.invoke('task-get-all');
@@ -370,6 +581,12 @@ class KanbanManager {
             list.innerHTML = '';
         });
 
+        // Filter tasks by project if needed
+        let filteredTasks = this.tasks;
+        if (this.currentProjectFilter !== 'all') {
+            filteredTasks = this.tasks.filter(task => task.project === this.currentProjectFilter);
+        }
+
         // Group tasks by status
         const tasksByStatus = {
             pending: [],
@@ -378,7 +595,7 @@ class KanbanManager {
             completed: []
         };
 
-        this.tasks.forEach(task => {
+        filteredTasks.forEach(task => {
             if (tasksByStatus[task.status]) {
                 tasksByStatus[task.status].push(task);
             }
@@ -430,6 +647,20 @@ class KanbanManager {
             `<span class="task-terminal">Terminal ${parseInt(task.terminal_id)}</span>` : '';
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
+        
+        // Get project info
+        let projectTag = '';
+        if (task.project) {
+            const project = this.projects.find(p => p.name === task.project) || 
+                           { name: task.project, display_name: task.project, color: '#007ACC' };
+            const displayName = project.display_name || project.name;
+            projectTag = `<span class="task-project-tag" style="background-color: ${project.color}">
+                <span class="project-name">${this.escapeHtml(displayName)}</span>
+                <button class="project-edit-btn" onclick="kanban.editProjectName('${project.name}')" title="Edit project name">
+                    <i data-lucide="pencil"></i>
+                </button>
+            </span>`;
+        }
 
         taskCard.innerHTML = `
             <div class="task-actions">
@@ -437,6 +668,7 @@ class KanbanManager {
                     <i data-lucide="eye"></i>
                 </button>
             </div>
+            ${projectTag}
             <div class="task-title"><span class="task-id">#${task.id}</span> ${this.escapeHtml(task.title)}</div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
@@ -470,6 +702,9 @@ class KanbanManager {
 
         taskCard.addEventListener('dragend', (e) => {
             taskCard.classList.remove('dragging');
+            
+            // Stop auto-scroll
+            this.stopAutoScroll();
             
             // Clean up placeholder if still exists
             if (this.placeholder && this.placeholder.parentNode) {
@@ -514,6 +749,16 @@ class KanbanManager {
         document.getElementById('task-description').value = '';
         document.getElementById('task-plan').value = '';
         document.getElementById('task-implementation').value = '';
+        
+        // Use the currently selected project filter as default, or let user choose
+        const projectSelect = document.getElementById('task-project');
+        if (this.currentProjectFilter && this.currentProjectFilter !== 'all') {
+            projectSelect.value = this.currentProjectFilter;
+        } else {
+            // If "All Projects" is selected, default to empty (no project)
+            projectSelect.value = '';
+        }
+        
         document.getElementById('task-terminal').value = '';
         document.getElementById('save-task-btn').textContent = 'Save Task';
         document.getElementById('task-modal').classList.add('show');
@@ -527,6 +772,7 @@ class KanbanManager {
         document.getElementById('task-description').value = task.description || '';
         document.getElementById('task-plan').value = task.plan || '';
         document.getElementById('task-implementation').value = task.implementation || '';
+        document.getElementById('task-project').value = task.project || '';
         document.getElementById('task-terminal').value = task.terminal_id || '';
         document.getElementById('save-task-btn').textContent = 'Update Task';
         document.getElementById('task-modal').classList.add('show');
@@ -543,6 +789,7 @@ class KanbanManager {
         const description = document.getElementById('task-description').value.trim();
         const plan = document.getElementById('task-plan').value.trim();
         const implementation = document.getElementById('task-implementation').value.trim();
+        const project = document.getElementById('task-project').value;
         const terminalIdValue = document.getElementById('task-terminal').value;
         let terminalId = null;
         if (terminalIdValue !== '') {
@@ -564,7 +811,7 @@ class KanbanManager {
             
             if (this.editingTaskId) {
                 // Update existing task
-                result = await ipcRenderer.invoke('task-update', this.editingTaskId, title, description);
+                result = await ipcRenderer.invoke('task-update', this.editingTaskId, title, description, project);
                 
                 // Update plan separately
                 if (result.success) {
@@ -591,7 +838,7 @@ class KanbanManager {
                 }
             } else {
                 // Create new task
-                result = await ipcRenderer.invoke('task-create', title, description, terminalId);
+                result = await ipcRenderer.invoke('task-create', title, description, terminalId, project);
                 
                 // Update plan for new task
                 if (result.success && plan) {
@@ -732,9 +979,196 @@ class KanbanManager {
         // For now, we'll use a simple console log
         console.log(`${type.toUpperCase()}: ${message}`);
         
-        // Optionally show desktop notification
-        if (type === 'success') {
+        // Show in-app notification
+        if (type === 'error') {
+            // Create a temporary error notification
+            const notification = document.createElement('div');
+            notification.className = 'notification notification-error';
+            notification.textContent = message;
+            notification.style.cssText = `
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: #dc3545;
+                color: white;
+                padding: 12px 20px;
+                border-radius: 6px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+                z-index: 10000;
+                animation: slideIn 0.3s ease;
+            `;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideOut 0.3s ease';
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        } else if (type === 'success') {
             ipcRenderer.send('show-desktop-notification', 'Task Update', message);
+        }
+    }
+    
+    showCreateProjectDialog() {
+        // Reset form
+        document.getElementById('project-name').value = '';
+        document.getElementById('color-1').checked = true;
+        document.getElementById('project-modal').classList.add('show');
+        document.getElementById('project-name').focus();
+    }
+
+    hideProjectModal() {
+        document.getElementById('project-modal').classList.remove('show');
+    }
+
+    async saveProject() {
+        const projectName = document.getElementById('project-name').value.trim();
+        const selectedColor = document.querySelector('input[name="project-color"]:checked')?.value;
+
+        if (!projectName) {
+            // Focus on empty field
+            document.getElementById('project-name').focus();
+            return;
+        }
+
+        // Prevent double submission
+        const saveButton = document.getElementById('save-project-btn');
+        if (saveButton.disabled) {
+            return;
+        }
+        saveButton.disabled = true;
+
+        try {
+            // First, ask for the project folder
+            const folderPath = await ipcRenderer.invoke('select-project-folder');
+            
+            if (!folderPath) {
+                // User cancelled folder selection
+                saveButton.disabled = false;
+                return;
+            }
+
+            const result = await ipcRenderer.invoke('project-create', projectName, selectedColor, folderPath);
+            if (result.success) {
+                this.hideProjectModal();
+                // Reload projects
+                await this.loadProjects();
+                // Select the new project in task form if modal is open
+                const taskProjectSelect = document.getElementById('task-project');
+                if (taskProjectSelect) {
+                    taskProjectSelect.value = projectName;
+                }
+                const message = result.alreadyExists 
+                    ? `Project "${projectName}" already existed, folder association updated`
+                    : `Project "${projectName}" created successfully`;
+                this.showNotification(message, 'success');
+            } else {
+                // Show error inline instead of alert
+                this.showNotification(`Failed to create project: ${result.error}`, 'error');
+                saveButton.disabled = false;
+            }
+        } catch (error) {
+            console.error('Error creating project:', error);
+            this.showNotification('Error creating project', 'error');
+            saveButton.disabled = false;
+        } finally {
+            // Ensure button is re-enabled after operation completes
+            const saveButton = document.getElementById('save-project-btn');
+            if (saveButton) {
+                saveButton.disabled = false;
+            }
+        }
+    }
+    
+    editProjectName(projectName) {
+        const project = this.projects.find(p => p.name === projectName);
+        if (!project) return;
+        
+        this.editingProjectName = projectName;
+        const currentDisplayName = project.display_name || project.name;
+        document.getElementById('project-edit-name').value = currentDisplayName;
+        
+        // Set current color in radio buttons
+        const colorRadios = document.querySelectorAll('input[name="project-edit-color"]');
+        colorRadios.forEach(radio => {
+            radio.checked = radio.value === project.color;
+        });
+        
+        document.getElementById('project-edit-modal').classList.add('show');
+        document.getElementById('project-edit-name').focus();
+    }
+
+    hideProjectEditModal() {
+        document.getElementById('project-edit-modal').classList.remove('show');
+        this.editingProjectName = null;
+    }
+
+    async saveProjectEdit() {
+        if (!this.editingProjectName) return;
+
+        const newDisplayName = document.getElementById('project-edit-name').value.trim();
+        if (!newDisplayName) {
+            document.getElementById('project-edit-name').focus();
+            return;
+        }
+
+        const selectedColor = document.querySelector('input[name="project-edit-color"]:checked')?.value;
+
+        try {
+            // Update display name
+            const nameResult = await ipcRenderer.invoke('project-update-display-name', this.editingProjectName, newDisplayName);
+            
+            // Update color if selected
+            let colorResult = { success: true };
+            if (selectedColor) {
+                colorResult = await ipcRenderer.invoke('project-update-color', this.editingProjectName, selectedColor);
+            }
+            
+            if (nameResult.success && colorResult.success) {
+                this.hideProjectEditModal();
+                // Reload projects and tasks to update UI
+                await this.loadProjects();
+                await this.loadTasks();
+                this.showNotification(`Project updated successfully`, 'success');
+            } else {
+                const error = !nameResult.success ? nameResult.error : colorResult.error;
+                this.showNotification(`Failed to update project: ${error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating project:', error);
+            this.showNotification('Error updating project', 'error');
+        }
+    }
+    
+    async deleteProject() {
+        if (!this.editingProjectName) return;
+        
+        const project = this.projects.find(p => p.name === this.editingProjectName);
+        if (!project) return;
+        
+        const confirmed = confirm(`Are you sure you want to delete the project "${project.display_name || project.name}"?\n\nThis will NOT delete tasks associated with this project.`);
+        if (!confirmed) return;
+        
+        try {
+            const result = await ipcRenderer.invoke('project-delete', this.editingProjectName);
+            if (result.success) {
+                this.hideProjectEditModal();
+                
+                // Reset filter if we're viewing the deleted project
+                if (this.currentProjectFilter === this.editingProjectName) {
+                    this.currentProjectFilter = 'all';
+                    document.getElementById('project-filter-select').value = 'all';
+                }
+                
+                // Reload projects and tasks
+                await this.loadProjects();
+                await this.loadTasks();
+                this.showNotification(`Project deleted successfully`, 'success');
+            } else {
+                this.showNotification(`Failed to delete project: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting project:', error);
+            this.showNotification('Error deleting project', 'error');
         }
     }
 

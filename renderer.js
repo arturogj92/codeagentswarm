@@ -161,6 +161,10 @@ class TerminalManager {
             this.showCreateTaskDialog();
         });
 
+        document.getElementById('mcp-info-btn').addEventListener('click', () => {
+            this.showMCPInfoModal();
+        });
+
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
             placeholder.addEventListener('click', (e) => {
                 const quadrant = parseInt(e.currentTarget.dataset.quadrant);
@@ -2042,6 +2046,107 @@ class TerminalManager {
         ipcRenderer.send('open-kanban-window');
     }
 
+    showMCPInfoModal() {
+        // Remove existing modal if present
+        const existingModal = document.querySelector('.mcp-info-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'mcp-info-modal';
+        modal.innerHTML = `
+            <div class="mcp-info-content">
+                <div class="mcp-info-header">
+                    <h3><i data-lucide="info"></i> MCP Tips & Information</h3>
+                    <button class="close-btn" id="close-mcp-info-modal">×</button>
+                </div>
+                <div class="mcp-info-body">
+                    <div class="info-section">
+                        <h4><i data-lucide="alert-circle"></i> MCP Connection Issues</h4>
+                        <p>If <code>/mcp</code> command doesn't work in Claude Code:</p>
+                        <ul>
+                            <li>Try restarting your terminal - MCP connections can sometimes disconnect</li>
+                            <li>Close and reopen Claude Code to refresh the connection</li>
+                            <li>Make sure CodeAgentSwarm is running</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i data-lucide="terminal"></i> About Claude Code</h4>
+                        <p>Claude Code is a terminal application that gets updated regularly. If the functionality changes:</p>
+                        <ul>
+                            <li>CodeAgentSwarm may need updates to maintain compatibility</li>
+                            <li>Check for CodeAgentSwarm updates when Claude Code updates</li>
+                            <li>Report issues on our GitHub repository</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i data-lucide="zap"></i> Quick Tips</h4>
+                        <ul>
+                            <li>MCP tools are available via <code>/mcp</code> command in Claude Code</li>
+                            <li>Task management is integrated with your terminal workflow</li>
+                            <li>Each terminal can have its own active task</li>
+                            <li>Tasks automatically sync between terminals and the Kanban board</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="info-section">
+                        <h4><i data-lucide="bell-off"></i> Notifications</h4>
+                        <p>Desktop notifications may not always work properly depending on your system settings:</p>
+                        <ul>
+                            <li>Check your system notification settings</li>
+                            <li>Make sure CodeAgentSwarm has permission to show notifications</li>
+                            <li>Some systems may block Electron app notifications</li>
+                            <li>Task status changes are always visible in the Kanban board</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="mcp-info-footer">
+                    <button class="btn btn-primary" id="close-mcp-info-btn">Got it!</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+        
+        // Initialize Lucide icons
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+
+        // Add event listeners
+        const closeModal = () => {
+            modal.remove();
+        };
+
+        modal.querySelector('#close-mcp-info-modal').addEventListener('click', closeModal);
+        modal.querySelector('#close-mcp-info-btn').addEventListener('click', closeModal);
+
+        // Close on background click
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeModal();
+            }
+        });
+
+        // Close on Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+
+        // Show modal with animation
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+    }
+
     showCreateTaskDialog() {
         // Remove existing modal if present
         const existingModal = document.querySelector('.create-task-modal');
@@ -2072,6 +2177,12 @@ class TerminalManager {
                         <textarea id="task-description" placeholder="Enter task description (optional)" rows="4"></textarea>
                     </div>
                     <div class="form-group">
+                        <label for="task-project">Project</label>
+                        <select id="task-project">
+                            <option value="">No Project</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="task-terminal">Terminal</label>
                         <select id="task-terminal">
                             <option value="">No terminal assigned</option>
@@ -2097,6 +2208,9 @@ class TerminalManager {
             window.lucide.createIcons();
         }
 
+        // Load projects for the dropdown
+        this.loadProjectsForModal();
+
         // Focus on title input
         const titleInput = document.getElementById('task-title');
         titleInput.focus();
@@ -2113,6 +2227,7 @@ class TerminalManager {
         document.getElementById('confirm-create-task').addEventListener('click', () => {
             const title = document.getElementById('task-title').value.trim();
             const description = document.getElementById('task-description').value.trim();
+            const project = document.getElementById('task-project').value;
             const terminalId = document.getElementById('task-terminal').value;
 
             if (!title) {
@@ -2124,6 +2239,7 @@ class TerminalManager {
             ipcRenderer.send('create-task', {
                 title,
                 description: description || undefined,
+                project: project || undefined,
                 terminal_id: terminalId ? parseInt(terminalId) : undefined
             });
 
@@ -4193,6 +4309,37 @@ class TerminalManager {
             } catch (e) {
                 // Ignore audio errors
             }
+        }
+    }
+
+    async loadProjectsForModal() {
+        try {
+            const result = await ipcRenderer.invoke('project-get-all');
+            if (result.success && result.projects) {
+                const projectSelect = document.getElementById('task-project');
+                if (!projectSelect) return;
+                
+                // Clear existing options except the first one
+                while (projectSelect.options.length > 1) {
+                    projectSelect.remove(1);
+                }
+                
+                // Add project options
+                result.projects.forEach(project => {
+                    const option = document.createElement('option');
+                    option.value = project.name;
+                    option.textContent = project.display_name || project.name;
+                    option.style.color = project.color;
+                    projectSelect.appendChild(option);
+                });
+                
+                // Set default to CodeAgentSwarm if available
+                if (projectSelect.options.length > 1) {
+                    projectSelect.value = 'CodeAgentSwarm';
+                }
+            }
+        } catch (error) {
+            console.error('Error loading projects:', error);
         }
     }
 

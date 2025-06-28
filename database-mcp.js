@@ -55,12 +55,10 @@ class DatabaseManagerMCP {
 
             CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                path TEXT UNIQUE NOT NULL,
-                description TEXT,
-                color TEXT DEFAULT '#2cb67d',
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                name TEXT UNIQUE NOT NULL,
+                display_name TEXT,
+                color TEXT NOT NULL,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             );
 
             CREATE TABLE IF NOT EXISTS tasks (
@@ -70,10 +68,11 @@ class DatabaseManagerMCP {
                 plan TEXT,
                 status TEXT DEFAULT 'pending',
                 terminal_id INTEGER,
-                project_id INTEGER REFERENCES projects(id),
+                project TEXT,
                 sort_order INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                implementation TEXT
             );
 
             CREATE TABLE IF NOT EXISTS task_history (
@@ -98,6 +97,12 @@ class DatabaseManagerMCP {
                 this.addImplementationColumnIfNeeded();
                 // Update status constraint to include in_testing
                 this.updateStatusConstraintIfNeeded();
+                // Add project column if it doesn't exist
+                this.addProjectColumnIfNeeded();
+                // Initialize default project if needed
+                this.initializeDefaultProject();
+                // Add display_name column if it doesn't exist
+                this.addDisplayNameColumnIfNeeded();
             }
         });
     }
@@ -191,6 +196,85 @@ class DatabaseManagerMCP {
         // The main database.js already has the constraint updated
         console.log('Status constraint includes in_testing support');
     }
+    
+    addProjectColumnIfNeeded() {
+        // Check if project column exists
+        this.db.all("PRAGMA table_info(tasks)", (err, columns) => {
+            if (err) {
+                console.error('Error checking for project column:', err);
+                return;
+            }
+            
+            const hasProject = columns.some(col => col.name === 'project');
+            if (!hasProject) {
+                this.db.run("ALTER TABLE tasks ADD COLUMN project TEXT", (err) => {
+                    if (err) {
+                        console.error('Error adding project column:', err);
+                    } else {
+                        console.log('Added project column to tasks table');
+                        // Update existing tasks with default project
+                        this.db.run("UPDATE tasks SET project = 'CodeAgentSwarm' WHERE project IS NULL", (err) => {
+                            if (err) {
+                                console.error('Error updating existing tasks with default project:', err);
+                            } else {
+                                console.log('Updated existing tasks with default project');
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
+    
+    initializeDefaultProject() {
+        // Check if default project exists
+        this.db.get("SELECT * FROM projects WHERE name = ?", ['CodeAgentSwarm'], (err, row) => {
+            if (err) {
+                console.error('Error checking for default project:', err);
+                return;
+            }
+            
+            if (!row) {
+                // Create default project with a nice blue color
+                this.db.run("INSERT INTO projects (name, display_name, color) VALUES (?, ?, ?)", ['CodeAgentSwarm', 'CodeAgentSwarm', '#007ACC'], (err) => {
+                    if (err) {
+                        console.error('Error creating default project:', err);
+                    } else {
+                        console.log('Created default project: CodeAgentSwarm');
+                    }
+                });
+            }
+        });
+    }
+    
+    addDisplayNameColumnIfNeeded() {
+        // Check if display_name column exists
+        this.db.all("PRAGMA table_info(projects)", (err, columns) => {
+            if (err) {
+                console.error('Failed to check table info:', err);
+                return;
+            }
+            
+            const hasDisplayName = columns.some(col => col.name === 'display_name');
+            if (!hasDisplayName) {
+                this.db.run("ALTER TABLE projects ADD COLUMN display_name TEXT", (err) => {
+                    if (err) {
+                        console.error('Failed to add display_name column:', err);
+                    } else {
+                        console.log('Added display_name column to projects table');
+                        // Update existing projects with display_name = name
+                        this.db.run("UPDATE projects SET display_name = name WHERE display_name IS NULL", (err) => {
+                            if (err) {
+                                console.error('Failed to update display names:', err);
+                            } else {
+                                console.log('Updated existing projects with display_name');
+                            }
+                        });
+                    }
+                });
+            }
+        });
+    }
 
     // Promisify database operations for async/await support
     async run(sql, params = []) {
@@ -230,12 +314,12 @@ class DatabaseManagerMCP {
     }
 
     // Task management methods - same interface as main DatabaseManager
-    createTask(title, description, terminalId) {
+    createTask(title, description, terminalId, project = null) {
         const db = this.db; // Capture db reference for use in callback
         return new Promise((resolve) => {
             db.run(
-                `INSERT INTO tasks (title, description, terminal_id) VALUES (?, ?, ?)`,
-                [title, description || '', terminalId || 0],
+                `INSERT INTO tasks (title, description, terminal_id, project) VALUES (?, ?, ?, ?)`,
+                [title, description || '', terminalId || 0, project || null],
                 function(err) {
                     if (err) {
                         resolve({
@@ -573,24 +657,98 @@ class DatabaseManagerMCP {
 
     // ===== PROJECT METHODS =====
 
-    async createProject(name, path, description = null, color = '#2cb67d') {
+    // Project management methods
+    
+    async createProject(name, color = null) {
         return new Promise((resolve, reject) => {
-            this.db.run(
-                `INSERT INTO projects (name, path, description, color) 
-                VALUES (?, ?, ?, ?)`,
-                [name, path, description, color],
-                function(err) {
+            // If no color provided, pick from predefined palette
+            if (!color) {
+                const colors = [
+                    '#007ACC', // Blue
+                    '#00C853', // Green
+                    '#FF6B6B', // Red
+                    '#FFA726', // Orange
+                    '#AB47BC', // Purple
+                    '#26A69A', // Teal
+                    '#EC407A', // Pink
+                    '#7E57C2', // Deep Purple
+                    '#29B6F6', // Light Blue
+                    '#66BB6A'  // Light Green
+                ];
+                
+                // Get existing projects to avoid color duplication
+                this.getProjects().then(existingProjects => {
+                    const usedColors = existingProjects.map(p => p.color);
+                    color = colors.find(c => !usedColors.includes(c)) || colors[0];
+                    
+                    // Projects created from UI don't have a path
+                    const path = null;
+                    this.db.run(
+                        `INSERT INTO projects (name, display_name, color, path) VALUES (?, ?, ?, ?)`,
+                        [name, name, color, path],
+                        function(err) {
+                            if (err) {
+                                console.error('Error creating project:', err);
+                                resolve({ success: false, error: err.message });
+                            } else {
+                                resolve({ success: true, projectId: this.lastID, name, color });
+                            }
+                        }
+                    );
+                });
+            } else {
+                // Projects created from UI don't have a path
+                const path = null;
+                this.db.run(
+                    `INSERT INTO projects (name, display_name, color, path) VALUES (?, ?, ?, ?)`,
+                    [name, name, color, path],
+                    function(err) {
+                        if (err) {
+                            console.error('Error creating project:', err);
+                            resolve({ success: false, error: err.message });
+                        } else {
+                            resolve({ success: true, projectId: this.lastID, name, color });
+                        }
+                    }
+                );
+            }
+        });
+    }
+    
+    async getProjects() {
+        return new Promise((resolve, reject) => {
+            this.db.all(
+                `SELECT * FROM projects ORDER BY name ASC`,
+                [],
+                (err, rows) => {
                     if (err) {
-                        console.error('Error creating project:', err);
-                        resolve({ success: false, error: err.message });
+                        console.error('Error getting all projects:', err);
+                        resolve([]);
                     } else {
-                        resolve({ success: true, projectId: this.lastID });
+                        resolve(rows || []);
                     }
                 }
             );
         });
     }
-
+    
+    async getProjectByName(name) {
+        return new Promise((resolve, reject) => {
+            this.db.get(
+                `SELECT * FROM projects WHERE name = ?`,
+                [name],
+                (err, row) => {
+                    if (err) {
+                        console.error('Error getting project by name:', err);
+                        resolve(null);
+                    } else {
+                        resolve(row);
+                    }
+                }
+            );
+        });
+    }
+    
     async getProjectByPath(path) {
         return new Promise((resolve, reject) => {
             this.db.get(
@@ -607,15 +765,32 @@ class DatabaseManagerMCP {
             );
         });
     }
-
-    async getAllProjects() {
+    
+    async updateProject(id, name, color) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `UPDATE projects SET name = ?, color = ? WHERE id = ?`,
+                [name, color, id],
+                function(err) {
+                    if (err) {
+                        console.error('Error updating project:', err);
+                        resolve({ success: false, error: err.message });
+                    } else {
+                        resolve({ success: true });
+                    }
+                }
+            );
+        });
+    }
+    
+    async getTasksByProject(projectName) {
         return new Promise((resolve, reject) => {
             this.db.all(
-                `SELECT * FROM projects ORDER BY name ASC`,
-                [],
+                `SELECT * FROM tasks WHERE project = ? ORDER BY sort_order ASC, created_at DESC`,
+                [projectName],
                 (err, rows) => {
                     if (err) {
-                        console.error('Error getting all projects:', err);
+                        console.error('Error getting project tasks:', err);
                         resolve([]);
                     } else {
                         resolve(rows || []);
@@ -624,18 +799,64 @@ class DatabaseManagerMCP {
             );
         });
     }
-
-    async getProjectTasks(projectId) {
+    
+    async updateProjectDisplayName(name, displayName) {
         return new Promise((resolve, reject) => {
-            this.db.all(
-                `SELECT * FROM tasks WHERE project_id = ? ORDER BY created_at DESC`,
-                [projectId],
-                (err, rows) => {
+            this.db.run(
+                `UPDATE projects SET display_name = ? WHERE name = ?`,
+                [displayName, name],
+                function(err) {
                     if (err) {
-                        console.error('Error getting project tasks:', err);
-                        resolve([]);
+                        console.error('Error updating project display name:', err);
+                        resolve({ success: false, error: err.message });
+                    } else if (this.changes > 0) {
+                        resolve({ success: true });
                     } else {
-                        resolve(rows || []);
+                        resolve({ success: false, error: 'Project not found' });
+                    }
+                }
+            );
+        });
+    }
+    
+    async updateProjectColor(name, color) {
+        return new Promise((resolve, reject) => {
+            this.db.run(
+                `UPDATE projects SET color = ? WHERE name = ?`,
+                [color, name],
+                function(err) {
+                    if (err) {
+                        console.error('Error updating project color:', err);
+                        resolve({ success: false, error: err.message });
+                    } else if (this.changes > 0) {
+                        resolve({ success: true });
+                    } else {
+                        resolve({ success: false, error: 'Project not found' });
+                    }
+                }
+            );
+        });
+    }
+    
+    async deleteProject(name) {
+        return new Promise((resolve, reject) => {
+            // Don't allow deleting the default project
+            if (name === 'CodeAgentSwarm') {
+                resolve({ success: false, error: 'Cannot delete the default project' });
+                return;
+            }
+            
+            this.db.run(
+                `DELETE FROM projects WHERE name = ?`,
+                [name],
+                function(err) {
+                    if (err) {
+                        console.error('Error deleting project:', err);
+                        resolve({ success: false, error: err.message });
+                    } else if (this.changes > 0) {
+                        resolve({ success: true });
+                    } else {
+                        resolve({ success: false, error: 'Project not found' });
                     }
                 }
             );

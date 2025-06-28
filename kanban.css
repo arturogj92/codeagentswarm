@@ -86,6 +86,11 @@ body {
     background: #c82333;
 }
 
+.btn-icon {
+    padding: 0.5rem;
+    min-width: auto;
+}
+
 /* Kanban Board */
 .kanban-board {
     flex: 1;
@@ -461,6 +466,92 @@ body {
     }
 }
 
+/* Project Tags */
+.task-project-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: #ffffff;
+    margin-bottom: 0.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.project-name {
+    display: inline-block;
+}
+
+.project-edit-btn {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    padding: 0.1rem;
+    border-radius: 3px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+}
+
+.project-edit-btn:hover {
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.project-edit-btn i {
+    width: 12px;
+    height: 12px;
+}
+
+/* Project Filter */
+.project-filter {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.project-filter label {
+    display: flex;
+    align-items: center;
+    gap: 0.3rem;
+    color: #cccccc;
+    font-size: 0.9rem;
+}
+
+.project-filter-select {
+    padding: 0.4rem 0.8rem;
+    border: 1px solid #404040;
+    border-radius: 4px;
+    background: #1a1a1a;
+    color: #ffffff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.project-filter-select:hover {
+    border-color: #666666;
+}
+
+.project-filter-select:focus {
+    outline: none;
+    border-color: #007acc;
+    box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+/* Project color in select options */
+.project-filter-select option,
+#task-project option {
+    padding: 0.5rem;
+}
+
 /* Animations */
 @keyframes slideIn {
     from {
@@ -630,4 +721,23 @@ body {
     to {
         transform: rotate(360deg);
     }
+}
+
+/* Color selector for projects */
+.color-option {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s ease;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+}
+
+input[type="radio"]:checked + .color-option {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.3);
 }

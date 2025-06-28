@@ -186,6 +186,10 @@ class MCPStdioServer {
                     result = await this.callTool(params);
                     break;
                     
+                case 'get_working_directory':
+                    result = await this.getWorkingDirectory(params);
+                    break;
+                    
                 case 'resources/list':
                     result = this.listResources();
                     break;
@@ -241,13 +245,13 @@ class MCPStdioServer {
 
     // Task management methods
     async createTask(params) {
-        const { title, description, terminal_id } = params;
+        const { title, description, terminal_id, project } = params;
         
         if (!title) {
             throw new Error('Title is required');
         }
         
-        const result = await this.db.createTask(title, description, terminal_id);
+        const result = await this.db.createTask(title, description, terminal_id, project);
         
         if (!result.success) {
             throw new Error(result.error);
@@ -258,6 +262,7 @@ class MCPStdioServer {
             title,
             description,
             terminal_id,
+            project: project || 'CodeAgentSwarm',
             status: 'pending'
         };
     }
@@ -430,6 +435,44 @@ class MCPStdioServer {
         };
     }
 
+    // Project management methods
+    async createProject(params) {
+        const { name, color } = params;
+        
+        if (!name) {
+            throw new Error('Project name is required');
+        }
+        
+        const result = await this.db.createProject(name, color);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            id: result.projectId,
+            name: result.name,
+            color: result.color,
+            created: true
+        };
+    }
+    
+    async getProjects() {
+        const projects = await this.db.getProjects();
+        return { projects };
+    }
+    
+    async getProjectTasks(params) {
+        const { project_name } = params;
+        
+        if (!project_name) {
+            throw new Error('project_name is required');
+        }
+        
+        const tasks = await this.db.getTasksByProject(project_name);
+        return { tasks };
+    }
+
     // MCP Tools
     listTools() {
         return {
@@ -442,7 +485,8 @@ class MCPStdioServer {
                         properties: {
                             title: { type: 'string', description: 'Task title' },
                             description: { type: 'string', description: 'Task description' },
-                            terminal_id: { type: 'number', description: 'Terminal ID (0-3)' }
+                            terminal_id: { type: 'number', description: 'Terminal ID (0-3)' },
+                            project: { type: 'string', description: 'Project name (optional, defaults to CodeAgentSwarm)' }
                         },
                         required: ['title']
                     }
@@ -525,6 +569,37 @@ class MCPStdioServer {
                         },
                         required: ['task_id', 'terminal_id']
                     }
+                },
+                {
+                    name: 'create_project',
+                    description: 'Create a new project',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            name: { type: 'string', description: 'Project name' },
+                            color: { type: 'string', description: 'Project color in hex format (optional)' }
+                        },
+                        required: ['name']
+                    }
+                },
+                {
+                    name: 'get_projects',
+                    description: 'Get all projects',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {}
+                    }
+                },
+                {
+                    name: 'get_project_tasks',
+                    description: 'Get all tasks for a specific project',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            project_name: { type: 'string', description: 'Project name' }
+                        },
+                        required: ['project_name']
+                    }
                 }
             ]
         };
@@ -536,6 +611,35 @@ class MCPStdioServer {
         let result;
         switch (name) {
             case 'create_task':
+                // Auto-detect project if not provided
+                if (!args.project && args.terminal_id) {
+                    try {
+                        // Try to get the working directory for this terminal
+                        const workingDir = await this.getTerminalWorkingDirectory(args.terminal_id);
+                        if (workingDir) {
+                            // First, try to get project name from CLAUDE.md
+                            let projectName = await this.getProjectFromClaudeMd(workingDir);
+                            
+                            // If not found in CLAUDE.md, use directory name as fallback
+                            if (!projectName) {
+                                projectName = path.basename(workingDir);
+                                this.logError(`No project found in CLAUDE.md, using directory name: ${projectName}`);
+                            }
+                            
+                            // Check if project exists, create if not
+                            const existingProject = await this.db.getProjectByName(projectName);
+                            if (!existingProject) {
+                                await this.db.createProject(projectName);
+                                this.logError(`Created new project: ${projectName}`);
+                            }
+                            
+                            args.project = projectName;
+                        }
+                    } catch (error) {
+                        this.logError('Failed to auto-detect project:', error.message);
+                        // Continue with default project
+                    }
+                }
                 result = await this.createTask(args);
                 break;
                 
@@ -601,6 +705,18 @@ class MCPStdioServer {
                 
             case 'update_task_terminal':
                 result = await this.updateTaskTerminal({ task_id: args.task_id, terminal_id: args.terminal_id });
+                break;
+                
+            case 'create_project':
+                result = await this.createProject(args);
+                break;
+                
+            case 'get_projects':
+                result = await this.getProjects();
+                break;
+                
+            case 'get_project_tasks':
+                result = await this.getProjectTasks(args);
                 break;
                 
             default:
@@ -806,6 +922,55 @@ class MCPStdioServer {
             this.logError(`Task completion notification written for task: ${task.title}`);
         } catch (error) {
             this.logError('Failed to notify task completion:', error.message);
+        }
+    }
+
+    // Get terminal working directory from the database
+    async getTerminalWorkingDirectory(terminalId) {
+        return new Promise((resolve) => {
+            this.db.db.get(
+                "SELECT directory FROM terminal_directories WHERE terminal_id = ?",
+                [terminalId],
+                (err, row) => {
+                    if (err) {
+                        this.logError('Error getting terminal directory:', err.message);
+                        resolve(null);
+                    } else if (row && row.directory) {
+                        resolve(row.directory);
+                    } else {
+                        resolve(null);
+                    }
+                }
+            );
+        });
+    }
+
+    // Get project name from CLAUDE.md file in the given directory
+    async getProjectFromClaudeMd(directory) {
+        try {
+            const claudeMdPath = path.join(directory, 'CLAUDE.md');
+            
+            // Check if CLAUDE.md exists
+            if (!fs.existsSync(claudeMdPath)) {
+                return null;
+            }
+            
+            // Read the file
+            const content = fs.readFileSync(claudeMdPath, 'utf8');
+            
+            // Look for project name in the Project Configuration section
+            const projectMatch = content.match(/## Project Configuration[\s\S]*?\*\*Project Name\*\*:\s*(.+?)(?:\n|$)/);
+            
+            if (projectMatch && projectMatch[1]) {
+                const projectName = projectMatch[1].trim();
+                this.logError(`Found project name in CLAUDE.md: ${projectName}`);
+                return projectName;
+            }
+            
+            return null;
+        } catch (error) {
+            this.logError('Error reading project from CLAUDE.md:', error.message);
+            return null;
         }
     }
 
