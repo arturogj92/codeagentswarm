@@ -217,6 +217,16 @@
                         <input type="text" id="project-name" required maxlength="100" placeholder="Enter project name">
                     </div>
                     <div class="form-group">
+                        <label for="project-path">Project Path *</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="project-path" required readonly style="flex: 1;" placeholder="Select project directory">
+                            <button type="button" class="btn btn-secondary" id="select-new-project-path-btn">
+                                <i data-lucide="folder-open"></i> Browse
+                            </button>
+                        </div>
+                        <small style="color: #888; font-size: 0.8rem;">The location where your project files will be stored.</small>
+                    </div>
+                    <div class="form-group">
                         <label for="project-color">Color (optional)</label>
                         <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.5rem;">
                             <input type="radio" name="project-color" value="#007ACC" id="color-1" checked style="display: none;">
@@ -268,6 +278,16 @@
                         <label for="project-edit-name">Display Name *</label>
                         <input type="text" id="project-edit-name" required maxlength="100">
                         <small style="color: #888; font-size: 0.8rem;">This changes how the project name is displayed, but keeps the internal reference.</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="project-edit-path">Project Path *</label>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <input type="text" id="project-edit-path" required readonly style="flex: 1;">
+                            <button type="button" class="btn btn-secondary" id="select-project-path-btn">
+                                <i data-lucide="folder-open"></i> Browse
+                            </button>
+                        </div>
+                        <small style="color: #888; font-size: 0.8rem;">The location of your project files.</small>
                     </div>
                     <div class="form-group">
                         <label for="project-edit-color">Color</label>

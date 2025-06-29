@@ -1346,7 +1346,7 @@ ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
         console.log(`Creating new project "${displayName}" for directory: ${directory}`);
         
         // Create the project with the directory as its path
-        const projectResult = db.createProject(projectName, null, directory);
+        const projectResult = db.createProject(projectName, directory);
         
         if (projectResult.success) {
           // Update display name if different from project name
@@ -1519,7 +1519,7 @@ ipcMain.handle('project-create', async (event, name, color, folderPath) => {
     if (!db) return { success: false, error: 'Database not initialized' };
     
     // Create project in database with folder path
-    const result = db.createProject(name, color, folderPath);
+    const result = db.createProject(name, folderPath, color);
     
     if (result.success && folderPath) {
       // Create or update CLAUDE.md in the selected folder
@@ -1608,19 +1608,16 @@ ipcMain.handle('project-update-display-name', async (event, name, displayName) =
     const result = db.updateProjectDisplayName(name, displayName);
     
     if (result.success) {
-      // Get all folders associated with this project
-      const folders = db.getProjectFolders(name);
-      console.log(`Found ${folders.length} folders associated with project ${name}: ${folders.join(', ')}`);
-      
-      // Update CLAUDE.md in each folder
-      for (const folderPath of folders) {
-        const claudeMdPath = path.join(folderPath, 'CLAUDE.md');
+      // Get the project to find its path
+      const project = db.getProjectByName(name);
+      if (project && project.path) {
+        const claudeMdPath = path.join(project.path, 'CLAUDE.md');
         console.log(`Attempting to update CLAUDE.md at: ${claudeMdPath}`);
         const updated = updateClaudeMdProjectName(claudeMdPath, displayName);
         if (updated) {
-          console.log(`✅ Successfully updated CLAUDE.md in ${folderPath} with new project name: ${displayName}`);
+          console.log(`✅ Successfully updated CLAUDE.md in ${project.path} with new project name: ${displayName}`);
         } else {
-          console.log(`❌ Failed to update CLAUDE.md in ${folderPath} - file may not exist or project name not found`);
+          console.log(`❌ Failed to update CLAUDE.md in ${project.path} - file may not exist or project name not found`);
         }
       }
     }
@@ -1635,6 +1632,16 @@ ipcMain.handle('project-update-color', async (event, name, color) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
     const result = db.updateProjectColor(name, color);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('project-update-path', async (event, name, newPath) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateProjectPath(name, newPath);
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -1657,6 +1664,24 @@ ipcMain.handle('get-mcp-port', async () => {
     const port = mcpServer.getPort();
     return { success: true, port };
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('dialog-open-directory', async (event) => {
+  try {
+    // Don't specify a parent window to avoid crashes
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: 'Select Project Directory'
+    });
+    
+    if (!result.canceled && result.filePaths.length > 0) {
+      return { success: true, path: result.filePaths[0] };
+    }
+    return { success: false };
+  } catch (error) {
+    console.error('Error in dialog-open-directory:', error);
     return { success: false, error: error.message };
   }
 });

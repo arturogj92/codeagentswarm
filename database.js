@@ -81,6 +81,7 @@ class DatabaseManager {
                 name TEXT UNIQUE NOT NULL,
                 display_name TEXT,
                 color TEXT NOT NULL,
+                path TEXT UNIQUE NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
@@ -122,8 +123,8 @@ class DatabaseManager {
         // Add path column if it doesn't exist (migration)
         this.addPathColumnIfNeeded();
         
-        // Update path column to allow NULL (migration)
-        this.allowNullPathColumn();
+        // Enforce path constraints (migration)
+        this.enforcePathConstraints();
         
         console.log('✅ DatabaseManager initialization completed');
     }
@@ -412,39 +413,39 @@ class DatabaseManager {
         }
     }
     
-    allowNullPathColumn() {
+    enforcePathConstraints() {
         try {
-            console.log('Checking if path column allows NULL...');
+            console.log('Checking path column constraints...');
             // Check current schema
             const columns = this.db.prepare("PRAGMA table_info(projects)").all();
             const pathColumn = columns.find(col => col.name === 'path');
             
-            if (pathColumn && pathColumn.notnull === 1) {
-                console.log('Path column currently NOT NULL, need to recreate table to allow NULL...');
+            if (!pathColumn || pathColumn.notnull === 0) {
+                console.log('Path column needs to be NOT NULL, recreating table...');
                 
                 // Need to recreate table to change NOT NULL constraint
                 this.db.exec('BEGIN TRANSACTION');
                 
                 try {
-                    // Create new table with path allowing NULL
+                    // Create new table with path NOT NULL and UNIQUE
                     this.db.exec(`
                         CREATE TABLE projects_new (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
-                            name TEXT NOT NULL,
-                            path TEXT UNIQUE,
-                            description TEXT,
-                            color TEXT DEFAULT '#2cb67d',
+                            name TEXT UNIQUE NOT NULL,
+                            path TEXT UNIQUE NOT NULL,
+                            display_name TEXT,
+                            color TEXT NOT NULL DEFAULT '#007ACC',
                             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            display_name TEXT
+                            updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                         )
                     `);
                     
-                    // Copy data
+                    // Copy data (only projects with path)
                     this.db.exec(`
-                        INSERT INTO projects_new (id, name, path, description, color, created_at, updated_at, display_name)
-                        SELECT id, name, path, description, color, created_at, updated_at, display_name
+                        INSERT INTO projects_new (id, name, path, display_name, color, created_at, updated_at)
+                        SELECT id, name, path, display_name, color, created_at, updated_at
                         FROM projects
+                        WHERE path IS NOT NULL
                     `);
                     
                     // Drop old table and rename new one
@@ -452,13 +453,13 @@ class DatabaseManager {
                     this.db.exec('ALTER TABLE projects_new RENAME TO projects');
                     
                     this.db.exec('COMMIT');
-                    console.log('Successfully updated projects table to allow NULL path');
+                    console.log('Successfully updated projects table with NOT NULL path constraint');
                 } catch (error) {
                     this.db.exec('ROLLBACK');
                     throw error;
                 }
             } else {
-                console.log('Path column already allows NULL');
+                console.log('Path column constraints are correct');
             }
         } catch (error) {
             console.error('Error updating path column constraint:', error);
@@ -487,26 +488,30 @@ class DatabaseManager {
                     
                     if (projectMatch && projectMatch[1]) {
                         const projectName = projectMatch[1].trim();
-                        // Register this folder with the project
-                        this.addProjectFolder(projectName, directory);
-                        console.log(`Registered folder ${directory} with project ${projectName}`);
+                        // Check if project exists with this path
+                        const existingProject = this.getProjectByPath(directory);
+                        if (!existingProject) {
+                            // Check if a project with this name exists
+                            const projectByName = this.getProjectByName(projectName);
+                            if (!projectByName) {
+                                // Create new project
+                                this.createProject(projectName, directory);
+                                console.log(`Created project ${projectName} at ${directory}`);
+                            }
+                        }
                     } else {
                         // CLAUDE.md exists but no project name found
                         // Use directory name as project name
                         const projectName = path.basename(directory);
                         console.log(`No project name found in CLAUDE.md, using directory name: ${projectName}`);
                         
-                        // Create project if it doesn't exist
-                        const existingProject = this.getProjectByName(projectName);
+                        // Check if project exists at this path
+                        const existingProject = this.getProjectByPath(directory);
                         if (!existingProject) {
-                            const result = this.createProject(projectName, null, directory);
+                            const result = this.createProject(projectName, directory);
                             if (result.success) {
                                 console.log(`Created new project: ${projectName}`);
                             }
-                        } else {
-                            // Project exists, just add the folder association
-                            this.addProjectFolder(projectName, directory);
-                            console.log(`Added folder ${directory} to existing project ${projectName}`);
                         }
                         
                         // Update CLAUDE.md with project configuration section
@@ -798,7 +803,7 @@ class DatabaseManager {
     // Project management methods
     
     // Create a new project
-    createProject(name, color = null, path = null) {
+    createProject(name, path, color = null) {
         try {
             // First check if project already exists
             const existingProject = this.getProjectByName(name);
@@ -840,22 +845,30 @@ class DatabaseManager {
                 color = colors.find(c => !usedColors.includes(c)) || colors[0];
             }
             
-            // Allow path to be null if not provided
-            // Projects created from UI won't have a path initially
+            // Path is now required
+            if (!path) {
+                return { success: false, error: 'Path is required for project creation' };
+            }
+            
+            // Check if another project already uses this path
+            const existingProjectWithPath = this.getProjectByPath(path);
+            if (existingProjectWithPath) {
+                return { 
+                    success: false, 
+                    error: `Path already used by project "${existingProjectWithPath.name}"` 
+                };
+            }
             
             console.log('Creating project with:', { name, display_name: name, color, path });
             
             const stmt = this.db.prepare(`
-                INSERT INTO projects (name, display_name, color)
-                VALUES (?, ?, ?)
+                INSERT INTO projects (name, display_name, color, path)
+                VALUES (?, ?, ?, ?)
             `);
             
-            const result = stmt.run(name, name, color); // display_name defaults to name
+            const result = stmt.run(name, name, color, path); // display_name defaults to name
             
-            // If path is provided, save it in project_folders table
-            if (path) {
-                this.addProjectFolder(name, path);
-            }
+            // No need for project_folders table anymore
             
             return { success: true, projectId: result.lastInsertRowid, name, color };
         } catch (err) {
@@ -906,17 +919,30 @@ class DatabaseManager {
         }
     }
     
-    // Update project
-    updateProject(id, name, color) {
+    // Update project path
+    updateProjectPath(name, newPath) {
         try {
+            // Check if another project already uses this path
+            const existingProject = this.getProjectByPath(newPath);
+            if (existingProject && existingProject.name !== name) {
+                return { 
+                    success: false, 
+                    error: `Path already used by project "${existingProject.name}"` 
+                };
+            }
+            
             const stmt = this.db.prepare(`
                 UPDATE projects
-                SET name = ?, color = ?
-                WHERE id = ?
+                SET path = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE name = ?
             `);
             
-            stmt.run(name, color, id);
-            return { success: true };
+            const result = stmt.run(newPath, name);
+            if (result.changes > 0) {
+                return { success: true };
+            } else {
+                return { success: false, error: 'Project not found' };
+            }
         } catch (err) {
             return { success: false, error: err.message };
         }
@@ -1016,35 +1042,15 @@ class DatabaseManager {
                 return { success: false, error: 'Cannot delete the default project' };
             }
             
-            // Use a transaction to ensure atomicity
-            const deleteProjectFolders = this.db.prepare(`DELETE FROM project_folders WHERE project_name = ?`);
+            // Simple delete since we don't need project_folders anymore
             const deleteProject = this.db.prepare(`DELETE FROM projects WHERE name = ?`);
+            const result = deleteProject.run(name);
             
-            const transaction = this.db.transaction((projectName) => {
-                // Delete folder associations first
-                try {
-                    deleteProjectFolders.run(projectName);
-                } catch (err) {
-                    // Ignore if table doesn't exist
-                    console.log('Note: project_folders table might not exist yet');
-                }
-                
-                // Then delete the project
-                const result = deleteProject.run(projectName);
-                if (result.changes === 0) {
-                    throw new Error('Project not found');
-                }
-            });
-            
-            try {
-                transaction(name);
-                return { success: true };
-            } catch (err) {
-                if (err.message === 'Project not found') {
-                    return { success: false, error: 'Project not found' };
-                }
-                throw err;
+            if (result.changes === 0) {
+                return { success: false, error: 'Project not found' };
             }
+            
+            return { success: true };
         } catch (err) {
             console.error('Error in deleteProject:', err);
             return { success: false, error: err.message };

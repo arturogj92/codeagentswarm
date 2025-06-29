@@ -7,6 +7,7 @@ class KanbanManager {
         this.currentTask = null;
         this.editingTaskId = null;
         this.currentProjectFilter = 'all';
+        this.isSelectingDirectory = false;
         this.init();
     }
 
@@ -133,6 +134,24 @@ class KanbanManager {
             e.preventDefault();
             this.saveProject();
         });
+        
+        // Browse button for new project path
+        document.getElementById('select-new-project-path-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            try {
+                const result = await ipcRenderer.invoke('dialog-open-directory');
+                
+                if (result && result.success && result.path) {
+                    const pathInput = document.getElementById('project-path');
+                    pathInput.value = result.path;
+                    pathInput.setAttribute('value', result.path);
+                }
+            } catch (error) {
+                console.error('Error opening directory dialog:', error);
+            }
+        });
 
         // Project edit modal controls
         document.getElementById('project-edit-modal-close-btn').addEventListener('click', () => {
@@ -156,6 +175,52 @@ class KanbanManager {
         document.getElementById('delete-project-btn').addEventListener('click', () => {
             this.deleteProject();
         });
+        
+        // Browse button for project path
+        document.getElementById('select-project-path-btn').addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // Set flag to prevent modal from closing
+            this.isSelectingDirectory = true;
+            
+            // Temporarily store the editingProjectName to prevent modal from closing
+            const tempProjectName = this.editingProjectName;
+            
+            try {
+                const result = await ipcRenderer.invoke('dialog-open-directory');
+                
+                // Restore the editing state
+                this.editingProjectName = tempProjectName;
+                
+                // Re-show the modal if it was closed
+                const modal = document.getElementById('project-edit-modal');
+                if (!modal.classList.contains('show')) {
+                    modal.classList.add('show');
+                }
+                
+                if (result && result.success && result.path) {
+                    const pathInput = document.getElementById('project-edit-path');
+                    pathInput.value = result.path;
+                    
+                    // Force update the input value
+                    pathInput.setAttribute('value', result.path);
+                }
+            } catch (error) {
+                console.error('Error opening directory dialog:', error);
+                // Restore the editing state even on error
+                this.editingProjectName = tempProjectName;
+                
+                // Re-show modal
+                const modal = document.getElementById('project-edit-modal');
+                if (!modal.classList.contains('show')) {
+                    modal.classList.add('show');
+                }
+            } finally {
+                // Always reset the flag
+                this.isSelectingDirectory = false;
+            }
+        });
 
         // Click outside modal to close
         document.getElementById('task-modal').addEventListener('click', (e) => {
@@ -177,7 +242,7 @@ class KanbanManager {
         });
 
         document.getElementById('project-edit-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'project-edit-modal') {
+            if (e.target.id === 'project-edit-modal' && !this.isSelectingDirectory) {
                 this.hideProjectEditModal();
             }
         });
@@ -1011,6 +1076,7 @@ class KanbanManager {
     showCreateProjectDialog() {
         // Reset form
         document.getElementById('project-name').value = '';
+        document.getElementById('project-path').value = '';
         document.getElementById('color-1').checked = true;
         document.getElementById('project-modal').classList.add('show');
         document.getElementById('project-name').focus();
@@ -1022,11 +1088,17 @@ class KanbanManager {
 
     async saveProject() {
         const projectName = document.getElementById('project-name').value.trim();
+        const projectPath = document.getElementById('project-path').value.trim();
         const selectedColor = document.querySelector('input[name="project-color"]:checked')?.value;
 
         if (!projectName) {
             // Focus on empty field
             document.getElementById('project-name').focus();
+            return;
+        }
+        
+        if (!projectPath) {
+            this.showNotification('Please select a project directory', 'error');
             return;
         }
 
@@ -1038,16 +1110,7 @@ class KanbanManager {
         saveButton.disabled = true;
 
         try {
-            // First, ask for the project folder
-            const folderPath = await ipcRenderer.invoke('select-project-folder');
-            
-            if (!folderPath) {
-                // User cancelled folder selection
-                saveButton.disabled = false;
-                return;
-            }
-
-            const result = await ipcRenderer.invoke('project-create', projectName, selectedColor, folderPath);
+            const result = await ipcRenderer.invoke('project-create', projectName, selectedColor, projectPath);
             if (result.success) {
                 this.hideProjectModal();
                 // Reload projects
@@ -1087,6 +1150,9 @@ class KanbanManager {
         const currentDisplayName = project.display_name || project.name;
         document.getElementById('project-edit-name').value = currentDisplayName;
         
+        // Set current project path
+        document.getElementById('project-edit-path').value = project.path || '';
+        
         // Set current color in radio buttons
         const colorRadios = document.querySelectorAll('input[name="project-edit-color"]');
         colorRadios.forEach(radio => {
@@ -1111,11 +1177,24 @@ class KanbanManager {
             return;
         }
 
+        const newPath = document.getElementById('project-edit-path').value.trim();
+        if (!newPath) {
+            this.showNotification('Project path is required', 'error');
+            return;
+        }
+
         const selectedColor = document.querySelector('input[name="project-edit-color"]:checked')?.value;
 
         try {
             // Update display name
             const nameResult = await ipcRenderer.invoke('project-update-display-name', this.editingProjectName, newDisplayName);
+            
+            // Update path
+            let pathResult = { success: true };
+            const currentProject = this.projects.find(p => p.name === this.editingProjectName);
+            if (currentProject && currentProject.path !== newPath) {
+                pathResult = await ipcRenderer.invoke('project-update-path', this.editingProjectName, newPath);
+            }
             
             // Update color if selected
             let colorResult = { success: true };
@@ -1123,14 +1202,17 @@ class KanbanManager {
                 colorResult = await ipcRenderer.invoke('project-update-color', this.editingProjectName, selectedColor);
             }
             
-            if (nameResult.success && colorResult.success) {
+            if (nameResult.success && pathResult.success && colorResult.success) {
                 this.hideProjectEditModal();
                 // Reload projects and tasks to update UI
                 await this.loadProjects();
                 await this.loadTasks();
                 this.showNotification(`Project updated successfully`, 'success');
             } else {
-                const error = !nameResult.success ? nameResult.error : colorResult.error;
+                let error = '';
+                if (!nameResult.success) error = nameResult.error;
+                else if (!pathResult.success) error = pathResult.error;
+                else if (!colorResult.success) error = colorResult.error;
                 this.showNotification(`Failed to update project: ${error}`, 'error');
             }
         } catch (error) {
