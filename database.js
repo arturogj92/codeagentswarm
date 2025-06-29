@@ -483,13 +483,47 @@ class DatabaseManager {
             if (fs.existsSync(claudeMdPath)) {
                 try {
                     const content = fs.readFileSync(claudeMdPath, 'utf8');
-                    const projectMatch = content.match(/\*\*Project Name\*\*:\s*(.+?)(?:\n|$)/);
+                    const projectMatch = content.match(/\*\*Project Name\*\*:\s*([^\n]+)/);
                     
                     if (projectMatch && projectMatch[1]) {
                         const projectName = projectMatch[1].trim();
                         // Register this folder with the project
                         this.addProjectFolder(projectName, directory);
                         console.log(`Registered folder ${directory} with project ${projectName}`);
+                    } else {
+                        // CLAUDE.md exists but no project name found
+                        // Use directory name as project name
+                        const projectName = path.basename(directory);
+                        console.log(`No project name found in CLAUDE.md, using directory name: ${projectName}`);
+                        
+                        // Create project if it doesn't exist
+                        const existingProject = this.getProjectByName(projectName);
+                        if (!existingProject) {
+                            const result = this.createProject(projectName, null, directory);
+                            if (result.success) {
+                                console.log(`Created new project: ${projectName}`);
+                            }
+                        } else {
+                            // Project exists, just add the folder association
+                            this.addProjectFolder(projectName, directory);
+                            console.log(`Added folder ${directory} to existing project ${projectName}`);
+                        }
+                        
+                        // Update CLAUDE.md with project configuration section
+                        const { getCodeAgentSwarmSection, SECTION_START, SECTION_END } = require('./claude-md-config');
+                        
+                        // Check if CodeAgentSwarm section exists
+                        const startIndex = content.indexOf(SECTION_START);
+                        const endIndex = content.indexOf(SECTION_END);
+                        
+                        if (startIndex !== -1 && endIndex !== -1) {
+                            // Replace existing section with project info
+                            const newContent = content.substring(0, startIndex) +
+                                             getCodeAgentSwarmSection(projectName) +
+                                             content.substring(endIndex + SECTION_END.length);
+                            fs.writeFileSync(claudeMdPath, newContent, 'utf8');
+                            console.log(`Updated CLAUDE.md with project name: ${projectName}`);
+                        }
                     }
                 } catch (error) {
                     console.error('Error reading CLAUDE.md for project association:', error);

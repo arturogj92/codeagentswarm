@@ -234,7 +234,7 @@ Tasks are automatically organized by project based on the CLAUDE.md configuratio
 1. **Project Detection**: When creating a task, **ALWAYS** first check the CLAUDE.md file for the project name
 2. **Detection Steps**:
    - Read the CLAUDE.md file in the current working directory
-   - Look for "**Project Name**: [name]" in the Project Configuration section
+   - Look for "**Project Name**: " followed by the project name in the Project Configuration section
    - Use this name when calling \`create_task\`
    - If no CLAUDE.md or project name found, use the directory name as fallback
 3. **Visual Identification**: Each project has a unique color for easy identification in the UI

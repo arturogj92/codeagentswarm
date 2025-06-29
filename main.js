@@ -447,11 +447,8 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
     const workingDir = customWorkingDir || path.join(userHome, 'Desktop');
     console.log('Working directory:', workingDir);
     
-    // Auto-configure CLAUDE.md for MCP Task Manager when a custom directory is provided
-    if (customWorkingDir) {
-      console.log('Configuring CLAUDE.md for:', customWorkingDir);
-      ensureClaudeMdConfiguration(customWorkingDir);
-    }
+    // Auto-configure CLAUDE.md for MCP Task Manager
+    // We'll do this after claude creates its initial CLAUDE.md
     
     console.log(`Creating terminal ${quadrant}`);
     
@@ -489,6 +486,12 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
         const command = sessionType === 'new' ? 'claude' : 'claude --resume';
         console.log(`Auto-executing command: ${command}`);
         shell.executeCommand(command, true);
+        
+        // Configure CLAUDE.md after claude has created it
+        setTimeout(() => {
+          console.log('Configuring CLAUDE.md for:', workingDir);
+          ensureClaudeMdConfiguration(workingDir);
+        }, 2000); // Wait 2 seconds for claude to create its initial CLAUDE.md
       }
     }, 1000); // Increased to 1 second to ensure terminal is ready
     
@@ -1320,6 +1323,11 @@ ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
     
     // Save terminal directory
     const result = db.saveTerminalDirectory(terminalId, directory);
+    
+    // Ensure CLAUDE.md is configured for this directory
+    if (result.success && directory) {
+      ensureClaudeMdConfiguration(directory);
+    }
     
     // Check if a project exists for this directory
     if (result.success && directory) {
@@ -2659,17 +2667,17 @@ function ensureClaudeMdConfiguration(projectPath) {
         const afterTitle = titleIndex + titleLine.length;
         
         fileContent = existingUserContent.substring(0, afterTitle) + 
-                     '\n\n' + getCodeAgentSwarmSection() + 
+                     '\n\n' + getCodeAgentSwarmSection(projectName) + 
                      '\n\n' + existingUserContent.substring(afterTitle).trim();
       } else {
         // No title, add our section with a generic title
         fileContent = `# ${projectName} Project Configuration\n\n` +
-                     getCodeAgentSwarmSection() + 
+                     getCodeAgentSwarmSection(projectName) + 
                      '\n\n---\n\n' + existingUserContent;
       }
     } else {
       // New file or empty file
-      fileContent = `# ${projectName} Project Configuration\n\n` + getCodeAgentSwarmSection();
+      fileContent = `# ${projectName} Project Configuration\n\n` + getCodeAgentSwarmSection(projectName);
     }
     
     // Only write if content has changed

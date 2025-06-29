@@ -22,7 +22,7 @@
 
 ## Project Configuration
 
-**Project Name**: CodeAgentSwarm
+**Project Name**: codeagentswarm
 
 _This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
 
@@ -47,8 +47,9 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 1. **First check** if a similar task already exists using `list_tasks` from MCP
 2. If no similar task exists, **create a new task** using `create_task` from MCP:
    - **MANDATORY specify the correct terminal_id**
-   - The project will be detected automatically based on the terminal's working directory
-   - If working in a new directory, a new project will be created automatically
+   - **MANDATORY: Read the project name from the CLAUDE.md file** in the current directory
+   - Look for the "Project Name:" field in the "Project Configuration" section
+   - If no project name is found in CLAUDE.md, use the directory name as fallback
 3. **Start the task** using `start_task` before beginning any work
 4. **MANDATORY: Update the plan** using `update_task_plan` when starting a task with a detailed step plan
 5. **Complete the task** using `complete_task` when finished (goes to "completed") or `submit_for_testing` if testing needed
@@ -227,12 +228,26 @@ get_project_tasks(project_name="CodeAgentSwarm")  # Get all tasks for a project
 
 ## Project Organization
 
-Tasks are automatically organized by project based on the terminal's working directory:
+Tasks are automatically organized by project based on the CLAUDE.md configuration:
 
-1. **Automatic Project Detection**: When creating a task, the project is determined by the directory name
-2. **Default Project**: Tasks created without a specific directory context use "CodeAgentSwarm" as default
+1. **Project Detection**: When creating a task, **ALWAYS** first check the CLAUDE.md file for the project name
+2. **Detection Steps**:
+   - Read the CLAUDE.md file in the current working directory
+   - Look for "**Project Name**: " followed by the project name in the Project Configuration section
+   - Use this name when calling `create_task`
+   - If no CLAUDE.md or project name found, use the directory name as fallback
 3. **Visual Identification**: Each project has a unique color for easy identification in the UI
 4. **Project Filtering**: Use `get_project_tasks` to see tasks for a specific project
+
+### How to detect the project name (for agents):
+```bash
+# 1. First, check if CLAUDE.md exists
+if [ -f "CLAUDE.md" ]; then
+    # 2. Extract project name from CLAUDE.md
+    project_name=$(grep -A1 "## Project Configuration" CLAUDE.md | grep "Project Name:" | sed 's/.*Project Name**: //' | sed 's/^ *//')
+fi
+# 3. Use the project name when creating tasks
+```
 
 ## IMPORTANT: MCP Token Limits
 
@@ -286,7 +301,7 @@ This file is automatically managed by CodeAgentSwarm to ensure proper MCP (Model
 
 ## Project Configuration
 
-**Project Name**: CodeAgentSwarm
+**Project Name**: CodeAgentSwarmTEST
 
 _This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
 
