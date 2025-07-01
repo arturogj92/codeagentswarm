@@ -409,7 +409,7 @@ class TerminalManager {
         });
     }
 
-    showDirectorySelector(quadrant) {
+    async showDirectorySelector(quadrant) {
         const wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
         
         // Remove placeholder if it exists
@@ -418,12 +418,40 @@ class TerminalManager {
             placeholder.remove();
         }
         
+        // Get all projects first
+        const projectsResult = await ipcRenderer.invoke('project-get-all');
+        const projects = projectsResult.success ? projectsResult.projects : [];
+        
         // Create directory selector modal
         const selectorDiv = document.createElement('div');
         selectorDiv.className = 'directory-selector';
+        
+        // Build recent projects HTML
+        let recentProjectsHTML = '';
+        if (projects.length > 0) {
+            recentProjectsHTML = `
+                <div class="recent-projects-section">
+                    <h4>Recent Projects</h4>
+                    <div class="recent-projects-list">
+                        ${projects.map(project => `
+                            <div class="recent-project-item" data-project-path="${project.path}" data-project-name="${project.name}">
+                                <div class="project-info">
+                                    <span class="project-color-indicator" style="background-color: ${project.color}"></span>
+                                    <span class="project-name">${project.display_name || project.name}</span>
+                                    <span class="project-path">${project.path}</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+                <div class="directory-selector-divider"></div>
+            `;
+        }
+        
         selectorDiv.innerHTML = `
             <div class="directory-selector-content">
                 <h3>Select Working Directory</h3>
+                ${recentProjectsHTML}
                 ${this.lastSelectedDirectories[quadrant] ? `
                     <div class="last-directory-section">
                         <div class="last-directory-label">Last used:</div>
@@ -507,6 +535,22 @@ class TerminalManager {
         // Handle cancel button
         selectorDiv.querySelector('#cancel-btn').addEventListener('click', () => {
             restorePlaceholder();
+        });
+        
+        // Handle recent project clicks
+        selectorDiv.querySelectorAll('.recent-project-item').forEach(projectItem => {
+            projectItem.addEventListener('click', () => {
+                const projectPath = projectItem.dataset.projectPath;
+                const projectName = projectItem.dataset.projectName;
+                
+                // Update last selected directory
+                this.lastSelectedDirectories[quadrant] = projectPath;
+                this.saveDirectoryToStorage(quadrant, projectPath);
+                
+                // Remove selector and show session selector
+                wrapper.removeChild(selectorDiv);
+                this.showSessionSelector(quadrant, projectPath);
+            });
         });
         
         // Handle Escape key
