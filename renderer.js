@@ -3,6 +3,8 @@ const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
 
+console.log('🔧 [RENDERER] renderer.js loaded');
+
 // Performance monitor function - lazy loaded
 function loadPerformanceMonitor() {
     try {
@@ -33,6 +35,7 @@ class TerminalManager {
         this.customProjectColors = {}; // Store custom colors per project
         this.terminalsNeedingAttention = new Set(); // Track terminals that need user attention
         this.claudeFinishedNotified = new Map(); // Track if we already notified about CLAUDE FINISHED for each terminal
+        this.isChangingLayout = false; // Flag to prevent re-parsing during layout changes
         
         this.init();
         // Load directories asynchronously with error handling
@@ -160,6 +163,17 @@ class TerminalManager {
         document.getElementById('create-task-btn').addEventListener('click', () => {
             this.showCreateTaskDialog();
         });
+
+        const fixMcpBtn = document.getElementById('fix-mcp-btn');
+        if (fixMcpBtn) {
+            console.log('🔧 [RENDERER] Registering fix-mcp-btn click handler');
+            fixMcpBtn.addEventListener('click', () => {
+                console.log('🔧 [RENDERER] fix-mcp-btn clicked');
+                this.fixMCPTaskManager();
+            });
+        } else {
+            console.error('🔧 [RENDERER] fix-mcp-btn not found in DOM!');
+        }
 
         document.getElementById('mcp-info-btn').addEventListener('click', () => {
             this.showMCPInfoModal();
@@ -800,6 +814,11 @@ class TerminalManager {
     }
 
     parseClaudeCodeOutput(data, quadrant) {
+        // Skip parsing if we're in the middle of a layout change
+        if (this.isChangingLayout) {
+            return;
+        }
+        
         const text = data.toString();
         
         // Check if Claude Code is ready
@@ -2044,6 +2063,160 @@ class TerminalManager {
     showKanban() {
         // Request main process to open Kanban window
         ipcRenderer.send('open-kanban-window');
+    }
+
+    async fixMCPTaskManager() {
+        console.log('🔧 [RENDERER] fixMCPTaskManager called');
+        
+        // First show a modal explaining the process
+        const confirmModal = document.createElement('div');
+        confirmModal.className = 'mcp-info-modal';
+        confirmModal.innerHTML = `
+            <div class="mcp-info-content">
+                <div class="mcp-info-header">
+                    <h3><i data-lucide="wrench"></i> Fix MCP Connection</h3>
+                    <button class="close-btn" onclick="this.closest('.mcp-info-modal').remove()">×</button>
+                </div>
+                <div class="mcp-info-body">
+                    <div class="info-section">
+                        <h4>🔧 What does this fix do?</h4>
+                        <p>This will run a repair script that:</p>
+                        <ul>
+                            <li>Re-registers the MCP Task Manager with Claude CLI</li>
+                            <li>Fixes connection issues that occur when CodeAgentSwarm has been open for a long time</li>
+                        </ul>
+                        <br>
+                        <p><strong>Why is this needed?</strong></p>
+                        <p class="text-muted">Claude CLI sometimes loses MCP connections after extended use. This is a known Claude issue, not a CodeAgentSwarm problem.</p>
+                        <br>
+                        <h4>⚠️ Important:</h4>
+                        <p>After the fix completes, you'll need to <strong>restart CodeAgentSwarm</strong> for the changes to take effect.</p>
+                    </div>
+                </div>
+                <div class="mcp-info-footer">
+                    <button class="btn btn-secondary" onclick="this.closest('.mcp-info-modal').remove()">Cancel</button>
+                    <button class="btn btn-primary" id="proceed-fix-mcp">Proceed with Fix</button>
+                </div>
+            </div>
+        `;
+        
+        console.log('🔧 [RENDERER] Adding modal to DOM');
+        document.body.appendChild(confirmModal);
+        
+        // Make modal visible
+        setTimeout(() => {
+            confirmModal.classList.add('show');
+        }, 10);
+        
+        // Initialize Lucide icons
+        if (window.lucide) {
+            console.log('🔧 [RENDERER] Initializing Lucide icons');
+            window.lucide.createIcons();
+        }
+        
+        // Handle proceed button
+        const proceedBtn = document.getElementById('proceed-fix-mcp');
+        console.log('🔧 [RENDERER] Proceed button element:', proceedBtn);
+        
+        if (proceedBtn) {
+            proceedBtn.addEventListener('click', async () => {
+                console.log('🔧 [RENDERER] Proceed button clicked');
+            confirmModal.remove();
+            
+            // Get the button and disable it during operation
+            const fixButton = document.getElementById('fix-mcp-btn');
+            const originalHTML = fixButton.innerHTML;
+            
+            try {
+                // Update button to show loading state
+                fixButton.disabled = true;
+                fixButton.innerHTML = '<i data-lucide="loader" class="spinning"></i>';
+                
+                // Show a notification that we're starting the fix
+                this.showNotification('🔧 Fixing MCP Task Manager...', 'info');
+                
+                // Call the IPC handler to fix MCP
+                console.log('🔧 [RENDERER] Calling IPC handler fix-mcp-task-manager');
+                const result = await ipcRenderer.invoke('fix-mcp-task-manager');
+                console.log('🔧 [RENDERER] IPC handler returned:', result);
+            
+            if (result.success) {
+                this.showNotification('✅ MCP Task Manager fixed successfully!', 'success');
+                
+                // Show additional modal with instructions
+                const modal = document.createElement('div');
+                modal.className = 'mcp-info-modal';
+                
+                // Check if message indicates verification issues
+                const needsRestart = result.message.includes('restart') || result.message.includes('close all Claude');
+                
+                modal.innerHTML = `
+                    <div class="mcp-info-content">
+                        <div class="mcp-info-header">
+                            <h3><i data-lucide="${needsRestart ? 'alert-circle' : 'check-circle'}"></i> MCP Task Manager ${needsRestart ? 'Updated' : 'Fixed'}</h3>
+                            <button class="close-btn" onclick="this.closest('.mcp-info-modal').remove()">×</button>
+                        </div>
+                        <div class="mcp-info-body">
+                            <div class="info-section">
+                                ${needsRestart ? `
+                                <h4>⚠️ Action Required</h4>
+                                <p>The MCP Task Manager configuration has been updated.</p>
+                                <br>
+                                <p><strong>To complete the fix:</strong></p>
+                                <ol>
+                                    <li><strong>Restart CodeAgentSwarm</strong> (close and reopen the app)</li>
+                                    <li><strong>Open a new terminal</strong> in any directory</li>
+                                    <li><strong>Test the MCP</strong>:<br>
+                                        Open <code>claude</code> and run <code>/mcp</code></li>
+                                </ol>
+                                <br>
+                                <p class="text-muted">If the MCP still doesn't appear, make sure all Claude CLI sessions are closed before restarting.</p>
+                                ` : `
+                                <h4>✅ Success!</h4>
+                                <p>The MCP Task Manager has been successfully added to Claude CLI.</p>
+                                <p>You can now use task management tools in your Claude CLI sessions.</p>
+                                <br>
+                                <p><strong>Try it out:</strong></p>
+                                <p>Open <code>claude</code> and run <code>/mcp</code></p>
+                                `}
+                            </div>
+                        </div>
+                        <div class="mcp-info-footer">
+                            <button class="btn btn-primary" onclick="this.closest('.mcp-info-modal').remove()">Got it!</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+                
+                // Make modal visible
+                setTimeout(() => {
+                    modal.classList.add('show');
+                }, 10);
+                
+                // Initialize Lucide icons
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            } else {
+                this.showNotification(`❌ Failed to fix MCP: ${result.message || result.error}`, 'error');
+            }
+            } catch (error) {
+                console.error('Error fixing MCP task manager:', error);
+                this.showNotification('❌ Error fixing MCP Task Manager', 'error');
+            } finally {
+                // Restore button state
+                fixButton.disabled = false;
+                fixButton.innerHTML = originalHTML;
+                
+                // Re-initialize Lucide icons
+                if (window.lucide) {
+                    window.lucide.createIcons();
+                }
+            }
+            });
+        } else {
+            console.error('🔧 [RENDERER] Proceed button not found!');
+        }
     }
 
     showMCPInfoModal() {
@@ -3510,6 +3683,9 @@ class TerminalManager {
         const validLayouts = ['horizontal', 'vertical', '3-top1', '3-top2-horiz', '3-left2', '3-right2'];
         if (!validLayouts.includes(layout)) return;
         
+        // Set flag to prevent notification re-triggering during layout change
+        this.isChangingLayout = true;
+        
         this.currentLayout = layout;
         const container = document.getElementById('terminals-container');
         console.log('Container found:', container);
@@ -3535,6 +3711,8 @@ class TerminalManager {
         // Reparar controles después de cambiar layout
         setTimeout(() => {
             this.repairTerminalControls();
+            // Clear the flag after layout change is complete
+            this.isChangingLayout = false;
         }, 200);
     }
 

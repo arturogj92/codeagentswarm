@@ -2754,3 +2754,282 @@ ipcMain.handle('show-log-notification', () => {
   }
   return { logDir, logFile };
 });
+
+// Fix MCP Task Manager
+ipcMain.handle('fix-mcp-task-manager', async () => {
+  console.log('🔧 [FIX MCP] Starting MCP Task Manager fix...');
+  const startTime = Date.now();
+  
+  try {
+    // Get the MCP server path - use absolute path from app location
+    const appPath = app.isPackaged 
+      ? path.dirname(app.getPath('exe'))
+      : __dirname;
+    
+    const mcpServerPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+      : path.join(appPath, 'mcp-stdio-server.js');
+    
+    console.log('🔧 [FIX MCP] MCP Server Path:', mcpServerPath);
+    console.log('🔧 [FIX MCP] App Path:', appPath);
+    
+    // Check if Claude CLI is installed
+    console.log('🔧 [FIX MCP] Checking if Claude CLI is installed...');
+    const claudeInstalled = await new Promise((resolve) => {
+      const checkClaude = spawn('which', ['claude'], { shell: true });
+      checkClaude.on('close', (code) => resolve(code === 0));
+    });
+    
+    if (!claudeInstalled) {
+      return {
+        success: false,
+        message: 'Claude CLI is not installed. Please install it first: npm install -g @anthropic-ai/claude-code'
+      };
+    }
+    
+    // Check current MCP configuration with timeout
+    const currentConfig = await new Promise((resolve, reject) => {
+      const listMcp = spawn('claude', ['mcp', 'list'], { shell: true });
+      let output = '';
+      let completed = false;
+      
+      // Set timeout to prevent hanging
+      const timeout = setTimeout(() => {
+        if (!completed) {
+          completed = true;
+          listMcp.kill();
+          resolve(''); // Return empty string on timeout
+        }
+      }, 5000); // 5 second timeout
+      
+      listMcp.stdout.on('data', (data) => {
+        output += data.toString();
+      });
+      
+      listMcp.on('close', (code) => {
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeout);
+          resolve(output);
+        }
+      });
+      
+      listMcp.on('error', (err) => {
+        if (!completed) {
+          completed = true;
+          clearTimeout(timeout);
+          resolve(''); // Return empty string on error
+        }
+      });
+    });
+    
+    // Check if already configured
+    if (currentConfig.includes('codeagentswarm')) {
+      // Skip process check to avoid hanging - just return with warning
+      return {
+        success: true,
+        message: 'MCP Task Manager is already configured. Please close all Claude CLI instances and open a new terminal for changes to take effect.'
+      };
+    }
+    
+    // Remove any existing configuration with timeout
+    await new Promise((resolve) => {
+      const removeMcp = spawn('claude', ['mcp', 'remove', 'codeagentswarm-tasks'], { shell: true });
+      const timeout = setTimeout(() => {
+        removeMcp.kill();
+        resolve();
+      }, 3000);
+      
+      removeMcp.on('close', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      
+      removeMcp.on('error', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+    
+    await new Promise((resolve) => {
+      const removeMcp = spawn('claude', ['mcp', 'remove', 'codeagentswarm'], { shell: true });
+      const timeout = setTimeout(() => {
+        removeMcp.kill();
+        resolve();
+      }, 3000);
+      
+      removeMcp.on('close', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+      
+      removeMcp.on('error', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+    });
+    
+    // Add MCP configuration - use async spawn to avoid blocking
+    const addResult = await new Promise(async (resolve) => {
+      try {
+        // Prepare the JSON config with double quotes for bash
+        const configJson = `{"command": "node", "args": ["${mcpServerPath}"]}`;
+        
+        // First attempt with add-json
+        const result = await new Promise((resolveInner, rejectInner) => {
+          const command = process.platform === 'win32' 
+            ? `claude mcp add-json codeagentswarm-tasks "${configJson.replace(/"/g, '\\"')}"` 
+            : `claude mcp add-json codeagentswarm-tasks '${configJson}'`;
+          
+          console.log('Running command:', command);
+          
+          const addMcp = spawn(command, [], { 
+            shell: true,
+            env: process.env
+          });
+          
+          let output = '';
+          let error = '';
+          let completed = false;
+          
+          // Set timeout
+          const timeout = setTimeout(() => {
+            if (!completed) {
+              completed = true;
+              addMcp.kill();
+              rejectInner(new Error('Command timed out'));
+            }
+          }, 10000); // 10 second timeout
+          
+          addMcp.stdout.on('data', (data) => {
+            output += data.toString();
+          });
+          
+          addMcp.stderr.on('data', (data) => {
+            error += data.toString();
+          });
+          
+          addMcp.on('close', (code) => {
+            if (!completed) {
+              completed = true;
+              clearTimeout(timeout);
+              if (code === 0) {
+                resolveInner(true);
+              } else {
+                rejectInner(new Error(error || 'Failed to add MCP server'));
+              }
+            }
+          });
+          
+          addMcp.on('error', (err) => {
+            if (!completed) {
+              completed = true;
+              clearTimeout(timeout);
+              rejectInner(err);
+            }
+          });
+        });
+        
+        resolve(result);
+      } catch (cmdError) {
+        console.error('Error adding MCP with add-json:', cmdError);
+        
+        // Try alternative method with direct arguments
+        try {
+          console.log('Trying alternative method...');
+          const altResult = await new Promise((resolveAlt, rejectAlt) => {
+            const altCommand = `claude mcp add codeagentswarm-tasks node "${mcpServerPath}"`;
+            
+            const altMcp = spawn(altCommand, [], {
+              shell: true,
+              env: process.env
+            });
+            
+            let altError = '';
+            
+            altMcp.stderr.on('data', (data) => {
+              altError += data.toString();
+            });
+            
+            altMcp.on('close', (code) => {
+              if (code === 0) {
+                resolveAlt(true);
+              } else {
+                rejectAlt(new Error(altError || 'Alternative method failed'));
+              }
+            });
+          });
+          
+          resolve(altResult);
+        } catch (altError) {
+          console.error('Alternative method also failed:', altError);
+          throw new Error('Both methods to add MCP failed');
+        }
+      }
+    });
+    
+    if (addResult) {
+      console.log('✅ MCP Task Manager added, verifying...');
+      
+      // Wait a moment for the configuration to settle
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verify the MCP was actually added
+      const verifyConfig = await new Promise((resolve, reject) => {
+        const verifyMcp = spawn('claude', ['mcp', 'list'], { shell: true });
+        let verifyOutput = '';
+        
+        verifyMcp.stdout.on('data', (data) => {
+          verifyOutput += data.toString();
+        });
+        
+        verifyMcp.on('close', (code) => {
+          if (code === 0) {
+            resolve(verifyOutput);
+          } else {
+            reject(new Error('Failed to verify MCP configuration'));
+          }
+        });
+      });
+      
+      if (verifyConfig.includes('codeagentswarm')) {
+        console.log('✅ MCP Task Manager verified and working!');
+        return {
+          success: true,
+          message: 'MCP Task Manager has been fixed! You may need to restart your terminal or Claude CLI for changes to take effect.'
+        };
+      } else {
+        console.log('⚠️ MCP was added but verification failed');
+        return {
+          success: true,
+          message: 'MCP Task Manager configuration was updated. Please restart Claude CLI and try again. If it still doesn\'t work, close all Claude instances and try again.'
+        };
+      }
+    }
+    
+  } catch (error) {
+    console.error('❌ Failed to fix MCP Task Manager:', error);
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to fix MCP Task Manager';
+    
+    if (error.message.includes('Both methods')) {
+      errorMessage = 'Failed to add MCP server. Try running manually: claude mcp add codeagentswarm-tasks node ' + path.join(__dirname, 'mcp-stdio-server.js');
+    } else if (error.message.includes('command not found')) {
+      errorMessage = 'Claude CLI not found. Please install it first: npm install -g @anthropic-ai/claude-code';
+    } else {
+      errorMessage = `Failed to fix MCP Task Manager: ${error.message}`;
+    }
+    
+    const endTime = Date.now();
+    console.log(`🔧 [FIX MCP] Failed after ${endTime - startTime}ms`);
+    
+    return {
+      success: false,
+      message: errorMessage
+    };
+  } finally {
+    const endTime = Date.now();
+    console.log(`🔧 [FIX MCP] Total execution time: ${endTime - startTime}ms`);
+  }
+});

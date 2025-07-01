@@ -1315,6 +1315,11 @@ body::before {
   100% { transform: rotate(360deg); }
 }
 
+.spinning {
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
 .loader-text {
   color: var(--text-primary);
   font-size: 16px;

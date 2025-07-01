@@ -579,6 +579,32 @@ Cuando hay muchas tareas en la base de datos (30+), el comando `list_tasks` del 
 - Los cambios en el MCP server requieren reiniciar el servidor para aplicarse
 - Claude Code puede mantener conexiones MCP en caché
 
+## IMPORTANTE: Problemas de visibilidad de MCP en Claude CLI
+
+### Problema conocido
+Si el MCP de CodeAgentSwarm no aparece después de usar el botón Fix Task Manager (🔧):
+
+1. **Claude CLI mantiene conexiones activas**: Aunque borres la configuración MCP y la vuelvas a agregar, Claude CLI puede mantener la conexión anterior en caché
+2. **Solución**: 
+   - Cierra TODAS las instancias de Claude CLI (todos los terminales donde hayas usado `claude`)
+   - Espera 5-10 segundos
+   - Vuelve a hacer click en el botón Fix Task Manager (🔧)
+   - Abre un nuevo terminal y prueba: `claude "list my pending tasks"`
+
+### Botón Fix Task Manager (🔧)
+- Ubicado en la parte derecha del header de CodeAgentSwarm
+- Automáticamente ejecuta: `claude mcp add-json codeagentswarm-tasks` con el path absoluto del MCP server
+- El MCP funcionará en TODOS los directorios, no solo en CodeAgentSwarm
+- Verifica que la configuración se haya añadido correctamente
+- Muestra instrucciones claras sobre cerrar terminales y abrir nuevas
+
+### Proceso completo para arreglar MCP:
+1. Click en el botón Fix Task Manager (🔧)
+2. Lee las instrucciones en el modal y cierra TODOS los terminales con Claude CLI
+3. Click en "Proceed with Fix"
+4. Cuando termine, abre un NUEVO terminal
+5. Navega a CUALQUIER directorio y prueba: `claude "list my pending tasks"`
+
 
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
