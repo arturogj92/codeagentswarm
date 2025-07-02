@@ -22,7 +22,7 @@
 
 ## Project Configuration
 
-**Project Name**: codeagentswarm
+**Project Name**: CodeAgentSwarm
 
 _This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
 

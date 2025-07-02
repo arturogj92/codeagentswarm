@@ -2649,7 +2649,22 @@ function ensureClaudeMdConfiguration(projectPath) {
   const { SECTION_START, SECTION_END, getCodeAgentSwarmSection } = require('./claude-md-config');
   
   const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
-  const projectName = path.basename(projectPath);
+  let projectName = path.basename(projectPath);
+  
+  // Try to get the actual project name from the database
+  if (db) {
+    const existingProject = db.getProjectByPath(projectPath);
+    if (existingProject && existingProject.name) {
+      projectName = existingProject.name;
+    } else if (fs.existsSync(claudeMdPath)) {
+      // If no project in DB, try to extract project name from existing CLAUDE.md
+      const currentContent = fs.readFileSync(claudeMdPath, 'utf8');
+      const projectNameMatch = currentContent.match(/\*\*Project Name\*\*:\s*(.+?)(?=\n|$)/);
+      if (projectNameMatch && projectNameMatch[1]) {
+        projectName = projectNameMatch[1].trim();
+      }
+    }
+  }
   
   try {
     let fileContent = '';

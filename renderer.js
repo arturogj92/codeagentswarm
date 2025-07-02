@@ -426,14 +426,16 @@ class TerminalManager {
         const selectorDiv = document.createElement('div');
         selectorDiv.className = 'directory-selector';
         
-        // Build recent projects HTML
+        // Build recent projects HTML - Show only last 4 projects
         let recentProjectsHTML = '';
         if (projects.length > 0) {
+            // Take only the last 4 projects
+            const recentProjects = projects.slice(-4);
             recentProjectsHTML = `
                 <div class="recent-projects-section">
                     <h4>Recent Projects</h4>
                     <div class="recent-projects-list">
-                        ${projects.map(project => `
+                        ${recentProjects.map(project => `
                             <div class="recent-project-item" data-project-path="${project.path}" data-project-name="${project.name}">
                                 <div class="project-info">
                                     <span class="project-color-indicator" style="background-color: ${project.color}"></span>
@@ -444,29 +446,34 @@ class TerminalManager {
                         `).join('')}
                     </div>
                 </div>
-                <div class="directory-selector-divider"></div>
             `;
         }
         
         selectorDiv.innerHTML = `
             <div class="directory-selector-content">
                 <h3>Select Working Directory</h3>
-                ${recentProjectsHTML}
-                ${this.lastSelectedDirectories[quadrant] ? `
-                    <div class="last-directory-section">
-                        <div class="last-directory-label">Last used:</div>
-                        <div class="selected-directory-display clickable last-directory" id="last-directory-display">
-                            ${this.lastSelectedDirectories[quadrant]}
+                <div class="directory-selector-main">
+                    <div class="directory-selector-left">
+                        ${recentProjectsHTML || '<div class="no-projects-message">No recent projects</div>'}
+                    </div>
+                    <div class="directory-selector-right">
+                        ${this.lastSelectedDirectories[quadrant] ? `
+                            <div class="last-directory-section">
+                                <div class="last-directory-label">Last used:</div>
+                                <div class="selected-directory-display clickable last-directory" id="last-directory-display">
+                                    ${this.lastSelectedDirectories[quadrant]}
+                                </div>
+                            </div>
+                        ` : ''}
+                        <div class="selected-directory-display clickable" id="directory-display">
+                            ${this.lastSelectedDirectories[quadrant] ? 'Click to select different directory' : 'Click to select directory'}
+                        </div>
+                        <div class="directory-selector-buttons">
+                            <button class="btn" id="choose-dir-btn">Browse...</button>
+                            ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn">Use Last</button>' : ''}
+                            <button class="btn" id="cancel-btn">Cancel</button>
                         </div>
                     </div>
-                ` : ''}
-                <div class="selected-directory-display clickable" id="directory-display">
-                    ${this.lastSelectedDirectories[quadrant] ? 'Click to select different directory' : 'Click to select directory'}
-                </div>
-                <div class="directory-selector-buttons">
-                    <button class="btn" id="choose-dir-btn">Browse...</button>
-                    ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn">Use Last</button>' : ''}
-                    <button class="btn" id="cancel-btn">Cancel</button>
                 </div>
             </div>
         `;

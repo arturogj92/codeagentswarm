@@ -267,6 +267,12 @@ body::before {
   box-shadow: 0 8px 32px rgba(127, 90, 240, 0.5), var(--shadow-glow);
 }
 
+/* Estilo específico para el botón Use Last en el modal */
+.directory-selector-buttons .btn-primary {
+  background: var(--primary);
+  font-weight: 600;
+}
+
 .btn-primary::before {
   background: rgba(255, 255, 255, 0.3);
 }
@@ -1358,28 +1364,57 @@ body::before {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border);
   border-radius: 16px;
-  padding: 24px;
-  max-width: 380px;
-  width: 100%;
-  text-align: center;
+  padding: 20px;
+  max-width: 700px;
+  width: 90%;
   box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .directory-selector h3 {
-  margin: 0 0 20px 0;
+  margin: 0;
   color: var(--text-primary);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   background: var(--gradient-primary);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  text-align: center;
+}
+
+/* Contenedor horizontal principal */
+.directory-selector-main {
+  display: flex;
+  gap: 20px;
+  align-items: stretch;
+  min-height: 200px;
+}
+
+/* Columna izquierda - Recent Projects */
+.directory-selector-left {
+  flex: 1.2;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Columna derecha - Last Used y Buttons */
+.directory-selector-right {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  justify-content: space-between;
 }
 
 .last-directory-section {
-  margin-bottom: 16px;
-  padding-bottom: 16px;
-  border-bottom: 1px solid var(--border);
+  margin: 0;
+  padding: 0;
+  border: none;
 }
 
 .last-directory-label {
@@ -1389,6 +1424,7 @@ body::before {
   text-transform: uppercase;
   letter-spacing: 0.5px;
   font-weight: 600;
+  text-align: left;
 }
 
 .selected-directory-display.last-directory {
@@ -1405,18 +1441,19 @@ body::before {
 }
 
 .selected-directory-display {
-  margin: 20px 0;
-  padding: 16px;
+  margin: 0;
+  padding: 12px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
-  font-size: 0.875rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
   color: var(--primary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: 'JetBrains Mono', monospace;
   transition: all 0.3s ease;
+  text-align: left;
 }
 
 .selected-directory-display.clickable {
@@ -1437,57 +1474,64 @@ body::before {
 
 .directory-selector-buttons {
   display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 16px;
+  gap: 8px;
+  justify-content: stretch;
+  margin-top: auto;
 }
 
 .directory-selector-buttons .btn {
-  min-width: 100px;
+  flex: 1;
+  padding: 10px 16px;
+  font-size: 0.85rem;
 }
 
 /* Recent projects styles */
 .recent-projects-section {
-  margin-bottom: 16px;
+  margin: 0;
 }
 
 .recent-projects-section h4 {
-  font-size: 0.875rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: var(--text-muted);
-  margin-bottom: 12px;
+  margin-bottom: 8px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
+  text-align: left;
 }
 
 .recent-projects-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  max-height: 200px;
+  gap: 6px;
+  max-height: 180px;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevenir scroll horizontal */
+  flex: 1;
 }
 
 .recent-project-item {
-  padding: 12px;
+  padding: 10px;
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s ease;
+  overflow: hidden; /* Prevenir overflow horizontal */
 }
 
 .recent-project-item:hover {
-  background: var(--bg-hover);
-  border-color: hsl(var(--primary));
-  transform: translateX(4px);
-  box-shadow: 0 2px 8px rgba(127, 90, 240, 0.1);
+  background: var(--surface-hover);
+  border-color: var(--primary);
+  transform: translateX(0); /* Cambiar de 4px a 0 para evitar desbordamiento */
+  box-shadow: 0 2px 8px rgba(127, 90, 240, 0.2);
 }
 
 .project-info {
   display: flex;
   align-items: center;
   gap: 12px;
+  overflow: hidden; /* Prevenir overflow del contenido */
 }
 
 .project-color-indicator {
@@ -1501,10 +1545,15 @@ body::before {
   font-weight: 600;
   color: var(--text-primary);
   flex-shrink: 0;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
 }
 
 .project-path {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: var(--text-muted);
   font-family: 'JetBrains Mono', monospace;
   overflow: hidden;
@@ -1512,12 +1561,24 @@ body::before {
   white-space: nowrap;
   flex: 1;
   text-align: right;
+  min-width: 0; /* Importante para que funcione text-overflow */
+  opacity: 0.7;
 }
 
 .directory-selector-divider {
   height: 1px;
   background: var(--border);
   margin: 16px 0;
+}
+
+.no-projects-message {
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  padding: 40px 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
 }
 
 /* Session selector styles */
@@ -2916,5 +2977,285 @@ h3 i {
   display: flex;
   justify-content: center;
   background: rgba(0, 0, 0, 0.2);
+}
+
+/* Media query para resoluciones medias (alrededor de 1214x741) */
+@media (max-width: 1280px) and (min-width: 1000px) {
+  .directory-selector-content {
+    max-width: 600px;
+    padding: 16px;
+  }
+  
+  .directory-selector h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+  
+  .directory-selector-main {
+    gap: 16px;
+    min-height: 180px;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  
+  .recent-projects-list {
+    max-height: 150px;
+    gap: 4px;
+  }
+  
+  .recent-project-item {
+    padding: 8px;
+  }
+  
+  .project-color-indicator {
+    width: 10px;
+    height: 10px;
+  }
+  
+  .project-name {
+    font-size: 0.8rem;
+    max-width: 100px;
+  }
+  
+  .project-path {
+    font-size: 0.65rem;
+  }
+  
+  .last-directory-label {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  
+  .selected-directory-display {
+    padding: 10px;
+    font-size: 0.75rem;
+  }
+  
+  .directory-selector-buttons .btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Media queries para responsividad */
+@media (max-width: 768px) {
+  .modal-content {
+    min-width: 320px;
+    max-width: 90vw;
+    margin: 20px;
+  }
+  
+  .directory-selector-content {
+    max-width: 90vw;
+    padding: 20px;
+  }
+  
+  .directory-selector-main {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .directory-selector-left,
+  .directory-selector-right {
+    width: 100%;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.8rem;
+  }
+  
+  .recent-projects-list {
+    max-height: 150px;
+  }
+  
+  .recent-project-item {
+    padding: 10px;
+  }
+  
+  .project-info {
+    gap: 8px;
+  }
+  
+  .project-name {
+    max-width: 40%;
+    font-size: 0.85rem;
+  }
+  
+  .project-path {
+    font-size: 0.7rem;
+  }
+  
+  .selected-directory-display {
+    font-size: 0.8rem;
+    padding: 12px;
+  }
+  
+  .directory-selector-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  
+  .directory-selector-buttons .btn {
+    flex: 1;
+    min-width: 100px;
+  }
+}
+
+@media (max-width: 480px) {
+  .modal-overlay {
+    padding: 10px;
+  }
+  
+  .modal-content {
+    min-width: unset;
+    width: 100%;
+  }
+  
+  .directory-selector-content {
+    padding: 16px;
+    border-radius: 12px;
+    width: 100%;
+    box-sizing: border-box;
+  }
+  
+  .directory-selector h3 {
+    font-size: 1.1rem;
+    margin-bottom: 12px;
+  }
+  
+  .recent-projects-section {
+    margin-bottom: 12px;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.75rem;
+    margin-bottom: 8px;
+  }
+  
+  .recent-projects-list {
+    max-height: 100px;
+    gap: 6px;
+  }
+  
+  .recent-project-item {
+    padding: 6px 8px;
+  }
+  
+  .project-info {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 8px;
+  }
+  
+  .project-color-indicator {
+    width: 10px;
+    height: 10px;
+    grid-row: span 2;
+  }
+  
+  .project-name {
+    font-size: 0.8rem;
+    max-width: none;
+    grid-column: 2;
+  }
+  
+  .project-path {
+    font-size: 0.65rem;
+    grid-column: 2;
+    opacity: 0.7;
+  }
+  
+  .last-directory-section {
+    margin-bottom: 10px;
+    padding-bottom: 10px;
+  }
+  
+  .last-directory-label {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  
+  .selected-directory-display {
+    font-size: 0.75rem;
+    padding: 10px;
+  }
+  
+  .directory-selector-divider {
+    margin: 12px 0;
+  }
+  
+  .directory-selector-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  
+  .directory-selector-buttons .btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+    min-width: unset;
+  }
+  
+  .directory-selector-buttons #cancel-btn {
+    grid-column: span 2;
+  }
+}
+
+/* Media query específica para landscape en pantallas pequeñas */
+@media (max-width: 768px) and (orientation: landscape) {
+  .directory-selector {
+    padding: 12px;
+  }
+  
+  .directory-selector-content {
+    max-height: 90vh;
+    overflow-y: auto;
+    padding: 16px;
+    max-width: 90vw;
+  }
+  
+  .directory-selector h3 {
+    font-size: 1rem;
+    margin-bottom: 12px;
+  }
+  
+  .directory-selector-main {
+    flex-direction: row;
+    gap: 20px;
+  }
+  
+  .recent-projects-section {
+    margin: 0;
+  }
+  
+  .recent-projects-list {
+    max-height: 120px;
+  }
+  
+  .recent-project-item {
+    padding: 6px 10px;
+  }
+  
+  .selected-directory-display {
+    padding: 8px;
+    margin: 8px 0;
+  }
+  
+  .directory-selector-buttons {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+  }
+  
+  .directory-selector-buttons .btn {
+    flex: 1;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+  }
 }
 
