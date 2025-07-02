@@ -273,6 +273,44 @@ When there are many tasks in the database (30+), the \`list_tasks\` MCP command 
 - MCP server changes require server restart to apply
 - Claude Code can cache MCP connections
 
+## IMPORTANT: Documentation in Notion - MANDATORY
+
+### Documentation Updates in Notion
+
+**WHEN THE USER ASKS TO DOCUMENT something, it ALWAYS means documenting in Notion, NOT creating markdown files or README files locally:**
+
+1. **Default behavior:** The word "document" or "documentation" from the user = Update Notion documentation
+2. **Project in Notion:** CodeAgentSwarm has its own documentation database in Notion
+3. **NEVER create local documentation files** unless explicitly requested with phrases like:
+   - "create a README.md file"
+   - "create a markdown file"
+   - "create a local documentation file"
+4. **Process when user asks to "document":**
+   - Use Notion MCP tools to update the appropriate pages
+   - DO NOT create any local files
+
+### When to update Notion documentation:
+
+- **New features implemented**
+- **Architecture changes**
+- **Database or schema modifications**
+- **New SQL commands or scripts**
+- **API or endpoint changes**
+- **Technology stack updates**
+- **Important bug fixes**
+- **New MCP integrations**
+- **Configuration changes**
+
+### Available Notion MCP tools:
+
+- **\`mcp__notion__query-database\`**: Query the documentation database
+- **\`mcp__notion__get-page\`**: Get content from a specific page
+- **\`mcp__notion__update-page\`**: Update page properties
+- **\`mcp__notion__append-block-children\`**: Add content to existing pages
+- **\`mcp__notion__create-page\`**: Create new pages (use only if necessary)
+
+**This documentation is CRITICAL to maintain the knowledge base updated and facilitate other developers' work.**
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
