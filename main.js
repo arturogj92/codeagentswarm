@@ -1686,6 +1686,24 @@ ipcMain.handle('dialog-open-directory', async (event) => {
   }
 });
 
+// Show confirmation dialog
+ipcMain.handle('show-confirm-dialog', async (event, options) => {
+  try {
+    const result = await dialog.showMessageBox({
+      type: 'question',
+      buttons: options.buttons || ['OK', 'Cancel'],
+      defaultId: 1,
+      cancelId: 1,
+      title: options.title || 'Confirm',
+      message: options.message || 'Are you sure?'
+    });
+    return result.response;
+  } catch (error) {
+    console.error('Error in show-confirm-dialog:', error);
+    return 1; // Return cancel index on error
+  }
+});
+
 // Open Kanban window
 ipcMain.on('open-kanban-window', (event, options = {}) => {
   const kanbanWindow = new BrowserWindow({
@@ -2396,10 +2414,11 @@ ipcMain.handle('git-reset', async (event, commitHash, hard = false) => {
 });
 
 // Git diff handler
-ipcMain.handle('git-diff', async (event, fileName) => {
+ipcMain.handle('git-diff', async (event, fileName, workingDirectory) => {
   const { execSync } = require('child_process');
   try {
-    const cwd = getGitWorkingDirectory();
+    // Use provided working directory or fallback to getGitWorkingDirectory
+    const cwd = workingDirectory || getGitWorkingDirectory();
     
     // Get diff for specific file or all files
     const command = fileName ? `git diff "${fileName}"` : 'git diff';
@@ -2417,13 +2436,14 @@ ipcMain.handle('git-diff', async (event, fileName) => {
 });
 
 // Git discard file changes handler
-ipcMain.handle('git-discard-file', async (event, fileName) => {
+ipcMain.handle('git-discard-file', async (event, fileName, workingDirectory) => {
   const { execSync } = require('child_process');
   const fs = require('fs');
   const path = require('path');
   
   try {
-    const cwd = getGitWorkingDirectory();
+    // Use provided working directory or fallback to getGitWorkingDirectory
+    const cwd = workingDirectory || getGitWorkingDirectory();
     
     console.log(`[Git Discard] Processing file: ${fileName}`);
     
@@ -2596,6 +2616,326 @@ ipcMain.handle('git-switch-branch', async (event, branchName, terminalId = null)
     return { 
       success: false, 
       error: error.message || 'Failed to switch branch'
+    };
+  }
+});
+
+// Scan for git projects with changes (only from active terminals)
+ipcMain.handle('scan-git-projects', async () => {
+  const { execSync } = require('child_process');
+  const fs = require('fs').promises;
+  const path = require('path');
+  
+  try {
+    const projects = [];
+    const terminalDirs = new Set();
+    
+    // Get current working directory from each active terminal
+    const terminalMap = new Map();
+    console.log('[Git Scan] Getting current directories from terminals:');
+    console.log('[Git Scan] Active terminals:', terminals.size);
+    
+    for (const [terminalId, terminal] of terminals) {
+      console.log(`[Git Scan] Checking terminal ${terminalId}:`, terminal ? 'exists' : 'null');
+      if (terminal) {
+        try {
+          // First try to get current directory from terminal
+          if (terminal.cwd) {
+            console.log(`[Git Scan] Terminal ${terminalId} current directory:`, terminal.cwd);
+            terminalDirs.add(terminal.cwd);
+            terminalMap.set(terminal.cwd, terminalId);
+          } else {
+            // Fallback to saved directory from database
+            const savedDir = db.getTerminalDirectory(terminalId);
+            console.log(`[Git Scan] Terminal ${terminalId} saved directory:`, savedDir);
+            if (savedDir) {
+              console.log(`[Git Scan] Terminal ${terminalId}: ${savedDir}`);
+              terminalDirs.add(savedDir);
+              terminalMap.set(savedDir, terminalId);
+            }
+          }
+        } catch (e) {
+          console.error(`[Git Scan] Error getting directory for terminal ${terminalId}:`, e);
+        }
+      }
+    }
+    
+    console.log('[Git Scan] Total directories found:', terminalDirs.size);
+    
+    // If no terminals active, return empty list
+    if (terminalDirs.size === 0) {
+      console.log('[Git Scan] No active terminals found');
+      return { success: true, projects: [] };
+    }
+    
+    // Check each terminal directory for git repos
+    for (const terminalDir of terminalDirs) {
+      try {
+        // First check if the terminal directory itself is a git repo
+        let isGitRepo = false;
+        try {
+          execSync('git rev-parse --is-inside-work-tree', {
+            cwd: terminalDir,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'ignore']
+          });
+          isGitRepo = true;
+        } catch (e) {
+          // Not a git repo, continue
+        }
+        
+        if (isGitRepo) {
+          // Get status
+          const statusOutput = execSync('git status --porcelain', {
+            cwd: terminalDir,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'ignore']
+          });
+          
+          // Get current branch
+          const branch = execSync('git branch --show-current', {
+            cwd: terminalDir,
+            encoding: 'utf8',
+            stdio: ['pipe', 'pipe', 'ignore']
+          }).trim();
+          
+          // Count changes
+          const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
+          const changeCount = changes.length;
+          
+          if (changeCount > 0) {
+            projects.push({
+              path: terminalDir,
+              name: path.basename(terminalDir),
+              branch: branch || 'master',
+              changeCount: changeCount,
+              changes: changes.slice(0, 10), // First 10 changes
+              fromTerminal: true,
+              terminalId: terminalMap.get(terminalDir) || null
+            });
+          }
+        }
+        
+        // Also check parent directories up to 3 levels
+        let currentPath = terminalDir;
+        for (let i = 0; i < 3; i++) {
+          const parentPath = path.dirname(currentPath);
+          if (parentPath === currentPath || parentPath === '/') break;
+          
+          try {
+            execSync('git rev-parse --is-inside-work-tree', {
+              cwd: parentPath,
+              encoding: 'utf8',
+              stdio: ['pipe', 'pipe', 'ignore']
+            });
+            
+            // Parent is a git repo, check if it has changes
+            const statusOutput = execSync('git status --porcelain', {
+              cwd: parentPath,
+              encoding: 'utf8',
+              stdio: ['pipe', 'pipe', 'ignore']
+            });
+            
+            const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
+            if (changes.length > 0) {
+              // Check if we already have this project
+              const exists = projects.some(p => p.path === parentPath);
+              if (!exists) {
+                const branch = execSync('git branch --show-current', {
+                  cwd: parentPath,
+                  encoding: 'utf8',
+                  stdio: ['pipe', 'pipe', 'ignore']
+                }).trim();
+                
+                projects.push({
+                  path: parentPath,
+                  name: path.basename(parentPath),
+                  branch: branch || 'master',
+                  changeCount: changes.length,
+                  changes: changes.slice(0, 10),
+                  fromTerminal: true,
+                  terminalId: terminalMap.get(terminalDir) || null
+                });
+              }
+            }
+          } catch (e) {
+            // Not a git repo, continue
+          }
+          
+          currentPath = parentPath;
+        }
+      } catch (e) {
+        console.error('Error checking terminal directory:', e);
+      }
+    }
+    
+    // Sort by change count
+    projects.sort((a, b) => b.changeCount - a.changeCount);
+    
+    console.log(`[Git Scan] Found ${projects.length} projects with changes:`, projects.map(p => p.name));
+    
+    return { success: true, projects };
+  } catch (error) {
+    console.error('Scan git projects error:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Get git status for specific project
+ipcMain.handle('get-project-git-status', async (event, projectPath) => {
+  const { execSync } = require('child_process');
+  try {
+    // Check if directory is a git repository
+    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
+      cwd: projectPath, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim() === 'true';
+    
+    if (!isGitRepo) {
+      return { success: false, error: 'Not a git repository' };
+    }
+    
+    // Get git status with porcelain format for easy parsing
+    const statusOutput = execSync('git status --porcelain', { 
+      cwd: projectPath, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    });
+    
+    // Parse the status output
+    const files = [];
+    const lines = statusOutput.trim().split('\n').filter(line => line.length > 0);
+    
+    lines.forEach(line => {
+      if (line.length < 3) return;
+      
+      const status = line.substring(0, 2);
+      const fileName = line.substring(2).trim();
+      
+      let statusText = '';
+      const indexStatus = status[0];
+      const workingStatus = status[1];
+      
+      if (workingStatus === 'M' || indexStatus === 'M') {
+        statusText = 'Modified';
+      } else if (workingStatus === 'A' || indexStatus === 'A') {
+        statusText = 'Added';
+      } else if (workingStatus === 'D' || indexStatus === 'D') {
+        statusText = 'Deleted';
+      } else if (workingStatus === 'R' || indexStatus === 'R') {
+        statusText = 'Renamed';
+      } else if (workingStatus === 'C' || indexStatus === 'C') {
+        statusText = 'Copied';
+      } else if (workingStatus === 'T' || indexStatus === 'T') {
+        statusText = 'Type Changed';
+      } else if (status === '??') {
+        statusText = 'Untracked';
+      } else if (status === '!!') {
+        statusText = 'Ignored';
+      } else {
+        statusText = 'Modified';
+      }
+      
+      files.push({
+        file: fileName,
+        status: statusText,
+        raw: status,
+        staged: indexStatus !== ' ' && indexStatus !== '?'
+      });
+    });
+    
+    // Get current branch
+    const branch = execSync('git branch --show-current', { 
+      cwd: projectPath, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim();
+    
+    // Get recent commits
+    const commits = execSync('git log --oneline -10', { 
+      cwd: projectPath, 
+      encoding: 'utf8',
+      stdio: ['pipe', 'pipe', 'ignore']
+    }).trim().split('\n').filter(line => line.length > 0).map(line => {
+      const [hash, ...messageParts] = line.split(' ');
+      return {
+        hash: hash,
+        message: messageParts.join(' ')
+      };
+    });
+    
+    return { 
+      success: true, 
+      files, 
+      branch,
+      workingDirectory: projectPath,
+      projectName: path.basename(projectPath),
+      commits
+    };
+    
+  } catch (error) {
+    console.error('Project git status error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to get git status'
+    };
+  }
+});
+
+// Git operations for specific project
+ipcMain.handle('git-commit-project', async (event, projectPath, message, files) => {
+  const { execSync } = require('child_process');
+  try {
+    // Add specific files or all if none specified
+    if (files && files.length > 0) {
+      for (const file of files) {
+        execSync(`git add "${file}"`, { cwd: projectPath });
+      }
+    } else {
+      execSync('git add .', { cwd: projectPath });
+    }
+    
+    // Commit with message
+    execSync(`git commit -m "${message}"`, { cwd: projectPath, encoding: 'utf8' });
+    
+    return { success: true, message: 'Commit successful' };
+    
+  } catch (error) {
+    console.error('Git commit project error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to commit changes'
+    };
+  }
+});
+
+// Git push for specific project
+ipcMain.handle('git-push-project', async (event, projectPath) => {
+  const { execSync } = require('child_process');
+  try {
+    const output = execSync('git push', { cwd: projectPath, encoding: 'utf8' });
+    return { success: true, output };
+  } catch (error) {
+    console.error('Git push project error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to push changes'
+    };
+  }
+});
+
+// Git pull for specific project  
+ipcMain.handle('git-pull-project', async (event, projectPath) => {
+  const { execSync } = require('child_process');
+  try {
+    const output = execSync('git pull', { cwd: projectPath, encoding: 'utf8' });
+    return { success: true, output };
+  } catch (error) {
+    console.error('Git pull project error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to pull changes'
     };
   }
 });

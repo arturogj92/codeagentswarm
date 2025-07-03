@@ -437,6 +437,7 @@ class TerminalManager {
                     <div class="recent-projects-list">
                         ${recentProjects.map(project => `
                             <div class="recent-project-item" data-project-path="${project.path}" data-project-name="${project.name}">
+                                <button class="delete-project-btn" data-project-name="${project.name}" title="Remove from recent projects">×</button>
                                 <div class="project-info">
                                     <span class="project-color-indicator" style="background-color: ${project.color}"></span>
                                     <span class="project-name">${project.display_name || project.name}</span>
@@ -454,7 +455,7 @@ class TerminalManager {
                 <h3>Select Working Directory</h3>
                 <div class="directory-selector-main">
                     <div class="directory-selector-left">
-                        ${recentProjectsHTML || '<div class="no-projects-message">No recent projects</div>'}
+                        ${recentProjectsHTML}
                     </div>
                     <div class="directory-selector-right">
                         ${this.lastSelectedDirectories[quadrant] ? `
@@ -546,7 +547,12 @@ class TerminalManager {
         
         // Handle recent project clicks
         selectorDiv.querySelectorAll('.recent-project-item').forEach(projectItem => {
-            projectItem.addEventListener('click', () => {
+            projectItem.addEventListener('click', (e) => {
+                // Don't trigger if clicking on delete button
+                if (e.target.classList.contains('delete-project-btn')) {
+                    return;
+                }
+                
                 const projectPath = projectItem.dataset.projectPath;
                 const projectName = projectItem.dataset.projectName;
                 
@@ -557,6 +563,34 @@ class TerminalManager {
                 // Remove selector and show session selector
                 wrapper.removeChild(selectorDiv);
                 this.showSessionSelector(quadrant, projectPath);
+            });
+        });
+        
+        // Handle delete project buttons
+        selectorDiv.querySelectorAll('.delete-project-btn').forEach(deleteBtn => {
+            deleteBtn.addEventListener('click', async (e) => {
+                e.stopPropagation(); // Prevent triggering the project click
+                const projectName = deleteBtn.dataset.projectName;
+                
+                // Confirm deletion
+                const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+                    title: 'Remove Project',
+                    message: `Remove "${projectName}" from recent projects?`,
+                    buttons: ['Remove', 'Cancel']
+                });
+                
+                if (confirmed === 0) { // 0 is the index of "Remove" button
+                    // Delete the project
+                    const result = await ipcRenderer.invoke('project-delete', projectName);
+                    
+                    if (result.success) {
+                        // Refresh the directory selector
+                        wrapper.removeChild(selectorDiv);
+                        this.showDirectorySelector(quadrant);
+                    } else {
+                        console.error('Failed to delete project:', result.error);
+                    }
+                }
             });
         });
         
@@ -2098,12 +2132,27 @@ class TerminalManager {
 
     async showGitStatus() {
         try {
-            const result = await ipcRenderer.invoke('get-git-status');
+            // First scan for projects with changes
+            const scanResult = await ipcRenderer.invoke('scan-git-projects');
             
-            if (result.success) {
-                this.displayGitStatusModal(result);
+            if (scanResult.success && scanResult.projects.length > 0) {
+                // Show project selection modal
+                this.displayProjectSelectionModal(scanResult.projects);
+            } else if (scanResult.success && scanResult.projects.length === 0) {
+                if (!this.hasActiveTerminals()) {
+                    this.showNotification('No active terminals. Open a terminal first to scan for git changes.', 'info');
+                } else {
+                    this.showNotification('No git projects with changes found in active terminals', 'info');
+                }
             } else {
-                this.showNotification(result.error || 'Failed to get git status', 'warning');
+                // Fallback to current directory
+                const result = await ipcRenderer.invoke('get-git-status');
+                
+                if (result.success) {
+                    this.displayGitStatusModal(result);
+                } else {
+                    this.showNotification(result.error || 'Failed to get git status', 'warning');
+                }
             }
         } catch (error) {
             console.error('Error getting git status:', error);
@@ -2111,6 +2160,10 @@ class TerminalManager {
         }
     }
 
+    hasActiveTerminals() {
+        return this.terminals.size > 0;
+    }
+    
     showKanban() {
         // Request main process to open Kanban window
         ipcRenderer.send('open-kanban-window');
@@ -2486,6 +2539,119 @@ class TerminalManager {
         });
     }
 
+    displayProjectSelectionModal(projects) {
+        // Remove existing modal if present
+        const existingModal = document.querySelector('.git-project-modal');
+        if (existingModal) {
+            existingModal.remove();
+        }
+
+        // Create modal
+        const modal = document.createElement('div');
+        modal.className = 'git-project-modal';
+        modal.innerHTML = `
+            <div class="git-project-content">
+                <div class="git-project-header">
+                    <h3><i data-lucide="git-branch"></i> Git Projects</h3>
+                    <button class="close-btn" id="close-project-modal">×</button>
+                </div>
+                
+                <div class="git-project-list">
+                    <div class="project-list-header">
+                        <span>${this.hasActiveTerminals() ? 'Projects from active terminals:' : 'Git projects with changes:'}</span>
+                        <button class="btn btn-small" id="refresh-projects">
+                            <i data-lucide="refresh-cw"></i> Refresh
+                        </button>
+                    </div>
+                    ${projects.map(project => `
+                        <div class="git-project-item" data-path="${project.path}">
+                            <div class="project-info">
+                                <div class="project-name">
+                                    <i data-lucide="folder-git-2"></i>
+                                    <span class="name">${project.name}</span>
+                                </div>
+                                <div class="project-details">
+                                    <span class="project-branch">
+                                        <i data-lucide="git-branch"></i> ${project.branch}
+                                    </span>
+                                    <span class="project-changes">
+                                        <i data-lucide="file-diff"></i> ${project.changeCount} changes
+                                    </span>
+                                    ${project.terminalId ? `
+                                        <span class="project-terminal">
+                                            <i data-lucide="terminal"></i> Terminal ${project.terminalId}
+                                        </span>
+                                    ` : ''}
+                                </div>
+                                <div class="project-path">${project.path}</div>
+                            </div>
+                            <button class="btn btn-primary btn-small open-project">
+                                <i data-lucide="arrow-right"></i> Open
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+                
+                <div class="git-project-footer">
+                    <button class="btn btn-secondary" id="use-current-dir">
+                        <i data-lucide="folder"></i> Use Current Directory
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Initialize Lucide icons
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+
+        // Add event listeners
+        document.getElementById('close-project-modal').addEventListener('click', () => {
+            modal.remove();
+        });
+
+        document.getElementById('refresh-projects').addEventListener('click', async () => {
+            modal.remove();
+            await this.showGitStatus();
+        });
+
+        document.getElementById('use-current-dir').addEventListener('click', async () => {
+            modal.remove();
+            const result = await ipcRenderer.invoke('get-git-status');
+            if (result.success) {
+                this.displayGitStatusModal(result);
+            } else {
+                this.showNotification(result.error || 'Failed to get git status', 'warning');
+            }
+        });
+
+        // Add click listeners to project items
+        modal.querySelectorAll('.git-project-item').forEach(item => {
+            const openBtn = item.querySelector('.open-project');
+            openBtn.addEventListener('click', async () => {
+                const projectPath = item.dataset.path;
+                modal.remove();
+                
+                // Get git status for selected project
+                const result = await ipcRenderer.invoke('get-project-git-status', projectPath);
+                if (result.success) {
+                    this.displayGitStatusModal(result);
+                } else {
+                    this.showNotification(result.error || 'Failed to get project status', 'warning');
+                }
+            });
+        });
+
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
+    }
+
     displayGitStatusModal(gitData) {
         // Remove existing modal if present
         const existingModal = document.querySelector('.git-status-modal');
@@ -2499,7 +2665,7 @@ class TerminalManager {
         modal.innerHTML = `
             <div class="git-status-content">
                 <div class="git-status-header">
-                    <h3><i data-lucide="git-branch"></i> Git Manager</h3>
+                    <h3><i data-lucide="git-branch"></i> Git Manager${gitData.projectName ? ` - ${gitData.projectName}` : ''}</h3>
                     <button class="close-btn" id="close-git-modal">×</button>
                 </div>
                 
@@ -2556,8 +2722,8 @@ class TerminalManager {
                                                     <span class="file-name">${file.file}</span>
                                                 </div>
                                                 <div class="file-actions">
-                                                    <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}')"><i data-lucide="eye"></i> Diff</button>
-                                                    <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}', '${file.status}')"><i data-lucide="x"></i> Discard</button>
+                                                    <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}', '${gitData.workingDirectory}')"><i data-lucide="eye"></i> Diff</button>
+                                                    <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}', '${file.status}', '${gitData.workingDirectory}')"><i data-lucide="x"></i> Discard</button>
                                                 </div>
                                             </div>
                                         `).join('')
@@ -2624,19 +2790,22 @@ class TerminalManager {
             this.showGitStatus();
         });
         
-        modal.querySelector('#git-pull')?.addEventListener('click', () => this.gitPull());
-        modal.querySelector('#git-push')?.addEventListener('click', () => this.gitPush());
+        modal.querySelector('#git-pull')?.addEventListener('click', () => this.gitPullProject());
+        modal.querySelector('#git-push')?.addEventListener('click', () => this.gitPushProject());
+        
+        // Store project path for git operations
+        this.currentGitProject = gitData.workingDirectory;
         
         // Commit handlers
         modal.querySelector('#commit-selected')?.addEventListener('click', () => {
             const message = modal.querySelector('#commit-message').value;
             const selectedFiles = Array.from(modal.querySelectorAll('.file-checkbox:checked')).map(cb => cb.dataset.file);
-            this.gitCommit(message, selectedFiles);
+            this.gitCommitProject(message, selectedFiles);
         });
         
         modal.querySelector('#commit-all')?.addEventListener('click', () => {
             const message = modal.querySelector('#commit-message').value;
-            this.gitCommit(message);
+            this.gitCommitProject(message);
         });
         
         // Select/Deselect all handlers
@@ -2703,6 +2872,34 @@ class TerminalManager {
         }
     }
     
+    async gitCommitProject(message, files = null) {
+        if (!message || message.trim() === '') {
+            this.showInlineNotification('Please enter a commit message', 'error');
+            return;
+        }
+        
+        try {
+            const projectPath = this.currentGitProject;
+            const result = await ipcRenderer.invoke('git-commit-project', projectPath, message.trim(), files);
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Commit successful', 'success');
+                // Refresh the git status for the project
+                setTimeout(async () => {
+                    const gitResult = await ipcRenderer.invoke('get-project-git-status', projectPath);
+                    if (gitResult.success) {
+                        this.displayGitStatusModal(gitResult);
+                    }
+                }, 1000);
+            } else {
+                this.showInlineNotification(`❌ Commit failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error committing project:', error);
+            this.showInlineNotification('❌ Error committing changes', 'error');
+        }
+    }
+    
     async gitPush() {
         try {
             this.showInlineNotification('🚀 Pushing changes...', 'info');
@@ -2737,6 +2934,47 @@ class TerminalManager {
         }
     }
     
+    async gitPushProject() {
+        try {
+            this.showInlineNotification('🚀 Pushing changes...', 'info');
+            const projectPath = this.currentGitProject;
+            const result = await ipcRenderer.invoke('git-push-project', projectPath);
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Push successful', 'success');
+            } else {
+                this.showInlineNotification(`❌ Push failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error pushing project:', error);
+            this.showInlineNotification('❌ Error pushing changes', 'error');
+        }
+    }
+    
+    async gitPullProject() {
+        try {
+            this.showInlineNotification('⬇️ Pulling changes...', 'info');
+            const projectPath = this.currentGitProject;
+            const result = await ipcRenderer.invoke('git-pull-project', projectPath);
+            
+            if (result.success) {
+                this.showInlineNotification('✅ Pull successful', 'success');
+                // Refresh the git status for the project
+                setTimeout(async () => {
+                    const gitResult = await ipcRenderer.invoke('get-project-git-status', projectPath);
+                    if (gitResult.success) {
+                        this.displayGitStatusModal(gitResult);
+                    }
+                }, 1000);
+            } else {
+                this.showInlineNotification(`❌ Pull failed: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error pulling project:', error);
+            this.showInlineNotification('❌ Error pulling changes', 'error');
+        }
+    }
+    
     async resetToCommit(commitHash, hard = false) {
         const confirmMessage = hard ? 
             'Are you sure you want to do a HARD reset? This will PERMANENTLY delete all uncommitted changes.' :
@@ -2764,9 +3002,9 @@ class TerminalManager {
         }
     }
     
-    async showFileDiff(fileName) {
+    async showFileDiff(fileName, workingDirectory) {
         try {
-            const result = await ipcRenderer.invoke('git-diff', fileName);
+            const result = await ipcRenderer.invoke('git-diff', fileName, workingDirectory);
             
             if (result.success) {
                 this.displayDiffModal(fileName, result.diff);
@@ -2842,7 +3080,7 @@ class TerminalManager {
         return div.innerHTML;
     }
     
-    async discardFileChanges(fileName, fileStatus = 'Modified') {
+    async discardFileChanges(fileName, fileStatus = 'Modified', workingDirectory) {
         const isUntracked = fileStatus === 'Untracked';
         const action = isUntracked ? 'delete' : 'discard all changes to';
         const confirmMessage = `Are you sure you want to ${action} '${fileName}'? This action cannot be undone.`;
@@ -2854,7 +3092,7 @@ class TerminalManager {
         try {
             const actionText = isUntracked ? 'Deleting' : 'Discarding changes to';
             this.showInlineNotification(`🔄 ${actionText} ${fileName}...`, 'info');
-            const result = await ipcRenderer.invoke('git-discard-file', fileName);
+            const result = await ipcRenderer.invoke('git-discard-file', fileName, workingDirectory);
             
             if (result.success) {
                 this.showInlineNotification(`✅ ${result.message}`, 'success');

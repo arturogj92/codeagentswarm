@@ -86,18 +86,9 @@ class DatabaseManager {
             )
         `);
         
-        // Create project_folders table to track folders associated with projects
-        // Note: We don't use foreign keys here because of SQLite limitations
-        // with the existing projects table structure
-        this.db.exec(`
-            CREATE TABLE IF NOT EXISTS project_folders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_name TEXT NOT NULL,
-                folder_path TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(project_name, folder_path)
-            )
-        `);
+        // project_folders table is deprecated - using projects.path instead
+        // Drop the table if it exists
+        this.dropProjectFoldersTable();
         
         // Add sort_order column if it doesn't exist (migration)
         this.addSortOrderColumnIfNeeded();
@@ -809,10 +800,7 @@ class DatabaseManager {
             const existingProject = this.getProjectByName(name);
             if (existingProject) {
                 console.log(`Project "${name}" already exists, returning existing project`);
-                // If path is provided and not already associated, add it
-                if (path) {
-                    this.addProjectFolder(name, path);
-                }
+                // Path is already stored in projects table
                 return { 
                     success: true, 
                     projectId: existingProject.id, 
@@ -867,8 +855,6 @@ class DatabaseManager {
             `);
             
             const result = stmt.run(name, name, color, path); // display_name defaults to name
-            
-            // No need for project_folders table anymore
             
             return { success: true, projectId: result.lastInsertRowid, name, color };
         } catch (err) {
@@ -963,34 +949,25 @@ class DatabaseManager {
         }
     }
     
-    // Add a folder association to a project
-    addProjectFolder(projectName, folderPath) {
-        try {
-            const stmt = this.db.prepare(`
-                INSERT OR IGNORE INTO project_folders (project_name, folder_path)
-                VALUES (?, ?)
-            `);
-            
-            stmt.run(projectName, folderPath);
-            return { success: true };
-        } catch (err) {
-            console.error('Error adding project folder:', err);
-            return { success: false, error: err.message };
-        }
-    }
+    // Deprecated - project folders are now stored in projects.path
+    // addProjectFolder and getProjectFolders removed
     
-    // Get all folders associated with a project
-    getProjectFolders(projectName) {
+    // Drop project_folders table migration
+    dropProjectFoldersTable() {
         try {
-            const stmt = this.db.prepare(`
-                SELECT folder_path FROM project_folders
-                WHERE project_name = ?
-            `);
+            // Check if table exists
+            const tableExists = this.db.prepare(`
+                SELECT name FROM sqlite_master 
+                WHERE type='table' AND name='project_folders'
+            `).get();
             
-            return stmt.all(projectName).map(row => row.folder_path);
+            if (tableExists) {
+                console.log('Dropping deprecated project_folders table...');
+                this.db.exec('DROP TABLE project_folders');
+                console.log('project_folders table dropped successfully');
+            }
         } catch (err) {
-            console.error('Error getting project folders:', err);
-            return [];
+            console.error('Error dropping project_folders table:', err);
         }
     }
     
@@ -1042,7 +1019,6 @@ class DatabaseManager {
                 return { success: false, error: 'Cannot delete the default project' };
             }
             
-            // Simple delete since we don't need project_folders anymore
             const deleteProject = this.db.prepare(`DELETE FROM projects WHERE name = ?`);
             const result = deleteProject.run(name);
             
