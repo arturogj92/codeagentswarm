@@ -2688,8 +2688,9 @@ class TerminalManager {
                             <button class="btn btn-small" id="git-pull" title="Pull - Descargar cambios del repositorio remoto">
                                 <i data-lucide="download"></i>
                             </button>
-                            <button class="btn btn-small btn-primary" id="git-push" title="Push - Subir cambios al repositorio remoto">
+                            <button class="btn btn-small btn-primary ${gitData.unpushedCount > 0 ? 'btn-pulse' : ''}" id="git-push" title="Push - Subir cambios al repositorio remoto${gitData.unpushedCount > 0 ? ` (${gitData.unpushedCount} commits pendientes)` : ''}">
                                 <i data-lucide="upload"></i>
+                                ${gitData.unpushedCount > 0 ? `<span class="badge">${gitData.unpushedCount}</span>` : ''}
                             </button>
                             <button class="btn btn-small" id="refresh-git-status" title="Refresh - Actualizar el estado del repositorio">
                                 <i data-lucide="refresh-cw"></i>

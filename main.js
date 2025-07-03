@@ -2295,12 +2295,48 @@ ipcMain.handle('get-git-status', async () => {
       };
     });
     
+    // Check for unpushed commits
+    let unpushedCount = 0;
+    let hasUpstream = true;
+    try {
+      // First check if there's an upstream branch
+      execSync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
+        cwd,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      
+      // Count unpushed commits
+      const unpushedOutput = execSync('git rev-list --count @{u}..HEAD', { 
+        cwd, 
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      }).trim();
+      unpushedCount = parseInt(unpushedOutput) || 0;
+    } catch (e) {
+      // No upstream branch configured
+      hasUpstream = false;
+      // Count all commits if no upstream
+      try {
+        const allCommitsCount = execSync('git rev-list --count HEAD', {
+          cwd,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'ignore']
+        }).trim();
+        unpushedCount = parseInt(allCommitsCount) || 0;
+      } catch (e2) {
+        // Ignore
+      }
+    }
+    
     return { 
       success: true, 
       files, 
       branch,
       workingDirectory: cwd,
-      commits
+      commits,
+      unpushedCount,
+      hasUpstream
     };
     
   } catch (error) {
@@ -2865,13 +2901,49 @@ ipcMain.handle('get-project-git-status', async (event, projectPath) => {
       };
     });
     
+    // Check for unpushed commits
+    let unpushedCount = 0;
+    let hasUpstream = true;
+    try {
+      // First check if there's an upstream branch
+      execSync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
+        cwd: projectPath,
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      });
+      
+      // Count unpushed commits
+      const unpushedOutput = execSync('git rev-list --count @{u}..HEAD', { 
+        cwd: projectPath, 
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      }).trim();
+      unpushedCount = parseInt(unpushedOutput) || 0;
+    } catch (e) {
+      // No upstream branch configured
+      hasUpstream = false;
+      // Count all commits if no upstream
+      try {
+        const allCommitsCount = execSync('git rev-list --count HEAD', {
+          cwd: projectPath,
+          encoding: 'utf8',
+          stdio: ['pipe', 'pipe', 'ignore']
+        }).trim();
+        unpushedCount = parseInt(allCommitsCount) || 0;
+      } catch (e2) {
+        // Ignore
+      }
+    }
+    
     return { 
       success: true, 
       files, 
       branch,
       workingDirectory: projectPath,
       projectName: path.basename(projectPath),
-      commits
+      commits,
+      unpushedCount,
+      hasUpstream
     };
     
   } catch (error) {
