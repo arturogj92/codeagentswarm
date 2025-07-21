@@ -708,8 +708,16 @@ class KanbanManager {
         taskCard.draggable = true;
         taskCard.dataset.taskId = task.id;
 
-        const terminalInfo = task.terminal_id !== null && task.terminal_id > 0 ? 
-            `<span class="task-terminal">Terminal ${parseInt(task.terminal_id)}</span>` : '';
+        // Create terminal selector
+        const terminalSelector = `
+            <select class="task-terminal-selector" data-task-id="${task.id}" onchange="kanban.updateTaskTerminal(${task.id}, this.value)">
+                <option value="">No terminal</option>
+                <option value="1" ${task.terminal_id == 1 ? 'selected' : ''}>Terminal 1</option>
+                <option value="2" ${task.terminal_id == 2 ? 'selected' : ''}>Terminal 2</option>
+                <option value="3" ${task.terminal_id == 3 ? 'selected' : ''}>Terminal 3</option>
+                <option value="4" ${task.terminal_id == 4 ? 'selected' : ''}>Terminal 4</option>
+            </select>
+        `;
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
         
@@ -721,24 +729,30 @@ class KanbanManager {
             const displayName = project.display_name || project.name;
             projectTag = `<span class="task-project-tag" style="background-color: ${project.color}">
                 <span class="project-name">${this.escapeHtml(displayName)}</span>
-                <button class="project-edit-btn" onclick="kanban.editProjectName('${project.name}')" title="Edit project name">
-                    <i data-lucide="pencil"></i>
-                </button>
             </span>`;
         }
 
         taskCard.innerHTML = `
             <div class="task-actions">
-                <button class="task-action-btn" onclick="kanban.showTaskDetails(${task.id})" title="View Details">
-                    <i data-lucide="eye"></i>
+                <button class="task-action-btn" onclick="kanban.editTask(${task.id})" title="Edit Task">
+                    <i data-lucide="edit-3"></i>
+                </button>
+                <button class="task-action-btn" onclick="kanban.duplicateTask(${task.id})" title="Duplicate Task">
+                    <i data-lucide="copy"></i>
+                </button>
+                <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
+                    <i data-lucide="trash-2"></i>
                 </button>
             </div>
             ${projectTag}
-            <div class="task-title"><span class="task-id">#${task.id}</span> ${this.escapeHtml(task.title)}</div>
+            <div class="task-title">
+                <span class="task-id">#${task.id}</span> 
+                <span class="task-title-text" contenteditable="true" data-task-id="${task.id}" onblur="kanban.updateTaskTitle(${task.id}, this.textContent)" onkeydown="kanban.handleTitleKeydown(event, ${task.id})">${this.escapeHtml(task.title)}</span>
+            </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
                 <span>${createdDate}</span>
-                ${terminalInfo}
+                ${terminalSelector}
             </div>
         `;
 
@@ -799,9 +813,13 @@ class KanbanManager {
 
         // Add click listener
         taskCard.addEventListener('click', (e) => {
-            if (!e.target.closest('.task-actions')) {
-                this.showTaskDetails(task.id);
+            // Don't open details if clicking on editable elements
+            if (e.target.closest('.task-actions') || 
+                e.target.closest('.task-title-text') || 
+                e.target.closest('.task-terminal-selector')) {
+                return;
             }
+            this.showTaskDetails(task.id);
         });
 
         return taskCard;
@@ -1036,6 +1054,155 @@ class KanbanManager {
         } catch (error) {
             console.error('Error updating task status:', error);
             await this.loadTasks(); // Reload to reset UI
+        }
+    }
+
+    async updateTaskTerminal(taskId, terminalId) {
+        try {
+            // Convert empty string to null for no terminal
+            const terminalValue = terminalId === '' ? null : parseInt(terminalId);
+            
+            const result = await ipcRenderer.invoke('task-update-terminal', taskId, terminalValue);
+            
+            if (result.success) {
+                // Update local task data
+                const task = this.tasks.find(t => t.id === taskId);
+                if (task) {
+                    task.terminal_id = terminalValue;
+                }
+                
+                this.showNotification(`Terminal updated successfully`, 'success');
+            } else {
+                // Revert the select to previous value
+                await this.loadTasks();
+                this.showNotification(`Failed to update terminal: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating task terminal:', error);
+            await this.loadTasks();
+            this.showNotification('Error updating terminal', 'error');
+        }
+    }
+
+    async updateTaskTitle(taskId, newTitle) {
+        const trimmedTitle = newTitle.trim();
+        
+        // Find the task to get original title
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        
+        // If title hasn't changed, do nothing
+        if (trimmedTitle === task.title) return;
+        
+        // If title is empty, revert to original
+        if (!trimmedTitle) {
+            const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
+            if (titleElement) {
+                titleElement.textContent = task.title;
+            }
+            return;
+        }
+        
+        try {
+            const result = await ipcRenderer.invoke('task-update', taskId, {
+                title: trimmedTitle
+            });
+            
+            if (result.success) {
+                // Update local task data
+                task.title = trimmedTitle;
+                this.showNotification('Title updated successfully', 'success');
+            } else {
+                // Revert to original title
+                const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
+                if (titleElement) {
+                    titleElement.textContent = task.title;
+                }
+                this.showNotification(`Failed to update title: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating task title:', error);
+            // Revert to original title
+            const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
+            if (titleElement) {
+                titleElement.textContent = task.title;
+            }
+            this.showNotification('Error updating title', 'error');
+        }
+    }
+
+    handleTitleKeydown(event, taskId) {
+        // Handle Enter key
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            event.target.blur(); // This will trigger the onblur event
+        }
+        
+        // Handle Escape key
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            const task = this.tasks.find(t => t.id === taskId);
+            if (task) {
+                event.target.textContent = task.title;
+                event.target.blur();
+            }
+        }
+    }
+
+    async duplicateTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        try {
+            const newTask = {
+                title: `${task.title} (Copy)`,
+                description: task.description,
+                status: 'pending',
+                terminal_id: task.terminal_id,
+                project: task.project,
+                plan: task.plan,
+                implementation: task.implementation
+            };
+
+            const result = await ipcRenderer.invoke('task-create', newTask);
+            
+            if (result.success) {
+                await this.loadTasks();
+                this.showNotification('Task duplicated successfully', 'success');
+            } else {
+                this.showNotification(`Failed to duplicate task: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error duplicating task:', error);
+            this.showNotification('Error duplicating task', 'error');
+        }
+    }
+
+    async quickDeleteTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Quick confirmation
+        if (!confirm(`Delete "${task.title}"?`)) return;
+
+        try {
+            const result = await ipcRenderer.invoke('task-delete', taskId);
+            if (result.success) {
+                await this.loadTasks();
+                this.showNotification('Task deleted successfully', 'success');
+            } else {
+                this.showNotification(`Failed to delete task: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error deleting task:', error);
+            this.showNotification('Error deleting task', 'error');
+        }
+    }
+
+    editTask(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (task) {
+            this.showEditTaskModal(task);
         }
     }
 
