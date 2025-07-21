@@ -10,7 +10,15 @@ const path = require('path');
 const fs = require('fs');
 
 // Import our MCP-compatible database manager
-const DatabaseManagerMCP = require('./database-mcp');
+// Try to load the regular database-mcp, fallback to standalone
+let DatabaseManagerMCP;
+try {
+  DatabaseManagerMCP = require('./database-mcp');
+} catch (e) {
+  // If database-mcp fails (likely due to missing sqlite3), use standalone version
+  console.error('[MCP Server] Using standalone database module');
+  DatabaseManagerMCP = require('./database-mcp-standalone');
+}
 
 class MCPStdioServer {
     constructor() {

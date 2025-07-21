@@ -756,9 +756,9 @@ async function configureMCPInClaudeCLI() {
     // For packaged apps, we need to extract the MCP server to a writable location
     let serverPath;
     if (app.isPackaged) {
-      // Use app support directory for writable files
-      const userDataPath = app.getPath('userData');
-      const mcpDir = path.join(userDataPath, 'mcp');
+      // Use a directory without spaces in the user's home to avoid Claude parsing issues
+      const homeDir = os.homedir();
+      const mcpDir = path.join(homeDir, '.codeagentswarm-mcp');
       
       // Create MCP directory if it doesn't exist
       if (!fs.existsSync(mcpDir)) {
@@ -769,7 +769,9 @@ async function configureMCPInClaudeCLI() {
       const filesToExtract = [
         'mcp-stdio-server.js',
         'database-mcp.js',
-        'database.js'
+        'database-mcp-standalone.js',
+        'database.js',
+        'mcp-launcher.sh'
       ];
       
       try {
@@ -797,8 +799,20 @@ async function configureMCPInClaudeCLI() {
     console.log('   Server path:', serverPath);
     
     // Check if claude CLI is available
+    let claudeCommand = 'claude';
     try {
-      await execPromise('which claude');
+      // In packaged apps, we need to find claude explicitly
+      if (app.isPackaged) {
+        const claudePath = findClaudeBinary();
+        if (claudePath) {
+          claudeCommand = claudePath;
+          console.log('📍 Found Claude CLI at:', claudeCommand);
+        } else {
+          throw new Error('Claude not found');
+        }
+      } else {
+        await execPromise('which claude');
+      }
     } catch (error) {
       console.log('⚠️ Claude CLI not found. Skipping MCP configuration.');
       // Don't show notification here - let checkClaudeInstallation handle it
@@ -808,7 +822,7 @@ async function configureMCPInClaudeCLI() {
     // Check if MCP is already configured with correct path
     try {
       // Check both user and local scopes
-      const { stdout: userMcpConfig } = await execPromise('claude mcp get codeagentswarm-tasks -s user 2>&1');
+      const { stdout: userMcpConfig } = await execPromise(`"${claudeCommand}" mcp get codeagentswarm-tasks -s user 2>&1`);
       
       // Check if already configured in user scope with correct path
       if (userMcpConfig.includes(serverPath) && !userMcpConfig.includes('not found')) {
@@ -818,7 +832,7 @@ async function configureMCPInClaudeCLI() {
       
       // Remove any local scope configuration to avoid conflicts
       try {
-        await execPromise('claude mcp remove codeagentswarm-tasks -s local 2>&1');
+        await execPromise(`"${claudeCommand}" mcp remove codeagentswarm-tasks -s local 2>&1`);
         console.log('🧹 Removed local scope MCP to avoid conflicts');
       } catch (e) {
         // Ignore if not found
@@ -835,10 +849,102 @@ async function configureMCPInClaudeCLI() {
     };
     
     // Configure MCP with user scope (globally available)
-    const configCommand = `claude mcp add -s user codeagentswarm-tasks node "${serverPath}"`;
-    await execPromise(configCommand);
+    console.log('🔧 Running MCP configuration command...');
     
-    console.log('✅ MCP configured successfully in Claude CLI');
+    // For packaged apps, we need to spawn the process differently
+    if (app.isPackaged) {
+      // Use spawn to force the command execution
+      await new Promise((resolve, reject) => {
+        // Find node executable path for claude to use
+        let nodeForClaude = 'node';
+        const possibleNodePaths = [
+          '/usr/local/bin/node',
+          '/usr/bin/node',
+          '/opt/homebrew/bin/node'
+        ];
+        
+        // Check NVM
+        const homeDir = os.homedir();
+        const nvmDir = path.join(homeDir, '.nvm', 'versions', 'node');
+        if (fs.existsSync(nvmDir)) {
+          try {
+            const nodeVersions = fs.readdirSync(nvmDir).sort().reverse();
+            for (const version of nodeVersions) {
+              const nvmNodePath = path.join(nvmDir, version, 'bin', 'node');
+              if (fs.existsSync(nvmNodePath)) {
+                possibleNodePaths.unshift(nvmNodePath);
+                break;
+              }
+            }
+          } catch (e) {
+            // Ignore
+          }
+        }
+        
+        // Find first existing node
+        for (const nodePath of possibleNodePaths) {
+          if (fs.existsSync(nodePath)) {
+            nodeForClaude = nodePath;
+            console.log('📍 Using node for MCP:', nodeForClaude);
+            break;
+          }
+        }
+        
+        // Use launcher script to avoid issues with spaces in paths
+        const launcherPath = path.join(path.dirname(serverPath), 'mcp-launcher.sh');
+        
+        // Make sure launcher is executable
+        try {
+          fs.chmodSync(launcherPath, '755');
+        } catch (e) {
+          console.log('Could not set launcher permissions:', e.message);
+        }
+        
+        const args = ['mcp', 'add', '-s', 'user', 'codeagentswarm-tasks', launcherPath];
+        console.log('🔧 Spawning:', claudeCommand, args.join(' '));
+        
+        const mcpAddProcess = spawn(claudeCommand, args, {
+          stdio: 'pipe',
+          shell: true, // Use shell to ensure PATH is available
+          env: {
+            ...process.env,
+            PATH: `/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin:${process.env.PATH}`
+          }
+        });
+        
+        let output = '';
+        let errorOutput = '';
+        
+        mcpAddProcess.stdout.on('data', (data) => {
+          output += data.toString();
+        });
+        
+        mcpAddProcess.stderr.on('data', (data) => {
+          errorOutput += data.toString();
+        });
+        
+        mcpAddProcess.on('close', (code) => {
+          if (code === 0) {
+            console.log('✅ MCP configured successfully in Claude CLI');
+            console.log('📝 Output:', output);
+            resolve();
+          } else {
+            console.error('❌ Failed to configure MCP:', errorOutput || output);
+            reject(new Error(`MCP configuration failed with code ${code}`));
+          }
+        });
+        
+        mcpAddProcess.on('error', (err) => {
+          console.error('❌ Failed to spawn claude mcp add:', err);
+          reject(err);
+        });
+      });
+    } else {
+      // Development mode - use exec
+      const configCommand = `claude mcp add -s user codeagentswarm-tasks node "${serverPath}"`;
+      await execPromise(configCommand);
+      console.log('✅ MCP configured successfully in Claude CLI');
+    }
     
     // Show success notification
     if (Notification.isSupported()) {
@@ -862,14 +968,66 @@ function startMCPServerAndRegister() {
     }
 
     // Start MCP server as child process
-    // In production, files are in the app.asar archive
-    const serverPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
-      : path.join(__dirname, 'mcp-stdio-server.js');
+    // For packaged apps, we need to extract files from app.asar to a writable location
+    let serverPath, workingDir;
     
-    const workingDir = app.isPackaged
-      ? path.join(process.resourcesPath, 'app.asar')
-      : __dirname;
+    if (app.isPackaged) {
+      // Use a directory without spaces in the user's home to avoid Claude parsing issues
+      const homeDir = os.homedir();
+      const mcpDir = path.join(homeDir, '.codeagentswarm-mcp');
+      
+      // Create MCP directory if it doesn't exist
+      if (!fs.existsSync(mcpDir)) {
+        fs.mkdirSync(mcpDir, { recursive: true });
+      }
+      
+      // Files needed for MCP to work
+      const filesToExtract = [
+        'mcp-stdio-server.js',
+        'database-mcp.js',
+        'database-mcp-standalone.js',
+        'database.js',
+        'mcp-launcher.sh'
+      ];
+      
+      try {
+        // Extract all necessary files from app.asar
+        for (const file of filesToExtract) {
+          const bundledPath = path.join(process.resourcesPath, 'app.asar', file);
+          const extractedPath = path.join(mcpDir, file);
+          
+          // Check if file needs to be updated
+          let needsUpdate = !fs.existsSync(extractedPath);
+          
+          if (!needsUpdate) {
+            // Check if the bundled version is newer
+            try {
+              const bundledContent = fs.readFileSync(bundledPath, 'utf8');
+              const extractedContent = fs.readFileSync(extractedPath, 'utf8');
+              needsUpdate = bundledContent !== extractedContent;
+            } catch (e) {
+              needsUpdate = true;
+            }
+          }
+          
+          if (needsUpdate) {
+            const content = fs.readFileSync(bundledPath, 'utf8');
+            fs.writeFileSync(extractedPath, content, 'utf8');
+            console.log(`📦 Extracted ${file} to:`, extractedPath);
+          }
+        }
+        
+        serverPath = path.join(mcpDir, 'mcp-stdio-server.js');
+        workingDir = mcpDir;
+      } catch (error) {
+        console.error('Failed to extract MCP files:', error);
+        throw error;
+      }
+    } else {
+      // Development mode - use direct path
+      serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+      workingDir = __dirname;
+    }
     
     console.log('🔧 MCP Server Configuration:');
     console.log('  - Server path:', serverPath);
@@ -883,12 +1041,63 @@ function startMCPServerAndRegister() {
       mcpServerProcess.kill();
     }
     
-    mcpServerProcess = spawn('node', [serverPath], {
+    // In packaged apps, we need to find node executable or use Electron's node
+    let nodeExecutable = 'node';
+    
+    if (app.isPackaged) {
+      // Try to find node in common locations
+      const possibleNodePaths = [
+        '/usr/local/bin/node',
+        '/usr/bin/node',
+        '/opt/homebrew/bin/node'
+      ];
+      
+      // Also check NVM installations
+      const homeDir = os.homedir();
+      const nvmDir = path.join(homeDir, '.nvm', 'versions', 'node');
+      if (fs.existsSync(nvmDir)) {
+        try {
+          const nodeVersions = fs.readdirSync(nvmDir).sort().reverse();
+          for (const version of nodeVersions) {
+            const nvmNodePath = path.join(nvmDir, version, 'bin', 'node');
+            if (fs.existsSync(nvmNodePath)) {
+              possibleNodePaths.unshift(nvmNodePath); // Add to beginning
+              break; // Use the first (latest) version found
+            }
+          }
+        } catch (e) {
+          console.log('Could not read NVM directory:', e.message);
+        }
+      }
+      
+      possibleNodePaths.push(process.execPath); // Use Electron's executable as fallback
+      
+      for (const nodePath of possibleNodePaths) {
+        if (fs.existsSync(nodePath) && nodePath !== process.execPath) {
+          nodeExecutable = nodePath;
+          console.log('📍 Found node at:', nodeExecutable);
+          break;
+        }
+      }
+      
+      // If no system node found, use Electron's node
+      if (nodeExecutable === 'node') {
+        nodeExecutable = process.execPath;
+        console.log('📍 Using Electron executable:', nodeExecutable);
+      }
+    }
+    
+    const spawnArgs = nodeExecutable === process.execPath 
+      ? [serverPath] // Electron can run JS files directly
+      : [serverPath]; // Regular node
+    
+    mcpServerProcess = spawn(nodeExecutable, spawnArgs, {
       cwd: workingDir,
       stdio: 'pipe',
       env: {
         ...process.env,
-        NODE_ENV: process.env.NODE_ENV || 'production'
+        NODE_ENV: process.env.NODE_ENV || 'production',
+        ELECTRON_RUN_AS_NODE: nodeExecutable === process.execPath ? '1' : undefined
       }
     });
 
@@ -1030,7 +1239,7 @@ function updateClaudeConfigFile() {
     
     // Update codeagentswarm-tasks configuration
     const serverPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
+      ? path.join(app.getPath('userData'), 'mcp', 'mcp-stdio-server.js')
       : path.join(__dirname, 'mcp-stdio-server.js');
     
     config.mcpServers['codeagentswarm-tasks'] = {
@@ -1794,7 +2003,8 @@ app.whenReady().then(async () => {
     console.log(`MCP Task Server running on port ${port}`);
     
     // Create MCP configuration file for Claude Code
-    createMCPConfig(port);
+    // Note: We don't use WebSocket MCP anymore, we use stdio MCP
+    // createMCPConfig(port);
   } catch (error) {
     console.error('Failed to start MCP Task Server:', error);
     mcpServer = null;
@@ -3193,9 +3403,48 @@ ipcMain.handle('fix-mcp-task-manager', async () => {
       ? path.dirname(app.getPath('exe'))
       : __dirname;
     
-    const mcpServerPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
-      : path.join(appPath, 'mcp-stdio-server.js');
+    // Ensure MCP files are extracted for packaged apps
+    let mcpServerPath;
+    if (app.isPackaged) {
+      const userDataPath = app.getPath('userData');
+      const mcpDir = path.join(userDataPath, 'mcp');
+      
+      // Create MCP directory if it doesn't exist
+      if (!fs.existsSync(mcpDir)) {
+        fs.mkdirSync(mcpDir, { recursive: true });
+      }
+      
+      // Files needed for MCP to work
+      const filesToExtract = [
+        'mcp-stdio-server.js',
+        'database-mcp.js',
+        'database-mcp-standalone.js',
+        'database.js',
+        'mcp-launcher.sh'
+      ];
+      
+      try {
+        // Extract all necessary files
+        for (const file of filesToExtract) {
+          const bundledPath = path.join(process.resourcesPath, 'app.asar', file);
+          const extractedPath = path.join(mcpDir, file);
+          
+          const content = fs.readFileSync(bundledPath, 'utf8');
+          fs.writeFileSync(extractedPath, content, 'utf8');
+          console.log(`📦 [FIX MCP] Extracted ${file} to:`, extractedPath);
+        }
+        
+        mcpServerPath = path.join(mcpDir, 'mcp-stdio-server.js');
+      } catch (error) {
+        console.error('[FIX MCP] Failed to extract MCP files:', error);
+        return {
+          success: false,
+          message: 'Failed to extract MCP files: ' + error.message
+        };
+      }
+    } else {
+      mcpServerPath = path.join(appPath, 'mcp-stdio-server.js');
+    }
     
     console.log('🔧 [FIX MCP] MCP Server Path:', mcpServerPath);
     console.log('🔧 [FIX MCP] App Path:', appPath);
