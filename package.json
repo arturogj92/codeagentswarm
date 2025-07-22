@@ -1,6 +1,6 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0721.2125",
+  "version": "2025.0722.2029",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
@@ -21,6 +21,8 @@
   },
   "dependencies": {
     "better-sqlite3": "^8.7.0",
+    "body-parser": "^1.20.2",
+    "express": "^4.18.2",
     "node-pty": "^1.0.0",
     "sqlite3": "^5.1.7",
     "ws": "^8.18.0",
@@ -47,6 +49,11 @@
       "mcp-stdio-server.js",
       "mcp-launcher.sh",
       "claude-md-config.js",
+      "hooks-manager.js",
+      "webhook-server.js",
+      "hook-sender.sh",
+      "hook-wrapper.sh",
+      "test-hooks.js",
       "kanban.html",
       "kanban.js",
       "kanban.css",

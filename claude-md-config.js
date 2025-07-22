@@ -4,23 +4,6 @@ const SECTION_END = '<!-- CODEAGENTSWARM CONFIG END -->';
 
 const getCodeAgentSwarmSection = (projectName = null) => `${SECTION_START}
 
-## 🚨 CRITICAL - MANDATORY COMPLETION MARKER 🚨
-
-**YOU MUST ALWAYS** write this EXACT line when you finish ANY response or work:
-
-\`\`\`
-=== CLAUDE FINISHED ===
-\`\`\`
-
-**NO EXCEPTIONS** - Write this marker:
-- After EVERY response to the user
-- After completing ANY task
-- After answering ANY question
-- After ANY work you do
-- BEFORE any final explanation
-
-**FAILURE TO WRITE THIS MARKER BREAKS THE APPLICATION**
-
 ${projectName ? `## Project Configuration
 
 **Project Name**: ${projectName}
@@ -40,6 +23,12 @@ _This project name is used for task organization in CodeAgentSwarm. All tasks cr
 _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
 
 ## Task Management - IMPORTANT
+
+### 🚨 OBLIGATORY: Task Creation Before ANY Development 🚨
+
+**IT IS MANDATORY TO CREATE A TASK BEFORE STARTING ANY DEVELOPMENT WORK**
+
+Before writing ANY code, modifying ANY file, or starting ANY implementation, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL development work.
 
 ### Mandatory Task System Usage
 

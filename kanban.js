@@ -8,12 +8,19 @@ class KanbanManager {
         this.editingTaskId = null;
         this.currentProjectFilter = 'all';
         this.isSelectingDirectory = false;
+        this.sortDirections = {
+            pending: 'desc',
+            in_progress: 'desc',
+            in_testing: 'desc',
+            completed: 'desc'
+        };
         this.init();
     }
 
     async init() {
         this.setupEventListeners();
         this.initializeLucideIcons();
+        this.initializeColorGradients();
         await this.loadProjects();
         await this.loadTasks();
     }
@@ -23,6 +30,18 @@ class KanbanManager {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
+    }
+
+    initializeColorGradients() {
+        // Apply gradients to all color options
+        const colorOptions = document.querySelectorAll('.color-option');
+        colorOptions.forEach(option => {
+            const color = option.style.backgroundColor;
+            if (color) {
+                const gradient = this.getProjectGradient(color);
+                option.style.background = gradient;
+            }
+        });
     }
 
     setupEventListeners() {
@@ -249,6 +268,9 @@ class KanbanManager {
 
         // Drag and drop
         this.setupDragAndDrop();
+        
+        // Setup sorting buttons
+        this.setupSortingButtons();
     }
 
     setupDragAndDrop() {
@@ -631,6 +653,15 @@ class KanbanManager {
             if (result.success) {
                 this.tasks = result.tasks;
                 this.renderTasks();
+                
+                // Check if there's a pending task to focus
+                if (pendingFocusTaskId) {
+                    console.log('Processing pending focus task:', pendingFocusTaskId);
+                    setTimeout(() => {
+                        this.focusTask(pendingFocusTaskId);
+                        pendingFocusTaskId = null;
+                    }, 100); // Small delay to ensure DOM is ready
+                }
             } else {
                 console.error('Failed to load tasks:', result.error);
             }
@@ -672,14 +703,8 @@ class KanbanManager {
             const container = document.getElementById(`${status}-tasks`);
             const count = document.getElementById(`${status}-count`);
             
-            // Sort completed tasks by updated_at (most recent first)
-            if (status === 'completed') {
-                tasks = tasks.sort((a, b) => {
-                    const dateA = new Date(a.updated_at);
-                    const dateB = new Date(b.updated_at);
-                    return dateB - dateA; // Descending order (most recent first)
-                });
-            }
+            // Sort tasks by creation date according to the current sort direction
+            tasks = this.sortTasksByCreatedDate(tasks, this.sortDirections[status]);
             
             count.textContent = tasks.length;
 
@@ -700,6 +725,17 @@ class KanbanManager {
 
         // Re-initialize icons for new elements
         this.initializeLucideIcons();
+        
+        // Update sort button states
+        Object.keys(this.sortDirections).forEach(status => {
+            const button = document.querySelector(`.sort-button[data-status="${status}"]`);
+            if (button) {
+                button.classList.remove('sort-asc', 'sort-desc');
+                button.classList.add(`sort-${this.sortDirections[status]}`);
+                const direction = this.sortDirections[status] === 'asc' ? 'descending' : 'ascending';
+                button.title = `Sort by creation date (${direction})`;
+            }
+        });
     }
 
     createTaskElement(task) {
@@ -727,7 +763,8 @@ class KanbanManager {
             const project = this.projects.find(p => p.name === task.project) || 
                            { name: task.project, display_name: task.project, color: '#007ACC' };
             const displayName = project.display_name || project.name;
-            projectTag = `<span class="task-project-tag" style="background-color: ${project.color}">
+            const gradient = this.getProjectGradient(project.color);
+            projectTag = `<span class="task-project-tag" style="background: ${gradient}">
                 <span class="project-name">${this.escapeHtml(displayName)}</span>
             </span>`;
         }
@@ -736,9 +773,6 @@ class KanbanManager {
             <div class="task-actions">
                 <button class="task-action-btn" onclick="kanban.editTask(${task.id})" title="Edit Task">
                     <i data-lucide="edit-3"></i>
-                </button>
-                <button class="task-action-btn" onclick="kanban.duplicateTask(${task.id})" title="Duplicate Task">
-                    <i data-lucide="copy"></i>
                 </button>
                 <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
                     <i data-lucide="trash-2"></i>
@@ -989,6 +1023,27 @@ class KanbanManager {
 
     // Focus on a specific task (called from IPC)
     async focusTask(taskId) {
+        console.log('focusTask called with taskId:', taskId);
+        console.log('Current tasks:', this.tasks);
+        
+        // Find the task element in the DOM
+        const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
+        console.log('Found task element:', taskElement);
+        
+        if (taskElement) {
+            // Scroll the task into view
+            taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Add a highlight effect
+            taskElement.classList.add('task-focused');
+            
+            // Remove the highlight after animation
+            setTimeout(() => {
+                taskElement.classList.remove('task-focused');
+            }, 2000);
+        }
+        
+        // Show task details modal
         await this.showTaskDetails(taskId);
     }
 
@@ -1149,34 +1204,6 @@ class KanbanManager {
         }
     }
 
-    async duplicateTask(taskId) {
-        const task = this.tasks.find(t => t.id === taskId);
-        if (!task) return;
-
-        try {
-            const newTask = {
-                title: `${task.title} (Copy)`,
-                description: task.description,
-                status: 'pending',
-                terminal_id: task.terminal_id,
-                project: task.project,
-                plan: task.plan,
-                implementation: task.implementation
-            };
-
-            const result = await ipcRenderer.invoke('task-create', newTask);
-            
-            if (result.success) {
-                await this.loadTasks();
-                this.showNotification('Task duplicated successfully', 'success');
-            } else {
-                this.showNotification(`Failed to duplicate task: ${result.error}`, 'error');
-            }
-        } catch (error) {
-            console.error('Error duplicating task:', error);
-            this.showNotification('Error duplicating task', 'error');
-        }
-    }
 
     async quickDeleteTask(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
@@ -1247,6 +1274,8 @@ class KanbanManager {
         document.getElementById('color-1').checked = true;
         document.getElementById('project-modal').classList.add('show');
         document.getElementById('project-name').focus();
+        // Apply gradients to color options
+        setTimeout(() => this.initializeColorGradients(), 0);
     }
 
     hideProjectModal() {
@@ -1328,6 +1357,8 @@ class KanbanManager {
         
         document.getElementById('project-edit-modal').classList.add('show');
         document.getElementById('project-edit-name').focus();
+        // Apply gradients to color options
+        setTimeout(() => this.initializeColorGradients(), 0);
     }
 
     hideProjectEditModal() {
@@ -1419,6 +1450,64 @@ class KanbanManager {
             console.error('Error deleting project:', error);
             this.showNotification('Error deleting project', 'error');
         }
+    }
+
+    getProjectGradient(color) {
+        // Map solid colors to modern gradients
+        const gradients = {
+            '#007ACC': 'linear-gradient(135deg, #007ACC 0%, #0098FF 100%)', // Blue
+            '#00C853': 'linear-gradient(135deg, #00C853 0%, #00E676 100%)', // Green
+            '#FF6B6B': 'linear-gradient(135deg, #FF6B6B 0%, #FF8787 100%)', // Red
+            '#FFA726': 'linear-gradient(135deg, #FFA726 0%, #FFB74D 100%)', // Orange
+            '#AB47BC': 'linear-gradient(135deg, #AB47BC 0%, #BA68C8 100%)', // Purple
+            '#26A69A': 'linear-gradient(135deg, #26A69A 0%, #4DB6AC 100%)', // Teal
+            '#EC407A': 'linear-gradient(135deg, #EC407A 0%, #F06292 100%)', // Pink
+            '#7E57C2': 'linear-gradient(135deg, #7E57C2 0%, #9575CD 100%)'  // Deep Purple
+        };
+        
+        return gradients[color] || `linear-gradient(135deg, ${color} 0%, ${color} 100%)`;
+    }
+
+    setupSortingButtons() {
+        const sortButtons = document.querySelectorAll('.sort-button');
+        sortButtons.forEach(button => {
+            button.addEventListener('click', (e) => {
+                const status = button.dataset.status;
+                this.toggleSort(status);
+            });
+        });
+    }
+
+    toggleSort(status) {
+        // Toggle sort direction
+        this.sortDirections[status] = this.sortDirections[status] === 'asc' ? 'desc' : 'asc';
+        
+        // Update button appearance
+        const button = document.querySelector(`.sort-button[data-status="${status}"]`);
+        if (button) {
+            button.classList.remove('sort-asc', 'sort-desc');
+            button.classList.add(`sort-${this.sortDirections[status]}`);
+            
+            // Update tooltip
+            const direction = this.sortDirections[status] === 'asc' ? 'descending' : 'ascending';
+            button.title = `Sort by creation date (${direction})`;
+        }
+        
+        // Re-render tasks with new sorting
+        this.renderTasks();
+    }
+
+    sortTasksByCreatedDate(tasks, direction) {
+        return tasks.sort((a, b) => {
+            const dateA = new Date(a.created_at);
+            const dateB = new Date(b.created_at);
+            
+            if (direction === 'asc') {
+                return dateA - dateB; // Oldest first
+            } else {
+                return dateB - dateA; // Newest first
+            }
+        });
     }
 
     escapeHtml(text) {
@@ -1533,9 +1622,16 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
+// Store task ID to focus on when kanban is ready
+let pendingFocusTaskId = null;
+
 // Handle focus-task IPC message from main window
 ipcRenderer.on('focus-task', (event, taskId) => {
-    if (kanban) {
+    console.log('Received focus-task event with taskId:', taskId);
+    if (kanban && kanban.tasks.length > 0) {
         kanban.focusTask(taskId);
+    } else {
+        console.log('Kanban not ready yet, storing taskId for later');
+        pendingFocusTaskId = taskId;
     }
 });

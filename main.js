@@ -6,6 +6,8 @@ const fs = require('fs');
 const os = require('os');
 const DatabaseManager = require('./database');
 const MCPTaskServer = require('./mcp-server');
+const HooksManager = require('./hooks-manager');
+const WebhookServer = require('./webhook-server');
 
 // Logging setup
 const logDir = path.join(app.getPath('userData'), 'logs');
@@ -82,6 +84,8 @@ let mainWindow;
 const terminals = new Map();
 let db;
 let mcpServer;
+let hooksManager;
+let webhookServer;
 let terminalsWaitingForResponse = new Set();
 
 // Handle unhandled promise rejections
@@ -736,6 +740,51 @@ ipcMain.handle('check-claude-code', async () => {
       resolve(false);
     });
   });
+});
+
+// Hooks IPC handlers
+ipcMain.handle('hooks-check-status', async () => {
+  try {
+    if (!hooksManager) {
+      return { installed: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.checkHooksStatus();
+  } catch (error) {
+    return { installed: false, error: error.message };
+  }
+});
+
+ipcMain.handle('hooks-install', async () => {
+  try {
+    if (!hooksManager) {
+      return { success: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.installHooks();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('hooks-remove', async () => {
+  try {
+    if (!hooksManager) {
+      return { success: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.removeHooks();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('webhook-status', async () => {
+  try {
+    if (!webhookServer) {
+      return { running: false, error: 'Webhook server not initialized' };
+    }
+    return webhookServer.getStatus();
+  } catch (error) {
+    return { running: false, error: error.message };
+  }
 });
 
 // Start MCP server as child process and register with Claude Code
@@ -1952,10 +2001,6 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
     }
   });
   
-  // Open DevTools in development
-  if (process.argv.includes('--dev')) {
-    kanbanWindow.webContents.openDevTools();
-  }
 });
 
 // Handle task creation from renderer
@@ -2017,6 +2062,36 @@ app.whenReady().then(async () => {
   }
   
   createWindow();
+  
+  // Initialize hooks manager and webhook server
+  try {
+    hooksManager = new HooksManager();
+    webhookServer = new WebhookServer(mainWindow);
+    
+    // Start webhook server
+    const webhookResult = await webhookServer.start();
+    if (webhookResult.success) {
+      console.log(`Webhook server started on port ${webhookResult.port}`);
+      
+      // Install hooks automatically
+      const hooksStatus = await hooksManager.checkHooksStatus();
+      if (!hooksStatus.installed) {
+        console.log('Installing CodeAgentSwarm hooks...');
+        const installResult = await hooksManager.installHooks();
+        if (installResult.success) {
+          console.log('Hooks installed successfully');
+        } else {
+          console.error('Failed to install hooks:', installResult.error);
+        }
+      } else {
+        console.log('Hooks already installed');
+      }
+    } else {
+      console.error('Failed to start webhook server:', webhookResult.error);
+    }
+  } catch (error) {
+    console.error('Failed to initialize hooks system:', error);
+  }
   
   // Start MCP server and register with Claude Code
   try {

@@ -23,10 +23,6 @@ class TerminalManager {
         this.currentLayout = 'horizontal'; // Default layout for 2 terminals
         this.visualOrder = null; // Track visual order after swaps
         this.lastSelectedDirectories = {}; // Initialize empty, will load async
-        this.lastConfirmationMessages = new Map(); // Track last confirmation per terminal
-        this.confirmationDebounce = new Map(); // Debounce confirmations
-        this.confirmedCommands = new Map(); // Track which commands already notified
-        this.lastMenuContent = new Map(); // Track last menu content per terminal
         this.notificationBlocked = new Map(); // Block notifications until user interaction
         this.waitingForUserInteraction = new Map(); // Track terminals waiting for interaction
         this.terminalFocused = new Map(); // Track which terminals are focused
@@ -34,8 +30,8 @@ class TerminalManager {
         this.highlightedTerminal = null; // Track which terminal is currently highlighted for confirmation
         this.customProjectColors = {}; // Store custom colors per project
         this.terminalsNeedingAttention = new Set(); // Track terminals that need user attention
-        this.claudeFinishedNotified = new Map(); // Track if we already notified about CLAUDE FINISHED for each terminal
         this.isChangingLayout = false; // Flag to prevent re-parsing during layout changes
+        this.hooksStatus = { installed: false, webhookRunning: false }; // Track hooks status
         
         this.init();
         // Load directories asynchronously with error handling
@@ -88,6 +84,8 @@ class TerminalManager {
         this.setupGlobalTerminalFocusDetection(); // Add global focus detection
         this.updateGitButtonVisibility(); // Initialize git button visibility
         this.startTaskIndicatorUpdates(); // Initialize task indicators with periodic updates
+        this.checkHooksStatus(); // Check hooks status on startup
+        this.startHooksStatusUpdates(); // Periodically check hooks status
         
         // Listen for clear waiting states message
         ipcRenderer.on('clear-waiting-states', () => {
@@ -98,6 +96,38 @@ class TerminalManager {
             this.notificationBlocked.forEach((value, key) => {
                 this.notificationBlocked.set(key, false);
             });
+        });
+        
+        // Listen for webhook events
+        ipcRenderer.on('confirmation-needed', (event, data) => {
+            console.log('Confirmation needed via webhook:', data);
+            const { terminalId, tool } = data;
+            if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
+                this.terminalsNeedingAttention.add(terminalId);
+                this.updateNotificationBadge();
+                this.highlightTerminalForConfirmation(terminalId);
+                this.scrollTerminalToBottom(terminalId);
+            }
+        });
+        
+        ipcRenderer.on('claude-finished', (event, data) => {
+            console.log('Claude finished via webhook:', data);
+            const { terminalId } = data;
+            if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
+                this.highlightTerminal(terminalId);
+                this.scrollTerminalToBottom(terminalId);
+            }
+        });
+        
+        ipcRenderer.on('play-completion-sound', (event, data) => {
+            // Play completion sound
+            try {
+                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGBzvLZiTYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
+                audio.volume = 0.3;
+                audio.play().catch(e => {});
+            } catch (e) {
+                // Ignore audio errors
+            }
         });
         
         // Listen for task created response
@@ -201,8 +231,10 @@ class TerminalManager {
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && this.fullscreenTerminal !== null) {
+            // Only handle Escape if a terminal is in fullscreen mode AND that terminal has focus
+            if (e.key === 'Escape' && this.fullscreenTerminal !== null && this.activeTerminal === this.fullscreenTerminal) {
                 this.exitFullscreen();
+                e.preventDefault(); // Prevent any other Escape handlers
             }
         });
 
@@ -754,7 +786,9 @@ class TerminalManager {
             scrollback: 1000,
             allowTransparency: true,
             cols: 100,
-            rows: 30
+            rows: 30,
+            // Disable bracketed paste mode to prevent ~200/~201 escape sequences
+            bracketedPasteMode: false
         });
 
         const fitAddon = new FitAddon();
@@ -803,14 +837,20 @@ class TerminalManager {
                 }
             }
         });
+        
+        // Handle paste events to ensure clean paste without bracketed paste mode sequences
+        terminal.attachCustomKeyEventHandler((event) => {
+            // Intercept paste events
+            if (event.type === 'keydown' && event.ctrlKey && event.key === 'v') {
+                // Let the default paste handler work, but with bracketedPasteMode disabled
+                return true;
+            }
+            return true;
+        });
 
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
-            this.parseClaudeCodeOutput(data, quadrant);
-            
-            // Update last output time and check for inactivity
-            this.updateActivityAndCheckCompletion(quadrant, data);
         });
 
         // Handle terminal exit
@@ -898,103 +938,6 @@ class TerminalManager {
 
     }
 
-    parseClaudeCodeOutput(data, quadrant) {
-        // Skip parsing if we're in the middle of a layout change
-        if (this.isChangingLayout) {
-            return;
-        }
-        
-        const text = data.toString();
-        
-        // Check if Claude Code is ready
-        if (!this.claudeCodeReady[quadrant]) {
-            const loader = document.getElementById(`loader-${quadrant}`);
-            const terminalDiv = document.getElementById(`terminal-${quadrant}`);
-            
-            // Update loader status
-            if (loader) {
-                const statusElement = loader.querySelector('.loader-status');
-                // Check for any Claude Code indication to show terminal quickly
-                if (text.includes('Welcome to Claude Code') || 
-                    text.includes('Do you trust the files in this folder?') ||
-                    text.includes('I\'ll help you with') ||
-                    text.includes('▓') ||  // Claude Code's UI elements
-                    text.includes('claude code') ||  // The actual command
-                    text.includes('Claude Code')) {  // Claude Code mentions
-                    
-                    // Update status based on specific message
-                    if (text.includes('Do you trust the files in this folder?')) {
-                        statusElement.textContent = 'Waiting for trust confirmation...';
-                    } else if (text.includes('Welcome to Claude Code')) {
-                        statusElement.textContent = 'Claude Code starting...';
-                    } else if (text.includes('I\'ll help you with')) {
-                        statusElement.textContent = 'Claude Code ready!';
-                        this.claudeCodeReady[quadrant] = true;
-                    }
-                    
-                    // Show terminal immediately for any Claude Code activity
-                    if (loader.style.display !== 'none') {
-                        loader.style.display = 'none';
-                        terminalDiv.style.display = 'block';
-                        
-                        const terminalInfo = this.terminals.get(quadrant);
-                        if (terminalInfo && terminalInfo.fitAddon) {
-                            // Multiple fit attempts to ensure proper sizing
-                            // Single fit operation
-                            setTimeout(() => terminalInfo.fitAddon.fit(), 50);
-                            setTimeout(() => terminalInfo.fitAddon.fit(), 200);
-                        }
-                    }
-                } else if (text.includes('command not found')) {
-                    statusElement.textContent = 'Error: Claude Code not found';
-                    statusElement.style.color = '#ef4444';
-                }
-            }
-        }
-        
-        // Parse Claude Code specific outputs for notifications
-        if (text.includes('Task completed successfully')) {
-        } else if (text.includes('Waiting for confirmation') || 
-                   text.includes('Continue? (y/n)') ||
-                   text.includes('Do you want to') ||
-                   text.includes('Would you like to') ||
-                   text.includes('Proceed?') ||
-                   text.includes('Allow access to') ||
-                   text.includes('Grant permission') ||
-                   text.includes('Enable MCP') ||
-                   text.includes('Trust this') ||
-                   text.includes('make this edit') ||
-                   text.includes('Confirm')) {
-            this.handleConfirmationRequest(text, quadrant);
-        } else if (text.includes('Starting task') || text.includes('Processing...')) {
-        }
-
-        // Check for specific Claude Code patterns
-        const patterns = [
-            {
-                regex: /Generated (\d+) files?/i,
-                type: 'success',
-                message: (match) => `Generated ${match[1]} files`
-            },
-            {
-                regex: /Found (\d+) issues?/i,
-                type: 'warning',
-                message: (match) => `Found ${match[1]} issues`
-            },
-            {
-                regex: /Building project.../i,
-                type: 'info',
-                message: 'Building project...'
-            }
-        ];
-
-        patterns.forEach(pattern => {
-            const match = text.match(pattern.regex);
-            if (match) {
-                this.showNotification(pattern.message(match), pattern.type);
-            }
-        });
-    }
 
     highlightTerminal(quadrant) {
         const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
@@ -1051,180 +994,8 @@ class TerminalManager {
         // Fallback de notificación interna removido - solo notificaciones externas
     }
 
-    handleConfirmationRequest(text, quadrant) {
-        // RADICAL SOLUTION: If notifications are blocked for this terminal, skip entirely
-        if (this.notificationBlocked.get(quadrant)) {
-            return;
-        }
-        
-        // Skip if this is just cursor movement or user typing
-        if (text.length < 50) {
-            return;
-        }
-        
-        // CRITICAL: Only process if text contains ACTUAL confirmation patterns
-        const hasConfirmation = text.includes('Do you want to') || 
-                              text.includes('Proceed?') || 
-                              text.includes('Continue?') || 
-                              text.includes('Would you like to') ||
-                              text.includes('Allow access to') || 
-                              text.includes('Grant permission') ||
-                              text.includes('Enable MCP') || 
-                              text.includes('Trust this') ||
-                              text.includes('Waiting for confirmation') ||
-                              text.includes('Do you trust the files') ||
-                              text.includes('make this edit');
-        
-        if (!hasConfirmation) {
-            return;
-        }
-        
-        // Detect if this is menu navigation (contains selection arrow and numbered options)
-        const isMenuNavigation = text.includes('❯') && /\s*[0-9]+\./m.test(text);
-        
-        // Create a content signature to detect reprints of the same menu
-        // Remove all variable parts to detect if it's the same menu structure
-        const contentSignature = text
-            .replace(/❯\s*/g, '') // Remove selection arrow and its spacing
-            .replace(/\s*[0-9]+\./g, '') // Remove option numbers
-            .replace(/\s+/g, ' ') // Normalize whitespace
-            .replace(/shift\+tab/g, '') // Remove keyboard hints that might vary
-            .replace(/esc/g, '') // Remove keyboard hints
-            .replace(/\([^)]+\)/g, '') // Remove parenthetical content
-            .trim();
-        
-        // Check if this is just a reprint of the same menu content
-        const lastContent = this.lastMenuContent.get(quadrant);
-        if (lastContent === contentSignature) {
-            return; // Same menu content, just different selection
-        }
-        
-        // If this is a menu navigation, check if we recently showed a notification for this quadrant
-        if (isMenuNavigation) {
-            const lastNotificationTime = this.confirmedCommands.get(`${quadrant}_menu_notification`);
-            const now = Date.now();
-            if (lastNotificationTime && (now - lastNotificationTime) < 30000) { // 30 second cooldown for menu navigations
-                return; // Don't spam notifications for menu navigation
-            }
-            // Mark that we're about to show a notification for this menu
-            this.confirmedCommands.set(`${quadrant}_menu_notification`, now);
-        }
-        
-        // Update last menu content
-        this.lastMenuContent.set(quadrant, contentSignature);
-        
-        // Extract command from the text (usually appears before "Do you want to proceed?")
-        let command = '';
-        const lines = text.split('\n');
-        
-        // Look for the command line (usually contains the actual command like "mkdir pruebas2")
-        for (const line of lines) {
-            const trimmedLine = line.trim();
-            // Skip empty lines, UI elements, and option lines
-            if (trimmedLine && 
-                !trimmedLine.includes('│') && 
-                !trimmedLine.includes('╭') && 
-                !trimmedLine.includes('╰') && 
-                !trimmedLine.includes('❯') &&
-                !trimmedLine.match(/^[0-9]+\./) &&
-                !trimmedLine.includes('Do you want to') &&
-                !trimmedLine.includes('Bash command') &&
-                trimmedLine.length > 3) {
-                command = trimmedLine;
-                break;
-            }
-        }
-        
-        // Find the confirmation question
-        let confirmationQuestion = '';
-        for (const line of lines) {
-            if (line.includes('Do you want to') || line.includes('Proceed?') || 
-                line.includes('Continue?') || line.includes('Would you like to') ||
-                line.includes('Allow access to') || line.includes('Grant permission') ||
-                line.includes('Enable MCP') || line.includes('Trust this') ||
-                line.includes('Waiting for confirmation') || line.includes('Do you trust the files') ||
-                line.includes('make this edit')) {
-                confirmationQuestion = line.trim().replace(/[│]/g, '').trim();
-                break;
-            }
-        }
-        
-        // If no clear confirmation question found, skip
-        if (!confirmationQuestion) {
-            return;
-        }
-        
-        // Create a unique identifier for this specific command + question combination
-        const commandKey = `${command}_${confirmationQuestion}`.replace(/\s+/g, '_');
-        
-        // If we already notified for this exact command, skip (unless it's been a while)
-        const now = Date.now();
-        const lastNotified = this.confirmedCommands.get(`${quadrant}_${commandKey}`);
-        if (lastNotified && (now - lastNotified) < 300000) { // 5 minute cooldown per command
-            return;
-        }
-        
-        // Also check if this terminal is already in the attention list
-        if (this.terminalsNeedingAttention.has(quadrant)) {
-            return;
-        }
-        
-        // If this is menu navigation, increase debounce significantly
-        const debounceTime = isMenuNavigation ? 2000 : 500;
-        
-        // Clear existing debounce timer
-        if (this.confirmationDebounce.has(quadrant)) {
-            clearTimeout(this.confirmationDebounce.get(quadrant));
-        }
-        
-        // Don't block immediately, wait for debounce to complete
-        
-        // Set new debounce timer
-        const timeoutId = setTimeout(() => {
-            // Double check this isn't menu navigation at execution time
-            const terminalInfo = this.terminals.get(quadrant);
-            if (terminalInfo && terminalInfo.terminal) {
-                // Mark this command as notified
-                this.confirmedCommands.set(`${quadrant}_${commandKey}`, now);
-                
-                // Add terminal to those needing attention
-                this.terminalsNeedingAttention.add(quadrant);
-                this.updateNotificationBadge();
-                
-                this.showDesktopNotification('Confirmation Required', `Terminal ${quadrant + 1}: Claude Code needs confirmation`);
-                this.highlightTerminalForConfirmation(quadrant);
-                
-                // Auto-scroll to bottom when notification appears
-                this.scrollTerminalToBottom(quadrant);
-                
-                // Block notifications temporarily (auto-unblock after 15 seconds)
-                this.notificationBlocked.set(quadrant, true);
-                this.waitingForUserInteraction.set(quadrant, true);
-                
-                // Auto-unblock after 15 seconds to prevent permanent blocking
-                // BUT keep the terminal in the attention list if still waiting
-                setTimeout(() => {
-                    if (this.notificationBlocked.get(quadrant)) {
-                        // Only unblock notifications, but keep in attention list
-                        this.notificationBlocked.set(quadrant, false);
-                        // Don't call unblockNotifications here to avoid removing from attention list
-                    }
-                }, 15000);
-                
-                // Clean up old confirmed commands after 5 minutes
-                setTimeout(() => {
-                    const entries = Array.from(this.confirmedCommands.entries());
-                    entries.forEach(([key, timestamp]) => {
-                        if (Date.now() - timestamp > 300000) { // 5 minutes
-                            this.confirmedCommands.delete(key);
-                        }
-                    });
-                }, 300000);
-            }
-        }, debounceTime);
-        
-        this.confirmationDebounce.set(quadrant, timeoutId);
-    }
+    // Removed handleConfirmationRequest - now using webhooks
+    
     
     unblockNotifications(quadrant) {
         this.notificationBlocked.set(quadrant, false);
@@ -3533,6 +3304,103 @@ class TerminalManager {
         }
     }
 
+    async checkHooksStatus() {
+        try {
+            // Check hooks installation status
+            const hooksResult = await ipcRenderer.invoke('hooks-check-status');
+            this.hooksStatus.installed = hooksResult.installed || false;
+            
+            // Check webhook server status
+            const webhookResult = await ipcRenderer.invoke('webhook-status');
+            this.hooksStatus.webhookRunning = webhookResult.running || false;
+            
+            // Update UI indicator
+            this.updateHooksStatusIndicator();
+            
+            console.log('Hooks status:', this.hooksStatus);
+        } catch (error) {
+            console.error('Error checking hooks status:', error);
+            this.hooksStatus = { installed: false, webhookRunning: false };
+            this.updateHooksStatusIndicator();
+        }
+    }
+
+    updateHooksStatusIndicator() {
+        // Find or create the hooks status indicator
+        let indicator = document.getElementById('hooks-status-indicator');
+        
+        if (!indicator) {
+            // Create the indicator if it doesn't exist
+            const header = document.querySelector('.header-left');
+            if (!header) return;
+            
+            indicator = document.createElement('div');
+            indicator.id = 'hooks-status-indicator';
+            indicator.className = 'hooks-status-indicator';
+            indicator.innerHTML = `
+                <i data-lucide="webhook"></i>
+                <span class="status-text">Hooks</span>
+                <span class="status-dot"></span>
+            `;
+            
+            // Insert after the app title
+            const title = header.querySelector('h1');
+            if (title) {
+                title.insertAdjacentElement('afterend', indicator);
+            } else {
+                header.appendChild(indicator);
+            }
+            
+            // Initialize Lucide icon
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }
+        
+        // Update the status
+        const statusDot = indicator.querySelector('.status-dot');
+        const statusText = indicator.querySelector('.status-text');
+        
+        if (this.hooksStatus.installed && this.hooksStatus.webhookRunning) {
+            statusDot.className = 'status-dot status-active';
+            statusText.textContent = 'Hooks Active';
+            indicator.title = 'Hooks are installed and webhook server is running';
+        } else if (this.hooksStatus.webhookRunning && !this.hooksStatus.installed) {
+            statusDot.className = 'status-dot status-warning';
+            statusText.textContent = 'Hooks Not Installed';
+            indicator.title = 'Webhook server is running but hooks are not installed. Click to install.';
+            indicator.style.cursor = 'pointer';
+            indicator.onclick = () => this.installHooks();
+        } else {
+            statusDot.className = 'status-dot status-inactive';
+            statusText.textContent = 'Hooks Inactive';
+            indicator.title = 'Hooks system is not active';
+        }
+    }
+
+    async installHooks() {
+        try {
+            const result = await ipcRenderer.invoke('hooks-install');
+            if (result.success) {
+                this.showNotification('Hooks installed successfully', 'success');
+                // Recheck status
+                await this.checkHooksStatus();
+            } else {
+                this.showNotification(`Failed to install hooks: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error installing hooks:', error);
+            this.showNotification('Error installing hooks', 'error');
+        }
+    }
+
+    startHooksStatusUpdates() {
+        // Check hooks status every 30 seconds
+        setInterval(() => {
+            this.checkHooksStatus();
+        }, 30000);
+    }
+
     async checkForTaskCompletionNotifications() {
         try {
             const result = await ipcRenderer.invoke('check-task-notifications');
@@ -4720,68 +4588,6 @@ class TerminalManager {
 
 
     // Update activity and check for completion marker
-    updateActivityAndCheckCompletion(terminalId, data) {
-        // Check for completion marker
-        if (data.includes('=== CLAUDE FINISHED ===')) {
-            // Check if we already notified for this marker recently
-            const lastNotified = this.claudeFinishedNotified.get(terminalId);
-            const now = Date.now();
-            
-            // Skip if we notified in the last 30 seconds (prevents spam when user types the marker)
-            if (lastNotified && (now - lastNotified) < 30000) {
-                return;
-            }
-            
-            // Also skip if user is currently typing (prevents notification when copying/pasting)
-            if (this.userTypingTimers.has(terminalId)) {
-                return;
-            }
-            
-            console.log(`✅ Claude finished marker detected in terminal ${terminalId + 1}`);
-            
-            // Mark that we notified for this terminal
-            this.claudeFinishedNotified.set(terminalId, now);
-            
-            // Clear the notification flag after 30 seconds
-            setTimeout(() => {
-                this.claudeFinishedNotified.delete(terminalId);
-            }, 30000);
-            
-            // Highlight the terminal
-            this.highlightTerminal(terminalId);
-            
-            // Auto-scroll to bottom when Claude finishes
-            this.scrollTerminalToBottom(terminalId);
-            
-            // Use system notification
-            if (Notification.permission === 'granted') {
-                new Notification('Claude has finished', {
-                    body: `Terminal ${terminalId + 1} - Work completed`,
-                    icon: 'logo_prod_512.png',
-                    silent: false
-                });
-            } else if (Notification.permission !== 'denied') {
-                Notification.requestPermission().then(permission => {
-                    if (permission === 'granted') {
-                        new Notification('Claude has finished', {
-                            body: `Terminal ${terminalId + 1} - Work completed`,
-                            icon: 'logo_prod_512.png',
-                            silent: false
-                        });
-                    }
-                });
-            }
-            
-            // Play completion sound
-            try {
-                const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBTGBzvLZiTYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWT');
-                audio.volume = 0.3;
-                audio.play().catch(e => {});
-            } catch (e) {
-                // Ignore audio errors
-            }
-        }
-    }
 
     async loadProjectsForModal() {
         try {
@@ -4851,10 +4657,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             // Wrap critical functions with performance measurement
             const tm = window.terminalManager;
-            tm.parseClaudeCodeOutput = perfMonitor.measureFunction(
-                'parseClaudeCodeOutput',
-                tm.parseClaudeCodeOutput.bind(tm)
-            );
             
             tm.resizeAllTerminals = perfMonitor.measureFunction(
                 'resizeAllTerminals',

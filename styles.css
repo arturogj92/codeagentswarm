@@ -86,6 +86,67 @@ body::before {
   gap: 16px;
 }
 
+/* Hooks Status Indicator */
+.hooks-status-indicator {
+  display: none; /* Hidden as requested */
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.hooks-status-indicator:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hooks-status-indicator i {
+  width: 14px;
+  height: 14px;
+}
+
+.hooks-status-indicator .status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.hooks-status-indicator .status-dot.status-active {
+  background: var(--secondary);
+  box-shadow: 0 0 8px var(--secondary);
+}
+
+.hooks-status-indicator .status-dot.status-warning {
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--accent);
+  animation: pulse 2s infinite;
+}
+
+.hooks-status-indicator .status-dot.status-inactive {
+  background: var(--text-tertiary);
+}
+
+@keyframes pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .logo-container {
   display: flex;
   align-items: center;
