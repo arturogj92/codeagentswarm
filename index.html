@@ -15,16 +15,18 @@
                     <img src="logo_prod.png" alt="CodeAgentSwarm" class="app-logo">
                 </div>
                 <div class="action-buttons">
-                    <button class="btn-layout" id="git-status-btn" title="Git Status">
-                        <i data-lucide="git-branch-plus"></i>
-                    </button>
-                    <button class="btn-layout" id="kanban-btn" title="Task Manager">
+                    <button class="btn-layout with-text" id="kanban-btn" title="Task Manager">
                         <i data-lucide="list-checks"></i>
+                        <span>Tasks</span>
                     </button>
-                    <button class="btn-layout" id="create-task-btn" title="Create Task">
+                    <button class="btn-layout with-text" id="create-task-btn" title="Create Task">
                         <i data-lucide="plus-square"></i>
+                        <span>Create</span>
                     </button>
                 </div>
+                <button class="btn-layout git-button" id="git-status-btn" title="Git Status">
+                    <i data-lucide="git-branch-plus"></i>
+                </button>
             </div>
             <div class="dev-indicator" id="dev-indicator" style="display: none;">DEV</div>
             <div class="header-controls">
@@ -62,15 +64,14 @@
                             </button>
                         </div>
                     </div>
-                    <button class="btn btn-success" id="add-terminal-btn" title="Add Terminal"><i data-lucide="plus"></i></button>
+                    <button class="btn btn-add-terminal" id="add-terminal-btn" title="Add Terminal">
+                        <i data-lucide="terminal"></i>
+                        <i data-lucide="plus" class="add-icon"></i>
+                    </button>
                     <button class="btn btn-info" id="mcp-info-btn" title="MCP Information & Tips">
                         <i data-lucide="info"></i>
                     </button>
-                    <button class="btn-layout" id="fix-mcp-btn" title="Fix MCP Connection - Use when MCP stops working">
-                        <i data-lucide="wrench"></i>
-                    </button>
                 </div>
-                <button class="btn btn-primary" id="settings-btn">⚙️</button>
             </div>
         </header>
 

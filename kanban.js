@@ -8,11 +8,11 @@ class KanbanManager {
         this.editingTaskId = null;
         this.currentProjectFilter = 'all';
         this.isSelectingDirectory = false;
-        this.sortDirections = {
-            pending: 'desc',
-            in_progress: 'desc',
-            in_testing: 'desc',
-            completed: 'desc'
+        this.sortStates = {
+            pending: 'default',
+            in_progress: 'default',
+            in_testing: 'default',
+            completed: 'default'
         };
         this.init();
     }
@@ -704,7 +704,7 @@ class KanbanManager {
             const count = document.getElementById(`${status}-count`);
             
             // Sort tasks by creation date according to the current sort direction
-            tasks = this.sortTasksByCreatedDate(tasks, this.sortDirections[status]);
+            tasks = this.sortTasksByCreatedDate(tasks, this.sortStates[status]);
             
             count.textContent = tasks.length;
 
@@ -727,13 +727,42 @@ class KanbanManager {
         this.initializeLucideIcons();
         
         // Update sort button states
-        Object.keys(this.sortDirections).forEach(status => {
+        Object.keys(this.sortStates).forEach(status => {
             const button = document.querySelector(`.sort-button[data-status="${status}"]`);
             if (button) {
-                button.classList.remove('sort-asc', 'sort-desc');
-                button.classList.add(`sort-${this.sortDirections[status]}`);
-                const direction = this.sortDirections[status] === 'asc' ? 'descending' : 'ascending';
-                button.title = `Sort by creation date (${direction})`;
+                button.classList.remove('sort-default', 'sort-asc', 'sort-desc');
+                button.classList.add(`sort-${this.sortStates[status]}`);
+                
+                // Update icon
+                const icon = button.querySelector('i');
+                if (icon) {
+                    switch(this.sortStates[status]) {
+                        case 'default':
+                            icon.setAttribute('data-lucide', 'arrow-up-down');
+                            break;
+                        case 'desc':
+                            icon.setAttribute('data-lucide', 'arrow-down');
+                            break;
+                        case 'asc':
+                            icon.setAttribute('data-lucide', 'arrow-up');
+                            break;
+                    }
+                }
+                
+                // Update tooltip
+                let tooltipText = '';
+                switch(this.sortStates[status]) {
+                    case 'default':
+                        tooltipText = 'Sin ordenar (orden manual)';
+                        break;
+                    case 'desc':
+                        tooltipText = 'Ordenado: Más recientes primero';
+                        break;
+                    case 'asc':
+                        tooltipText = 'Ordenado: Más antiguos primero';
+                        break;
+                }
+                button.title = tooltipText;
             }
         });
     }
@@ -744,15 +773,38 @@ class KanbanManager {
         taskCard.draggable = true;
         taskCard.dataset.taskId = task.id;
 
-        // Create terminal selector
-        const terminalSelector = `
-            <select class="task-terminal-selector" data-task-id="${task.id}" onchange="kanban.updateTaskTerminal(${task.id}, this.value)">
-                <option value="">No terminal</option>
-                <option value="1" ${task.terminal_id == 1 ? 'selected' : ''}>Terminal 1</option>
-                <option value="2" ${task.terminal_id == 2 ? 'selected' : ''}>Terminal 2</option>
-                <option value="3" ${task.terminal_id == 3 ? 'selected' : ''}>Terminal 3</option>
-                <option value="4" ${task.terminal_id == 4 ? 'selected' : ''}>Terminal 4</option>
-            </select>
+        // Create terminal icon with dropdown
+        const terminalIcon = `
+            <div class="task-terminal-wrapper">
+                <div class="task-terminal-badge ${task.terminal_id ? '' : 'unassigned'}" 
+                     onclick="kanban.toggleTerminalDropdown(event, ${task.id})" 
+                     title="${task.terminal_id ? `Terminal ${task.terminal_id}` : 'Sin terminal'}">
+                    ${task.terminal_id ? `<i data-lucide="terminal"></i><span class="terminal-number">${task.terminal_id}</span>` : '<i data-lucide="plus"></i>'}
+                </div>
+                <div class="terminal-dropdown" id="terminal-dropdown-${task.id}" style="display: none;">
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, null)">
+                        <i data-lucide="x-circle"></i> Ninguno
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 1)">
+                        <i data-lucide="terminal"></i> T1
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 2)">
+                        <i data-lucide="terminal"></i> T2
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 3)">
+                        <i data-lucide="terminal"></i> T3
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 4)">
+                        <i data-lucide="terminal"></i> T4
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 5)">
+                        <i data-lucide="terminal"></i> T5
+                    </div>
+                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 6)">
+                        <i data-lucide="terminal"></i> Terminal 6
+                    </div>
+                </div>
+            </div>
         `;
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
@@ -770,23 +822,27 @@ class KanbanManager {
         }
 
         taskCard.innerHTML = `
-            <div class="task-actions">
-                <button class="task-action-btn" onclick="kanban.editTask(${task.id})" title="Edit Task">
-                    <i data-lucide="edit-3"></i>
-                </button>
-                <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
-                    <i data-lucide="trash-2"></i>
-                </button>
+            <div class="task-header">
+                ${projectTag}
+                <div class="task-header-right">
+                    <span class="task-id">#${task.id}</span>
+                    <div class="task-actions">
+                        <button class="task-action-btn" onclick="kanban.editTask(${task.id})" title="Edit Task">
+                            <i data-lucide="edit-3"></i>
+                        </button>
+                        <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                    </div>
+                </div>
             </div>
-            ${projectTag}
             <div class="task-title">
-                <span class="task-id">#${task.id}</span> 
                 <span class="task-title-text" contenteditable="true" data-task-id="${task.id}" onblur="kanban.updateTaskTitle(${task.id}, this.textContent)" onkeydown="kanban.handleTitleKeydown(event, ${task.id})">${this.escapeHtml(task.title)}</span>
             </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
-                <span>${createdDate}</span>
-                ${terminalSelector}
+                <span class="task-date">${createdDate}</span>
+                ${terminalIcon}
             </div>
         `;
 
@@ -850,7 +906,7 @@ class KanbanManager {
             // Don't open details if clicking on editable elements
             if (e.target.closest('.task-actions') || 
                 e.target.closest('.task-title-text') || 
-                e.target.closest('.task-terminal-selector')) {
+                e.target.closest('.task-terminal-wrapper')) {
                 return;
             }
             this.showTaskDetails(task.id);
@@ -911,9 +967,9 @@ class KanbanManager {
         let terminalId = null;
         if (terminalIdValue !== '') {
             terminalId = parseInt(terminalIdValue);
-            // Validate terminal ID (must be between 1 and 4)
-            if (isNaN(terminalId) || terminalId < 1 || terminalId > 4) {
-                alert('Terminal ID must be between 1 and 4');
+            // Validate terminal ID (must be between 1 and 6)
+            if (isNaN(terminalId) || terminalId < 1 || terminalId > 6) {
+                alert('Terminal ID must be between 1 and 6');
                 return;
             }
         }
@@ -1137,6 +1193,88 @@ class KanbanManager {
             await this.loadTasks();
             this.showNotification('Error updating terminal', 'error');
         }
+    }
+
+    toggleTerminalDropdown(event, taskId) {
+        event.stopPropagation();
+        
+        // Close all other dropdowns first
+        document.querySelectorAll('.terminal-dropdown').forEach(dropdown => {
+            if (dropdown.id !== `terminal-dropdown-${taskId}`) {
+                dropdown.style.display = 'none';
+            }
+        });
+        
+        // Toggle current dropdown
+        const dropdown = document.getElementById(`terminal-dropdown-${taskId}`);
+        if (dropdown) {
+            const isOpening = dropdown.style.display === 'none';
+            dropdown.style.display = isOpening ? 'block' : 'none';
+            
+            // Find the task card and temporarily adjust overflow
+            const taskCard = dropdown.closest('.task-card');
+            if (taskCard) {
+                if (isOpening) {
+                    taskCard.style.zIndex = '1000';
+                    // Temporarily set overflow visible on parent containers
+                    const taskList = taskCard.closest('.task-list');
+                    if (taskList) {
+                        taskList.style.overflow = 'visible';
+                    }
+                } else {
+                    taskCard.style.zIndex = '';
+                    const taskList = taskCard.closest('.task-list');
+                    if (taskList) {
+                        taskList.style.overflow = '';
+                    }
+                }
+            }
+        }
+        
+        // Close dropdown when clicking outside
+        const closeDropdown = (e) => {
+            if (!e.target.closest('.task-terminal-wrapper')) {
+                dropdown.style.display = 'none';
+                // Reset overflow
+                const taskCard = dropdown.closest('.task-card');
+                if (taskCard) {
+                    taskCard.style.zIndex = '';
+                    const taskList = taskCard.closest('.task-list');
+                    if (taskList) {
+                        taskList.style.overflow = '';
+                    }
+                }
+                document.removeEventListener('click', closeDropdown);
+            }
+        };
+        
+        if (dropdown.style.display === 'block') {
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdown);
+            }, 0);
+        }
+    }
+    
+    async selectTerminal(taskId, terminalId) {
+        if (event) event.stopPropagation();
+        
+        // Hide dropdown and reset overflow
+        const dropdown = document.getElementById(`terminal-dropdown-${taskId}`);
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            const taskCard = dropdown.closest('.task-card');
+            if (taskCard) {
+                taskCard.style.zIndex = '';
+                const taskList = taskCard.closest('.task-list');
+                if (taskList) {
+                    taskList.style.overflow = '';
+                }
+            }
+        }
+        
+        // Update terminal
+        await this.updateTaskTerminal(taskId, terminalId === null ? '' : terminalId.toString());
+        await this.loadTasks(); // Refresh to show new icon
     }
 
     async updateTaskTitle(taskId, newTitle) {
@@ -1479,36 +1617,78 @@ class KanbanManager {
     }
 
     toggleSort(status) {
-        // Toggle sort direction
-        this.sortDirections[status] = this.sortDirections[status] === 'asc' ? 'desc' : 'asc';
+        // Cycle through states: default -> desc -> asc -> default
+        const states = ['default', 'desc', 'asc'];
+        const currentIndex = states.indexOf(this.sortStates[status]);
+        const nextIndex = (currentIndex + 1) % states.length;
+        this.sortStates[status] = states[nextIndex];
         
         // Update button appearance
         const button = document.querySelector(`.sort-button[data-status="${status}"]`);
         if (button) {
-            button.classList.remove('sort-asc', 'sort-desc');
-            button.classList.add(`sort-${this.sortDirections[status]}`);
+            button.classList.remove('sort-default', 'sort-asc', 'sort-desc');
+            button.classList.add(`sort-${this.sortStates[status]}`);
             
-            // Update tooltip
-            const direction = this.sortDirections[status] === 'asc' ? 'descending' : 'ascending';
-            button.title = `Sort by creation date (${direction})`;
+            // Update icon based on state
+            const icon = button.querySelector('i');
+            if (icon) {
+                switch(this.sortStates[status]) {
+                    case 'default':
+                        icon.setAttribute('data-lucide', 'arrow-up-down');
+                        break;
+                    case 'desc':
+                        icon.setAttribute('data-lucide', 'arrow-down');
+                        break;
+                    case 'asc':
+                        icon.setAttribute('data-lucide', 'arrow-up');
+                        break;
+                }
+                // Re-initialize the icon
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+            
+            // Update tooltip with current state
+            let tooltipText = '';
+            switch(this.sortStates[status]) {
+                case 'default':
+                    tooltipText = 'Sin ordenar (orden manual)';
+                    break;
+                case 'desc':
+                    tooltipText = 'Ordenado: Más recientes primero';
+                    break;
+                case 'asc':
+                    tooltipText = 'Ordenado: Más antiguos primero';
+                    break;
+            }
+            button.title = tooltipText;
         }
         
         // Re-render tasks with new sorting
         this.renderTasks();
     }
 
-    sortTasksByCreatedDate(tasks, direction) {
+    sortTasksByCreatedDate(tasks, sortState) {
+        if (sortState === 'default') {
+            // For default state, sort by sort_order (manual order)
+            return tasks.sort((a, b) => {
+                return (a.sort_order || 0) - (b.sort_order || 0);
+            });
+        }
+        
         return tasks.sort((a, b) => {
             const dateA = new Date(a.created_at);
             const dateB = new Date(b.created_at);
             
-            if (direction === 'asc') {
+            if (sortState === 'asc') {
                 return dateA - dateB; // Oldest first
             } else {
                 return dateB - dateA; // Newest first
             }
         });
     }
+
 
     escapeHtml(text) {
         const div = document.createElement('div');

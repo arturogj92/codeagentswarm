@@ -245,6 +245,10 @@ body::before {
   align-items: center;
 }
 
+.git-button {
+  margin-left: 8px;
+}
+
 .action-buttons {
   display: flex;
   gap: 4px;
@@ -253,6 +257,20 @@ body::before {
   padding: 2px;
   background: rgba(255, 255, 255, 0.05);
   margin-left: 8px;
+}
+
+.btn-layout.with-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.btn-layout.with-text span {
+  font-size: 0.8125rem;
+  letter-spacing: 0.02em;
 }
 
 /* Special styling for git button when there are changes */
@@ -444,6 +462,52 @@ body::before {
 .btn-danger:hover {
   transform: translateY(-2px) scale(1.02);
   box-shadow: 0 8px 32px rgba(239, 68, 68, 0.5);
+}
+
+.btn-add-terminal {
+  background: rgba(44, 182, 125, 0.1);
+  color: var(--secondary);
+  border: 1px solid rgba(44, 182, 125, 0.3);
+  box-shadow: none;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+  overflow: visible;
+}
+
+.btn-add-terminal:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 4px 16px rgba(44, 182, 125, 0.3);
+  background: rgba(44, 182, 125, 0.2);
+  border-color: var(--secondary);
+}
+
+.btn-add-terminal i {
+  font-size: 1rem;
+  transition: all 0.3s ease;
+}
+
+.btn-add-terminal .add-icon {
+  font-size: 0.75rem;
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: var(--secondary);
+  color: var(--background);
+  border-radius: 50%;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(44, 182, 125, 0.4);
+}
+
+.btn-add-terminal:hover .add-icon {
+  transform: scale(1.1);
+  box-shadow: 0 2px 12px rgba(44, 182, 125, 0.6);
 }
 
 .btn-info {
@@ -2282,69 +2346,107 @@ body::before {
   border-top: 1px solid var(--border);
 }
 
-/* Create Task Modal */
+/* Create Task Modal - Matching Kanban style */
 .create-task-modal {
   position: fixed;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.85);
   z-index: 10000;
-  opacity: 1;
-  transition: opacity 0.3s ease;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .create-task-content {
-  background: rgba(20, 20, 20, 0.95);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--border);
+  background: rgba(30, 30, 30, 0.98);
   border-radius: 16px;
-  padding: 24px;
-  width: 500px;
-  max-width: 90vw;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-  transform: scale(1);
-  transition: transform 0.3s ease;
+  border: 1px solid var(--border);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .create-task-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  padding: 1.5rem;
   border-bottom: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .create-task-header h3 {
-  color: var(--accent);
+  color: var(--text-primary);
   margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 1.2rem;
 }
 
 .create-task-body {
-  padding: 10px 0;
+  padding: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.create-task-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.create-task-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 4px;
+}
+
+.create-task-body::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.create-task-body::-webkit-scrollbar-thumb:hover {
+  background: var(--border-hover);
 }
 
 .create-task-body .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 1.25rem;
 }
 
 .create-task-body label {
   display: block;
-  margin-bottom: 8px;
-  color: var(--text-muted);
-  font-size: 0.875rem;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.9rem;
   font-weight: 500;
 }
 
@@ -2352,36 +2454,63 @@ body::before {
 .create-task-body textarea,
 .create-task-body select {
   width: 100%;
-  padding: 10px 14px;
-  background: rgba(255, 255, 255, 0.05);
+  padding: 0.75rem 1rem;
+  background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--text-primary);
-  font-size: 0.875rem;
-  font-family: 'JetBrains Mono', monospace;
-  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .create-task-body input:focus,
 .create-task-body textarea:focus,
 .create-task-body select:focus {
   outline: none;
-  border-color: var(--accent);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+  background: var(--surface-hover);
+  box-shadow: 0 0 0 2px rgba(127, 90, 240, 0.1);
 }
 
 .create-task-body textarea {
   resize: vertical;
   min-height: 80px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
 .create-task-footer {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-  margin-top: 24px;
-  padding-top: 16px;
+  padding: 1.5rem;
   border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Close button matching kanban style */
+.create-task-header .close-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.create-task-header .close-btn:hover {
+  color: var(--text-primary);
+  background: var(--surface-hover);
+  border-color: var(--border-hover);
+  transform: rotate(90deg);
 }
 
 /* Git Tabs */
@@ -2868,16 +2997,64 @@ body::before {
   margin-bottom: 12px;
 }
 
+.branch-search {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.branch-search input {
+  width: 100%;
+  padding: 10px 40px 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.branch-search input:focus {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--primary);
+  outline: none;
+}
+
+.branch-search .search-icon {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.branch-search .search-icon [data-lucide="search"],
+.branch-search .search-icon svg {
+  width: 16px;
+  height: 16px;
+  color: var(--text-secondary);
+}
+
 .branches {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.branch-list-info {
+  margin-top: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-style: italic;
 }
 
 .branch-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 12px;
   padding: 10px 12px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -2896,6 +3073,11 @@ body::before {
 
 .branch-item .branch-name {
   color: var(--text-primary);
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .branch-item.current .branch-name {
@@ -2911,6 +3093,12 @@ body::before {
 .btn-sm {
   padding: 6px 12px;
   font-size: 0.8rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.switch-branch-btn {
+  min-width: 70px;
 }
 
 /* Inline Notifications */

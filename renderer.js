@@ -178,9 +178,6 @@ class TerminalManager {
             this.setLayout('3-right2');
         });
 
-        document.getElementById('settings-btn').addEventListener('click', () => {
-            this.showSettings();
-        });
 
         document.getElementById('git-status-btn').addEventListener('click', () => {
             this.showGitStatus();
@@ -194,16 +191,6 @@ class TerminalManager {
             this.showCreateTaskDialog();
         });
 
-        const fixMcpBtn = document.getElementById('fix-mcp-btn');
-        if (fixMcpBtn) {
-            console.log('🔧 [RENDERER] Registering fix-mcp-btn click handler');
-            fixMcpBtn.addEventListener('click', () => {
-                console.log('🔧 [RENDERER] fix-mcp-btn clicked');
-                this.fixMCPTaskManager();
-            });
-        } else {
-            console.error('🔧 [RENDERER] fix-mcp-btn not found in DOM!');
-        }
 
         document.getElementById('mcp-info-btn').addEventListener('click', () => {
             this.showMCPInfoModal();
@@ -231,8 +218,9 @@ class TerminalManager {
         });
 
         document.addEventListener('keydown', (e) => {
-            // Only handle Escape if a terminal is in fullscreen mode AND that terminal has focus
-            if (e.key === 'Escape' && this.fullscreenTerminal !== null && this.activeTerminal === this.fullscreenTerminal) {
+            // Handle Escape if a terminal is in fullscreen mode
+            // This works regardless of which element has focus (terminal, buttons, etc.)
+            if (e.key === 'Escape' && this.fullscreenTerminal !== null) {
                 this.exitFullscreen();
                 e.preventDefault(); // Prevent any other Escape handlers
             }
@@ -1898,8 +1886,6 @@ class TerminalManager {
         }
     }
 
-    showSettings() {
-    }
 
     async showGitStatus() {
         try {
@@ -1940,159 +1926,6 @@ class TerminalManager {
         ipcRenderer.send('open-kanban-window');
     }
 
-    async fixMCPTaskManager() {
-        console.log('🔧 [RENDERER] fixMCPTaskManager called');
-        
-        // First show a modal explaining the process
-        const confirmModal = document.createElement('div');
-        confirmModal.className = 'mcp-info-modal';
-        confirmModal.innerHTML = `
-            <div class="mcp-info-content">
-                <div class="mcp-info-header">
-                    <h3><i data-lucide="wrench"></i> Fix MCP Connection</h3>
-                    <button class="close-btn" onclick="this.closest('.mcp-info-modal').remove()">×</button>
-                </div>
-                <div class="mcp-info-body">
-                    <div class="info-section">
-                        <h4>🔧 What does this fix do?</h4>
-                        <p>This will run a repair script that:</p>
-                        <ul>
-                            <li>Re-registers the MCP Task Manager with Claude CLI</li>
-                            <li>Fixes connection issues that occur when CodeAgentSwarm has been open for a long time</li>
-                        </ul>
-                        <br>
-                        <p><strong>Why is this needed?</strong></p>
-                        <p class="text-muted">Claude CLI sometimes loses MCP connections after extended use. This is a known Claude issue, not a CodeAgentSwarm problem.</p>
-                        <br>
-                        <h4>⚠️ Important:</h4>
-                        <p>After the fix completes, you'll need to <strong>restart CodeAgentSwarm</strong> for the changes to take effect.</p>
-                    </div>
-                </div>
-                <div class="mcp-info-footer">
-                    <button class="btn btn-secondary" onclick="this.closest('.mcp-info-modal').remove()">Cancel</button>
-                    <button class="btn btn-primary" id="proceed-fix-mcp">Proceed with Fix</button>
-                </div>
-            </div>
-        `;
-        
-        console.log('🔧 [RENDERER] Adding modal to DOM');
-        document.body.appendChild(confirmModal);
-        
-        // Make modal visible
-        setTimeout(() => {
-            confirmModal.classList.add('show');
-        }, 10);
-        
-        // Initialize Lucide icons
-        if (window.lucide) {
-            console.log('🔧 [RENDERER] Initializing Lucide icons');
-            window.lucide.createIcons();
-        }
-        
-        // Handle proceed button
-        const proceedBtn = document.getElementById('proceed-fix-mcp');
-        console.log('🔧 [RENDERER] Proceed button element:', proceedBtn);
-        
-        if (proceedBtn) {
-            proceedBtn.addEventListener('click', async () => {
-                console.log('🔧 [RENDERER] Proceed button clicked');
-            confirmModal.remove();
-            
-            // Get the button and disable it during operation
-            const fixButton = document.getElementById('fix-mcp-btn');
-            const originalHTML = fixButton.innerHTML;
-            
-            try {
-                // Update button to show loading state
-                fixButton.disabled = true;
-                fixButton.innerHTML = '<i data-lucide="loader" class="spinning"></i>';
-                
-                // Show a notification that we're starting the fix
-                this.showNotification('🔧 Fixing MCP Task Manager...', 'info');
-                
-                // Call the IPC handler to fix MCP
-                console.log('🔧 [RENDERER] Calling IPC handler fix-mcp-task-manager');
-                const result = await ipcRenderer.invoke('fix-mcp-task-manager');
-                console.log('🔧 [RENDERER] IPC handler returned:', result);
-            
-            if (result.success) {
-                this.showNotification('✅ MCP Task Manager fixed successfully!', 'success');
-                
-                // Show additional modal with instructions
-                const modal = document.createElement('div');
-                modal.className = 'mcp-info-modal';
-                
-                // Check if message indicates verification issues
-                const needsRestart = result.message.includes('restart') || result.message.includes('close all Claude');
-                
-                modal.innerHTML = `
-                    <div class="mcp-info-content">
-                        <div class="mcp-info-header">
-                            <h3><i data-lucide="${needsRestart ? 'alert-circle' : 'check-circle'}"></i> MCP Task Manager ${needsRestart ? 'Updated' : 'Fixed'}</h3>
-                            <button class="close-btn" onclick="this.closest('.mcp-info-modal').remove()">×</button>
-                        </div>
-                        <div class="mcp-info-body">
-                            <div class="info-section">
-                                ${needsRestart ? `
-                                <h4>⚠️ Action Required</h4>
-                                <p>The MCP Task Manager configuration has been updated.</p>
-                                <br>
-                                <p><strong>To complete the fix:</strong></p>
-                                <ol>
-                                    <li><strong>Restart CodeAgentSwarm</strong> (close and reopen the app)</li>
-                                    <li><strong>Open a new terminal</strong> in any directory</li>
-                                    <li><strong>Test the MCP</strong>:<br>
-                                        Open <code>claude</code> and run <code>/mcp</code></li>
-                                </ol>
-                                <br>
-                                <p class="text-muted">If the MCP still doesn't appear, make sure all Claude CLI sessions are closed before restarting.</p>
-                                ` : `
-                                <h4>✅ Success!</h4>
-                                <p>The MCP Task Manager has been successfully added to Claude CLI.</p>
-                                <p>You can now use task management tools in your Claude CLI sessions.</p>
-                                <br>
-                                <p><strong>Try it out:</strong></p>
-                                <p>Open <code>claude</code> and run <code>/mcp</code></p>
-                                `}
-                            </div>
-                        </div>
-                        <div class="mcp-info-footer">
-                            <button class="btn btn-primary" onclick="this.closest('.mcp-info-modal').remove()">Got it!</button>
-                        </div>
-                    </div>
-                `;
-                document.body.appendChild(modal);
-                
-                // Make modal visible
-                setTimeout(() => {
-                    modal.classList.add('show');
-                }, 10);
-                
-                // Initialize Lucide icons
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            } else {
-                this.showNotification(`❌ Failed to fix MCP: ${result.message || result.error}`, 'error');
-            }
-            } catch (error) {
-                console.error('Error fixing MCP task manager:', error);
-                this.showNotification('❌ Error fixing MCP Task Manager', 'error');
-            } finally {
-                // Restore button state
-                fixButton.disabled = false;
-                fixButton.innerHTML = originalHTML;
-                
-                // Re-initialize Lucide icons
-                if (window.lucide) {
-                    window.lucide.createIcons();
-                }
-            }
-            });
-        } else {
-            console.error('🔧 [RENDERER] Proceed button not found!');
-        }
-    }
 
     showMCPInfoModal() {
         // Remove existing modal if present
@@ -2213,38 +2046,42 @@ class TerminalManager {
             <div class="create-task-content">
                 <div class="create-task-header">
                     <h3><i data-lucide="plus-square"></i> Create New Task</h3>
-                    <button class="close-btn" id="close-create-task-modal">×</button>
+                    <button class="close-btn" id="close-create-task-modal">
+                        <i data-lucide="x"></i>
+                    </button>
                 </div>
                 <div class="create-task-body">
-                    <div class="form-group">
-                        <label for="task-title">Title *</label>
-                        <input type="text" id="task-title" placeholder="Enter task title" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-description">Description</label>
-                        <textarea id="task-description" placeholder="Enter task description (optional)" rows="4"></textarea>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-project">Project</label>
-                        <select id="task-project">
-                            <option value="">No Project</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-terminal">Terminal</label>
-                        <select id="task-terminal">
-                            <option value="">No terminal assigned</option>
-                            ${Array.from(this.terminals.entries()).map(([quadrant, term]) => {
-                                const num = quadrant + 1;
-                                const isActive = activeTerminalId === quadrant;
-                                return `<option value="${num}" ${isActive ? 'selected' : ''}>Terminal ${num}${isActive ? ' (current)' : ''}</option>`;
-                            }).join('')}
-                        </select>
-                    </div>
+                    <form id="create-task-form">
+                        <div class="form-group">
+                            <label for="task-title">Title *</label>
+                            <input type="text" id="task-title" required placeholder="Enter task title">
+                        </div>
+                        <div class="form-group">
+                            <label for="task-description">Description</label>
+                            <textarea id="task-description" rows="4" placeholder="Enter task description (optional)"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-project">Project</label>
+                            <select id="task-project">
+                                <option value="">No Project</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="task-terminal">Terminal</label>
+                            <select id="task-terminal">
+                                <option value="">No terminal assigned</option>
+                                ${Array.from(this.terminals.entries()).map(([quadrant, term]) => {
+                                    const num = quadrant + 1;
+                                    const isActive = activeTerminalId === quadrant;
+                                    return `<option value="${num}" ${isActive ? 'selected' : ''}>Terminal ${num}${isActive ? ' (current)' : ''}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                    </form>
                 </div>
                 <div class="create-task-footer">
-                    <button class="btn btn-secondary" id="cancel-create-task">Cancel</button>
-                    <button class="btn btn-primary" id="confirm-create-task">Create Task</button>
+                    <button type="button" class="btn btn-secondary" id="cancel-create-task">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="confirm-create-task">Create Task</button>
                 </div>
             </div>
         `;
@@ -3027,9 +2864,13 @@ class TerminalManager {
                 
                 <div class="branch-list">
                     <h4>Switch to Existing Branch</h4>
-                    <div class="branches">
-                        ${branchData.branches.map(branch => `
-                            <div class="branch-item ${branch === branchData.currentBranch ? 'current' : ''}">
+                    <div class="branch-search">
+                        <input type="text" id="branch-search-input" placeholder="Search branches..." />
+                        <span class="search-icon"><i data-lucide="search"></i></span>
+                    </div>
+                    <div class="branches" id="branch-list-container">
+                        ${branchData.branches.slice(0, 5).map(branch => `
+                            <div class="branch-item ${branch === branchData.currentBranch ? 'current' : ''}" data-branch-name="${branch}">
                                 <span class="branch-name">${branch}</span>
                                 ${branch !== branchData.currentBranch ? 
                                     `<button class="btn btn-sm switch-branch-btn" data-branch="${branch}">Switch</button>` : 
@@ -3038,6 +2879,10 @@ class TerminalManager {
                             </div>
                         `).join('')}
                     </div>
+                    ${branchData.branches.length > 5 ? 
+                        `<div class="branch-list-info">Showing 5 of ${branchData.branches.length} branches. Use search to find more.</div>` : 
+                        ''
+                    }
                 </div>
             </div>
         `;
@@ -3097,6 +2942,57 @@ class TerminalManager {
                     this.showNotification('Error switching branch', 'error');
                 }
             });
+        });
+        
+        // Search functionality
+        const searchInput = modal.querySelector('#branch-search-input');
+        const branchListContainer = modal.querySelector('#branch-list-container');
+        const allBranches = branchData.branches;
+        
+        const filterBranches = (searchTerm) => {
+            const filtered = searchTerm 
+                ? allBranches.filter(branch => branch.toLowerCase().includes(searchTerm.toLowerCase()))
+                : allBranches.slice(0, 5);
+            
+            branchListContainer.innerHTML = filtered.map(branch => `
+                <div class="branch-item ${branch === branchData.currentBranch ? 'current' : ''}" data-branch-name="${branch}">
+                    <span class="branch-name">${branch}</span>
+                    ${branch !== branchData.currentBranch ? 
+                        `<button class="btn btn-sm switch-branch-btn" data-branch="${branch}">Switch</button>` : 
+                        '<span class="current-indicator">Current</span>'
+                    }
+                </div>
+            `).join('');
+            
+            // Re-attach switch branch event listeners
+            branchListContainer.querySelectorAll('.switch-branch-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const branchName = btn.dataset.branch;
+                    
+                    try {
+                        const result = await ipcRenderer.invoke('git-switch-branch', branchName, terminalId);
+                        
+                        if (result.success) {
+                            closeModal();
+                            await this.updateBranchDisplay(terminalId);
+                        } else {
+                            this.showNotification(result.error || 'Failed to switch branch', 'error');
+                        }
+                    } catch (error) {
+                        console.error('Error switching branch:', error);
+                        this.showNotification('Error switching branch', 'error');
+                    }
+                });
+            });
+            
+            // Update Lucide icons
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        };
+        
+        searchInput.addEventListener('input', (e) => {
+            filterBranches(e.target.value);
         });
         
         // Enter key for creating branch
