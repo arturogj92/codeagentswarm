@@ -6,7 +6,7 @@ let app;
 try {
     app = require('electron').app;
 } catch (e) {
-    // Running outside Electron (e.g., as MCP server)
+    // Running outside Electron (e.g., as MCP server))
     app = null;
 }
 
