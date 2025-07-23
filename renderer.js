@@ -2521,6 +2521,8 @@ class TerminalManager {
             
             if (result.success) {
                 this.showInlineNotification('✅ Push successful', 'success');
+                // Refresh the git status to update the push button
+                setTimeout(() => this.showGitStatus(), 1000);
             } else {
                 this.showInlineNotification(`❌ Push failed: ${result.error}`, 'error');
             }
@@ -2556,6 +2558,8 @@ class TerminalManager {
             
             if (result.success) {
                 this.showInlineNotification('✅ Push successful', 'success');
+                // Refresh the git status to update the push button
+                setTimeout(() => this.showGitStatus(), 1000);
             } else {
                 this.showInlineNotification(`❌ Push failed: ${result.error}`, 'error');
             }
