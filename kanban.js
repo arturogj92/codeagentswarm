@@ -778,29 +778,29 @@ class KanbanManager {
             <div class="task-terminal-wrapper">
                 <div class="task-terminal-badge ${task.terminal_id ? '' : 'unassigned'}" 
                      onclick="kanban.toggleTerminalDropdown(event, ${task.id})" 
-                     title="${task.terminal_id ? `Terminal ${task.terminal_id}` : 'Sin terminal'}">
-                    ${task.terminal_id ? `<i data-lucide="terminal"></i><span class="terminal-number">${task.terminal_id}</span>` : '<i data-lucide="plus"></i>'}
+                     title="${task.terminal_id ? `Terminal ${task.terminal_id}` : 'Assign to terminal'}">
+                    ${task.terminal_id ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="terminal" class="lucide lucide-terminal"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="terminal-number">${task.terminal_id}</span>` : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" class="lucide lucide-plus"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>'}
                 </div>
                 <div class="terminal-dropdown" id="terminal-dropdown-${task.id}" style="display: none;">
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, null)">
-                        <i data-lucide="x-circle"></i> Ninguno
+                    <div class="terminal-option ${!task.terminal_id ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, null)">
+                        <i data-lucide="x-circle"></i> None
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 1)">
-                        <i data-lucide="terminal"></i> T1
+                    <div class="terminal-option ${task.terminal_id == 1 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 1)">
+                        <i data-lucide="terminal"></i> Terminal 1
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 2)">
-                        <i data-lucide="terminal"></i> T2
+                    <div class="terminal-option ${task.terminal_id == 2 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 2)">
+                        <i data-lucide="terminal"></i> Terminal 2
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 3)">
-                        <i data-lucide="terminal"></i> T3
+                    <div class="terminal-option ${task.terminal_id == 3 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 3)">
+                        <i data-lucide="terminal"></i> Terminal 3
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 4)">
-                        <i data-lucide="terminal"></i> T4
+                    <div class="terminal-option ${task.terminal_id == 4 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 4)">
+                        <i data-lucide="terminal"></i> Terminal 4
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 5)">
-                        <i data-lucide="terminal"></i> T5
+                    <div class="terminal-option ${task.terminal_id == 5 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 5)">
+                        <i data-lucide="terminal"></i> Terminal 5
                     </div>
-                    <div class="terminal-option" onclick="kanban.selectTerminal(${task.id}, 6)">
+                    <div class="terminal-option ${task.terminal_id == 6 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 6)">
                         <i data-lucide="terminal"></i> Terminal 6
                     </div>
                 </div>

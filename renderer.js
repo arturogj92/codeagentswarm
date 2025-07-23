@@ -1097,7 +1097,9 @@ class TerminalManager {
     updateTerminalTitle(quadrant, title) {
         const titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
         if (titleElement) {
-            titleElement.textContent = title;
+            // Add terminal number before the title
+            const terminalNumber = quadrant + 1;
+            titleElement.textContent = `${terminalNumber} · ${title}`;
         }
         
         // Update terminal header color based on project
@@ -3461,8 +3463,17 @@ class TerminalManager {
                     const titleElement = existingElement.querySelector('.terminal-title');
                     const headerElement = existingElement.querySelector('.terminal-header');
                     
+                    // Extract the actual title without the terminal number prefix
+                    let actualTitle = `Terminal ${terminalId + 1}`;
+                    if (titleElement && titleElement.textContent) {
+                        // Remove the terminal number prefix (e.g., "1 · " or "2 · ")
+                        const titleText = titleElement.textContent;
+                        const match = titleText.match(/^\d+\s*·\s*(.+)$/);
+                        actualTitle = match ? match[1] : titleText;
+                    }
+                    
                     preservedInfo[terminalId] = {
-                        title: titleElement ? titleElement.textContent : `Terminal ${terminalId + 1}`,
+                        title: actualTitle,
                         directory: this.lastSelectedDirectories[terminalId] || null,
                         // Preserve header styling info if any
                         hasProjectStyling: headerElement && headerElement.style.background && headerElement.style.background !== ''

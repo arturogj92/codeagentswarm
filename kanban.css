@@ -504,6 +504,7 @@ body::before {
     display: flex;
     align-items: center;
     gap: 0.25rem;
+    height: 20px;
 }
 
 .task-card::before {
@@ -614,13 +615,14 @@ body::before {
     align-items: center;
     font-size: 0.75rem;
     color: var(--text-muted);
-    gap: 0.75rem;
-    padding: 0.75rem 1rem;
+    gap: 0.5rem;
+    padding: 0.5rem 1rem;
     background: rgba(255, 255, 255, 0.02);
     border-top: 1px solid rgba(255, 255, 255, 0.05);
     border-bottom-left-radius: 12px;
     border-bottom-right-radius: 12px;
     position: relative;
+    min-height: 32px;
 }
 
 /* Terminal selector inline */
@@ -660,81 +662,76 @@ body::before {
     padding: 0.5rem;
 }
 
-/* Terminal badge - new compact design */
+/* Terminal badge - simple and aligned */
 .task-terminal-badge {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 2px;
-    padding: 0.15rem 0.3rem;
+    gap: 3px;
+    padding: 0 6px;
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
     color: var(--text-secondary);
-    border-radius: 5px;
     font-size: 0.65rem;
-    font-weight: 600;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
-    margin-left: auto;
+    transition: opacity 0.2s ease, border-color 0.2s ease;
     position: relative;
+    height: 20px;
 }
 
 .task-terminal-badge:hover {
-    background: rgba(255, 255, 255, 0.04);
-    border-color: rgba(255, 255, 255, 0.15);
-    color: var(--text-primary);
+    opacity: 0.8;
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
 .task-terminal-badge.unassigned {
-    background: transparent;
-    border-color: rgba(255, 255, 255, 0.06);
+    background: rgba(255, 255, 255, 0.04);
     color: var(--text-muted);
 }
 
 .task-terminal-badge.unassigned:hover {
-    background: rgba(255, 255, 255, 0.02);
-    border-color: rgba(255, 255, 255, 0.1);
-}
-
-.task-terminal-badge.unassigned:hover i {
     opacity: 0.7;
+    border-color: rgba(255, 255, 255, 0.12);
 }
 
-.task-terminal-badge i {
-    width: 11px;
-    height: 11px;
+.task-terminal-badge svg {
+    width: 14px;
+    height: 14px;
     opacity: 0.6;
+    margin-bottom: 1px;
 }
 
 .terminal-number {
-    font-size: 0.6rem;
+    font-size: 0.65rem;
     font-weight: 600;
-    letter-spacing: 0;
+    color: var(--text-secondary);
     line-height: 1;
+    margin-bottom: 1px;
+    background: none !important;
 }
 
 /* Terminal dropdown wrapper */
 .task-terminal-wrapper {
     position: relative;
-    margin-left: auto;
     z-index: 50;
 }
 
-/* Terminal dropdown menu */
+/* Terminal dropdown menu - simple */
 .terminal-dropdown {
     position: absolute;
-    top: 100%;
+    top: calc(100% + 4px);
     right: 0;
-    margin-top: 4px;
-    background: rgba(10, 10, 10, 0.95);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 8px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    min-width: 130px;
+    background: rgba(20, 20, 20, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    min-width: 120px;
     z-index: 9999;
     overflow: hidden;
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     animation: dropdownFadeIn 0.15s ease-out;
 }
 
@@ -756,7 +753,7 @@ body::before {
     padding: 8px 12px;
     color: var(--text-secondary);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: background 0.15s ease;
     font-size: 0.7rem;
     font-weight: 500;
     background: transparent;
@@ -789,6 +786,20 @@ body::before {
 
 .terminal-option:hover i {
     opacity: 1;
+}
+
+/* Special styling for active terminal option */
+.terminal-option.active {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-primary);
+}
+
+.terminal-option.active::after {
+    content: '✓';
+    position: absolute;
+    right: 12px;
+    font-size: 0.7rem;
+    color: var(--text-secondary);
 }
 
 .task-actions {
@@ -1087,15 +1098,7 @@ body::before {
     line-height: 1.5;
 }
 
-.task-meta span {
-    display: inline-block;
-    background: #404040;
-    padding: 0.25rem 0.5rem;
-    border-radius: 3px;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-    font-size: 0.8rem;
-}
+/* Remove this rule - it's causing unwanted backgrounds on terminal numbers */
 
 /* Empty State with better styling */
 .empty-state {

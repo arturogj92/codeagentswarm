@@ -40,7 +40,7 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
    - If no project name is found in CLAUDE.md, use the directory name as fallback
 3. **Start the task** using `start_task` before beginning any work
 4. **MANDATORY: Update the plan** using `update_task_plan` when starting a task with a detailed step plan
-5. **Complete the task** using `complete_task` when finished (goes to "completed") or `submit_for_testing` if testing needed
+5. **CRITICAL: Tasks ALWAYS go to testing first** - Use `complete_task` when finished (automatically goes to "in_testing" state, NEVER directly to "completed") or use `submit_for_testing` for direct testing submission
 6. **If you detect the current task deviates from focus or significantly changes objective, create a new task and continue work under that new task.**
 
 ### IMPORTANT: Terminal ID - Automatic Detection
@@ -114,22 +114,24 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
      - Summary: clear description of changes made
      - Flow: explanation of implemented functionality
    - If plan wasn't fully completed, update plan with what's missing or create new task for pending
-   - **NEW MANDATORY TESTING FLOW:**
-     - First `complete_task` call: moves task to `in_testing` state
+   - **🚨 MANDATORY TESTING FLOW - NO EXCEPTIONS:**
+     - First `complete_task` call: ALWAYS moves task to `in_testing` state (NO DIRECT PATH TO COMPLETED)
      - User must manually review and approve
      - Second `complete_task` call: moves to `completed` (requires `implementation` documented)
-   - **NEVER can go directly from `in_progress` to `completed`**
+     - **CRITICAL: Tasks can NEVER go directly from `in_progress` to `completed` - this is PROHIBITED**
+     - **The ONLY way to reach `completed` is through `in_testing` state with manual approval**
    - This automatically updates interface and database state
    - Plan and implementation remain documented for future reference
 
-### Mandatory Testing Flow
+### 🚨 MANDATORY Testing Flow - TASKS NEVER GO DIRECTLY TO COMPLETED 🚨
 
-**IMPORTANT: All tasks MUST go through testing phase before completion:**
+**CRITICAL: All tasks MUST go through testing phase before completion. Tasks can NEVER go directly from "in_progress" to "completed" status:**
 
-1. **Mandatory transition to testing:**
+1. **🚨 Mandatory transition to testing (NO EXCEPTIONS):**
    - When finishing task implementation, use `complete_task`
-   - This automatically moves task to `in_testing` state
-   - CANNOT go directly from `in_progress` to `completed`
+   - This ALWAYS and AUTOMATICALLY moves task to `in_testing` state
+   - **PROHIBITED:** Going directly from `in_progress` to `completed`
+   - **REMEMBER:** Unless the user EXPLICITLY asks to mark as completed, tasks ALWAYS go to testing first
 
 2. **Requirements to complete from testing:**
    - Task must have `implementation` field documented
@@ -170,7 +172,7 @@ The following MCP tools are available for task management:
 
 - **`create_task`**: Create new task (requires terminal_id, project is auto-detected)
 - **`start_task`**: Mark task as "in_progress"
-- **`complete_task`**: First call: moves to "in_testing". Second call (after manual approval): moves to "completed"
+- **`complete_task`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **`submit_for_testing`**: Mark task as "in_testing"
 - **`list_tasks`**: List all tasks (optional: filter by status)
 - **`update_task_plan`**: Update specific task plan
