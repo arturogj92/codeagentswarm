@@ -478,10 +478,22 @@ body::before {
     gap: 0;
 }
 
-/* When dropdown is open, increase z-index */
+/* When dropdown is open, increase z-index and ensure visibility 
+   Commented out as we're now using fixed positioning for the dropdown
 .task-card:has(.terminal-dropdown[style*="block"]) {
-    z-index: 100;
+    z-index: 1000 !important;
+    overflow: visible !important;
 }
+
+.task-list:has(.terminal-dropdown[style*="block"]) {
+    overflow: visible !important;
+}
+
+.kanban-column:has(.terminal-dropdown[style*="block"]) {
+    overflow: visible !important;
+    z-index: 10 !important;
+}
+*/
 
 /* Task header with project tag and ID */
 .task-header {
@@ -715,7 +727,37 @@ body::before {
 /* Terminal dropdown wrapper */
 .task-terminal-wrapper {
     position: relative;
-    z-index: 50;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Send to terminal icon button */
+.send-to-terminal-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.send-to-terminal-icon:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.15);
+    color: var(--text-primary);
+}
+
+.send-to-terminal-icon svg {
+    width: 12px;
+    height: 12px;
 }
 
 /* Terminal dropdown menu - simple */
@@ -840,6 +882,145 @@ body::before {
     color: #ff6666;
     border-color: rgba(255, 102, 102, 0.3);
     background: rgba(255, 102, 102, 0.15);
+}
+
+/* Send to Terminal Button */
+.send-to-terminal-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1rem;
+    margin: 0 1rem 0.75rem 1rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    width: calc(100% - 2rem);
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(74, 144, 226, 0.2);
+}
+
+.send-to-terminal-btn:hover {
+    background: linear-gradient(135deg, #357abd 0%, #2968a5 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 8px rgba(74, 144, 226, 0.3);
+}
+
+.send-to-terminal-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 4px rgba(74, 144, 226, 0.2);
+}
+
+.send-to-terminal-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+.send-to-terminal-btn span {
+    flex: 1;
+    text-align: center;
+}
+
+/* Send to Terminal Wrapper and Dropdown */
+.send-to-terminal-wrapper {
+    position: relative;
+    margin: 0 1rem 0.75rem 1rem;
+}
+
+.send-to-terminal-btn .dropdown-icon {
+    width: 14px;
+    height: 14px;
+    margin-left: 0.25rem;
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+}
+
+.send-terminal-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    background: rgba(20, 20, 20, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    z-index: 10000;
+    max-height: 200px;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    min-width: 200px;
+    width: max-content;
+}
+
+/* Fix z-index stacking when dropdown is open */
+.task-card:has(.send-terminal-dropdown[style*="block"]) {
+    z-index: 1000 !important;
+    overflow: visible !important;
+}
+
+/* Ensure parent containers don't clip the dropdown */
+.task-list:has(.send-terminal-dropdown[style*="block"]) {
+    overflow: visible !important;
+}
+
+.kanban-column:has(.send-terminal-dropdown[style*="block"]) {
+    overflow: visible !important;
+    z-index: 10 !important;
+}
+
+.send-terminal-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.send-terminal-option:last-child {
+    border-bottom: none;
+}
+
+.send-terminal-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.send-terminal-option i {
+    width: 16px;
+    height: 16px;
+    color: var(--text-muted);
+}
+
+.send-terminal-option.no-terminals {
+    color: var(--text-muted);
+    cursor: default;
+}
+
+.send-terminal-option.no-terminals i {
+    color: #ff9800;
+}
+
+.send-terminal-option.copy-option {
+    background: rgba(74, 144, 226, 0.1);
+    border-top: 1px solid rgba(74, 144, 226, 0.2);
+}
+
+.send-terminal-option.copy-option:hover {
+    background: rgba(74, 144, 226, 0.2);
+}
+
+.terminal-status {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-left: auto;
 }
 
 /* Status Colors with gradients */
@@ -1086,6 +1267,10 @@ body::before {
 }
 
 /* Task Details */
+.task-info {
+    padding: 0.5rem 0;
+}
+
 .task-info h4 {
     color: #ffffff;
     margin-bottom: 0.5rem;
@@ -1371,6 +1556,150 @@ body::before {
     display: flex;
     gap: 0.5rem;
     justify-content: flex-end;
+}
+
+/* Task Status Header */
+.task-status-header {
+    margin-bottom: 1.5rem;
+    position: relative;
+}
+
+.status-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.25rem;
+    background: linear-gradient(135deg, rgba(0, 122, 204, 0.15) 0%, rgba(0, 122, 204, 0.05) 100%);
+    border: 1px solid rgba(0, 122, 204, 0.3);
+    border-radius: 12px;
+    transition: all 0.2s ease;
+    position: relative;
+    cursor: pointer;
+}
+
+.status-display.clickable:hover {
+    background: linear-gradient(135deg, rgba(0, 122, 204, 0.25) 0%, rgba(0, 122, 204, 0.1) 100%);
+    border-color: rgba(0, 122, 204, 0.5);
+    transform: translateY(-1px);
+}
+
+#details-status-text {
+    font-size: 1rem;
+    color: var(--text-primary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.status-dropdown-icon {
+    width: 16px;
+    height: 16px;
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+}
+
+.status-display:hover .status-dropdown-icon {
+    opacity: 1;
+}
+
+.status-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    min-width: 200px;
+    background: rgba(30, 30, 30, 0.98);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+    z-index: 1000;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+}
+
+.status-option {
+    padding: 0.75rem 1.25rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.status-option:last-child {
+    border-bottom: none;
+}
+
+.status-option:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.status-option.active {
+    background: rgba(0, 122, 204, 0.1);
+    border-left: 3px solid var(--primary);
+    padding-left: calc(1.25rem - 3px);
+}
+
+.status-option[data-value="pending"] {
+    color: #ffc107;
+}
+
+.status-option[data-value="in_progress"] {
+    color: #007ACC;
+}
+
+.status-option[data-value="in_testing"] {
+    color: #9c27b0;
+}
+
+.status-option[data-value="completed"] {
+    color: #4caf50;
+}
+
+.status-display.dropdown-open .status-dropdown-icon {
+    transform: rotate(180deg);
+}
+
+/* Status-specific colors */
+.status-display[data-status="pending"] {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.15) 0%, rgba(255, 193, 7, 0.05) 100%);
+    border-color: rgba(255, 193, 7, 0.3);
+}
+
+.status-display[data-status="pending"]:hover {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.25) 0%, rgba(255, 193, 7, 0.1) 100%);
+    border-color: rgba(255, 193, 7, 0.5);
+}
+
+.status-display[data-status="in_progress"] {
+    background: linear-gradient(135deg, rgba(0, 122, 204, 0.15) 0%, rgba(0, 122, 204, 0.05) 100%);
+    border-color: rgba(0, 122, 204, 0.3);
+}
+
+.status-display[data-status="in_progress"]:hover {
+    background: linear-gradient(135deg, rgba(0, 122, 204, 0.25) 0%, rgba(0, 122, 204, 0.1) 100%);
+    border-color: rgba(0, 122, 204, 0.5);
+}
+
+.status-display[data-status="in_testing"] {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.15) 0%, rgba(156, 39, 176, 0.05) 100%);
+    border-color: rgba(156, 39, 176, 0.3);
+}
+
+.status-display[data-status="in_testing"]:hover {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.25) 0%, rgba(156, 39, 176, 0.1) 100%);
+    border-color: rgba(156, 39, 176, 0.5);
+}
+
+.status-display[data-status="completed"] {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(76, 175, 80, 0.05) 100%);
+    border-color: rgba(76, 175, 80, 0.3);
+}
+
+.status-display[data-status="completed"]:hover {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.25) 0%, rgba(76, 175, 80, 0.1) 100%);
+    border-color: rgba(76, 175, 80, 0.5);
 }
 
 /* Loading State with modern animation */

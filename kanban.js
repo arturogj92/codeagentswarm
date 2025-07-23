@@ -1,4 +1,5 @@
 const { ipcRenderer } = require('electron');
+const path = require('path');
 
 class KanbanManager {
     constructor() {
@@ -108,6 +109,28 @@ class KanbanManager {
 
         document.getElementById('cancel-implementation-btn').addEventListener('click', () => {
             this.hideImplementationEditMode();
+        });
+
+        // Status change controls
+        document.getElementById('status-display').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleStatusDropdown();
+        });
+
+        // Handle status option clicks
+        document.querySelectorAll('.status-option').forEach(option => {
+            option.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const newStatus = option.getAttribute('data-value');
+                await this.changeTaskStatus(newStatus);
+            });
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.task-status-header')) {
+                this.hideStatusDropdown();
+            }
         });
 
         // Form submission
@@ -238,6 +261,55 @@ class KanbanManager {
             } finally {
                 // Always reset the flag
                 this.isSelectingDirectory = false;
+            }
+        });
+
+        // Click outside to close dropdowns
+        document.addEventListener('click', (e) => {
+            // Close terminal dropdowns
+            if (!e.target.closest('.task-terminal-wrapper')) {
+                document.querySelectorAll('.terminal-dropdown').forEach(dropdown => {
+                    if (dropdown.style.display === 'block') {
+                        dropdown.style.display = 'none';
+                        
+                        // Restore overflow for the card
+                        const taskCard = dropdown.closest('.task-card');
+                        const taskList = taskCard?.closest('.task-list');
+                        const kanbanColumn = taskList?.closest('.kanban-column');
+                        
+                        if (taskCard) {
+                            taskCard.style.overflow = '';
+                            taskCard.style.zIndex = '';
+                        }
+                        if (taskList) taskList.style.overflow = '';
+                        if (kanbanColumn) kanbanColumn.style.overflow = '';
+                    }
+                });
+            }
+            
+            // Close send to terminal dropdowns
+            if (!e.target.closest('.send-to-terminal-wrapper')) {
+                document.querySelectorAll('.send-terminal-dropdown').forEach(dropdown => {
+                    if (dropdown.style.display === 'block') {
+                        dropdown.style.display = 'none';
+                        
+                        // Restore overflow for the card
+                        const wrapper = dropdown.closest('.send-to-terminal-wrapper');
+                        const taskCard = wrapper?.closest('.task-card');
+                        const taskList = taskCard?.closest('.task-list');
+                        const kanbanColumn = taskList?.closest('.kanban-column');
+                        
+                        const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
+                        if (dropdownIcon) dropdownIcon.style.transform = '';
+                        
+                        if (taskCard) {
+                            taskCard.style.overflow = '';
+                            taskCard.style.zIndex = '';
+                        }
+                        if (taskList) taskList.style.overflow = '';
+                        if (kanbanColumn) kanbanColumn.style.overflow = '';
+                    }
+                });
             }
         });
 
@@ -773,36 +845,42 @@ class KanbanManager {
         taskCard.draggable = true;
         taskCard.dataset.taskId = task.id;
 
-        // Create terminal icon with dropdown
+        // Create terminal icon with dropdown and send button
         const terminalIcon = `
             <div class="task-terminal-wrapper">
+                <div class="send-to-terminal-icon" onclick="kanban.toggleSendToTerminalDropdown(event, ${task.id}); return false;" title="Send task to terminal">
+                    <i data-lucide="send"></i>
+                </div>
                 <div class="task-terminal-badge ${task.terminal_id ? '' : 'unassigned'}" 
-                     onclick="kanban.toggleTerminalDropdown(event, ${task.id})" 
+                     onclick="kanban.toggleTerminalDropdown(event, ${task.id}); return false;" 
                      title="${task.terminal_id ? `Terminal ${task.terminal_id}` : 'Assign to terminal'}">
                     ${task.terminal_id ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="terminal" class="lucide lucide-terminal"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="terminal-number">${task.terminal_id}</span>` : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" class="lucide lucide-plus"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>'}
                 </div>
                 <div class="terminal-dropdown" id="terminal-dropdown-${task.id}" style="display: none;">
-                    <div class="terminal-option ${!task.terminal_id ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, null)">
+                    <div class="terminal-option ${!task.terminal_id ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, null); return false;">
                         <i data-lucide="x-circle"></i> None
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 1 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 1)">
+                    <div class="terminal-option ${task.terminal_id == 1 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 1); return false;">
                         <i data-lucide="terminal"></i> Terminal 1
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 2 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 2)">
+                    <div class="terminal-option ${task.terminal_id == 2 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 2); return false;">
                         <i data-lucide="terminal"></i> Terminal 2
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 3 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 3)">
+                    <div class="terminal-option ${task.terminal_id == 3 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 3); return false;">
                         <i data-lucide="terminal"></i> Terminal 3
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 4 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 4)">
+                    <div class="terminal-option ${task.terminal_id == 4 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 4); return false;">
                         <i data-lucide="terminal"></i> Terminal 4
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 5 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 5)">
+                    <div class="terminal-option ${task.terminal_id == 5 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 5); return false;">
                         <i data-lucide="terminal"></i> Terminal 5
                     </div>
-                    <div class="terminal-option ${task.terminal_id == 6 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 6)">
+                    <div class="terminal-option ${task.terminal_id == 6 ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, 6); return false;">
                         <i data-lucide="terminal"></i> Terminal 6
                     </div>
+                </div>
+                <div class="send-terminal-dropdown" id="send-terminal-dropdown-${task.id}" style="display: none;">
+                    <!-- Dropdown will be populated dynamically -->
                 </div>
             </div>
         `;
@@ -821,6 +899,7 @@ class KanbanManager {
             </span>`;
         }
 
+
         taskCard.innerHTML = `
             <div class="task-header">
                 ${projectTag}
@@ -837,7 +916,7 @@ class KanbanManager {
                 </div>
             </div>
             <div class="task-title">
-                <span class="task-title-text" contenteditable="true" data-task-id="${task.id}" onblur="kanban.updateTaskTitle(${task.id}, this.textContent)" onkeydown="kanban.handleTitleKeydown(event, ${task.id})">${this.escapeHtml(task.title)}</span>
+                <span class="task-title-text" data-task-id="${task.id}">${this.escapeHtml(task.title)}</span>
             </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
@@ -922,6 +1001,7 @@ class KanbanManager {
         document.getElementById('task-description').value = '';
         document.getElementById('task-plan').value = '';
         document.getElementById('task-implementation').value = '';
+        document.getElementById('task-status').value = 'pending';
         
         // Use the currently selected project filter as default, or let user choose
         const projectSelect = document.getElementById('task-project');
@@ -945,6 +1025,7 @@ class KanbanManager {
         document.getElementById('task-description').value = task.description || '';
         document.getElementById('task-plan').value = task.plan || '';
         document.getElementById('task-implementation').value = task.implementation || '';
+        document.getElementById('task-status').value = task.status || 'pending';
         document.getElementById('task-project').value = task.project || '';
         document.getElementById('task-terminal').value = task.terminal_id || '';
         document.getElementById('save-task-btn').textContent = 'Update Task';
@@ -962,6 +1043,7 @@ class KanbanManager {
         const description = document.getElementById('task-description').value.trim();
         const plan = document.getElementById('task-plan').value.trim();
         const implementation = document.getElementById('task-implementation').value.trim();
+        const status = document.getElementById('task-status').value;
         const project = document.getElementById('task-project').value;
         const terminalIdValue = document.getElementById('task-terminal').value;
         let terminalId = null;
@@ -999,6 +1081,17 @@ class KanbanManager {
                     const implementationResult = await ipcRenderer.invoke('task-update-implementation', this.editingTaskId, implementation);
                     if (!implementationResult.success) {
                         console.error('Failed to update implementation:', implementationResult.error);
+                    }
+                }
+                
+                // Update status if changed
+                if (result.success && status) {
+                    const currentTask = this.tasks.find(t => t.id === this.editingTaskId);
+                    if (currentTask && currentTask.status !== status) {
+                        const statusResult = await ipcRenderer.invoke('task-update-status', this.editingTaskId, status);
+                        if (!statusResult.success) {
+                            console.error('Failed to update status:', statusResult.error);
+                        }
                     }
                 }
                 
@@ -1062,7 +1155,12 @@ class KanbanManager {
         const terminalText = task.terminal_id !== null && task.terminal_id > 0 ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
         const createdText = new Date(task.created_at).toLocaleString();
         
-        document.getElementById('details-status').textContent = `Status: ${statusText}`;
+        // Update status display
+        document.getElementById('details-status-text').textContent = statusText;
+        document.getElementById('status-display').setAttribute('data-status', task.status);
+        document.getElementById('status-dropdown-menu').style.display = 'none';
+        document.getElementById('status-display').classList.remove('dropdown-open');
+        
         document.getElementById('details-terminal').textContent = terminalText;
         document.getElementById('details-created').textContent = `Created: ${createdText}`;
 
@@ -1106,6 +1204,8 @@ class KanbanManager {
     hideTaskDetailsModal() {
         document.getElementById('task-details-modal').classList.remove('show');
         this.currentTask = null;
+        // Reset status dropdown
+        this.hideStatusDropdown();
     }
 
     editCurrentTask() {
@@ -1197,6 +1297,12 @@ class KanbanManager {
 
     toggleTerminalDropdown(event, taskId) {
         event.stopPropagation();
+        event.preventDefault();
+        
+        // Save scroll position of the column
+        const taskCard = event.target.closest('.task-card');
+        const taskList = taskCard?.closest('.task-list');
+        const savedScrollTop = taskList ? taskList.scrollTop : 0;
         
         // Close all other dropdowns first
         document.querySelectorAll('.terminal-dropdown').forEach(dropdown => {
@@ -1207,26 +1313,28 @@ class KanbanManager {
         
         // Toggle current dropdown
         const dropdown = document.getElementById(`terminal-dropdown-${taskId}`);
+        
         if (dropdown) {
-            const isOpening = dropdown.style.display === 'none';
-            dropdown.style.display = isOpening ? 'block' : 'none';
-            
-            // Find the task card and temporarily adjust overflow
-            const taskCard = dropdown.closest('.task-card');
-            if (taskCard) {
-                if (isOpening) {
+            if (dropdown.style.display === 'none' || dropdown.style.display === '') {
+                dropdown.style.display = 'block';
+                
+                // Make the task card high z-index to ensure dropdown is visible
+                if (taskCard) {
                     taskCard.style.zIndex = '1000';
-                    // Temporarily set overflow visible on parent containers
-                    const taskList = taskCard.closest('.task-list');
-                    if (taskList) {
-                        taskList.style.overflow = 'visible';
-                    }
-                } else {
+                    taskCard.style.position = 'relative';
+                }
+                
+                // Restore scroll position if it changed
+                if (taskList && taskList.scrollTop !== savedScrollTop) {
+                    taskList.scrollTop = savedScrollTop;
+                }
+            } else {
+                dropdown.style.display = 'none';
+                
+                // Reset z-index
+                if (taskCard) {
                     taskCard.style.zIndex = '';
-                    const taskList = taskCard.closest('.task-list');
-                    if (taskList) {
-                        taskList.style.overflow = '';
-                    }
+                    taskCard.style.position = '';
                 }
             }
         }
@@ -1234,21 +1342,21 @@ class KanbanManager {
         // Close dropdown when clicking outside
         const closeDropdown = (e) => {
             if (!e.target.closest('.task-terminal-wrapper')) {
-                dropdown.style.display = 'none';
-                // Reset overflow
-                const taskCard = dropdown.closest('.task-card');
-                if (taskCard) {
-                    taskCard.style.zIndex = '';
-                    const taskList = taskCard.closest('.task-list');
-                    if (taskList) {
-                        taskList.style.overflow = '';
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                    
+                    // Reset z-index
+                    const taskCard = dropdown.closest('.task-card');
+                    if (taskCard) {
+                        taskCard.style.zIndex = '';
+                        taskCard.style.position = '';
                     }
                 }
                 document.removeEventListener('click', closeDropdown);
             }
         };
         
-        if (dropdown.style.display === 'block') {
+        if (dropdown && dropdown.style.display === 'block') {
             setTimeout(() => {
                 document.addEventListener('click', closeDropdown);
             }, 0);
@@ -1256,25 +1364,55 @@ class KanbanManager {
     }
     
     async selectTerminal(taskId, terminalId) {
-        if (event) event.stopPropagation();
+        if (event) {
+            event.stopPropagation();
+            event.preventDefault();
+        }
         
-        // Hide dropdown and reset overflow
+        // Hide dropdown and reset z-index
         const dropdown = document.getElementById(`terminal-dropdown-${taskId}`);
         if (dropdown) {
             dropdown.style.display = 'none';
+            
             const taskCard = dropdown.closest('.task-card');
             if (taskCard) {
                 taskCard.style.zIndex = '';
-                const taskList = taskCard.closest('.task-list');
-                if (taskList) {
-                    taskList.style.overflow = '';
-                }
+                taskCard.style.position = '';
             }
         }
         
         // Update terminal
         await this.updateTaskTerminal(taskId, terminalId === null ? '' : terminalId.toString());
-        await this.loadTasks(); // Refresh to show new icon
+        
+        // Update the badge display without reloading everything
+        const badge = document.querySelector(`.task-card[data-task-id="${taskId}"] .task-terminal-badge`);
+        if (badge) {
+            if (terminalId === null) {
+                badge.classList.add('unassigned');
+                badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" class="lucide lucide-plus"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>';
+                badge.title = 'Assign to terminal';
+            } else {
+                badge.classList.remove('unassigned');
+                badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="terminal" class="lucide lucide-terminal"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="terminal-number">${terminalId}</span>`;
+                badge.title = `Terminal ${terminalId}`;
+            }
+            // Re-initialize Lucide icons for the updated badge
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+        
+        // Update the dropdown options to show the new active state
+        const options = document.querySelectorAll(`#terminal-dropdown-${taskId} .terminal-option`);
+        options.forEach((option, index) => {
+            if (index === 0 && terminalId === null) {
+                option.classList.add('active');
+            } else if (index > 0 && index === terminalId) {
+                option.classList.add('active');
+            } else {
+                option.classList.remove('active');
+            }
+        });
     }
 
     async updateTaskTitle(taskId, newTitle) {
@@ -1765,6 +1903,286 @@ class KanbanManager {
         } catch (error) {
             console.error('Error updating implementation:', error);
             alert('Error updating implementation');
+        }
+    }
+
+    toggleStatusDropdown() {
+        if (!this.currentTask) return;
+        
+        const dropdown = document.getElementById('status-dropdown-menu');
+        const statusDisplay = document.getElementById('status-display');
+        
+        if (dropdown.style.display === 'none') {
+            dropdown.style.display = 'block';
+            statusDisplay.classList.add('dropdown-open');
+            
+            // Highlight current status
+            document.querySelectorAll('.status-option').forEach(option => {
+                if (option.getAttribute('data-value') === this.currentTask.status) {
+                    option.classList.add('active');
+                } else {
+                    option.classList.remove('active');
+                }
+            });
+        } else {
+            this.hideStatusDropdown();
+        }
+    }
+
+    hideStatusDropdown() {
+        document.getElementById('status-dropdown-menu').style.display = 'none';
+        document.getElementById('status-display').classList.remove('dropdown-open');
+    }
+
+    async changeTaskStatus(newStatus) {
+        if (!this.currentTask) return;
+        
+        try {
+            const result = await ipcRenderer.invoke('task-update-status', this.currentTask.id, newStatus);
+            if (result.success) {
+                const oldStatus = this.currentTask.status;
+                this.currentTask.status = newStatus;
+                
+                // Update the status text display
+                const statusText = newStatus.replace('_', ' ').toUpperCase();
+                document.getElementById('details-status-text').textContent = statusText;
+                document.getElementById('status-display').setAttribute('data-status', newStatus);
+                
+                // Hide the dropdown
+                this.hideStatusDropdown();
+                
+                // Update delete button visibility
+                const deleteBtn = document.getElementById('delete-task-btn');
+                deleteBtn.style.display = newStatus === 'in_progress' ? 'none' : 'block';
+                
+                // Reload tasks to update the board
+                await this.loadTasks();
+                
+                this.showNotification(`Status updated to ${statusText}`, 'success');
+            } else {
+                // Close dropdown on error
+                this.hideStatusDropdown();
+                this.showNotification(`Failed to update status: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error updating task status:', error);
+            this.hideStatusDropdown();
+            this.showNotification('Error updating status', 'error');
+        }
+    }
+
+    async toggleSendToTerminalDropdown(event, taskId) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
+        const button = event.currentTarget || event.target;
+        const taskCard = button?.closest('.task-card');
+        const taskList = taskCard?.closest('.task-list');
+        const kanbanColumn = taskList?.closest('.kanban-column');
+        
+        // Close all other dropdowns and restore their overflow
+        document.querySelectorAll('.send-terminal-dropdown').forEach(d => {
+            if (d !== dropdown && d.style.display === 'block') {
+                d.style.display = 'none';
+                // Restore overflow for other cards
+                const otherCard = d.closest('.task-card');
+                const otherList = otherCard?.closest('.task-list');
+                const otherColumn = otherList?.closest('.kanban-column');
+                if (otherCard) otherCard.style.overflow = '';
+                if (otherList) otherList.style.overflow = '';
+                if (otherColumn) otherColumn.style.overflow = '';
+            }
+        });
+        
+        if (dropdown.style.display === 'none') {
+            // Get task and available terminals
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return;
+            
+            // Temporarily set overflow to visible for parent containers
+            if (taskCard) {
+                taskCard.style.overflow = 'visible';
+                taskCard.style.zIndex = '1000';
+            }
+            if (taskList) {
+                taskList.style.overflow = 'visible';
+            }
+            if (kanbanColumn) {
+                kanbanColumn.style.overflow = 'visible';
+            }
+            
+            // Request available terminals from main process
+            const terminals = await ipcRenderer.invoke('get-terminals-for-project', task.project);
+            
+            // Build dropdown content
+            let dropdownHTML = '';
+            
+            if (terminals && terminals.length > 0) {
+                dropdownHTML = terminals.map(terminal => `
+                    <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
+                        <i data-lucide="terminal"></i>
+                        Terminal ${terminal.id + 1}
+                        <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
+                    </div>
+                `).join('');
+            } else {
+                dropdownHTML = `
+                    <div class="send-terminal-option no-terminals">
+                        <i data-lucide="alert-circle"></i>
+                        No terminals with this project
+                    </div>
+                `;
+            }
+            
+            // Always add copy option
+            dropdownHTML += `
+                <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                    <i data-lucide="clipboard-copy"></i>
+                    Copy Task Summary
+                </div>
+            `;
+            
+            dropdown.innerHTML = dropdownHTML;
+            dropdown.style.display = 'block';
+            
+            // Rotate dropdown icon
+            const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
+            if (dropdownIcon) {
+                dropdownIcon.style.transform = 'rotate(180deg)';
+            }
+            
+            // Re-initialize icons
+            this.initializeLucideIcons();
+            
+            // Add click handler to close dropdown when clicking outside
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    if (!wrapper.contains(e.target)) {
+                        dropdown.style.display = 'none';
+                        if (dropdownIcon) dropdownIcon.style.transform = '';
+                        // Restore overflow
+                        if (taskCard) {
+                            taskCard.style.overflow = '';
+                            taskCard.style.zIndex = '';
+                        }
+                        if (taskList) taskList.style.overflow = '';
+                        if (kanbanColumn) kanbanColumn.style.overflow = '';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 0);
+        } else {
+            dropdown.style.display = 'none';
+            const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
+            if (dropdownIcon) dropdownIcon.style.transform = '';
+            // Restore overflow
+            if (taskCard) {
+                taskCard.style.overflow = '';
+                taskCard.style.zIndex = '';
+            }
+            if (taskList) taskList.style.overflow = '';
+            if (kanbanColumn) kanbanColumn.style.overflow = '';
+        }
+    }
+
+    async sendTaskToSpecificTerminal(taskId, terminalId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) {
+            console.error('Task not found');
+            return;
+        }
+
+        // Build the message to send to terminal
+        let message = `\n# Work on task #${task.id}: ${task.title}\n\n`;
+        
+        if (task.description) {
+            message += `## Description:\n${task.description}\n\n`;
+        }
+        
+        if (task.implementation) {
+            message += `## Previous Implementation:\n${task.implementation}\n\n`;
+        }
+        
+        if (task.plan) {
+            message += `## Plan:\n${task.plan}\n\n`;
+        }
+        
+        message += `## Command:\nWork on this task\n`;
+
+        // Send the message to the terminal via IPC
+        ipcRenderer.send('send-to-terminal', terminalId, message);
+        
+        // Hide dropdown
+        const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            // Reset z-index for task card
+            const taskCard = dropdown.closest('.task-card');
+            if (taskCard) {
+                taskCard.style.zIndex = '';
+                taskCard.style.position = '';
+            }
+        }
+        
+        // Send command to start the task
+        const startCommand = `mcp__codeagentswarm-tasks__start_task --task_id ${taskId}\n`;
+        ipcRenderer.send('send-to-terminal', terminalId, startCommand);
+        
+        // Send notification to main window
+        ipcRenderer.send('show-badge-notification', 'Task sent to terminal');
+        
+        // Close Task Manager window immediately
+        window.close();
+    }
+
+    async copyTaskSummary(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+
+        // Build task summary
+        let summary = `Task #${task.id}: ${task.title}\n\n`;
+        
+        if (task.description) {
+            summary += `Description:\n${task.description}\n\n`;
+        }
+        
+        if (task.plan) {
+            summary += `Plan:\n${task.plan}\n\n`;
+        }
+        
+        if (task.implementation) {
+            summary += `Previous Implementation:\n${task.implementation}\n\n`;
+        }
+        
+        summary += `Project: ${task.project || 'None'}\n`;
+        summary += `Status: ${task.status}\n`;
+        summary += `Terminal: ${task.terminal_id || 'Unassigned'}\n`;
+
+        // Copy to clipboard
+        try {
+            await navigator.clipboard.writeText(summary);
+            // Send notification to main window
+            ipcRenderer.send('show-badge-notification', 'Task copied to clipboard');
+            // Close Task Manager window immediately
+            window.close();
+        } catch (err) {
+            console.error('Failed to copy to clipboard:', err);
+            // Still close even if copy failed
+            window.close();
+        }
+        
+        // Hide dropdown
+        const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            // Reset z-index for task card
+            const taskCard = dropdown.closest('.task-card');
+            if (taskCard) {
+                taskCard.style.zIndex = '';
+                taskCard.style.position = '';
+            }
         }
     }
 }

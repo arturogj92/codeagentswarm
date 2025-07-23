@@ -137,6 +137,15 @@
                         <textarea id="task-implementation" rows="3" maxlength="100000" placeholder="Files modified, summary and implementation details..."></textarea>
                     </div>
                     <div class="form-group">
+                        <label for="task-status">Status</label>
+                        <select id="task-status">
+                            <option value="pending">Pending</option>
+                            <option value="in_progress">In Progress</option>
+                            <option value="in_testing">In Testing</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
                         <label for="task-project">Project</label>
                         <select id="task-project">
                             <option value="CodeAgentSwarm">CodeAgentSwarm</option>
@@ -172,6 +181,18 @@
             </div>
             <div class="modal-body">
                 <div class="task-info">
+                    <div class="task-status-header">
+                        <div id="status-display" class="status-display clickable">
+                            <span id="details-status-text"></span>
+                            <i data-lucide="chevron-down" class="status-dropdown-icon"></i>
+                        </div>
+                        <div id="status-dropdown-menu" class="status-dropdown-menu" style="display: none;">
+                            <div class="status-option" data-value="pending">Pending</div>
+                            <div class="status-option" data-value="in_progress">In Progress</div>
+                            <div class="status-option" data-value="in_testing">In Testing</div>
+                            <div class="status-option" data-value="completed">Completed</div>
+                        </div>
+                    </div>
                     <h4 id="details-title"></h4>
                     <p id="details-description"></p>
                     <div class="task-plan-section">
@@ -207,7 +228,6 @@
                         </div>
                     </div>
                     <div class="task-meta">
-                        <span id="details-status"></span>
                         <span id="details-terminal"></span>
                         <span id="details-created"></span>
                     </div>

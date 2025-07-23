@@ -78,9 +78,22 @@ if (process.argv.includes('--dev')) {
     } catch (err) {
         console.log('electron-reload not installed, run: npm install --save-dev electron-reload');
     }
+    
+    // Watch kanban files for changes
+    const kanbanFiles = ['kanban.html', 'kanban.css', 'kanban.js'];
+    kanbanFiles.forEach(file => {
+        const filePath = path.join(__dirname, file);
+        fs.watchFile(filePath, { interval: 1000 }, (curr, prev) => {
+            if (curr.mtime !== prev.mtime && kanbanWindow && !kanbanWindow.isDestroyed()) {
+                console.log(`Detected change in ${file}, reloading kanban window...`);
+                kanbanWindow.webContents.reload();
+            }
+        });
+    });
 }
 
 let mainWindow;
+let kanbanWindow; // Global reference to kanban window
 const terminals = new Map();
 let db;
 let mcpServer;
@@ -516,6 +529,50 @@ ipcMain.on('terminal-input', (event, quadrant, data) => {
     shell.handleInput(data);
   } else {
     console.error(`Shell ${quadrant} not found`);
+  }
+});
+
+ipcMain.on('send-to-terminal', (event, terminalId, message) => {
+  console.log(`Sending message to terminal ${terminalId}`);
+  const shell = terminals.get(terminalId);
+  if (shell) {
+    // Send the message as if it was typed
+    shell.handleInput(message);
+  } else {
+    console.error(`Terminal ${terminalId} not found`);
+  }
+});
+
+ipcMain.handle('get-terminals-for-project', async (event, projectName) => {
+  try {
+    const activeTerminals = [];
+    
+    // Iterate through all active terminals
+    for (const [terminalId, shell] of terminals) {
+      if (shell && shell.cwd) {
+        // Check if this terminal has a CLAUDE.md file
+        const claudeMdPath = path.join(shell.cwd, 'CLAUDE.md');
+        
+        if (fs.existsSync(claudeMdPath)) {
+          // Read CLAUDE.md to get project name
+          const claudeMdContent = fs.readFileSync(claudeMdPath, 'utf8');
+          const projectMatch = claudeMdContent.match(/\*\*Project Name\*\*:\s*(.+)/);
+          
+          if (projectMatch && projectMatch[1].trim() === projectName) {
+            activeTerminals.push({
+              id: terminalId,
+              currentDir: shell.cwd,
+              project: projectName
+            });
+          }
+        }
+      }
+    }
+    
+    return activeTerminals;
+  } catch (error) {
+    console.error('Error getting terminals for project:', error);
+    return [];
   }
 });
 
@@ -1964,7 +2021,16 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
 
 // Open Kanban window
 ipcMain.on('open-kanban-window', (event, options = {}) => {
-  const kanbanWindow = new BrowserWindow({
+  // If kanban window already exists, just focus it
+  if (kanbanWindow && !kanbanWindow.isDestroyed()) {
+    kanbanWindow.focus();
+    if (options.focusTaskId) {
+      kanbanWindow.webContents.send('focus-task', options.focusTaskId);
+    }
+    return;
+  }
+  
+  kanbanWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     title: 'Task Manager - Kanban Board',
@@ -1999,6 +2065,11 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
     if (options.focusTaskId) {
       kanbanWindow.webContents.send('focus-task', options.focusTaskId);
     }
+  });
+  
+  // Clean up reference when window is closed
+  kanbanWindow.on('closed', () => {
+    kanbanWindow = null;
   });
   
 });
@@ -2355,6 +2426,13 @@ Get current task for a terminal.
 }
 
 // Desktop notification handler
+ipcMain.on('show-badge-notification', (event, message) => {
+  // Send badge notification to main window
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('display-badge', message);
+  }
+});
+
 ipcMain.on('show-desktop-notification', (event, title, message) => {
   if (Notification.isSupported()) {
     const notification = new Notification({
@@ -2376,6 +2454,24 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
     });
   } else {
     console.log('Desktop notifications not supported on this system');
+  }
+});
+
+// Open system notification settings
+ipcMain.on('open-system-notifications', (event) => {
+  const { shell } = require('electron');
+  
+  if (process.platform === 'darwin') {
+    // macOS: Open System Settings > Notifications
+    shell.openExternal('x-apple.systempreferences:com.apple.Notifications-Settings.extension');
+  } else if (process.platform === 'win32') {
+    // Windows: Open Settings > System > Notifications
+    shell.openExternal('ms-settings:notifications');
+  } else {
+    // Linux: Try to open system settings (varies by distribution)
+    shell.openExternal('gnome-control-center notifications') ||
+    shell.openExternal('unity-control-center notifications') ||
+    shell.openExternal('systemsettings5 notifications');
   }
 });
 

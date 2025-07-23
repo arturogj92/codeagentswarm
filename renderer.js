@@ -145,6 +145,11 @@ class TerminalManager {
         ipcRenderer.on('refresh-tasks', () => {
             this.updateTaskIndicators();
         });
+        
+        // Listen for badge notifications
+        ipcRenderer.on('display-badge', (event, message) => {
+            this.showBadgeNotification(message);
+        });
     }
 
     setupEventListeners() {
@@ -963,6 +968,39 @@ class TerminalManager {
         // Notificaciones internas deshabilitadas - solo notificaciones externas permitidas
         return;
     }
+    
+    showBadgeNotification(message) {
+        // Create badge element
+        const badge = document.createElement('div');
+        badge.className = 'badge-notification';
+        badge.innerHTML = `
+            <i data-lucide="check-circle"></i>
+            <span>${message}</span>
+        `;
+        
+        // Add to body
+        document.body.appendChild(badge);
+        
+        // Initialize lucide icon
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+        
+        // Trigger animation
+        setTimeout(() => {
+            badge.classList.add('show');
+        }, 10);
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+            badge.classList.remove('show');
+            setTimeout(() => {
+                if (badge.parentNode) {
+                    badge.parentNode.removeChild(badge);
+                }
+            }, 300);
+        }, 3000);
+    }
 
     showDesktopNotification(title, message) {
         // Send IPC message to main process to show native notification
@@ -1480,6 +1518,9 @@ class TerminalManager {
             quadrantElement.classList.add('fullscreen');
             this.fullscreenTerminal = quadrant;
             
+            // Hide arrow buttons for all terminals when in fullscreen
+            this.updateArrowButtonsVisibility();
+            
             // Force multiple resize attempts with delays to ensure proper sizing
             setTimeout(() => {
                 this.forceTerminalResize(quadrant);
@@ -1514,7 +1555,22 @@ class TerminalManager {
             }, 500);
             
             this.fullscreenTerminal = null;
+            
+            // Show arrow buttons again when exiting fullscreen
+            this.updateArrowButtonsVisibility();
         }
+    }
+
+    updateArrowButtonsVisibility() {
+        // Update visibility of arrow buttons based on fullscreen state
+        const allReorderControls = document.querySelectorAll('.terminal-reorder-controls');
+        allReorderControls.forEach(controls => {
+            if (this.fullscreenTerminal !== null) {
+                controls.style.display = 'none';
+            } else {
+                controls.style.display = '';
+            }
+        });
     }
 
     async closeTerminal(quadrant) {
@@ -1985,6 +2041,9 @@ class TerminalManager {
                             <li>Some systems may block Electron app notifications</li>
                             <li>Task status changes are always visible in the Kanban board</li>
                         </ul>
+                        <button class="btn btn-secondary" id="open-system-notifications">
+                            <i data-lucide="settings"></i> Open System Notification Settings
+                        </button>
                     </div>
                 </div>
                 <div class="mcp-info-footer">
@@ -2007,6 +2066,14 @@ class TerminalManager {
 
         modal.querySelector('#close-mcp-info-modal').addEventListener('click', closeModal);
         modal.querySelector('#close-mcp-info-btn').addEventListener('click', closeModal);
+
+        // Add handler for system notifications button
+        const notificationsBtn = modal.querySelector('#open-system-notifications');
+        if (notificationsBtn) {
+            notificationsBtn.addEventListener('click', () => {
+                ipcRenderer.send('open-system-notifications');
+            });
+        }
 
         // Close on background click
         modal.addEventListener('click', (e) => {
@@ -3609,7 +3676,7 @@ class TerminalManager {
                     </div>
                 </div>
                 <div class="terminal-controls">
-                    <div class="terminal-reorder-controls">
+                    <div class="terminal-reorder-controls" style="${this.fullscreenTerminal !== null ? 'display: none;' : ''}">
                         <button class="terminal-reorder-btn" data-action="move-left" data-terminal="${terminalId}" title="Move Left">
                             ◀
                         </button>
