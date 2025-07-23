@@ -2521,6 +2521,8 @@ class TerminalManager {
             
             if (result.success) {
                 this.showInlineNotification('✅ Push successful', 'success');
+                // Update push button immediately
+                this.updatePushButton();
                 // Refresh the git status to update the push button
                 setTimeout(() => this.showGitStatus(), 1000);
             } else {
@@ -2558,6 +2560,8 @@ class TerminalManager {
             
             if (result.success) {
                 this.showInlineNotification('✅ Push successful', 'success');
+                // Update push button immediately
+                this.updatePushButton();
                 // Refresh the git status to update the push button
                 setTimeout(() => this.showGitStatus(), 1000);
             } else {
@@ -2566,6 +2570,26 @@ class TerminalManager {
         } catch (error) {
             console.error('Error pushing project:', error);
             this.showInlineNotification('❌ Error pushing changes', 'error');
+        }
+    }
+    
+    updatePushButton() {
+        // Remove the pending push reminder immediately
+        const pushReminder = document.querySelector('.push-reminder');
+        if (pushReminder) {
+            pushReminder.remove();
+        }
+        
+        // Remove the pulse animation and badge from push button
+        const pushButton = document.querySelector('#git-push');
+        if (pushButton) {
+            pushButton.classList.remove('btn-pulse');
+            const badge = pushButton.querySelector('.badge');
+            if (badge) {
+                badge.remove();
+            }
+            // Update the title to remove pending count
+            pushButton.title = 'Push - Upload changes to remote repository';
         }
     }
     
