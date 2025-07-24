@@ -816,12 +816,6 @@ class TerminalManager {
         // Focus the terminal
         terminal.focus();
         
-        // Send command to disable bracketed paste mode when connecting to terminal
-        // This ensures it's disabled even when reconnecting to existing terminals
-        setTimeout(() => {
-            ipcRenderer.send('terminal-input', quadrant, '\x1b[?2004l');
-        }, 100);
-        
         // Handle terminal input with debug
         terminal.onData(data => {
             ipcRenderer.send('terminal-input', quadrant, data);
@@ -2452,7 +2446,12 @@ class TerminalManager {
                                 </div>
                                 ${gitData.files.length > 0 ? `
                                     <div class="commit-section">
-                                        <textarea id="commit-message" placeholder="Enter commit message..." rows="3"></textarea>
+                                        <div class="commit-message-wrapper">
+                                            <textarea id="commit-message" placeholder="Enter commit message..." rows="3"></textarea>
+                                            <button class="btn-ai-generate" id="generate-ai-commit" title="Generate commit message with AI">
+                                                <i data-lucide="sparkles"></i>
+                                            </button>
+                                        </div>
                                         <div class="commit-buttons">
                                             <button class="btn btn-primary" id="commit-selected"><i data-lucide="check-square"></i> Commit Selected</button>
                                             <button class="btn" id="commit-all"><i data-lucide="check-square"></i> Commit All</button>
@@ -2517,6 +2516,41 @@ class TerminalManager {
         // Store project path for git operations
         this.currentGitProject = gitData.workingDirectory;
         
+        // AI Commit generator
+        modal.querySelector('#generate-ai-commit')?.addEventListener('click', async () => {
+            const button = modal.querySelector('#generate-ai-commit');
+            const messageTextarea = modal.querySelector('#commit-message');
+            
+            // Show loading state
+            button.disabled = true;
+            button.innerHTML = '<i data-lucide="loader-2" class="spinning"></i>';
+            lucide.createIcons();
+            
+            try {
+                const result = await ipcRenderer.invoke('generate-ai-commit-message', this.currentGitProject);
+                
+                if (result.success) {
+                    messageTextarea.value = result.message;
+                    messageTextarea.focus();
+                    // Flash the textarea to show it was updated
+                    messageTextarea.style.animation = 'flash 0.5s';
+                    setTimeout(() => {
+                        messageTextarea.style.animation = '';
+                    }, 500);
+                } else {
+                    this.showNotification(`Failed to generate commit message: ${result.error}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error calling AI service:', error);
+                this.showNotification('Failed to connect to AI service', 'error');
+            } finally {
+                // Restore button
+                button.disabled = false;
+                button.innerHTML = '<i data-lucide="sparkles"></i>';
+                lucide.createIcons();
+            }
+        });
+
         // Commit handlers
         modal.querySelector('#commit-selected')?.addEventListener('click', () => {
             const message = modal.querySelector('#commit-message').value;

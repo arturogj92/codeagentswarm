@@ -2653,23 +2653,68 @@ body::before {
   padding-top: 20px;
 }
 
+.commit-message-wrapper {
+  position: relative;
+  margin-bottom: 12px;
+}
+
 #commit-message {
   width: 100%;
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 12px;
+  padding-right: 50px; /* Space for AI button */
   color: var(--text-primary);
   font-family: inherit;
   font-size: 14px;
   resize: vertical;
-  margin-bottom: 12px;
 }
 
 #commit-message:focus {
   outline: none;
   border-color: var(--primary);
   box-shadow: 0 0 0 2px rgba(127, 90, 240, 0.2);
+}
+
+.btn-ai-generate {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  cursor: pointer;
+  color: var(--primary);
+  transition: all 0.2s ease;
+}
+
+.btn-ai-generate:hover {
+  background: var(--surface-hover);
+  border-color: var(--primary);
+  color: var(--primary-hover);
+  transform: scale(1.05);
+}
+
+.btn-ai-generate:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn-ai-generate i {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+.btn-ai-generate .spinning {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes flash {
+  0%, 100% { background-color: var(--surface); }
+  50% { background-color: rgba(127, 90, 240, 0.1); }
 }
 
 .commit-buttons {

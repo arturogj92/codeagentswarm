@@ -8,6 +8,7 @@ const DatabaseManager = require('./database');
 const MCPTaskServer = require('./mcp-server');
 const HooksManager = require('./hooks-manager');
 const WebhookServer = require('./webhook-server');
+const GitService = require('./git-service');
 
 // Logging setup
 const logDir = path.join(app.getPath('userData'), 'logs');
@@ -99,6 +100,7 @@ let db;
 let mcpServer;
 let hooksManager;
 let webhookServer;
+let gitService; // Global reference to git service
 let terminalsWaitingForResponse = new Set();
 
 // Handle unhandled promise rejections
@@ -342,11 +344,14 @@ class SimpleShell {
         rows: 30
       });
       
-      // Disable bracketed paste mode to prevent ~200/~201 sequences
-      childProcess.write('\x1b[?2004l');
-
       // Mark this as active interactive process
       this.activeInteractiveProcess = childProcess;
+      
+      // Disable bracketed paste mode to prevent ~200/~201 sequences
+      // Skip for claude commands as they handle this internally
+      if (!isClaudeCommand) {
+        childProcess.write('\x1b[?2004l');
+      }
     } else {
       // Regular commands use the normal approach
       childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
@@ -2115,6 +2120,9 @@ app.whenReady().then(async () => {
     db = null;
   }
   
+  // Initialize Git service
+  gitService = new GitService();
+  
   // Start MCP Task Server
   try {
     mcpServer = new MCPTaskServer();
@@ -2593,181 +2601,42 @@ function getTerminalWorkingDirectory(terminalId) {
 
 // Git status handler
 ipcMain.handle('get-git-status', async () => {
-  const { execSync } = require('child_process');
   try {
     const cwd = getGitWorkingDirectory();
-    
-    // Check if directory is a git repository
-    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    }).trim() === 'true';
-    
-    if (!isGitRepo) {
-      return { success: false, error: 'Not a git repository' };
-    }
-    
-    // Get git status with porcelain format for easy parsing
-    const statusOutput = execSync('git status --porcelain', { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    });
-    
-    // Parse the status output
-    const files = [];
-    const lines = statusOutput.trim().split('\n').filter(line => line.length > 0);
-    
-    lines.forEach(line => {
-      if (line.length < 3) return; // Skip invalid lines
-      
-      const status = line.substring(0, 2);
-      const fileName = line.substring(2).trim();
-      
-      let statusText = '';
-      // Check both index and working tree status (first and second character)
-      const indexStatus = status[0];
-      const workingStatus = status[1];
-      
-      // Priority: working tree changes, then index changes
-      if (workingStatus === 'M' || indexStatus === 'M') {
-        statusText = 'Modified';
-      } else if (workingStatus === 'A' || indexStatus === 'A') {
-        statusText = 'Added';
-      } else if (workingStatus === 'D' || indexStatus === 'D') {
-        statusText = 'Deleted';
-      } else if (workingStatus === 'R' || indexStatus === 'R') {
-        statusText = 'Renamed';
-      } else if (workingStatus === 'C' || indexStatus === 'C') {
-        statusText = 'Copied';
-      } else if (workingStatus === 'T' || indexStatus === 'T') {
-        statusText = 'Type Changed';
-      } else if (status === '??') {
-        statusText = 'Untracked';
-      } else if (status === '!!') {
-        statusText = 'Ignored';
-      } else {
-        statusText = 'Modified'; // Default to Modified for most cases
-      }
-      
-      files.push({
-        file: fileName,
-        status: statusText,
-        raw: status,
-        staged: indexStatus !== ' ' && indexStatus !== '?'
-      });
-    });
-    
-    // Get current branch
-    const branch = execSync('git branch --show-current', { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    }).trim();
-    
-    // Get recent commits
-    const commits = execSync('git log --oneline -10', { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    }).trim().split('\n').filter(line => line.length > 0).map(line => {
-      const [hash, ...messageParts] = line.split(' ');
-      return {
-        hash: hash,
-        message: messageParts.join(' ')
-      };
-    });
-    
-    // Check for unpushed commits
-    let unpushedCount = 0;
-    let hasUpstream = true;
-    try {
-      // First check if there's an upstream branch
-      execSync('git rev-parse --abbrev-ref --symbolic-full-name @{u}', {
-        cwd,
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore']
-      });
-      
-      // Count unpushed commits
-      const unpushedOutput = execSync('git rev-list --count @{u}..HEAD', { 
-        cwd, 
-        encoding: 'utf8',
-        stdio: ['pipe', 'pipe', 'ignore']
-      }).trim();
-      unpushedCount = parseInt(unpushedOutput) || 0;
-    } catch (e) {
-      // No upstream branch configured
-      hasUpstream = false;
-      // Count all commits if no upstream
-      try {
-        const allCommitsCount = execSync('git rev-list --count HEAD', {
-          cwd,
-          encoding: 'utf8',
-          stdio: ['pipe', 'pipe', 'ignore']
-        }).trim();
-        unpushedCount = parseInt(allCommitsCount) || 0;
-      } catch (e2) {
-        // Ignore
-      }
-    }
-    
-    return { 
-      success: true, 
-      files, 
-      branch,
-      workingDirectory: cwd,
-      commits,
-      unpushedCount,
-      hasUpstream
-    };
-    
+    return await gitService.getStatus(cwd);
   } catch (error) {
     console.error('Git status error:', error);
     return { 
       success: false, 
-      error: error.message || 'Failed to get git status'
+      error: error.message || 'Failed to get git status' 
     };
   }
 });
 
 // Git commit handler
 ipcMain.handle('git-commit', async (event, message, files) => {
-  const { execSync } = require('child_process');
   try {
     const cwd = getGitWorkingDirectory();
-    
-    // Check if directory is a git repository
-    const isGitRepo = execSync('git rev-parse --is-inside-work-tree', { 
-      cwd, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    }).trim() === 'true';
-    
-    if (!isGitRepo) {
-      return { success: false, error: 'Not a git repository' };
-    }
-    
-    // Add specific files or all if none specified
-    if (files && files.length > 0) {
-      for (const file of files) {
-        execSync(`git add "${file}"`, { cwd });
-      }
-    } else {
-      execSync('git add .', { cwd });
-    }
-    
-    // Commit with message
-    execSync(`git commit -m "${message}"`, { cwd, encoding: 'utf8' });
-    
-    return { success: true, message: 'Commit successful' };
-    
+    return await gitService.commit(cwd, message, files);
   } catch (error) {
     console.error('Git commit error:', error);
     return { 
       success: false, 
-      error: error.message || 'Failed to commit changes'
+      error: error.message || 'Failed to commit changes' 
+    };
+  }
+});
+
+// Generate AI commit message handler
+ipcMain.handle('generate-ai-commit-message', async (event, workingDirectory) => {
+  try {
+    const cwd = workingDirectory || getGitWorkingDirectory();
+    return await gitService.generateCommitMessage(cwd);
+  } catch (error) {
+    console.error('Generate AI commit message error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to generate commit message' 
     };
   }
 });

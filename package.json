@@ -1,6 +1,6 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0723.1740",
+  "version": "2025.0724.1437",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
@@ -23,6 +23,7 @@
     "better-sqlite3": "^8.7.0",
     "body-parser": "^1.20.2",
     "express": "^4.18.2",
+    "node-fetch": "^2.7.0",
     "node-pty": "^1.0.0",
     "sqlite3": "^5.1.7",
     "ws": "^8.18.0",
@@ -51,6 +52,8 @@
       "claude-md-config.js",
       "hooks-manager.js",
       "webhook-server.js",
+      "git-service.js",
+      "deepseek-commit-service.js",
       "hook-sender.sh",
       "hook-wrapper.sh",
       "test-hooks.js",
