@@ -774,6 +774,7 @@ class TerminalManager {
             fontFamily: 'JetBrains Mono, SF Mono, Monaco, Inconsolata, "Fira Code", Consolas, "Courier New", monospace',
             fontSize: 13,
             lineHeight: 1.2,
+            bracketedPasteMode: false,
             cursorBlink: true,
             cursorStyle: 'block',
             scrollback: 1000,
@@ -815,6 +816,12 @@ class TerminalManager {
         // Focus the terminal
         terminal.focus();
         
+        // Send command to disable bracketed paste mode when connecting to terminal
+        // This ensures it's disabled even when reconnecting to existing terminals
+        setTimeout(() => {
+            ipcRenderer.send('terminal-input', quadrant, '\x1b[?2004l');
+        }, 100);
+        
         // Handle terminal input with debug
         terminal.onData(data => {
             ipcRenderer.send('terminal-input', quadrant, data);
@@ -833,12 +840,32 @@ class TerminalManager {
         
         // Handle paste events to ensure clean paste without bracketed paste mode sequences
         terminal.attachCustomKeyEventHandler((event) => {
-            // Intercept paste events
-            if (event.type === 'keydown' && event.ctrlKey && event.key === 'v') {
-                // Let the default paste handler work, but with bracketedPasteMode disabled
-                return true;
+            // Intercept paste events (Cmd+V on Mac, Ctrl+V on other platforms)
+            if (event.type === 'keydown' && (event.metaKey || event.ctrlKey) && event.key === 'v') {
+                // Prevent default to handle paste ourselves
+                event.preventDefault();
+                
+                // Use clipboard API to get clean text
+                navigator.clipboard.readText().then(text => {
+                    // Send the pasted text directly to the terminal
+                    ipcRenderer.send('terminal-input', quadrant, text);
+                }).catch(err => {
+                    console.error('Failed to read clipboard:', err);
+                });
+                
+                return false; // Prevent xterm from handling this event
             }
             return true;
+        });
+        
+        // Also handle paste event from context menu or other sources
+        terminalDiv.addEventListener('paste', (event) => {
+            event.preventDefault();
+            const text = event.clipboardData.getData('text/plain');
+            if (text) {
+                // Send the pasted text directly to the terminal
+                ipcRenderer.send('terminal-input', quadrant, text);
+            }
         });
 
         // Handle terminal output
@@ -986,12 +1013,15 @@ class TerminalManager {
             window.lucide.createIcons();
         }
         
+        // Play subtle sound effect (disabled for now)
+        // this.playNotificationSound();
+        
         // Trigger animation
         setTimeout(() => {
             badge.classList.add('show');
         }, 10);
         
-        // Remove after 3 seconds
+        // Remove after 4 seconds
         setTimeout(() => {
             badge.classList.remove('show');
             setTimeout(() => {
@@ -999,7 +1029,17 @@ class TerminalManager {
                     badge.parentNode.removeChild(badge);
                 }
             }, 300);
-        }, 3000);
+        }, 4000);
+    }
+
+    playNotificationSound() {
+        // Create audio element with data URI for a subtle notification sound
+        const audio = new Audio('data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhCCuBzvLZijYIG2m98OScTgwOUarm7blmFgU7k9n1unEiBC13yO/eizEIHWq+8+OWTAsOUqzn77djGAY2k9T0xHkiBCt9y+/ejjQIHWu+9OGSSwsLUqrl7rllGAU1k9T0xHkiBCt9y+/ejjQIHWu+9OGSSwsLUqrl7rllGAU1k9T0xHkiBCt9yu7blDwLG2S57OuqWg0HTKbg6r1pGAU2k9T0xHkiBCt9yu7blDwLG2S57OuqWg0HTKbg6r1pGAU2k9T0xHkiBCt9yu7blDwLG2S57OuqWg0HTKbg6r1pGAU2k9T0xHkiBCt9yu7blDwLG2S57OuqWg0=');
+        audio.volume = 0.3;
+        audio.play().catch(e => {
+            // Ignore errors - sound is optional
+            console.log('Could not play notification sound:', e);
+        });
     }
 
     showDesktopNotification(title, message) {

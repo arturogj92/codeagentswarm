@@ -2164,7 +2164,7 @@ class KanbanManager {
         try {
             await navigator.clipboard.writeText(summary);
             // Send notification to main window
-            ipcRenderer.send('show-badge-notification', 'Task copied to clipboard');
+            ipcRenderer.send('show-badge-notification', `Task #${task.id} copied to clipboard`);
             // Close Task Manager window immediately
             window.close();
         } catch (err) {

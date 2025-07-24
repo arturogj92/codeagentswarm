@@ -341,6 +341,9 @@ class SimpleShell {
         cols: 80,
         rows: 30
       });
+      
+      // Disable bracketed paste mode to prevent ~200/~201 sequences
+      childProcess.write('\x1b[?2004l');
 
       // Mark this as active interactive process
       this.activeInteractiveProcess = childProcess;
