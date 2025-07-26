@@ -2,13 +2,18 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const fetch = require('node-fetch');
 const execAsync = promisify(exec);
+require('dotenv').config();
 
 class DeepSeekCommitService {
     constructor() {
-        // DEVELOPMENT ONLY - This should be moved to a server
-        this.apiKey = 'sk-d68f24728fa0495d8b1d2100a484e274';
+        this.apiKey = process.env.DEEPSEEK_API_KEY;
         this.apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         this.model = 'deepseek-coder'; // Using the cheaper coder model
+        
+        if (!this.apiKey) {
+            console.error('[DeepSeek] API key not found in environment variables');
+            throw new Error('DEEPSEEK_API_KEY environment variable is required');
+        }
     }
 
     async getGitDiff(workingDirectory) {

@@ -448,29 +448,42 @@ class DatabaseManagerMCP {
 
     deleteTask(taskId) {
         try {
-            const stmt = this.db.prepare(`
-                DELETE FROM tasks WHERE id = ?
-            `);
-            const result = stmt.run(taskId);
-            stmt.finalize();
+            // Start transaction
+            this.db.run('BEGIN TRANSACTION');
             
-            if (result.changes === 0) {
+            try {
+                // First clean up task history due to foreign key constraint
+                const historyStmt = this.db.prepare(`
+                    DELETE FROM task_history WHERE task_id = ?
+                `);
+                historyStmt.run(taskId);
+                historyStmt.finalize();
+                
+                // Then delete the task
+                const stmt = this.db.prepare(`
+                    DELETE FROM tasks WHERE id = ?
+                `);
+                const result = stmt.run(taskId);
+                stmt.finalize();
+                
+                if (result.changes === 0) {
+                    this.db.run('ROLLBACK');
+                    return {
+                        success: false,
+                        error: 'Task not found'
+                    };
+                }
+                
+                // Commit transaction
+                this.db.run('COMMIT');
+                
                 return {
-                    success: false,
-                    error: 'Task not found'
+                    success: true
                 };
+            } catch (error) {
+                this.db.run('ROLLBACK');
+                throw error;
             }
-            
-            // Clean up task history
-            const historyStmt = this.db.prepare(`
-                DELETE FROM task_history WHERE task_id = ?
-            `);
-            historyStmt.run(taskId);
-            historyStmt.finalize();
-            
-            return {
-                success: true
-            };
         } catch (error) {
             return {
                 success: false,

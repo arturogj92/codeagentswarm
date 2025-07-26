@@ -2,6 +2,7 @@ const { ipcRenderer } = require('electron');
 const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
+const LogViewer = require('./log-viewer');
 
 console.log('🔧 [RENDERER] renderer.js loaded');
 
@@ -4719,6 +4720,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+    
+    // Initialize LogViewer
+    window.logViewer = new LogViewer();
     
     // Start performance monitoring in dev mode
     const urlParams = new URLSearchParams(window.location.search);

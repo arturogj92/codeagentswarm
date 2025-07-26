@@ -3,6 +3,10 @@ const bodyParser = require('body-parser');
 const { Notification } = require('electron');
 const path = require('path');
 
+// Initialize child process logger
+const ChildProcessLogger = require('./child-process-logger');
+const childLogger = new ChildProcessLogger('Webhook-Server');
+
 class WebhookServer {
     constructor(mainWindow) {
         this.mainWindow = mainWindow;

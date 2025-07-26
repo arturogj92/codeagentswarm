@@ -685,9 +685,27 @@ class DatabaseManager {
     // Delete a task
     deleteTask(taskId) {
         try {
-            const stmt = this.db.prepare(`DELETE FROM tasks WHERE id = ?`);
-            stmt.run(taskId);
-            return { success: true };
+            // Start a transaction to ensure atomicity
+            this.db.prepare('BEGIN TRANSACTION').run();
+            
+            try {
+                // First delete related task_history records
+                const deleteHistory = this.db.prepare(`DELETE FROM task_history WHERE task_id = ?`);
+                deleteHistory.run(taskId);
+                
+                // Then delete the task
+                const deleteTaskStmt = this.db.prepare(`DELETE FROM tasks WHERE id = ?`);
+                deleteTaskStmt.run(taskId);
+                
+                // Commit the transaction
+                this.db.prepare('COMMIT').run();
+                
+                return { success: true };
+            } catch (err) {
+                // Rollback on error
+                this.db.prepare('ROLLBACK').run();
+                throw err;
+            }
         } catch (err) {
             return { success: false, error: err.message };
         }

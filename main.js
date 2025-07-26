@@ -10,7 +10,10 @@ const HooksManager = require('./hooks-manager');
 const WebhookServer = require('./webhook-server');
 const GitService = require('./git-service');
 
-// Logging setup
+// Initialize the centralized logger
+const logger = require('./logger');
+
+// Logging setup for file output (keep existing file logging)
 const logDir = path.join(app.getPath('userData'), 'logs');
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
@@ -19,39 +22,76 @@ if (!fs.existsSync(logDir)) {
 const logFile = path.join(logDir, `codeagentswarm-${new Date().toISOString().split('T')[0]}.log`);
 const logStream = fs.createWriteStream(logFile, { flags: 'a' });
 
-// Store original console methods
-const originalConsole = {
-  log: console.log,
-  error: console.error,
-  warn: console.warn
-};
-
-// Custom logger
-const logger = {
-  log: (...args) => {
-    const timestamp = new Date().toISOString();
-    const message = `[${timestamp}] INFO: ${args.join(' ')}`;
-    originalConsole.log(...args);
-    logStream.write(message + '\n');
-  },
-  error: (...args) => {
-    const timestamp = new Date().toISOString();
-    const message = `[${timestamp}] ERROR: ${args.join(' ')}`;
-    originalConsole.error(...args);
-    logStream.write(message + '\n');
-  },
-  warn: (...args) => {
-    const timestamp = new Date().toISOString();
-    const message = `[${timestamp}] WARN: ${args.join(' ')}`;
-    originalConsole.warn(...args);
+// Add file logging to the centralized logger
+logger.subscribe((log) => {
+  if (log.type !== 'clear') {
+    const timestamp = new Date(log.timestamp).toISOString();
+    const message = `[${timestamp}] ${log.level.toUpperCase()}: ${log.message}`;
     logStream.write(message + '\n');
   }
-};
+});
 
-// Override console methods
-console.log = logger.log;
-console.error = logger.error;
-console.warn = logger.warn;
+// Handle log messages from renderer process
+ipcMain.on('log-message', (event, logData) => {
+  logger.addLog(logData.level, [logData.message]);
+  // Forward to all renderer windows
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('log-update', logData);
+    }
+  });
+});
+
+// Handle log messages from child processes
+ipcMain.on('child-process-log', (event, logData) => {
+  logger.addLog(logData.level, [`[${logData.source}] ${logData.message}`]);
+  // Forward to all renderer windows
+  const forwardData = {
+    ...logData,
+    message: `[${logData.source}] ${logData.message}`
+  };
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('log-update', forwardData);
+    }
+  });
+});
+
+// Subscribe to logger updates and forward to renderer
+logger.subscribe((log) => {
+  if (log.type !== 'clear') {
+    BrowserWindow.getAllWindows().forEach(window => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('log-update', log);
+      }
+    });
+  }
+});
+
+// Handle request for existing logs
+ipcMain.on('request-existing-logs', (event) => {
+  const logs = logger.getLogs();
+  logs.forEach(log => {
+    event.sender.send('log-update', log);
+  });
+});
+
+// Handle clear logs request
+ipcMain.on('clear-logs', (event) => {
+  logger.clearLogs();
+  // Send clear event to all windows
+  BrowserWindow.getAllWindows().forEach(window => {
+    if (!window.isDestroyed()) {
+      window.webContents.send('log-update', { type: 'clear' });
+    }
+  });
+});
+
+// Handle export logs request
+ipcMain.on('export-logs', (event) => {
+  const logsText = logger.exportLogs();
+  event.sender.send('export-logs-response', logsText);
+});
 
 // Log startup info
 console.log('=== CodeAgentSwarm Starting ===');
@@ -323,10 +363,34 @@ class SimpleShell {
           '/opt/homebrew/bin',
           '/usr/bin',
           path.join(os.homedir(), '.local/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
-          path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
+          path.join(os.homedir(), '.volta/bin'), // Volta
+          path.join(os.homedir(), 'bin') // Custom bin
         ];
+        
+        // Dynamically add all nvm node versions to PATH
+        const nvmPath = path.join(os.homedir(), '.nvm/versions/node');
+        if (fs.existsSync(nvmPath)) {
+          try {
+            const nodeVersions = fs.readdirSync(nvmPath);
+            nodeVersions.forEach(version => {
+              additionalPaths.push(path.join(nvmPath, version, 'bin'));
+              additionalPaths.push(path.join(nvmPath, version, 'lib/node_modules/@anthropic-ai/claude-code/bin'));
+            });
+          } catch (e) {
+            console.log('Error adding nvm paths:', e);
+          }
+        }
+        
+        // Add yarn and pnpm global bin paths
+        try {
+          const yarnBin = require('child_process').execSync('yarn global bin', { encoding: 'utf8' }).trim();
+          if (yarnBin) additionalPaths.push(yarnBin);
+        } catch (e) {}
+        
+        try {
+          const pnpmBin = require('child_process').execSync('pnpm bin -g', { encoding: 'utf8' }).trim();
+          if (pnpmBin) additionalPaths.push(pnpmBin);
+        } catch (e) {}
 
         const currentPath = env.PATH || '';
         env.PATH = [...additionalPaths, currentPath].join(':');
@@ -489,10 +553,35 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
         '/opt/homebrew/bin', 
         '/usr/bin',
         path.join(os.homedir(), '.local/bin'),
-        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/bin'), // ← LA UBICACIÓN CORRECTA!
-        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code/bin'),
-        path.join(os.homedir(), '.nvm/versions/node/v18.20.4/lib/node_modules/@anthropic-ai/claude-code')
+        path.join(os.homedir(), '.volta/bin'), // Volta
+        path.join(os.homedir(), 'bin') // Custom bin
       ];
+      
+      // Dynamically add all nvm node versions to PATH
+      const nvmPath = path.join(os.homedir(), '.nvm/versions/node');
+      if (fs.existsSync(nvmPath)) {
+        try {
+          const nodeVersions = fs.readdirSync(nvmPath);
+          nodeVersions.forEach(version => {
+            additionalPaths.push(path.join(nvmPath, version, 'bin'));
+            additionalPaths.push(path.join(nvmPath, version, 'lib/node_modules/@anthropic-ai/claude-code/bin'));
+          });
+          console.log(`Added ${nodeVersions.length} nvm node versions to PATH`);
+        } catch (e) {
+          console.log('Error adding nvm paths:', e);
+        }
+      }
+      
+      // Add yarn and pnpm global bin paths
+      try {
+        const yarnBin = require('child_process').execSync('yarn global bin', { encoding: 'utf8' }).trim();
+        if (yarnBin) additionalPaths.push(yarnBin);
+      } catch (e) {}
+      
+      try {
+        const pnpmBin = require('child_process').execSync('pnpm bin -g', { encoding: 'utf8' }).trim();
+        if (pnpmBin) additionalPaths.push(pnpmBin);
+      } catch (e) {}
       
       const currentPath = process.env.PATH || '';
       process.env.PATH = [...additionalPaths, currentPath].join(':');
@@ -805,6 +894,97 @@ ipcMain.handle('check-claude-code', async () => {
       resolve(false);
     });
   });
+});
+
+// Diagnostic command to help debug Claude detection issues
+ipcMain.handle('diagnose-claude', async () => {
+  const diagnostics = {
+    timestamp: new Date().toISOString(),
+    system: {
+      platform: process.platform,
+      arch: process.arch,
+      nodeVersion: process.version,
+      shell: process.env.SHELL,
+      path: process.env.PATH
+    },
+    claudeDetection: {
+      foundBinary: null,
+      searchResults: [],
+      errors: []
+    }
+  };
+  
+  // Run findClaudeBinary and capture results
+  try {
+    const originalLog = console.log;
+    const originalError = console.error;
+    const logs = [];
+    
+    // Capture console output
+    console.log = (...args) => {
+      logs.push({ type: 'log', message: args.join(' ') });
+      originalLog(...args);
+    };
+    console.error = (...args) => {
+      logs.push({ type: 'error', message: args.join(' ') });
+      originalError(...args);
+    };
+    
+    // Run detection
+    const claudePath = findClaudeBinary();
+    diagnostics.claudeDetection.foundBinary = claudePath;
+    diagnostics.claudeDetection.searchResults = logs;
+    
+    // Restore console
+    console.log = originalLog;
+    console.error = originalError;
+  } catch (error) {
+    diagnostics.claudeDetection.errors.push(error.message);
+  }
+  
+  // Check various package managers
+  const { execSync } = require('child_process');
+  const packageManagers = {
+    npm: 'npm list -g @anthropic-ai/claude-code --depth=0',
+    yarn: 'yarn global list @anthropic-ai/claude-code',
+    pnpm: 'pnpm list -g @anthropic-ai/claude-code',
+    homebrew: 'brew list claude-code'
+  };
+  
+  diagnostics.packageManagers = {};
+  
+  for (const [pm, cmd] of Object.entries(packageManagers)) {
+    try {
+      const result = execSync(cmd, { encoding: 'utf8' });
+      diagnostics.packageManagers[pm] = {
+        installed: true,
+        output: result.substring(0, 200) // First 200 chars
+      };
+    } catch (e) {
+      diagnostics.packageManagers[pm] = {
+        installed: false,
+        error: e.message
+      };
+    }
+  }
+  
+  // Check PATH directories
+  const pathDirs = process.env.PATH.split(':');
+  diagnostics.pathAnalysis = {
+    totalDirs: pathDirs.length,
+    claudeInPath: false,
+    claudeLocations: []
+  };
+  
+  for (const dir of pathDirs) {
+    const claudePath = path.join(dir, 'claude');
+    if (fs.existsSync(claudePath)) {
+      diagnostics.pathAnalysis.claudeInPath = true;
+      diagnostics.pathAnalysis.claudeLocations.push(claudePath);
+    }
+  }
+  
+  return diagnostics;
 });
 
 // Hooks IPC handlers
@@ -1211,19 +1391,21 @@ function startMCPServerAndRegister() {
       env: {
         ...process.env,
         NODE_ENV: process.env.NODE_ENV || 'production',
-        ELECTRON_RUN_AS_NODE: nodeExecutable === process.execPath ? '1' : undefined
+        ELECTRON_RUN_AS_NODE: nodeExecutable === process.execPath ? '1' : undefined,
+        ENABLE_DEBUG_LOGS: process.env.ENABLE_DEBUG_LOGS || 'false'
       }
     });
 
     console.log('🚀 Started MCP server as child process:', mcpServerProcess.pid);
 
-    // Handle server output
+    // Handle server output and forward logs to main logger
     mcpServerProcess.stdout.on('data', (data) => {
-      console.log('MCP Server:', data.toString());
+      const message = data.toString().trim();
+      console.log('MCP Server:', message);
     });
 
     mcpServerProcess.stderr.on('data', (data) => {
-      const errorMsg = data.toString();
+      const errorMsg = data.toString().trim();
       console.error('MCP Server Error:', errorMsg);
       
       // Log detailed errors to help diagnose issues
@@ -2240,15 +2422,19 @@ app.on('window-all-closed', () => {
 function findClaudeBinary() {
   const { execSync } = require('child_process');
   
+  console.log('🔍 Starting comprehensive Claude binary search...');
+  console.log('Current PATH:', process.env.PATH);
+  console.log('Current shell:', process.env.SHELL || 'unknown');
+  
   // Try to find claude using which command
   try {
     const claudePath = execSync('which claude', { encoding: 'utf8', shell: true }).trim();
     if (claudePath && fs.existsSync(claudePath)) {
-      console.log('Found claude via which:', claudePath);
+      console.log('✅ Found claude via which:', claudePath);
       return claudePath;
     }
   } catch (e) {
-    console.log('which claude failed, searching manually...');
+    console.log('❌ which claude failed:', e.message);
   }
   
   // Try to find claude through npm global list
@@ -2259,18 +2445,59 @@ function findClaudeBinary() {
       const npmBin = execSync('npm bin -g', { encoding: 'utf8', shell: true }).trim();
       const npmClaudePath = path.join(npmBin, 'claude');
       if (fs.existsSync(npmClaudePath)) {
-        console.log('Found claude via npm global:', npmClaudePath);
+        console.log('✅ Found claude via npm global:', npmClaudePath);
         return npmClaudePath;
       }
     }
   } catch (e) {
-    console.log('npm list check failed, continuing with manual search...');
+    console.log('❌ npm list check failed:', e.message);
   }
   
-  // Search common locations
+  // Try yarn global
+  try {
+    const yarnGlobal = execSync('yarn global list --json', { encoding: 'utf8', shell: true });
+    if (yarnGlobal.includes('@anthropic-ai/claude-code')) {
+      const yarnBin = execSync('yarn global bin', { encoding: 'utf8', shell: true }).trim();
+      const yarnClaudePath = path.join(yarnBin, 'claude');
+      if (fs.existsSync(yarnClaudePath)) {
+        console.log('✅ Found claude via yarn global:', yarnClaudePath);
+        return yarnClaudePath;
+      }
+    }
+  } catch (e) {
+    console.log('❌ yarn global check failed:', e.message);
+  }
+  
+  // Try pnpm global
+  try {
+    const pnpmList = execSync('pnpm list -g --json', { encoding: 'utf8', shell: true });
+    if (pnpmList.includes('@anthropic-ai/claude-code')) {
+      const pnpmBin = execSync('pnpm bin -g', { encoding: 'utf8', shell: true }).trim();
+      const pnpmClaudePath = path.join(pnpmBin, 'claude');
+      if (fs.existsSync(pnpmClaudePath)) {
+        console.log('✅ Found claude via pnpm global:', pnpmClaudePath);
+        return pnpmClaudePath;
+      }
+    }
+  } catch (e) {
+    console.log('❌ pnpm global check failed:', e.message);
+  }
+  
+  // Check volta
+  try {
+    const voltaBin = path.join(os.homedir(), '.volta/bin/claude');
+    if (fs.existsSync(voltaBin)) {
+      console.log('✅ Found claude via volta:', voltaBin);
+      return voltaBin;
+    }
+  } catch (e) {
+    console.log('❌ volta check failed:', e.message);
+  }
+  
+  // Search common macOS locations
   const possiblePaths = [
     '/usr/local/bin/claude',
-    '/opt/homebrew/bin/claude',
+    '/opt/homebrew/bin/claude',  // Apple Silicon Macs
     '/usr/bin/claude',
     path.join(os.homedir(), '.local/bin/claude'),
     // Additional paths for different installation methods
@@ -2284,28 +2511,37 @@ function findClaudeBinary() {
     '/opt/homebrew/lib/node_modules/@anthropic-ai/claude-code/bin/claude'
   ];
   
-  // Search all nvm node versions
+  // Search all nvm node versions dynamically
   const nvmPath = path.join(os.homedir(), '.nvm/versions/node');
   if (fs.existsSync(nvmPath)) {
     try {
       const nodeVersions = fs.readdirSync(nvmPath);
+      console.log(`🔍 Found ${nodeVersions.length} nvm node versions`);
       nodeVersions.forEach(version => {
         possiblePaths.push(path.join(nvmPath, version, 'bin/claude'));
+        // Also check in lib/node_modules for npm installed packages
+        possiblePaths.push(path.join(nvmPath, version, 'lib/node_modules/@anthropic-ai/claude-code/bin/claude'));
       });
     } catch (e) {
-      console.log('Error reading nvm versions:', e);
+      console.log('❌ Error reading nvm versions:', e.message);
     }
   }
   
+  // Check n node version manager
+  const nPath = path.join(os.homedir(), 'n/lib/node_modules/@anthropic-ai/claude-code/bin/claude');
+  possiblePaths.push(nPath);
+  
   // Check each path
+  console.log(`🔍 Checking ${possiblePaths.length} possible paths...`);
   for (const claudePath of possiblePaths) {
     if (fs.existsSync(claudePath)) {
-      console.log('Found claude at:', claudePath);
+      console.log('✅ Found claude at:', claudePath);
       return claudePath;
     }
   }
   
-  console.error('Claude not found in any common location');
+  console.error('❌ Claude not found in any of the', possiblePaths.length, 'locations checked');
+  console.log('📋 Paths checked:', possiblePaths);
   return null;
 }
 

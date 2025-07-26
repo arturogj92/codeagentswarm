@@ -5,8 +5,9 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
+    "dev": "ENABLE_DEBUG_LOGS=true electron . --dev",
     "build": "export PYTHON=/opt/homebrew/bin/python3.11 && npm run set-build-time && electron-builder",
+    "build:debug": "export PYTHON=/opt/homebrew/bin/python3.11 && export ENABLE_DEBUG_LOGS=true && npm run set-build-time && electron-builder",
     "set-build-time": "node -e \"const fs=require('fs'); const pkg=require('./package.json'); const now=new Date(); const timestamp=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+now.getDate().toString().padStart(2,'0')+'.'+(now.getHours().toString().padStart(2,'0')+now.getMinutes().toString().padStart(2,'0')); pkg.version=timestamp; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));\"",
     "dist": "electron-builder --publish=never",
     "postinstall": "electron-builder install-app-deps"
@@ -60,6 +61,9 @@
       "kanban.html",
       "kanban.js",
       "kanban.css",
+      "logger.js",
+      "log-viewer.js",
+      "child-process-logger.js",
       "package.json",
       "logo_prod.png",
       "logo_prod_512.png",

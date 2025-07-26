@@ -9,6 +9,10 @@ const readline = require('readline');
 const path = require('path');
 const fs = require('fs');
 
+// Initialize child process logger
+const ChildProcessLogger = require('./child-process-logger');
+const childLogger = new ChildProcessLogger('MCP-Server');
+
 // Import our MCP-compatible database manager
 // Try to load the regular database-mcp, fallback to standalone
 let DatabaseManagerMCP;
