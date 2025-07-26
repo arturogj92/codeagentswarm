@@ -5,7 +5,12 @@ const DeepSeekCommitService = require('./deepseek-commit-service');
 
 class GitService {
     constructor() {
-        this.deepSeekService = new DeepSeekCommitService();
+        try {
+            this.deepSeekService = new DeepSeekCommitService();
+        } catch (error) {
+            console.warn('[GitService] DeepSeek service initialization failed:', error.message);
+            this.deepSeekService = null;
+        }
     }
 
     // Check if directory is a git repository
@@ -108,6 +113,13 @@ class GitService {
         try {
             if (!this.isGitRepository(cwd)) {
                 return { success: false, error: 'Not a git repository' };
+            }
+
+            if (!this.deepSeekService) {
+                return { 
+                    success: false, 
+                    error: 'AI commit generation is not available. Please set DEEPSEEK_API_KEY environment variable.' 
+                };
             }
 
             const result = await this.deepSeekService.generateCommitMessage(cwd);

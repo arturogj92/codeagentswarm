@@ -93,6 +93,93 @@ ipcMain.on('export-logs', (event) => {
   event.sender.send('export-logs-response', logsText);
 });
 
+// Handle MCP diagnostic request
+ipcMain.on('run-mcp-diagnostic', async (event) => {
+  const { exec } = require('child_process');
+  const os = require('os');
+  const fs = require('fs');
+  
+  console.log('=== MCP DIAGNOSTIC STARTED ===');
+  
+  // System information
+  console.log('1. System Information:');
+  console.log(`   OS Version: ${os.release()}`);
+  console.log(`   Platform: ${process.platform}`);
+  console.log(`   Architecture: ${process.arch}`);
+  console.log(`   Node version: ${process.version}`);
+  console.log('');
+  
+  // Check MCP server file
+  console.log('2. MCP Server Files:');
+  const mcpServerPath = path.join(__dirname, 'mcp-stdio-server.js');
+  const dbModulePath = path.join(__dirname, 'database-mcp-standalone.js');
+  
+  if (fs.existsSync(mcpServerPath)) {
+    const stats = fs.statSync(mcpServerPath);
+    console.log(`   mcp-stdio-server.js: EXISTS (${stats.size} bytes)`);
+  } else {
+    console.log('   mcp-stdio-server.js: NOT FOUND');
+  }
+  
+  if (fs.existsSync(dbModulePath)) {
+    const stats = fs.statSync(dbModulePath);
+    console.log(`   database-mcp-standalone.js: EXISTS (${stats.size} bytes)`);
+  } else {
+    console.log('   database-mcp-standalone.js: NOT FOUND');
+  }
+  console.log('');
+  
+  // Check Application Support directory
+  console.log('3. Application Support Directory:');
+  const appSupportPath = path.join(os.homedir(), 'Library', 'Application Support', 'codeagentswarm');
+  const dbPath = path.join(appSupportPath, 'codeagentswarm.db');
+  
+  if (fs.existsSync(appSupportPath)) {
+    console.log(`   Directory exists: ${appSupportPath}`);
+    
+    if (fs.existsSync(dbPath)) {
+      const stats = fs.statSync(dbPath);
+      console.log(`   Database exists: ${dbPath} (${stats.size} bytes)`);
+      console.log(`   Database permissions: ${(stats.mode & parseInt('777', 8)).toString(8)}`);
+    } else {
+      console.log('   Database NOT FOUND - This might be the issue!');
+    }
+  } else {
+    console.log('   Directory NOT FOUND - App needs to create it first!');
+  }
+  console.log('');
+  
+  // Test MCP server startup
+  console.log('4. Testing MCP Server Startup:');
+  const testCommand = `cd "${__dirname}" && CODEAGENTSWARM_DB_PATH="${dbPath}" node mcp-stdio-server.js`;
+  
+  exec(testCommand, { timeout: 5000 }, (error, stdout, stderr) => {
+    if (error) {
+      console.log('   MCP Server test failed:');
+      console.log(`   Error: ${error.message}`);
+      if (stderr) console.log(`   Stderr: ${stderr}`);
+      if (stdout) console.log(`   Stdout: ${stdout}`);
+    } else {
+      console.log('   MCP Server started successfully (timeout after 5s is normal)');
+      if (stdout) console.log(`   Output: ${stdout.substring(0, 200)}...`);
+    }
+    
+    console.log('');
+    console.log('5. Environment Variables:');
+    console.log(`   PATH: ${process.env.PATH}`);
+    console.log(`   HOME: ${process.env.HOME}`);
+    console.log('');
+    
+    console.log('=== MCP DIAGNOSTIC COMPLETED ===');
+    console.log('');
+    console.log('Common issues to check:');
+    console.log('- If database does not exist, run the app first to create it');
+    console.log('- Check Node.js version compatibility');
+    console.log('- Verify file permissions');
+    console.log('- Check for error messages in the output above');
+  });
+});
+
 // Log startup info
 console.log('=== CodeAgentSwarm Starting ===');
 console.log('Log file:', logFile);
@@ -181,7 +268,21 @@ function createWindow() {
   
   // Send dev mode status to renderer after the page loads
   mainWindow.webContents.once('did-finish-load', () => {
-    const isDevMode = process.argv.includes('--dev');
+    let isDevMode = process.argv.includes('--dev') || process.env.ENABLE_DEBUG_LOGS === 'true';
+    
+    // Check for debug config file in packaged apps
+    try {
+      const debugConfigPath = path.join(__dirname, 'debug-config.json');
+      if (fs.existsSync(debugConfigPath)) {
+        const debugConfig = JSON.parse(fs.readFileSync(debugConfigPath, 'utf8'));
+        if (debugConfig.debugMode) {
+          isDevMode = true;
+        }
+      }
+    } catch (e) {
+      // Ignore errors reading debug config
+    }
+    
     mainWindow.webContents.send('dev-mode-status', isDevMode);
   });
   

@@ -4702,9 +4702,26 @@ class TerminalManager {
 // Listen for dev mode status from main process
 ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
     if (isDevMode) {
+        // Store debug mode in localStorage for persistence
+        localStorage.setItem('debugMode', 'true');
+        
+        // Enable logger
+        const logger = require('./logger');
+        logger.enable();
+        
+        // Show dev indicator
         const devIndicator = document.getElementById('dev-indicator');
         if (devIndicator) {
             devIndicator.style.display = 'block';
+        }
+        
+        // Initialize LogViewer if not already initialized
+        if (window.logViewer && !window.logViewer.container) {
+            window.logViewer.init();
+        } else if (!window.logViewer) {
+            // Create LogViewer if it doesn't exist
+            const LogViewer = require('./log-viewer');
+            window.logViewer = new LogViewer();
         }
     }
 });

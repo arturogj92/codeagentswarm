@@ -185,6 +185,12 @@ class LogViewer {
     exportButton.textContent = 'Exportar';
     exportButton.onclick = () => this.exportLogs();
 
+    const diagButton = document.createElement('button');
+    diagButton.className = 'log-viewer-button-small';
+    diagButton.textContent = 'Diagnóstico MCP';
+    diagButton.onclick = () => this.runMCPDiagnostic();
+    diagButton.style.background = '#ff9800';
+
     const closeButton = document.createElement('button');
     closeButton.className = 'log-viewer-button-small';
     closeButton.textContent = 'Cerrar';
@@ -192,6 +198,7 @@ class LogViewer {
 
     controls.appendChild(clearButton);
     controls.appendChild(exportButton);
+    controls.appendChild(diagButton);
     controls.appendChild(closeButton);
 
     header.appendChild(title);
@@ -325,6 +332,23 @@ class LogViewer {
         
         URL.revokeObjectURL(url);
       });
+    }
+  }
+
+  runMCPDiagnostic() {
+    // Send request to main process to run MCP diagnostic
+    if (typeof window !== 'undefined' && window.require) {
+      const { ipcRenderer } = window.require('electron');
+      
+      // Add a log entry indicating diagnostic is starting
+      this.addLogEntry({
+        timestamp: new Date().toISOString(),
+        level: 'info',
+        message: '=== INICIANDO DIAGNÓSTICO MCP ==='
+      });
+      
+      // Request diagnostic from main process
+      ipcRenderer.send('run-mcp-diagnostic');
     }
   }
 

@@ -14,15 +14,10 @@ const ChildProcessLogger = require('./child-process-logger');
 const childLogger = new ChildProcessLogger('MCP-Server');
 
 // Import our MCP-compatible database manager
-// Try to load the regular database-mcp, fallback to standalone
+// Always use standalone version to avoid native module compatibility issues
 let DatabaseManagerMCP;
-try {
-  DatabaseManagerMCP = require('./database-mcp');
-} catch (e) {
-  // If database-mcp fails (likely due to missing sqlite3), use standalone version
-  console.error('[MCP Server] Using standalone database module');
-  DatabaseManagerMCP = require('./database-mcp-standalone');
-}
+console.log('[MCP Server] Using standalone database module');
+DatabaseManagerMCP = require('./database-mcp-standalone');
 
 class MCPStdioServer {
     constructor() {

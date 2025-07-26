@@ -1,13 +1,14 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0724.1437",
+  "version": "2025.0726.2321",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "ENABLE_DEBUG_LOGS=true electron . --dev",
     "build": "export PYTHON=/opt/homebrew/bin/python3.11 && npm run set-build-time && electron-builder",
-    "build:debug": "export PYTHON=/opt/homebrew/bin/python3.11 && export ENABLE_DEBUG_LOGS=true && npm run set-build-time && electron-builder",
+    "build:debug": "./build-debug.sh",
+    "build:debug:clean": "rm -f debug-config.json",
     "set-build-time": "node -e \"const fs=require('fs'); const pkg=require('./package.json'); const now=new Date(); const timestamp=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+now.getDate().toString().padStart(2,'0')+'.'+(now.getHours().toString().padStart(2,'0')+now.getMinutes().toString().padStart(2,'0')); pkg.version=timestamp; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));\"",
     "dist": "electron-builder --publish=never",
     "postinstall": "electron-builder install-app-deps"
@@ -67,7 +68,9 @@
       "package.json",
       "logo_prod.png",
       "logo_prod_512.png",
-      "node_modules/**/*"
+      "node_modules/**/*",
+      "debug-config.json",
+      "build-debug.sh"
     ],
     "extraResources": [],
     "mac": {

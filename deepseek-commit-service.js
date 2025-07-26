@@ -2,7 +2,14 @@ const { exec } = require('child_process');
 const { promisify } = require('util');
 const fetch = require('node-fetch');
 const execAsync = promisify(exec);
-require('dotenv').config();
+
+// Only load dotenv in development
+try {
+    require('dotenv').config();
+} catch (e) {
+    // dotenv is not available in production build, which is fine
+    console.log('[DeepSeek] Running without dotenv - using environment variables directly');
+}
 
 class DeepSeekCommitService {
     constructor() {
@@ -11,8 +18,11 @@ class DeepSeekCommitService {
         this.model = 'deepseek-coder'; // Using the cheaper coder model
         
         if (!this.apiKey) {
-            console.error('[DeepSeek] API key not found in environment variables');
-            throw new Error('DEEPSEEK_API_KEY environment variable is required');
+            console.warn('[DeepSeek] API key not found in environment variables. AI commit generation will be disabled.');
+            // Don't throw an error - just disable the service
+            this.enabled = false;
+        } else {
+            this.enabled = true;
         }
     }
 
@@ -39,6 +49,10 @@ class DeepSeekCommitService {
     }
 
     async generateCommitMessage(workingDirectory) {
+        if (!this.enabled) {
+            throw new Error('DeepSeek service is disabled - API key not configured');
+        }
+        
         try {
             const diff = await this.getGitDiff(workingDirectory);
             
