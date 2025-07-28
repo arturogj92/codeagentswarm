@@ -1166,7 +1166,8 @@ async function configureMCPInClaudeCLI() {
         'database-mcp.js',
         'database-mcp-standalone.js',
         'database.js',
-        'mcp-launcher.sh'
+        'mcp-launcher.sh',
+        'child-process-logger.js'
       ];
       
       try {
@@ -1382,7 +1383,8 @@ function startMCPServerAndRegister() {
         'database-mcp.js',
         'database-mcp-standalone.js',
         'database.js',
-        'mcp-launcher.sh'
+        'mcp-launcher.sh',
+        'child-process-logger.js'
       ];
       
       try {
