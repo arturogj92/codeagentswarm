@@ -24,10 +24,10 @@ class DatabaseManagerMCP {
   // Execute SQL using sqlite3 command line
   execSQL(sql, params = []) {
     try {
-      // Escape single quotes in SQL
       let finalSQL = sql;
+      
       if (params.length > 0) {
-        // Replace ? placeholders with escaped values
+        // Replace ? placeholders with properly escaped values
         let paramIndex = 0;
         finalSQL = sql.replace(/\?/g, () => {
           if (paramIndex < params.length) {
@@ -37,22 +37,37 @@ class DatabaseManagerMCP {
             } else if (typeof param === 'number') {
               return param;
             } else {
-              // Escape single quotes for SQLite
-              return `'${String(param).replace(/'/g, "''")}'`;
+              // Escape single quotes by doubling them
+              const escaped = String(param).replace(/'/g, "''");
+              return `'${escaped}'`;
             }
           }
           return '?';
         });
       }
       
-      const result = execSync(`sqlite3 "${this.dbPath}" "${finalSQL}"`, {
+      // Use echo and pipe to avoid shell interpretation issues
+      // Create a temporary file to avoid command line length limits and escaping issues
+      const tempFile = path.join(os.tmpdir(), `mcp-sql-${Date.now()}.sql`);
+      fs.writeFileSync(tempFile, finalSQL);
+      
+      const result = execSync(`sqlite3 "${this.dbPath}" < "${tempFile}"`, {
         encoding: 'utf8',
         maxBuffer: 10 * 1024 * 1024 // 10MB buffer
       });
       
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
       return result.trim();
     } catch (error) {
       console.error('[MCP Database] SQL Error:', error.message);
+      console.error('[MCP Database] SQL Query:', sql);
+      console.error('[MCP Database] SQL Params:', params);
       throw error;
     }
   }

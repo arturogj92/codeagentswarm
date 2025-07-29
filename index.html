@@ -94,6 +94,7 @@
                         <button class="tab-btn active" data-tab="general"><i data-lucide="settings-2"></i> General</button>
                         <button class="tab-btn" data-tab="shell"><i data-lucide="terminal"></i> Shell</button>
                         <button class="tab-btn" data-tab="git"><i data-lucide="git-branch"></i> Git & Commits</button>
+                        <button class="tab-btn" data-tab="updates"><i data-lucide="download"></i> Updates</button>
                         <button class="tab-btn" data-tab="mcp-tips"><i data-lucide="info"></i> MCP Tips</button>
                     </div>
                     
@@ -164,6 +165,48 @@
                                         </button>
                                     </div>
                                     <p class="settings-note">Get your API key from <a href="https://platform.deepseek.com/" target="_blank" style="color: var(--primary);">platform.deepseek.com</a></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Updates Tab -->
+                        <div class="tab-panel" data-panel="updates">
+                            <div class="settings-section">
+                                <h3><i data-lucide="download-cloud"></i> Automatic Updates</h3>
+                                <div class="update-info">
+                                    <div class="current-version">
+                                        <span>Current Version:</span>
+                                        <strong id="current-version">Loading...</strong>
+                                    </div>
+                                    <div class="update-status" id="update-status">
+                                        <i data-lucide="loader-2" class="spin"></i>
+                                        <span>Checking for updates...</span>
+                                    </div>
+                                </div>
+                                
+                                <div class="update-actions">
+                                    <button class="btn btn-primary" id="check-updates-btn">
+                                        <i data-lucide="refresh-cw"></i>
+                                        Check for Updates
+                                    </button>
+                                </div>
+                                
+                                <div class="update-progress" id="update-progress" style="display: none;">
+                                    <div class="progress-bar">
+                                        <div class="progress-fill" id="progress-fill"></div>
+                                    </div>
+                                    <div class="progress-info">
+                                        <span id="progress-percent">0%</span>
+                                        <span id="progress-speed"></span>
+                                    </div>
+                                </div>
+                                
+                                <div class="settings-section">
+                                    <h4><i data-lucide="info"></i> Update Settings</h4>
+                                    <p class="settings-note">
+                                        CodeAgentSwarm automatically checks for updates on startup and every 4 hours.
+                                        Updates are downloaded in the background and installed when you restart the app.
+                                    </p>
                                 </div>
                             </div>
                         </div>

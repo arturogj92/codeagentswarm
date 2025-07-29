@@ -1,15 +1,14 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0729.1256",
+  "version": "1.0.0",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
     "dev": "ENABLE_DEBUG_LOGS=true electron . --dev",
-    "build": "export PYTHON=/opt/homebrew/bin/python3.11 && npm run set-build-time && electron-builder",
+    "build": "export PYTHON=/opt/homebrew/bin/python3.11 && electron-builder",
     "build:debug": "./build-debug.sh",
     "build:debug:clean": "rm -f debug-config.json",
-    "set-build-time": "node -e \"const fs=require('fs'); const pkg=require('./package.json'); const now=new Date(); const timestamp=now.getFullYear()+'.'+(now.getMonth()+1).toString().padStart(2,'0')+now.getDate().toString().padStart(2,'0')+'.'+(now.getHours().toString().padStart(2,'0')+now.getMinutes().toString().padStart(2,'0')); pkg.version=timestamp; fs.writeFileSync('./package.json', JSON.stringify(pkg, null, 2));\"",
     "dist": "electron-builder --publish=never",
     "postinstall": "electron-builder install-app-deps"
   },
@@ -18,12 +17,16 @@
   "devDependencies": {
     "electron": "^27.0.0",
     "electron-builder": "^24.13.3",
+    "electron-log": "^5.4.1",
     "electron-rebuild": "^3.2.9",
     "electron-reload": "^2.0.0-alpha.1"
   },
   "dependencies": {
+    "@sentry/electron": "^6.8.0",
     "better-sqlite3": "^8.7.0",
     "body-parser": "^1.20.2",
+    "electron-store": "^10.1.0",
+    "electron-updater": "^6.6.2",
     "express": "^4.18.2",
     "node-fetch": "^2.7.0",
     "node-pty": "^1.0.0",
@@ -70,7 +73,8 @@
       "logo_prod_512.png",
       "node_modules/**/*",
       "debug-config.json",
-      "build-debug.sh"
+      "build-debug.sh",
+      "services/**/*"
     ],
     "extraResources": [],
     "mac": {
@@ -82,6 +86,10 @@
     },
     "linux": {
       "icon": "logo_prod_512.png"
+    },
+    "publish": {
+      "provider": "generic",
+      "url": "https://codeagentswarm-backend.up.railway.app/update"
     }
   }
 }

@@ -2029,6 +2029,12 @@ class TerminalManager {
 
 
     async showGitStatus() {
+        // Blur the git status button to prevent Enter key from reopening it
+        const gitStatusBtn = document.getElementById('git-status-btn');
+        if (gitStatusBtn) {
+            gitStatusBtn.blur();
+        }
+        
         try {
             // First scan for projects with changes
             const scanResult = await ipcRenderer.invoke('scan-git-projects');
@@ -2038,9 +2044,9 @@ class TerminalManager {
                 this.displayProjectSelectionModal(scanResult.projects);
             } else if (scanResult.success && scanResult.projects.length === 0) {
                 if (!this.hasActiveTerminals()) {
-                    this.showNotification('No active terminals. Open a terminal first to scan for git changes.', 'info');
+                    this.showNotification('No active terminals. Open a terminal first to scan for git projects.', 'info');
                 } else {
-                    this.showNotification('No git projects with changes found in active terminals', 'info');
+                    this.showNotification('No git projects found in active terminals', 'info');
                 }
             } else {
                 // Fallback to current directory
@@ -2065,11 +2071,31 @@ class TerminalManager {
     showKanban() {
         // Request main process to open Kanban window
         ipcRenderer.send('open-kanban-window');
+        
+        // Blur the kanban button to prevent Enter key from reopening it
+        const kanbanBtn = document.getElementById('kanban-btn');
+        if (kanbanBtn) {
+            kanbanBtn.blur();
+        }
+        
+        // Return focus to active terminal if one exists
+        if (this.activeTerminal !== null) {
+            const terminal = this.terminals.get(this.activeTerminal);
+            if (terminal && terminal.terminal) {
+                terminal.terminal.focus();
+            }
+        }
     }
 
 
 
     showCreateTaskDialog() {
+        // Blur the create task button to prevent Enter key from reopening it
+        const createTaskBtn = document.getElementById('create-task-btn');
+        if (createTaskBtn) {
+            createTaskBtn.blur();
+        }
+        
         // Remove existing modal if present
         const existingModal = document.querySelector('.create-task-modal');
         if (existingModal) {
@@ -2223,8 +2249,8 @@ class TerminalManager {
                                     <span class="project-branch">
                                         <i data-lucide="git-branch"></i> ${project.branch}
                                     </span>
-                                    <span class="project-changes">
-                                        <i data-lucide="file-diff"></i> ${project.changeCount} changes
+                                    <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
+                                        <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
                                     </span>
                                     ${project.terminalId ? `
                                         <span class="project-terminal">
@@ -4647,6 +4673,9 @@ class TerminalManager {
             document.getElementById('deepseek-api-key').value = apiKeyResult.key;
         }
         
+        // Initialize Updates tab
+        this.initializeUpdatesTab();
+        
         if (shellPref.success) {
             // Update system shell display
             document.getElementById('system-shell-path').textContent = shellPref.currentShell;
@@ -4836,6 +4865,100 @@ class TerminalManager {
                 modal.style.display = 'none';
             }
         });
+    }
+    
+    async initializeUpdatesTab() {
+        // Get current version
+        const version = await ipcRenderer.invoke('get-app-version');
+        document.getElementById('current-version').textContent = version || 'Unknown';
+        
+        // Set initial status
+        this.updateStatus('ready');
+        
+        // Handle check updates button
+        const checkUpdatesBtn = document.getElementById('check-updates-btn');
+        if (checkUpdatesBtn && !checkUpdatesBtn.dataset.initialized) {
+            checkUpdatesBtn.dataset.initialized = 'true';
+            checkUpdatesBtn.addEventListener('click', async () => {
+                checkUpdatesBtn.disabled = true;
+                this.updateStatus('checking');
+                
+                try {
+                    const result = await ipcRenderer.invoke('check-for-updates');
+                    if (!result.success) {
+                        this.updateStatus('error', result.error);
+                    }
+                } catch (error) {
+                    this.updateStatus('error', error.message);
+                } finally {
+                    checkUpdatesBtn.disabled = false;
+                }
+            });
+        }
+        
+        // Listen for updater events
+        ipcRenderer.on('checking-for-update', () => {
+            this.updateStatus('checking');
+        });
+        
+        ipcRenderer.on('update-available', () => {
+            this.updateStatus('available');
+        });
+        
+        ipcRenderer.on('update-not-available', () => {
+            this.updateStatus('up-to-date');
+        });
+        
+        ipcRenderer.on('update-downloading', () => {
+            this.updateStatus('downloading');
+            document.getElementById('update-progress').style.display = 'block';
+        });
+        
+        ipcRenderer.on('update-progress', (event, progressObj) => {
+            const percent = Math.round(progressObj.percent);
+            document.getElementById('progress-fill').style.width = percent + '%';
+            document.getElementById('progress-percent').textContent = percent + '%';
+            
+            if (progressObj.bytesPerSecond) {
+                const speed = this.formatBytes(progressObj.bytesPerSecond) + '/s';
+                document.getElementById('progress-speed').textContent = speed;
+            }
+        });
+        
+        ipcRenderer.on('update-error', (event, error) => {
+            this.updateStatus('error', error);
+            document.getElementById('update-progress').style.display = 'none';
+        });
+    }
+    
+    updateStatus(status, message = '') {
+        const statusEl = document.getElementById('update-status');
+        if (!statusEl) return;
+        
+        const statusMessages = {
+            'ready': { icon: 'check-circle', text: 'Ready to check for updates' },
+            'checking': { icon: 'loader-2', text: 'Checking for updates...', spin: true },
+            'available': { icon: 'download', text: 'Update available!' },
+            'downloading': { icon: 'download-cloud', text: 'Downloading update...', spin: true },
+            'up-to-date': { icon: 'check-circle', text: 'You\'re up to date!' },
+            'error': { icon: 'alert-circle', text: message || 'Update check failed' }
+        };
+        
+        const config = statusMessages[status] || statusMessages.ready;
+        statusEl.innerHTML = `
+            <i data-lucide="${config.icon}" class="${config.spin ? 'spin' : ''}"></i>
+            <span>${config.text}</span>
+        `;
+        
+        lucide.createIcons();
+    }
+    
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
 }

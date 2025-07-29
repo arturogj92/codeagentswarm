@@ -9,6 +9,7 @@ const MCPTaskServer = require('./mcp-server');
 const HooksManager = require('./hooks-manager');
 const WebhookServer = require('./webhook-server');
 const GitService = require('./git-service');
+const UpdaterService = require('./services/updater-service');
 
 // Initialize the centralized logger
 const logger = require('./logger');
@@ -131,6 +132,25 @@ ipcMain.handle('get-api-key', async () => {
   } catch (error) {
     return { success: false, error: error.message };
   }
+});
+
+// Handle updater operations
+ipcMain.handle('check-for-updates', async () => {
+  try {
+    if (global.updaterService) {
+      await global.updaterService.checkForUpdatesAndNotify();
+      return { success: true };
+    } else {
+      return { success: false, error: 'Updater service not initialized' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get app version
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion();
 });
 
 // Handle get shell preference
@@ -2503,6 +2523,29 @@ app.whenReady().then(async () => {
   // Initialize Git service
   gitService = new GitService();
   
+  // Initialize Updater Service
+  try {
+    global.updaterService = new UpdaterService();
+    
+    // Check for updates after 3 seconds
+    setTimeout(() => {
+      if (!process.env.DISABLE_UPDATES) {
+        global.updaterService.checkForUpdatesAndNotify();
+      }
+    }, 3000);
+    
+    // Check for updates every 4 hours
+    setInterval(() => {
+      if (!process.env.DISABLE_UPDATES) {
+        global.updaterService.checkForUpdatesAndNotify();
+      }
+    }, 4 * 60 * 60 * 1000);
+    
+    logger.addLog('info', ['Updater service initialized']);
+  } catch (error) {
+    logger.addLog('error', ['Failed to initialize updater service:', error.message]);
+  }
+  
   // Start MCP Task Server
   try {
     mcpServer = new MCPTaskServer();
@@ -3427,17 +3470,16 @@ ipcMain.handle('scan-git-projects', async () => {
           const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
           const changeCount = changes.length;
           
-          if (changeCount > 0) {
-            projects.push({
-              path: terminalDir,
-              name: path.basename(terminalDir),
-              branch: branch || 'master',
-              changeCount: changeCount,
-              changes: changes.slice(0, 10), // First 10 changes
-              fromTerminal: true,
-              terminalId: terminalMap.get(terminalDir) || null
-            });
-          }
+          // Always add git projects, even without changes
+          projects.push({
+            path: terminalDir,
+            name: path.basename(terminalDir),
+            branch: branch || 'master',
+            changeCount: changeCount,
+            changes: changes.slice(0, 10), // First 10 changes
+            fromTerminal: true,
+            terminalId: terminalMap.get(terminalDir) || null
+          });
         }
         
         // Also check parent directories up to 3 levels
@@ -3453,7 +3495,7 @@ ipcMain.handle('scan-git-projects', async () => {
               stdio: ['pipe', 'pipe', 'ignore']
             });
             
-            // Parent is a git repo, check if it has changes
+            // Parent is a git repo, check status
             const statusOutput = execSync('git status --porcelain', {
               cwd: parentPath,
               encoding: 'utf8',
@@ -3461,26 +3503,24 @@ ipcMain.handle('scan-git-projects', async () => {
             });
             
             const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
-            if (changes.length > 0) {
-              // Check if we already have this project
-              const exists = projects.some(p => p.path === parentPath);
-              if (!exists) {
-                const branch = execSync('git branch --show-current', {
-                  cwd: parentPath,
-                  encoding: 'utf8',
-                  stdio: ['pipe', 'pipe', 'ignore']
-                }).trim();
-                
-                projects.push({
-                  path: parentPath,
-                  name: path.basename(parentPath),
-                  branch: branch || 'master',
-                  changeCount: changes.length,
-                  changes: changes.slice(0, 10),
-                  fromTerminal: true,
-                  terminalId: terminalMap.get(terminalDir) || null
-                });
-              }
+            // Check if we already have this project
+            const exists = projects.some(p => p.path === parentPath);
+            if (!exists) {
+              const branch = execSync('git branch --show-current', {
+                cwd: parentPath,
+                encoding: 'utf8',
+                stdio: ['pipe', 'pipe', 'ignore']
+              }).trim();
+              
+              projects.push({
+                path: parentPath,
+                name: path.basename(parentPath),
+                branch: branch || 'master',
+                changeCount: changes.length,
+                changes: changes.slice(0, 10),
+                fromTerminal: true,
+                terminalId: terminalMap.get(terminalDir) || null
+              });
             }
           } catch (e) {
             // Not a git repo, continue
