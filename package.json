@@ -1,6 +1,6 @@
 {
   "name": "codeagentswarm",
-  "version": "2025.0729.1029",
+  "version": "2025.0729.1256",
   "description": "Claude Code Terminal Manager - Multiple terminal quadrants for Claude Code",
   "main": "main.js",
   "scripts": {

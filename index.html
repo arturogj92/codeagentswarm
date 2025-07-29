@@ -31,9 +31,6 @@
             </div>
             <div class="dev-indicator" id="dev-indicator" style="display: none;">DEBUG</div>
             <div class="header-controls">
-                <button class="btn-layout" id="settings-btn" title="Settings">
-                    <i data-lucide="settings"></i>
-                </button>
                 <div class="terminal-management">
                     <div class="layout-selector" id="layout-selector" style="display: none;">
                         <!-- 2 terminals layouts -->
@@ -72,10 +69,10 @@
                         <i data-lucide="terminal"></i>
                         <i data-lucide="plus" class="add-icon"></i>
                     </button>
-                    <button class="btn btn-info" id="mcp-info-btn" title="MCP Information & Tips">
-                        <i data-lucide="info"></i>
-                    </button>
                 </div>
+                <button class="btn-layout" id="settings-btn" title="Settings">
+                    <i data-lucide="settings"></i>
+                </button>
             </div>
         </header>
 
@@ -92,46 +89,117 @@
                 <button class="close-modal" id="close-settings">×</button>
             </div>
             <div class="modal-body">
-                <div class="settings-section">
-                    <h3>Terminal Shell</h3>
-                    <div class="shell-options">
-                        <label class="radio-option">
-                            <input type="radio" name="shell-type" value="system" id="shell-system">
-                            <span>System Default (<span id="system-shell-path"></span>)</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="shell-type" value="bash" id="shell-bash">
-                            <span>Bash (/bin/bash)</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="shell-type" value="zsh" id="shell-zsh">
-                            <span>Zsh (/bin/zsh)</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="shell-type" value="fish" id="shell-fish">
-                            <span>Fish (/usr/local/bin/fish)</span>
-                        </label>
-                        <label class="radio-option">
-                            <input type="radio" name="shell-type" value="custom" id="shell-custom">
-                            <span>Custom</span>
-                        </label>
-                        <div class="custom-shell-input" id="custom-shell-container" style="display: none;">
-                            <input type="text" id="custom-shell-path" placeholder="/path/to/shell">
-                        </div>
+                <div class="settings-tabs">
+                    <div class="tab-buttons">
+                        <button class="tab-btn active" data-tab="general"><i data-lucide="settings-2"></i> General</button>
+                        <button class="tab-btn" data-tab="shell"><i data-lucide="terminal"></i> Shell</button>
+                        <button class="tab-btn" data-tab="git"><i data-lucide="git-branch"></i> Git & Commits</button>
+                        <button class="tab-btn" data-tab="mcp-tips"><i data-lucide="info"></i> MCP Tips</button>
                     </div>
-                    <p class="settings-note">Note: Changes will apply to new terminal sessions only.</p>
-                </div>
-                <div class="settings-section">
-                    <h3>AI Commit Messages</h3>
-                    <div class="api-key-section">
-                        <label for="deepseek-api-key">DeepSeek API Key</label>
-                        <div class="api-key-input-group">
-                            <input type="password" id="deepseek-api-key" placeholder="sk-..." autocomplete="off">
-                            <button type="button" id="toggle-api-key-visibility" class="btn-icon">
-                                <i data-lucide="eye"></i>
-                            </button>
+                    
+                    <div class="tab-content">
+                        <!-- General Tab -->
+                        <div class="tab-panel active" data-panel="general">
+                            <div class="settings-section">
+                                <h3><i data-lucide="bell"></i> Notifications</h3>
+                                <p>Desktop notifications may not always work properly depending on your system settings:</p>
+                                <ul class="settings-list">
+                                    <li>Check your system notification settings</li>
+                                    <li>Make sure CodeAgentSwarm has permission to show notifications</li>
+                                    <li>Some systems may block Electron app notifications</li>
+                                    <li>Task status changes are always visible in the Kanban board</li>
+                                </ul>
+                                <div class="notification-button-container">
+                                    <button class="btn btn-primary notification-button" id="open-system-notifications">
+                                        <i data-lucide="bell"></i>
+                                        <span>Open System Notification Settings</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        <p class="settings-note">Get your API key from <a href="https://platform.deepseek.com/" target="_blank" style="color: var(--primary);">platform.deepseek.com</a></p>
+                        
+                        <!-- Shell Tab -->
+                        <div class="tab-panel" data-panel="shell">
+                            <div class="settings-section">
+                                <h3>Terminal Shell</h3>
+                                <div class="shell-options">
+                                    <label class="radio-option">
+                                        <input type="radio" name="shell-type" value="system" id="shell-system">
+                                        <span>System Default (<span id="system-shell-path"></span>)</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="shell-type" value="bash" id="shell-bash">
+                                        <span>Bash (/bin/bash)</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="shell-type" value="zsh" id="shell-zsh">
+                                        <span>Zsh (/bin/zsh)</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="shell-type" value="fish" id="shell-fish">
+                                        <span>Fish (/usr/local/bin/fish)</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="shell-type" value="custom" id="shell-custom">
+                                        <span>Custom</span>
+                                    </label>
+                                    <div class="custom-shell-input" id="custom-shell-container" style="display: none;">
+                                        <input type="text" id="custom-shell-path" placeholder="/path/to/shell">
+                                    </div>
+                                </div>
+                                <p class="settings-note">Note: Changes will apply to new terminal sessions only.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Git & Commits Tab -->
+                        <div class="tab-panel" data-panel="git">
+                            <div class="settings-section">
+                                <h3>AI Commit Messages</h3>
+                                <div class="api-key-section">
+                                    <label for="deepseek-api-key">DeepSeek API Key</label>
+                                    <div class="api-key-input-group">
+                                        <input type="password" id="deepseek-api-key" placeholder="sk-..." autocomplete="off">
+                                        <button type="button" id="toggle-api-key-visibility" class="btn-icon">
+                                            <i data-lucide="eye"></i>
+                                        </button>
+                                    </div>
+                                    <p class="settings-note">Get your API key from <a href="https://platform.deepseek.com/" target="_blank" style="color: var(--primary);">platform.deepseek.com</a></p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- MCP Tips Tab -->
+                        <div class="tab-panel" data-panel="mcp-tips">
+                            <div class="settings-section">
+                                <h3><i data-lucide="alert-circle"></i> MCP Connection Issues</h3>
+                                <p>If <code>/mcp</code> command doesn't work in Claude Code:</p>
+                                <ul class="settings-list">
+                                    <li>Try restarting your terminal - MCP connections can sometimes disconnect</li>
+                                    <li>Close and reopen Claude Code to refresh the connection</li>
+                                    <li>Make sure CodeAgentSwarm is running</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="settings-section">
+                                <h3><i data-lucide="terminal"></i> About Claude Code</h3>
+                                <p>Claude Code is a terminal application that gets updated regularly. If the functionality changes:</p>
+                                <ul class="settings-list">
+                                    <li>CodeAgentSwarm may need updates to maintain compatibility</li>
+                                    <li>Check for CodeAgentSwarm updates when Claude Code updates</li>
+                                    <li>Report issues on our GitHub repository</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="settings-section">
+                                <h3><i data-lucide="zap"></i> Quick Tips</h3>
+                                <ul class="settings-list">
+                                    <li>MCP tools are available via <code>/mcp</code> command in Claude Code</li>
+                                    <li>Task management is integrated with your terminal workflow</li>
+                                    <li>Each terminal can have its own active task</li>
+                                    <li>Tasks automatically sync between terminals and the Kanban board</li>
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

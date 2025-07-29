@@ -200,11 +200,6 @@ class TerminalManager {
             this.showSettingsModal();
         });
 
-
-        document.getElementById('mcp-info-btn').addEventListener('click', () => {
-            this.showMCPInfoModal();
-        });
-
         document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
             placeholder.addEventListener('click', (e) => {
                 const quadrant = parseInt(e.currentTarget.dataset.quadrant);
@@ -2073,117 +2068,6 @@ class TerminalManager {
     }
 
 
-    showMCPInfoModal() {
-        // Remove existing modal if present
-        const existingModal = document.querySelector('.mcp-info-modal');
-        if (existingModal) {
-            existingModal.remove();
-        }
-
-        // Create modal
-        const modal = document.createElement('div');
-        modal.className = 'mcp-info-modal';
-        modal.innerHTML = `
-            <div class="mcp-info-content">
-                <div class="mcp-info-header">
-                    <h3><i data-lucide="info"></i> MCP Tips & Information</h3>
-                    <button class="close-btn" id="close-mcp-info-modal">×</button>
-                </div>
-                <div class="mcp-info-body">
-                    <div class="info-section">
-                        <h4><i data-lucide="alert-circle"></i> MCP Connection Issues</h4>
-                        <p>If <code>/mcp</code> command doesn't work in Claude Code:</p>
-                        <ul>
-                            <li>Try restarting your terminal - MCP connections can sometimes disconnect</li>
-                            <li>Close and reopen Claude Code to refresh the connection</li>
-                            <li>Make sure CodeAgentSwarm is running</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4><i data-lucide="terminal"></i> About Claude Code</h4>
-                        <p>Claude Code is a terminal application that gets updated regularly. If the functionality changes:</p>
-                        <ul>
-                            <li>CodeAgentSwarm may need updates to maintain compatibility</li>
-                            <li>Check for CodeAgentSwarm updates when Claude Code updates</li>
-                            <li>Report issues on our GitHub repository</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4><i data-lucide="zap"></i> Quick Tips</h4>
-                        <ul>
-                            <li>MCP tools are available via <code>/mcp</code> command in Claude Code</li>
-                            <li>Task management is integrated with your terminal workflow</li>
-                            <li>Each terminal can have its own active task</li>
-                            <li>Tasks automatically sync between terminals and the Kanban board</li>
-                        </ul>
-                    </div>
-                    
-                    <div class="info-section">
-                        <h4><i data-lucide="bell-off"></i> Notifications</h4>
-                        <p>Desktop notifications may not always work properly depending on your system settings:</p>
-                        <ul>
-                            <li>Check your system notification settings</li>
-                            <li>Make sure CodeAgentSwarm has permission to show notifications</li>
-                            <li>Some systems may block Electron app notifications</li>
-                            <li>Task status changes are always visible in the Kanban board</li>
-                        </ul>
-                        <button class="btn btn-secondary" id="open-system-notifications">
-                            <i data-lucide="settings"></i> Open System Notification Settings
-                        </button>
-                    </div>
-                </div>
-                <div class="mcp-info-footer">
-                    <button class="btn btn-primary" id="close-mcp-info-btn">Got it!</button>
-                </div>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-        
-        // Initialize Lucide icons
-        if (window.lucide) {
-            window.lucide.createIcons();
-        }
-
-        // Add event listeners
-        const closeModal = () => {
-            modal.remove();
-        };
-
-        modal.querySelector('#close-mcp-info-modal').addEventListener('click', closeModal);
-        modal.querySelector('#close-mcp-info-btn').addEventListener('click', closeModal);
-
-        // Add handler for system notifications button
-        const notificationsBtn = modal.querySelector('#open-system-notifications');
-        if (notificationsBtn) {
-            notificationsBtn.addEventListener('click', () => {
-                ipcRenderer.send('open-system-notifications');
-            });
-        }
-
-        // Close on background click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                closeModal();
-            }
-        });
-
-        // Close on Escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', handleEscape);
-            }
-        };
-        document.addEventListener('keydown', handleEscape);
-
-        // Show modal with animation
-        setTimeout(() => {
-            modal.classList.add('show');
-        }, 10);
-    }
 
     showCreateTaskDialog() {
         // Remove existing modal if present
@@ -4750,7 +4634,7 @@ class TerminalManager {
         }
     }
 
-    async showSettingsModal() {
+    async showSettingsModal(initialTab = null) {
         const modal = document.getElementById('settings-modal');
         if (!modal) return;
 
@@ -4823,6 +4707,14 @@ class TerminalManager {
 
         // Initialize settings modal handlers
         this.initializeSettingsHandlers();
+        
+        // Switch to specific tab if requested
+        if (initialTab) {
+            const tabButton = modal.querySelector(`.tab-btn[data-tab="${initialTab}"]`);
+            if (tabButton) {
+                tabButton.click();
+            }
+        }
     }
 
     initializeSettingsHandlers() {
@@ -4830,6 +4722,26 @@ class TerminalManager {
         if (!modal || modal.dataset.handlersInitialized === 'true') return;
         
         modal.dataset.handlersInitialized = 'true';
+        
+        // Handle tab switching
+        const tabButtons = modal.querySelectorAll('.tab-btn');
+        const tabPanels = modal.querySelectorAll('.tab-panel');
+        
+        tabButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetTab = button.getAttribute('data-tab');
+                
+                // Update active states
+                tabButtons.forEach(btn => btn.classList.remove('active'));
+                tabPanels.forEach(panel => panel.classList.remove('active'));
+                
+                button.classList.add('active');
+                const targetPanel = modal.querySelector(`.tab-panel[data-panel="${targetTab}"]`);
+                if (targetPanel) {
+                    targetPanel.classList.add('active');
+                }
+            });
+        });
 
         // Event delegation for shell type changes
         modal.addEventListener('change', (e) => {
@@ -4859,6 +4771,12 @@ class TerminalManager {
                     icon.setAttribute('data-lucide', 'eye');
                 }
                 lucide.createIcons();
+                return;
+            }
+            
+            // Handle open system notifications button
+            if (e.target.closest('#open-system-notifications')) {
+                ipcRenderer.send('open-system-notifications');
                 return;
             }
 
