@@ -227,6 +227,12 @@ class TerminalManager {
         });
 
         document.addEventListener('keydown', (e) => {
+            // Prevent Cmd+R (Mac) or Ctrl+R (Windows/Linux) from refreshing the app
+            if ((e.metaKey || e.ctrlKey) && e.key === 'r') {
+                e.preventDefault();
+                return false;
+            }
+            
             // Handle Escape if a terminal is in fullscreen mode
             // This works regardless of which element has focus (terminal, buttons, etc.)
             if (e.key === 'Escape' && this.fullscreenTerminal !== null) {
@@ -836,7 +842,9 @@ class TerminalManager {
             }
         });
         
-        // Handle paste events to ensure clean paste without bracketed paste mode sequences
+        // Comment out the custom paste handler to allow normal paste functionality
+        // This was blocking image paste in Claude
+        /*
         terminal.attachCustomKeyEventHandler((event) => {
             // Intercept paste events (Cmd+V on Mac, Ctrl+V on other platforms)
             if (event.type === 'keydown' && (event.metaKey || event.ctrlKey) && event.key === 'v') {
@@ -855,16 +863,58 @@ class TerminalManager {
             }
             return true;
         });
+        */
         
-        // Also handle paste event from context menu or other sources
-        terminalDiv.addEventListener('paste', (event) => {
+        // Comment out the paste event handler to allow normal paste functionality
+        // This was preventing image paste in Claude
+        /*
+        terminalDiv.addEventListener('paste', async (event) => {
             event.preventDefault();
-            const text = event.clipboardData.getData('text/plain');
-            if (text) {
-                // Send the pasted text directly to the terminal
-                ipcRenderer.send('terminal-input', quadrant, text);
+            
+            // Check if there are files (images) in the clipboard
+            const items = event.clipboardData.items;
+            let imageFound = false;
+            
+            for (let i = 0; i < items.length; i++) {
+                const item = items[i];
+                
+                // Check if it's an image
+                if (item.type.indexOf('image') !== -1) {
+                    imageFound = true;
+                    const blob = item.getAsFile();
+                    
+                    if (blob) {
+                        // Create a temporary file path
+                        const timestamp = new Date().getTime();
+                        const filename = `clipboard-image-${timestamp}.png`;
+                        const tempPath = `/tmp/${filename}`;
+                        
+                        // Read the blob as array buffer
+                        const arrayBuffer = await blob.arrayBuffer();
+                        const buffer = Buffer.from(arrayBuffer);
+                        
+                        // Send to main process to save the file
+                        ipcRenderer.send('save-clipboard-image', {
+                            quadrant: quadrant,
+                            buffer: buffer,
+                            filename: filename,
+                            path: tempPath
+                        });
+                    }
+                    break;
+                }
+            }
+            
+            // If no image found, handle as text
+            if (!imageFound) {
+                const text = event.clipboardData.getData('text/plain');
+                if (text) {
+                    // Send the pasted text directly to the terminal
+                    ipcRenderer.send('terminal-input', quadrant, text);
+                }
             }
         });
+        */
 
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {

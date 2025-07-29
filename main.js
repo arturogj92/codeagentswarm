@@ -283,7 +283,13 @@ if (process.argv.includes('--dev')) {
     try {
         require('electron-reload')(__dirname, {
             electron: path.join(__dirname, 'node_modules', '.bin', 'electron'),
-            hardResetMethod: 'exit'
+            hardResetMethod: 'exit',
+            forceHardReset: true,
+            ignored: [
+                path.join(__dirname, 'database.db'),
+                path.join(__dirname, 'logs/**/*'),
+                path.join(__dirname, 'node_modules/**/*')
+            ]
         });
     } catch (err) {
         console.log('electron-reload not installed, run: npm install --save-dev electron-reload');
@@ -307,6 +313,7 @@ let kanbanWindow; // Global reference to kanban window
 const terminals = new Map();
 let db;
 let mcpServer;
+let isHandlingQuit = false; // Flag to prevent multiple quit handlers
 let hooksManager;
 let webhookServer;
 let gitService; // Global reference to git service
@@ -2576,7 +2583,10 @@ app.on('window-all-closed', () => {
   app.isQuitting = true;
   
   terminals.forEach((shell) => {
-    shell.kill();
+    // Check if it's a real shell with kill method
+    if (shell && typeof shell.kill === 'function') {
+      shell.kill();
+    }
   });
   terminals.clear();
   
@@ -2604,9 +2614,8 @@ app.on('window-all-closed', () => {
     mcpServerProcess = null;
   }
   
-  if (process.platform !== 'darwin') {
-    app.quit();
-  }
+  // Always quit the app when all windows are closed
+  app.quit();
 });
 
 // Function to find claude binary dynamically
@@ -3694,6 +3703,21 @@ ipcMain.handle('git-pull-project', async (event, projectPath) => {
 app.on('before-quit', (event) => {
   console.log('App is quitting, cleaning up processes...');
   
+  // If we're already handling quit, don't do it again
+  if (isHandlingQuit) {
+    console.log('Already handling quit, skipping...');
+    return;
+  }
+  
+  // In dev mode with electron-reload, force immediate exit
+  if (process.argv.includes('--dev')) {
+    console.log('Dev mode detected, forcing immediate exit for reload...');
+    process.exit(0);
+  }
+  
+  // Mark that we're handling quit
+  isHandlingQuit = true;
+  
   // Prevent default quit to ensure cleanup
   event.preventDefault();
   
@@ -3701,7 +3725,10 @@ app.on('before-quit', (event) => {
   let cleanupCount = terminals.size;
   terminals.forEach((shell, quadrant) => {
     console.log(`Killing terminal ${quadrant}...`);
-    shell.kill();
+    // Check if it's a real shell with kill method
+    if (shell && typeof shell.kill === 'function') {
+      shell.kill();
+    }
   });
   terminals.clear();
   
@@ -3713,6 +3740,29 @@ app.on('before-quit', (event) => {
   // Stop MCP server
   if (mcpServer) {
     mcpServer.stop();
+  }
+  
+  // Clear all intervals and timers
+  if (mcpServerHealthCheckInterval) {
+    clearInterval(mcpServerHealthCheckInterval);
+    mcpServerHealthCheckInterval = null;
+  }
+  
+  if (mcpServerRestartTimer) {
+    clearTimeout(mcpServerRestartTimer);
+    mcpServerRestartTimer = null;
+  }
+  
+  // Stop webhook server
+  if (webhookServer) {
+    webhookServer.stop();
+  }
+  
+  // Stop MCP child process
+  if (mcpServerProcess) {
+    console.log('Stopping MCP server process...');
+    mcpServerProcess.kill();
+    mcpServerProcess = null;
   }
   
   // Force kill any remaining Python processes after a short delay
@@ -3728,8 +3778,17 @@ app.on('before-quit', (event) => {
       }
     }
     
-    // Now actually quit
-    app.exit(0);
+    // Now actually quit - force quit on macOS to remove from dock
+    if (process.platform === 'darwin') {
+      // On macOS, we need to force quit to remove from dock
+      app.quit();
+      // If app.quit() doesn't work, force exit
+      setTimeout(() => {
+        process.exit(0);
+      }, 100);
+    } else {
+      app.quit();
+    }
   }, 500);
 });
 
