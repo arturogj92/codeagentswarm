@@ -17,12 +17,31 @@ class DeepSeekCommitService {
         this.apiUrl = 'https://api.deepseek.com/v1/chat/completions';
         this.model = 'deepseek-coder'; // Using the cheaper coder model
         
+        // If API key not in environment, try to load from database
         if (!this.apiKey) {
-            console.warn('[DeepSeek] API key not found in environment variables. AI commit generation will be disabled.');
+            try {
+                const DatabaseManager = require('./database');
+                const db = new DatabaseManager();
+                const savedKey = db.getSetting('deepseek_api_key');
+                if (savedKey) {
+                    this.apiKey = savedKey;
+                    process.env.DEEPSEEK_API_KEY = savedKey;
+                }
+            } catch (err) {
+                // Database might not be available in some contexts
+                console.log('[DeepSeek] Could not load API key from database:', err.message);
+            }
+        }
+        
+        if (!this.apiKey) {
+            console.warn('[DeepSeek] API key not found. AI commit generation will be disabled.');
             // Don't throw an error - just disable the service
             this.enabled = false;
         } else {
             this.enabled = true;
+            // Log API key info for debugging (only first/last 4 chars)
+            const keyPreview = this.apiKey.substring(0, 4) + '...' + this.apiKey.substring(this.apiKey.length - 4);
+            console.log(`[DeepSeek] API key loaded: ${keyPreview} (length: ${this.apiKey.length})`);
         }
     }
 

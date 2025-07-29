@@ -12,6 +12,19 @@ class GitService {
             this.deepSeekService = null;
         }
     }
+    
+    // Method to reinitialize DeepSeek service (for when API key is updated)
+    reinitializeDeepSeekService() {
+        try {
+            this.deepSeekService = new DeepSeekCommitService();
+            console.log('[GitService] DeepSeek service reinitialized');
+            return true;
+        } catch (error) {
+            console.error('[GitService] Failed to reinitialize DeepSeek service:', error);
+            this.deepSeekService = null;
+            return false;
+        }
+    }
 
     // Check if directory is a git repository
     isGitRepository(cwd) {

@@ -196,6 +196,9 @@ class TerminalManager {
         document.getElementById('create-task-btn').addEventListener('click', () => {
             this.showCreateTaskDialog();
         });
+        document.getElementById('settings-btn').addEventListener('click', () => {
+            this.showSettingsModal();
+        });
 
 
         document.getElementById('mcp-info-btn').addEventListener('click', () => {
@@ -4697,6 +4700,176 @@ class TerminalManager {
         }
     }
 
+    async showSettingsModal() {
+        const modal = document.getElementById('settings-modal');
+        if (!modal) return;
+
+        // Get current shell preference
+        const shellPref = await ipcRenderer.invoke('get-shell-preference');
+        
+        // Get API key
+        const apiKeyResult = await ipcRenderer.invoke('get-api-key');
+        if (apiKeyResult.success && apiKeyResult.key) {
+            document.getElementById('deepseek-api-key').value = apiKeyResult.key;
+        }
+        
+        if (shellPref.success) {
+            // Update system shell display
+            document.getElementById('system-shell-path').textContent = shellPref.currentShell;
+            
+            // Dynamically update available shells
+            if (shellPref.availableShells && shellPref.availableShells.length > 0) {
+                const shellOptions = document.querySelector('.shell-options');
+                
+                // Keep system default option
+                let optionsHTML = `
+                    <label class="radio-option">
+                        <input type="radio" name="shell-type" value="system" id="shell-system">
+                        <span>System Default (<span id="system-shell-path">${shellPref.currentShell}</span>)</span>
+                    </label>`;
+                
+                // Add detected shells
+                shellPref.availableShells.forEach(shell => {
+                    const shellId = `shell-${shell.name}`;
+                    optionsHTML += `
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="${shell.name}" id="${shellId}">
+                            <span>${shell.name.charAt(0).toUpperCase() + shell.name.slice(1)} (${shell.path})</span>
+                        </label>`;
+                });
+                
+                // Add custom option
+                optionsHTML += `
+                    <label class="radio-option">
+                        <input type="radio" name="shell-type" value="custom" id="shell-custom">
+                        <span>Custom</span>
+                    </label>
+                    <div class="custom-shell-input" id="custom-shell-container" style="display: none;">
+                        <input type="text" id="custom-shell-path" placeholder="/path/to/shell">
+                    </div>`;
+                
+                shellOptions.innerHTML = optionsHTML;
+            }
+            
+            // Set the selected radio button
+            const shellType = shellPref.config.type || 'system';
+            const radioBtn = document.querySelector(`input[name="shell-type"][value="${shellType}"]`);
+            if (radioBtn) {
+                radioBtn.checked = true;
+            }
+            
+            // Show/hide custom shell input
+            const customContainer = document.getElementById('custom-shell-container');
+            if (shellType === 'custom') {
+                customContainer.style.display = 'block';
+                document.getElementById('custom-shell-path').value = shellPref.config.path || '';
+            } else {
+                customContainer.style.display = 'none';
+            }
+        }
+
+        // Show modal
+        modal.style.display = 'block';
+
+        // Initialize settings modal handlers
+        this.initializeSettingsHandlers();
+    }
+
+    initializeSettingsHandlers() {
+        const modal = document.getElementById('settings-modal');
+        if (!modal || modal.dataset.handlersInitialized === 'true') return;
+        
+        modal.dataset.handlersInitialized = 'true';
+
+        // Event delegation for shell type changes
+        modal.addEventListener('change', (e) => {
+            if (e.target.name === 'shell-type') {
+                const customContainer = document.getElementById('custom-shell-container');
+                if (e.target.value === 'custom') {
+                    customContainer.style.display = 'block';
+                    document.getElementById('custom-shell-path').focus();
+                } else {
+                    customContainer.style.display = 'none';
+                }
+            }
+        });
+
+        // Toggle API key visibility - using delegation
+        modal.addEventListener('click', async (e) => {
+            // Handle toggle API key visibility
+            if (e.target.closest('#toggle-api-key-visibility')) {
+                const input = document.getElementById('deepseek-api-key');
+                const icon = document.querySelector('#toggle-api-key-visibility i');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    icon.setAttribute('data-lucide', 'eye-off');
+                } else {
+                    input.type = 'password';
+                    icon.setAttribute('data-lucide', 'eye');
+                }
+                lucide.createIcons();
+                return;
+            }
+
+            // Handle close button
+            if (e.target.id === 'close-settings') {
+                modal.style.display = 'none';
+                return;
+            }
+
+            // Handle cancel button
+            if (e.target.id === 'cancel-settings') {
+                modal.style.display = 'none';
+                return;
+            }
+
+            // Handle save button
+            if (e.target.id === 'save-settings') {
+                let hasErrors = false;
+                
+                // Save shell preference
+                const selectedType = document.querySelector('input[name="shell-type"]:checked').value;
+                const shellConfig = { type: selectedType };
+                
+                if (selectedType === 'custom') {
+                    const customPath = document.getElementById('custom-shell-path').value.trim();
+                    if (!customPath) {
+                        alert('Please enter a custom shell path');
+                        return;
+                    }
+                    shellConfig.path = customPath;
+                }
+
+                const shellResult = await ipcRenderer.invoke('update-shell-preference', shellConfig);
+                if (!shellResult.success) {
+                    hasErrors = true;
+                    alert('Failed to save shell preference: ' + (shellResult.error || 'Unknown error'));
+                }
+                
+                // Save API key
+                const apiKey = document.getElementById('deepseek-api-key').value.trim();
+                const apiKeyResult = await ipcRenderer.invoke('save-api-key', apiKey);
+                if (!apiKeyResult.success) {
+                    hasErrors = true;
+                    alert('Failed to save API key: ' + (apiKeyResult.error || 'Unknown error'));
+                }
+                
+                if (!hasErrors) {
+                    modal.style.display = 'none';
+                    // Show notification
+                    this.showBadgeNotification('Settings saved successfully');
+                }
+                return;
+            }
+
+            // Click outside to close
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        });
+    }
+
 }
 
 // Listen for dev mode status from main process
@@ -4737,6 +4910,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
+    
+    // Re-initialize icons after a short delay to ensure all elements are rendered
+    setTimeout(() => {
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }, 100);
     
     // Initialize LogViewer
     window.logViewer = new LogViewer();

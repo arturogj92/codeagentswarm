@@ -31,6 +31,9 @@
             </div>
             <div class="dev-indicator" id="dev-indicator" style="display: none;">DEBUG</div>
             <div class="header-controls">
+                <button class="btn-layout" id="settings-btn" title="Settings">
+                    <i data-lucide="settings"></i>
+                </button>
                 <div class="terminal-management">
                     <div class="layout-selector" id="layout-selector" style="display: none;">
                         <!-- 2 terminals layouts -->
@@ -79,6 +82,64 @@
         <main class="terminals-container" id="terminals-container">
             <!-- Terminals will be dynamically generated here -->
         </main>
+    </div>
+
+    <!-- Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Settings</h2>
+                <button class="close-modal" id="close-settings">×</button>
+            </div>
+            <div class="modal-body">
+                <div class="settings-section">
+                    <h3>Terminal Shell</h3>
+                    <div class="shell-options">
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="system" id="shell-system">
+                            <span>System Default (<span id="system-shell-path"></span>)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="bash" id="shell-bash">
+                            <span>Bash (/bin/bash)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="zsh" id="shell-zsh">
+                            <span>Zsh (/bin/zsh)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="fish" id="shell-fish">
+                            <span>Fish (/usr/local/bin/fish)</span>
+                        </label>
+                        <label class="radio-option">
+                            <input type="radio" name="shell-type" value="custom" id="shell-custom">
+                            <span>Custom</span>
+                        </label>
+                        <div class="custom-shell-input" id="custom-shell-container" style="display: none;">
+                            <input type="text" id="custom-shell-path" placeholder="/path/to/shell">
+                        </div>
+                    </div>
+                    <p class="settings-note">Note: Changes will apply to new terminal sessions only.</p>
+                </div>
+                <div class="settings-section">
+                    <h3>AI Commit Messages</h3>
+                    <div class="api-key-section">
+                        <label for="deepseek-api-key">DeepSeek API Key</label>
+                        <div class="api-key-input-group">
+                            <input type="password" id="deepseek-api-key" placeholder="sk-..." autocomplete="off">
+                            <button type="button" id="toggle-api-key-visibility" class="btn-icon">
+                                <i data-lucide="eye"></i>
+                            </button>
+                        </div>
+                        <p class="settings-note">Get your API key from <a href="https://platform.deepseek.com/" target="_blank" style="color: var(--primary);">platform.deepseek.com</a></p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancel-settings">Cancel</button>
+                <button class="btn btn-primary" id="save-settings">Save</button>
+            </div>
+        </div>
     </div>
 
     <script src="node_modules/xterm/lib/xterm.js"></script>

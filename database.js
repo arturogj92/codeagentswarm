@@ -603,6 +603,39 @@ class DatabaseManager {
         }
     }
 
+    // Get user's preferred shell
+    getUserShell() {
+        const shellSetting = this.getSetting('preferred_shell');
+        if (shellSetting && shellSetting.type) {
+            if (shellSetting.type === 'system') {
+                return process.env.SHELL || '/bin/zsh';
+            } else if (shellSetting.type === 'custom') {
+                return shellSetting.path || process.env.SHELL || '/bin/zsh';
+            } else {
+                // For specific shell names, try to find them in common locations
+                const shellName = shellSetting.type;
+                const commonPaths = [
+                    `/bin/${shellName}`,
+                    `/usr/bin/${shellName}`,
+                    `/usr/local/bin/${shellName}`,
+                    `/opt/homebrew/bin/${shellName}`
+                ];
+                
+                const fs = require('fs');
+                for (const path of commonPaths) {
+                    if (fs.existsSync(path)) {
+                        return path;
+                    }
+                }
+                
+                // If not found, default to system shell
+                return process.env.SHELL || '/bin/zsh';
+            }
+        }
+        // Default to system shell
+        return process.env.SHELL || '/bin/zsh';
+    }
+
     // Task management methods
     
     // Create a new task
