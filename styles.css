@@ -863,7 +863,7 @@ body::before {
   border-radius: 16px;
   padding: 24px;
   min-width: 400px;
-  max-width: 500px;
+  max-width: 800px;
   box-shadow: var(--shadow-card);
 }
 
@@ -3766,7 +3766,7 @@ h3 i {
   padding: 0;
   border: 1px solid var(--border-color);
   border-radius: 8px;
-  width: 500px;
+  width: 800px;
   max-width: 100%;
   max-height: calc(100vh - 40px);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
