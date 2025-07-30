@@ -118,17 +118,14 @@ jobs:
       
       - name: Install dependencies
         run: npm ci
-        working-directory: codeagentswarm-app
       
       - name: Update package.json version
         run: |
           npm version ${{ needs.calculate-version.outputs.new_version }} --no-git-tag-version
           echo "Updated package.json to version ${{ needs.calculate-version.outputs.new_version }}"
-        working-directory: codeagentswarm-app
       
       - name: Build Electron app
         run: npm run build -- ${{ matrix.build_flags }}
-        working-directory: codeagentswarm-app
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           npm_config_arch: ${{ matrix.node_arch }}
@@ -141,13 +138,13 @@ jobs:
           VERSION="${{ needs.calculate-version.outputs.new_version }}"
           
           if [ "${{ matrix.platform }}" = "darwin" ]; then
-            FILE=$(find codeagentswarm-app/dist -name "*.dmg" -o -name "*.zip" | grep -E "(dmg|mac.*zip)" | head -1)
+            FILE=$(find dist -name "*.dmg" -o -name "*.zip" | grep -E "(dmg|mac.*zip)" | head -1)
             EXT="${FILE##*.}"
           elif [ "${{ matrix.platform }}" = "win32" ]; then
-            FILE=$(find codeagentswarm-app/dist -name "*.exe" | grep -v "blockmap" | head -1)
+            FILE=$(find dist -name "*.exe" | grep -v "blockmap" | head -1)
             EXT="exe"
           else
-            FILE=$(find codeagentswarm-app/dist -name "*.AppImage" -o -name "*.deb" | head -1)
+            FILE=$(find dist -name "*.AppImage" -o -name "*.deb" | head -1)
             EXT="${FILE##*.}"
           fi
           
