@@ -70,16 +70,27 @@ jobs:
           echo "New version: $NEW_VERSION"
           echo "New tag: $NEW_TAG"
           
+          # Check if the new tag already exists without a release
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Warning: Tag $NEW_TAG already exists. Checking for associated release..."
+            # Check if there's a GitHub release for this tag
+            RELEASE_EXISTS=$(gh release view "$NEW_TAG" >/dev/null 2>&1 && echo "true" || echo "false")
+            if [ "$RELEASE_EXISTS" = "false" ]; then
+              echo "No release found for $NEW_TAG. This might be from a failed previous run."
+              echo "Deleting orphaned tag $NEW_TAG..."
+              git push origin --delete "$NEW_TAG" || true
+              git tag -d "$NEW_TAG" || true
+            else
+              echo "Release already exists for $NEW_TAG. Cannot proceed."
+              exit 1
+            fi
+          fi
+          
           # Output for other jobs
           echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
           echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
-      
-      - name: Create and push tag
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          git tag ${{ steps.version.outputs.new_tag }}
-          git push origin ${{ steps.version.outputs.new_tag }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-and-release:
     needs: calculate-version
@@ -181,10 +192,11 @@ jobs:
           UPLOAD_PATH="releases/${{ matrix.platform }}/${{ matrix.arch }}/${{ steps.release_info.outputs.version }}/${{ steps.release_info.outputs.filename }}"
           
           echo "Uploading to Supabase Storage at path: $UPLOAD_PATH"
+          echo "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}"
           
           UPLOAD_RESPONSE=$(curl -X POST \
-            "${{ env.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/octet-stream" \
             -H "Cache-Control: public, max-age=31536000" \
             --data-binary "@${{ steps.release_info.outputs.file }}" \
@@ -200,7 +212,7 @@ jobs:
           fi
           
           # Get public URL
-          PUBLIC_URL="${{ env.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
+          PUBLIC_URL="${{ secrets.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
           echo "File uploaded successfully. Public URL: $PUBLIC_URL"
           
           # Insert release record into database
@@ -222,8 +234,8 @@ jobs:
           
           echo "Inserting release record into database..."
           DB_RESPONSE=$(curl -X POST \
-            "${{ env.SUPABASE_URL }}/rest/v1/releases" \
-            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/releases" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
             -d "$RELEASE_DATA" \
@@ -257,3 +269,63 @@ jobs:
             The app will auto-update to this version.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-tag:
+    needs: [calculate-version, build-and-release]
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create and push tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Create tag
+          git tag -a "${{ needs.calculate-version.outputs.new_tag }}" -m "Release ${{ needs.calculate-version.outputs.new_version }}"
+          
+          # Push tag
+          git push origin "${{ needs.calculate-version.outputs.new_tag }}"
+
+  cleanup-on-failure:
+    needs: [calculate-version, build-and-release, create-tag]
+    runs-on: ubuntu-latest
+    if: failure()
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Clean up failed tag if exists
+        run: |
+          TAG="${{ needs.calculate-version.outputs.new_tag }}"
+          
+          if [ -z "$TAG" ]; then
+            echo "No tag to clean up"
+            exit 0
+          fi
+          
+          echo "Checking if tag $TAG exists..."
+          
+          # Check if tag exists locally
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG exists locally, deleting..."
+            git tag -d "$TAG" || true
+          fi
+          
+          # Check if tag exists on remote
+          if git ls-remote --tags origin | grep -q "refs/tags/$TAG"; then
+            echo "Tag $TAG exists on remote, deleting..."
+            git push origin --delete "$TAG" || true
+          else
+            echo "Tag $TAG does not exist on remote"
+          fi
+          
+          echo "Cleanup completed"
