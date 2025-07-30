@@ -202,8 +202,8 @@ jobs:
             --data-binary "@${{ steps.release_info.outputs.file }}" \
             -w "\n%{http_code}")
           
-          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | head -n-1)
+          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
           
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "Upload failed with status $HTTP_STATUS"
@@ -241,8 +241,8 @@ jobs:
             -d "$RELEASE_DATA" \
             -w "\n%{http_code}")
           
-          DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n1)
-          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | head -n-1)
+          DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n 1)
+          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
           
           if [ "$DB_HTTP_STATUS" -ne 201 ]; then
             echo "Database insert failed with status $DB_HTTP_STATUS"
