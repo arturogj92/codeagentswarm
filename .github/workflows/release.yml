@@ -154,7 +154,12 @@ jobs:
           fi
           
           FILENAME="CodeAgentSwarm-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}.${EXT}"
-          SHA512=$(sha512sum "$FILE" | cut -d' ' -f1)
+          # Use shasum on macOS, sha512sum on Linux
+          if command -v shasum >/dev/null 2>&1; then
+            SHA512=$(shasum -a 512 "$FILE" | cut -d' ' -f1)
+          else
+            SHA512=$(sha512sum "$FILE" | cut -d' ' -f1)
+          fi
           FILESIZE=$(stat -f%z "$FILE" 2>/dev/null || stat -c%s "$FILE")
           
           echo "file=$FILE" >> $GITHUB_OUTPUT
