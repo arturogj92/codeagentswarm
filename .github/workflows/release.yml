@@ -96,16 +96,6 @@ jobs:
             arch: arm64
             node_arch: arm64
             build_flags: --arm64
-          - os: windows-latest
-            platform: win32
-            arch: x64
-            node_arch: x64
-            build_flags: --x64
-          - os: ubuntu-latest
-            platform: linux
-            arch: x64
-            node_arch: x64
-            build_flags: --x64
 
     runs-on: ${{ matrix.os }}
     
