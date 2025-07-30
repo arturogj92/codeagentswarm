@@ -1,0 +1,186 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+jobs:
+  build-and-release:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            node_arch: x64
+            build_flags: --x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            node_arch: arm64
+            build_flags: --arm64
+          - os: windows-latest
+            platform: win32
+            arch: x64
+            node_arch: x64
+            build_flags: --x64
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            node_arch: x64
+            build_flags: --x64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build Electron app
+        run: npm run build -- ${{ matrix.build_flags }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_arch: ${{ matrix.node_arch }}
+          TARGET_ARCH: ${{ matrix.arch }}
+      
+      - name: Get release file info
+        id: release_info
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name || inputs.version }}"
+          VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          
+          if [ "${{ matrix.platform }}" = "darwin" ]; then
+            FILE=$(find dist -name "*.dmg" -o -name "*.zip" | grep -E "(dmg|mac.*zip)" | head -1)
+            EXT="${FILE##*.}"
+          elif [ "${{ matrix.platform }}" = "win32" ]; then
+            FILE=$(find dist -name "*.exe" | grep -v "blockmap" | head -1)
+            EXT="exe"
+          else
+            FILE=$(find dist -name "*.AppImage" -o -name "*.deb" | head -1)
+            EXT="${FILE##*.}"
+          fi
+          
+          if [ -z "$FILE" ]; then
+            echo "Error: No release file found"
+            exit 1
+          fi
+          
+          FILENAME="CodeAgentSwarm-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}.${EXT}"
+          SHA512=$(sha512sum "$FILE" | cut -d' ' -f1)
+          FILESIZE=$(stat -f%z "$FILE" 2>/dev/null || stat -c%s "$FILE")
+          
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+          echo "sha512=$SHA512" >> $GITHUB_OUTPUT
+          echo "filesize=$FILESIZE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Upload release to Supabase
+        shell: bash
+        run: |
+          # Install curl if not available (for Windows)
+          if ! command -v curl &> /dev/null; then
+            echo "Installing curl..."
+            choco install curl -y || apt-get update && apt-get install -y curl || true
+          fi
+          
+          # Upload file to Supabase Storage
+          UPLOAD_PATH="releases/${{ matrix.platform }}/${{ matrix.arch }}/${{ steps.release_info.outputs.version }}/${{ steps.release_info.outputs.filename }}"
+          
+          echo "Uploading to Supabase Storage at path: $UPLOAD_PATH"
+          
+          UPLOAD_RESPONSE=$(curl -X POST \
+            "${{ env.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/octet-stream" \
+            -H "Cache-Control: public, max-age=31536000" \
+            --data-binary "@${{ steps.release_info.outputs.file }}" \
+            -w "\n%{http_code}")
+          
+          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | head -n-1)
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Upload failed with status $HTTP_STATUS"
+            echo "Response: $RESPONSE_BODY"
+            exit 1
+          fi
+          
+          # Get public URL
+          PUBLIC_URL="${{ env.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
+          echo "File uploaded successfully. Public URL: $PUBLIC_URL"
+          
+          # Insert release record into database
+          RELEASE_DATA=$(cat <<EOF
+          {
+            "version": "${{ steps.release_info.outputs.version }}",
+            "platform": "${{ matrix.platform }}",
+            "arch": "${{ matrix.arch }}",
+            "file_name": "${{ steps.release_info.outputs.filename }}",
+            "file_url": "$PUBLIC_URL",
+            "file_size": ${{ steps.release_info.outputs.filesize }},
+            "sha512": "${{ steps.release_info.outputs.sha512 }}",
+            "release_notes": "Release ${{ steps.release_info.outputs.version }}",
+            "is_prerelease": false,
+            "is_active": true
+          }
+          EOF
+          )
+          
+          echo "Inserting release record into database..."
+          DB_RESPONSE=$(curl -X POST \
+            "${{ env.SUPABASE_URL }}/rest/v1/releases" \
+            -H "Authorization: Bearer ${{ env.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "$RELEASE_DATA" \
+            -w "\n%{http_code}")
+          
+          DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n1)
+          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | head -n-1)
+          
+          if [ "$DB_HTTP_STATUS" -ne 201 ]; then
+            echo "Database insert failed with status $DB_HTTP_STATUS"
+            echo "Response: $DB_RESPONSE_BODY"
+            exit 1
+          fi
+          
+          echo "Release registered successfully in database"
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.release_info.outputs.file }}
+          tag_name: ${{ github.ref_name || format('v{0}', inputs.version) }}
+          name: Release ${{ steps.release_info.outputs.version }}
+          body: |
+            ## CodeAgentSwarm ${{ steps.release_info.outputs.version }}
+            
+            ### Downloads
+            - Platform: ${{ matrix.platform }}
+            - Architecture: ${{ matrix.arch }}
+            - SHA512: `${{ steps.release_info.outputs.sha512 }}`
+            
+            The app will auto-update to this version.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
