@@ -79,7 +79,13 @@
     "extraResources": [],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "logo_prod_512.png"
+      "icon": "logo_prod_512.png",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
+      ]
     },
     "win": {
       "icon": "logo_prod_512.png"

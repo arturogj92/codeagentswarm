@@ -163,7 +163,12 @@ jobs:
           VERSION="${{ needs.calculate-version.outputs.new_version }}"
           
           if [ "${{ matrix.platform }}" = "darwin" ]; then
-            FILE=$(find dist -name "*.dmg" -o -name "*.zip" | grep -E "(dmg|mac.*zip)" | head -1)
+            # Prioritize DMG files over ZIP
+            FILE=$(find dist -name "*.dmg" | head -1)
+            if [ -z "$FILE" ]; then
+              # Fallback to ZIP if no DMG found
+              FILE=$(find dist -name "*.zip" | grep -i mac | head -1)
+            fi
             EXT="${FILE##*.}"
           elif [ "${{ matrix.platform }}" = "win32" ]; then
             FILE=$(find dist -name "*.exe" | grep -v "blockmap" | head -1)
@@ -236,10 +241,10 @@ jobs:
             UPLOAD_RESPONSE="200"  # Set success status
           else
             # Determine content type based on file extension
-            if [[ "${{ steps.release_info.outputs.filename }}" == *.zip ]]; then
-              CONTENT_TYPE="application/zip"
-            elif [[ "${{ steps.release_info.outputs.filename }}" == *.dmg ]]; then
+            if [[ "${{ steps.release_info.outputs.filename }}" == *.dmg ]]; then
               CONTENT_TYPE="application/x-apple-diskimage"
+            elif [[ "${{ steps.release_info.outputs.filename }}" == *.zip ]]; then
+              CONTENT_TYPE="application/zip"
             else
               CONTENT_TYPE="application/octet-stream"
             fi
