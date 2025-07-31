@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Type of version bump'
+        description: 'Type of version bump (ignored if manual_version is set)'
         required: true
         type: choice
         options:
@@ -16,6 +16,10 @@ on:
           - minor
           - major
         default: 'patch'
+      manual_version:
+        description: 'Manual version (e.g., 1.2.3) - Leave empty to auto-increment'
+        required: false
+        type: string
 
 env:
   SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
@@ -37,34 +41,44 @@ jobs:
       - name: Get latest tag and calculate new version
         id: version
         run: |
-          # Get the latest tag
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          echo "Latest tag: $LATEST_TAG"
+          # Check if manual version is provided
+          if [ -n "${{ inputs.manual_version }}" ]; then
+            # Use manual version
+            NEW_VERSION="${{ inputs.manual_version }}"
+            # Remove 'v' prefix if provided
+            NEW_VERSION="${NEW_VERSION#v}"
+            echo "Using manual version: $NEW_VERSION"
+          else
+            # Get the latest tag
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            echo "Latest tag: $LATEST_TAG"
+            
+            # Remove 'v' prefix
+            CURRENT_VERSION="${LATEST_TAG#v}"
+            
+            # Split version into components
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            
+            # Increment based on type
+            case "${{ inputs.version_type }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            
+            # Create new version
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
           
-          # Remove 'v' prefix
-          CURRENT_VERSION="${LATEST_TAG#v}"
-          
-          # Split version into components
-          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-          
-          # Increment based on type
-          case "${{ inputs.version_type }}" in
-            major)
-              MAJOR=$((MAJOR + 1))
-              MINOR=0
-              PATCH=0
-              ;;
-            minor)
-              MINOR=$((MINOR + 1))
-              PATCH=0
-              ;;
-            patch)
-              PATCH=$((PATCH + 1))
-              ;;
-          esac
-          
-          # Create new version
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
           NEW_TAG="v$NEW_VERSION"
           
           echo "New version: $NEW_VERSION"
