@@ -1,0 +1,363 @@
+name: Build and Release (Unsigned)
+
+permissions:
+  contents: write
+  packages: write
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_type:
+        description: 'Type of version bump (only used if manual_version is empty)'
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: 'patch'
+      manual_version:
+        description: 'Manual version (e.g., 1.2.3) - If set, overrides version_type'
+        required: false
+        type: string
+
+env:
+  SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+  SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+
+jobs:
+  calculate-version:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.version.outputs.new_version }}
+      new_tag: ${{ steps.version.outputs.new_tag }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Get latest tag and calculate new version
+        id: version
+        run: |
+          # Check if manual version is provided
+          if [ -n "${{ inputs.manual_version }}" ]; then
+            # Use manual version
+            NEW_VERSION="${{ inputs.manual_version }}"
+            # Remove 'v' prefix if provided
+            NEW_VERSION="${NEW_VERSION#v}"
+            echo "Using manual version: $NEW_VERSION"
+          else
+            # Get the latest tag
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            echo "Latest tag: $LATEST_TAG"
+            
+            # Remove 'v' prefix
+            CURRENT_VERSION="${LATEST_TAG#v}"
+            
+            # Split version into components
+            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
+            
+            # Increment based on type
+            case "${{ inputs.version_type }}" in
+              major)
+                MAJOR=$((MAJOR + 1))
+                MINOR=0
+                PATCH=0
+                ;;
+              minor)
+                MINOR=$((MINOR + 1))
+                PATCH=0
+                ;;
+              patch)
+                PATCH=$((PATCH + 1))
+                ;;
+            esac
+            
+            # Create new version
+            NEW_VERSION="$MAJOR.$MINOR.$PATCH"
+          fi
+          
+          NEW_TAG="v$NEW_VERSION-unsigned"
+          
+          echo "New version: $NEW_VERSION"
+          echo "New tag: $NEW_TAG"
+          
+          # Check if the new tag already exists
+          if git rev-parse "$NEW_TAG" >/dev/null 2>&1; then
+            echo "Warning: Tag $NEW_TAG already exists. Deleting it..."
+            git push origin --delete "$NEW_TAG" || true
+            git tag -d "$NEW_TAG" || true
+          fi
+          
+          # Output for other jobs
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_tag=$NEW_TAG" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-and-release:
+    needs: calculate-version
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            platform: darwin
+            arch: x64
+            node_arch: x64
+            build_flags: --x64
+          - os: macos-latest
+            platform: darwin
+            arch: arm64
+            node_arch: arm64
+            build_flags: --arm64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      
+      - name: Install setuptools for node-gyp
+        run: |
+          python -m pip install setuptools
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Update package.json version
+        run: |
+          npm version ${{ needs.calculate-version.outputs.new_version }} --no-git-tag-version
+          echo "Updated package.json to version ${{ needs.calculate-version.outputs.new_version }}"
+      
+      - name: Build Electron app (UNSIGNED)
+        run: npm run build -- ${{ matrix.build_flags }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          npm_config_arch: ${{ matrix.node_arch }}
+          TARGET_ARCH: ${{ matrix.arch }}
+          # NO signing environment variables - builds unsigned
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          CI: true
+      
+      - name: Get release file info
+        id: release_info
+        shell: bash
+        run: |
+          VERSION="${{ needs.calculate-version.outputs.new_version }}"
+          
+          if [ "${{ matrix.platform }}" = "darwin" ]; then
+            # Prioritize DMG files over ZIP
+            FILE=$(find dist -name "*.dmg" | head -1)
+            if [ -z "$FILE" ]; then
+              # Fallback to ZIP if no DMG found
+              FILE=$(find dist -name "*.zip" | grep -i mac | head -1)
+            fi
+            EXT="${FILE##*.}"
+          elif [ "${{ matrix.platform }}" = "win32" ]; then
+            FILE=$(find dist -name "*.exe" | grep -v "blockmap" | head -1)
+            EXT="exe"
+          else
+            FILE=$(find dist -name "*.AppImage" -o -name "*.deb" | head -1)
+            EXT="${FILE##*.}"
+          fi
+          
+          if [ -z "$FILE" ]; then
+            echo "Error: No release file found"
+            exit 1
+          fi
+          
+          FILENAME="CodeAgentSwarm-${VERSION}-UNSIGNED-${{ matrix.platform }}-${{ matrix.arch }}.${EXT}"
+          # Use shasum on macOS, sha512sum on Linux
+          if command -v shasum >/dev/null 2>&1; then
+            SHA512=$(shasum -a 512 "$FILE" | cut -d' ' -f1)
+          else
+            SHA512=$(sha512sum "$FILE" | cut -d' ' -f1)
+          fi
+          FILESIZE=$(stat -f%z "$FILE" 2>/dev/null || stat -c%s "$FILE")
+          
+          echo "file=$FILE" >> $GITHUB_OUTPUT
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+          echo "sha512=$SHA512" >> $GITHUB_OUTPUT
+          echo "filesize=$FILESIZE" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Upload release to Supabase
+        shell: bash
+        run: |
+          # Install curl if not available (for Windows)
+          if ! command -v curl &> /dev/null; then
+            echo "Installing curl..."
+            choco install curl -y || apt-get update && apt-get install -y curl || true
+          fi
+          
+          # Upload file to Supabase Storage
+          UPLOAD_PATH="releases/unsigned/${{ matrix.platform }}/${{ matrix.arch }}/${{ steps.release_info.outputs.version }}/${{ steps.release_info.outputs.filename }}"
+          
+          echo "Uploading UNSIGNED release to Supabase Storage at path: $UPLOAD_PATH"
+          echo "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}"
+          echo "File size: ${{ steps.release_info.outputs.filesize }} bytes ($((${{ steps.release_info.outputs.filesize }} / 1024 / 1024)) MB)"
+          
+          # First, try to delete existing file if it exists
+          echo "Checking if file already exists..."
+          DELETE_RESPONSE=$(curl -X DELETE \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -w "\n%{http_code}" 2>/dev/null || true)
+          
+          DELETE_STATUS=$(echo "$DELETE_RESPONSE" | tail -n 1)
+          if [ "$DELETE_STATUS" = "200" ]; then
+            echo "Existing file deleted successfully"
+          else
+            echo "No existing file to delete or delete failed (status: $DELETE_STATUS)"
+          fi
+          
+          # Determine content type based on file extension
+          if [[ "${{ steps.release_info.outputs.filename }}" == *.dmg ]]; then
+            CONTENT_TYPE="application/x-apple-diskimage"
+          elif [[ "${{ steps.release_info.outputs.filename }}" == *.zip ]]; then
+            CONTENT_TYPE="application/zip"
+          else
+            CONTENT_TYPE="application/octet-stream"
+          fi
+          
+          UPLOAD_RESPONSE=$(curl -X POST \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: $CONTENT_TYPE" \
+            -H "Cache-Control: public, max-age=31536000" \
+            --data-binary "@${{ steps.release_info.outputs.file }}" \
+            -w "\n%{http_code}")
+          
+          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "Upload failed with status $HTTP_STATUS"
+            echo "Response: $RESPONSE_BODY"
+            exit 1
+          fi
+          
+          # Get public URL
+          PUBLIC_URL="${{ secrets.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
+          echo "File uploaded successfully. Public URL: $PUBLIC_URL"
+          
+          # Insert release record into database with is_signed = false
+          RELEASE_DATA=$(cat <<EOF
+          {
+            "version": "${{ steps.release_info.outputs.version }}",
+            "platform": "${{ matrix.platform }}",
+            "arch": "${{ matrix.arch }}",
+            "file_name": "${{ steps.release_info.outputs.filename }}",
+            "file_url": "$PUBLIC_URL",
+            "file_size": ${{ steps.release_info.outputs.filesize }},
+            "sha512": "${{ steps.release_info.outputs.sha512 }}",
+            "release_notes": "UNSIGNED Release ${{ steps.release_info.outputs.version }} - For testing only",
+            "is_prerelease": true,
+            "is_active": true,
+            "is_signed": false
+          }
+          EOF
+          )
+          
+          echo "Inserting UNSIGNED release record into database..."
+          
+          # First, try to delete existing release record if it exists
+          echo "Checking for existing release record..."
+          DELETE_DB_RESPONSE=$(curl -X DELETE \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/releases?version=eq.${{ steps.release_info.outputs.version }}&platform=eq.${{ matrix.platform }}&arch=eq.${{ matrix.arch }}&is_signed=eq.false" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -w "\n%{http_code}" 2>/dev/null || true)
+          
+          DELETE_DB_STATUS=$(echo "$DELETE_DB_RESPONSE" | tail -n 1)
+          if [ "$DELETE_DB_STATUS" = "200" ] || [ "$DELETE_DB_STATUS" = "204" ]; then
+            echo "Existing release record deleted successfully"
+          else
+            echo "No existing release record to delete (status: $DELETE_DB_STATUS)"
+          fi
+          
+          # Now insert the new record
+          DB_RESPONSE=$(curl -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/releases" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=minimal" \
+            -d "$RELEASE_DATA" \
+            -w "\n%{http_code}")
+          
+          DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n 1)
+          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
+          
+          if [ "$DB_HTTP_STATUS" -ne 201 ] && [ "$DB_HTTP_STATUS" -ne 200 ]; then
+            echo "Database insert failed with status $DB_HTTP_STATUS"
+            echo "Response: $DB_RESPONSE_BODY"
+            exit 1
+          else
+            echo "UNSIGNED release registered successfully in database"
+          fi
+      
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ${{ steps.release_info.outputs.file }}
+          tag_name: ${{ needs.calculate-version.outputs.new_tag }}
+          name: UNSIGNED Release ${{ needs.calculate-version.outputs.new_version }}
+          body: |
+            ## ⚠️ UNSIGNED Release - CodeAgentSwarm ${{ steps.release_info.outputs.version }}
+            
+            **This is an UNSIGNED release for testing purposes only.**
+            
+            macOS users will see security warnings when opening this app.
+            To open: Right-click → Open → Open anyway
+            
+            ### Downloads
+            - Platform: ${{ matrix.platform }}
+            - Architecture: ${{ matrix.arch }}
+            - SHA512: `${{ steps.release_info.outputs.sha512 }}`
+            
+            This release will NOT auto-update in production apps.
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-tag:
+    needs: [calculate-version, build-and-release]
+    runs-on: ubuntu-latest
+    if: success()
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create and push tag
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          
+          # Force delete tag locally if it exists
+          git tag -d "${{ needs.calculate-version.outputs.new_tag }}" 2>/dev/null || true
+          
+          # Force delete tag on remote if it exists
+          git push origin --delete "${{ needs.calculate-version.outputs.new_tag }}" 2>/dev/null || true
+          
+          # Create tag
+          git tag -a "${{ needs.calculate-version.outputs.new_tag }}" -m "UNSIGNED Release ${{ needs.calculate-version.outputs.new_version }}"
+          
+          # Push tag
+          git push origin "${{ needs.calculate-version.outputs.new_tag }}"
