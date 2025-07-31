@@ -30,17 +30,38 @@ exports.default = async function notarizing(context) {
   console.log('Using Team ID:', process.env.APPLE_TEAM_ID);
 
   try {
-    await notarize({
+    console.log('Starting notarization with notarytool...');
+    
+    const notarizeOptions = {
       tool: 'notarytool',
       appPath,
       appleId: process.env.APPLE_ID,
       appleIdPassword: process.env.APPLE_ID_PASSWORD,
       teamId: process.env.APPLE_TEAM_ID
+    };
+    
+    console.log('Notarize options (without password):', {
+      ...notarizeOptions,
+      appleIdPassword: '***hidden***'
     });
+    
+    await notarize(notarizeOptions);
     console.log('Notarization complete');
   } catch (error) {
     console.error('Notarization failed:', error);
-    console.error('Full error details:', JSON.stringify(error, null, 2));
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+    
+    // Intenta capturar más detalles del error
+    if (error.message && error.message.includes('Error: HTT')) {
+      console.error('This appears to be an HTTP error. Common causes:');
+      console.error('1. Invalid app-specific password');
+      console.error('2. Invalid Apple ID');
+      console.error('3. Invalid Team ID');
+      console.error('4. Apple Developer account not active');
+      console.error('5. App-specific password needs to be regenerated');
+    }
+    
     throw error;
   }
 };

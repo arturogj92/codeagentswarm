@@ -93,6 +93,7 @@
       "entitlementsInherit": "entitlements.mac.plist",
       "notarize": false
     },
+    "afterSign": "scripts/notarize.js",
     "win": {
       "icon": "logo_prod_512.png"
     },
