@@ -254,7 +254,7 @@ jobs:
           PUBLIC_URL="${{ secrets.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
           echo "File uploaded successfully. Public URL: $PUBLIC_URL"
           
-          # Insert release record into database
+          # Insert release record into database with is_signed = false
           RELEASE_DATA=$(cat <<EOF
           {
             "version": "${{ steps.release_info.outputs.version }}",
@@ -266,7 +266,8 @@ jobs:
             "sha512": "${{ steps.release_info.outputs.sha512 }}",
             "release_notes": "UNSIGNED Release ${{ steps.release_info.outputs.version }} - For testing only",
             "is_prerelease": true,
-            "is_active": true
+            "is_active": true,
+            "is_signed": false
           }
           EOF
           )

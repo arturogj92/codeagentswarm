@@ -296,7 +296,8 @@ jobs:
             "sha512": "${{ steps.release_info.outputs.sha512 }}",
             "release_notes": "Release ${{ steps.release_info.outputs.version }}",
             "is_prerelease": false,
-            "is_active": true
+            "is_active": true,
+            "is_signed": true
           }
           EOF
           )
