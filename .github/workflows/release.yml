@@ -233,24 +233,47 @@ jobs:
           )
           
           echo "Inserting release record into database..."
+          # Debug: Show part of the service key to verify format
+          echo "Service key starts with: ${SUPABASE_SERVICE_KEY:0:10}..."
+          
           DB_RESPONSE=$(curl -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/releases" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
+            -H "Prefer: return=minimal" \
             -d "$RELEASE_DATA" \
-            -w "\n%{http_code}")
+            -v \
+            -w "\n%{http_code}" 2>&1)
           
           DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n 1)
           DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
           
-          if [ "$DB_HTTP_STATUS" -ne 201 ]; then
+          if [ "$DB_HTTP_STATUS" -ne 201 ] && [ "$DB_HTTP_STATUS" -ne 200 ]; then
             echo "Database insert failed with status $DB_HTTP_STATUS"
             echo "Response: $DB_RESPONSE_BODY"
-            exit 1
+            
+            # Try alternative method using Node.js
+            echo "Trying alternative method using Node.js..."
+            node scripts/upload-release-to-supabase.js \
+              "${{ secrets.SUPABASE_URL }}" \
+              "${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              "${{ steps.release_info.outputs.version }}" \
+              "${{ matrix.platform }}" \
+              "${{ matrix.arch }}" \
+              "${{ steps.release_info.outputs.filename }}" \
+              "$PUBLIC_URL" \
+              "${{ steps.release_info.outputs.filesize }}" \
+              "${{ steps.release_info.outputs.sha512 }}" \
+              "Release ${{ steps.release_info.outputs.version }}"
+            
+            if [ $? -ne 0 ]; then
+              echo "Both methods failed"
+              exit 1
+            fi
+          else
+            echo "Release registered successfully in database"
           fi
-          
-          echo "Release registered successfully in database"
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
