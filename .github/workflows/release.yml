@@ -193,27 +193,45 @@ jobs:
           
           echo "Uploading to Supabase Storage at path: $UPLOAD_PATH"
           echo "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}"
+          echo "File size: ${{ steps.release_info.outputs.filesize }} bytes ($(({{ steps.release_info.outputs.filesize }} / 1024 / 1024)) MB)"
           
-          # Determine content type based on file extension
-          if [[ "${{ steps.release_info.outputs.filename }}" == *.zip ]]; then
-            CONTENT_TYPE="application/zip"
-          elif [[ "${{ steps.release_info.outputs.filename }}" == *.dmg ]]; then
-            CONTENT_TYPE="application/x-apple-diskimage"
+          # For files over 100MB, use the Node.js script for better handling
+          if [ ${{ steps.release_info.outputs.filesize }} -gt 104857600 ]; then
+            echo "Large file detected, using resumable upload..."
+            node scripts/upload-large-file.js \
+              "${{ secrets.SUPABASE_URL }}" \
+              "${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              "${{ steps.release_info.outputs.file }}" \
+              "releases/$UPLOAD_PATH"
+            
+            UPLOAD_RESPONSE="200"  # Set success status
           else
-            CONTENT_TYPE="application/octet-stream"
+            # Determine content type based on file extension
+            if [[ "${{ steps.release_info.outputs.filename }}" == *.zip ]]; then
+              CONTENT_TYPE="application/zip"
+            elif [[ "${{ steps.release_info.outputs.filename }}" == *.dmg ]]; then
+              CONTENT_TYPE="application/x-apple-diskimage"
+            else
+              CONTENT_TYPE="application/octet-stream"
+            fi
+            
+            UPLOAD_RESPONSE=$(curl -X POST \
+              "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              -H "Content-Type: $CONTENT_TYPE" \
+              -H "Cache-Control: public, max-age=31536000" \
+              --data-binary "@${{ steps.release_info.outputs.file }}" \
+              -w "\n%{http_code}")
           fi
           
-          UPLOAD_RESPONSE=$(curl -X POST \
-            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
-            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
-            -H "Content-Type: $CONTENT_TYPE" \
-            -H "Cache-Control: public, max-age=31536000" \
-            --data-binary "@${{ steps.release_info.outputs.file }}" \
-            -w "\n%{http_code}")
-          
-          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
-          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          if [ ${{ steps.release_info.outputs.filesize }} -gt 104857600 ]; then
+            HTTP_STATUS="200"
+            RESPONSE_BODY=""
+          else
+            HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
+            RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          fi
           
           if [ "$HTTP_STATUS" -ne 200 ]; then
             echo "Upload failed with status $HTTP_STATUS"
@@ -253,8 +271,7 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Prefer: return=minimal" \
             -d "$RELEASE_DATA" \
-            -v \
-            -w "\n%{http_code}" 2>&1)
+            -w "\n%{http_code}")
           
           DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n 1)
           DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
