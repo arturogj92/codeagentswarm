@@ -1,4 +1,5 @@
 const { notarize } = require('@electron/notarize');
+const { promiseWithTimeout } = require('./utils/timeout');
 
 exports.default = async function notarizing(context) {
   const { electronPlatformName, appOutDir } = context;
@@ -45,7 +46,16 @@ exports.default = async function notarizing(context) {
       appleIdPassword: '***hidden***'
     });
     
-    await notarize(notarizeOptions);
+    // Añadir timeout de 10 minutos (600000 ms)
+    const timeoutMs = 10 * 60 * 1000;
+    console.log(`Setting notarization timeout to ${timeoutMs / 1000} seconds`);
+    
+    await promiseWithTimeout(
+      notarize(notarizeOptions),
+      timeoutMs,
+      'Notarization timed out after 10 minutes. This might indicate an issue with Apple services or credentials.'
+    );
+    
     console.log('Notarization complete');
   } catch (error) {
     console.error('Notarization failed:', error);
