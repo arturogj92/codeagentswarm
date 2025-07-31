@@ -195,6 +195,21 @@ jobs:
           echo "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}"
           echo "File size: ${{ steps.release_info.outputs.filesize }} bytes ($((${{ steps.release_info.outputs.filesize }} / 1024 / 1024)) MB)"
           
+          # First, try to delete existing file if it exists
+          echo "Checking if file already exists..."
+          DELETE_RESPONSE=$(curl -X DELETE \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -w "\n%{http_code}" 2>/dev/null || true)
+          
+          DELETE_STATUS=$(echo "$DELETE_RESPONSE" | tail -n 1)
+          if [ "$DELETE_STATUS" = "200" ]; then
+            echo "Existing file deleted successfully"
+          else
+            echo "No existing file to delete or delete failed (status: $DELETE_STATUS)"
+          fi
+          
           # For files over 100MB, use the Node.js script for better handling
           if [ ${{ steps.release_info.outputs.filesize }} -gt 104857600 ]; then
             echo "Large file detected, using resumable upload..."
@@ -261,9 +276,23 @@ jobs:
           )
           
           echo "Inserting release record into database..."
-          # Debug: Show part of the service key to verify format
-          echo "Service key starts with: ${SUPABASE_SERVICE_KEY:0:10}..."
           
+          # First, try to delete existing release record if it exists
+          echo "Checking for existing release record..."
+          DELETE_DB_RESPONSE=$(curl -X DELETE \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/releases?version=eq.${{ steps.release_info.outputs.version }}&platform=eq.${{ matrix.platform }}&arch=eq.${{ matrix.arch }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -w "\n%{http_code}" 2>/dev/null || true)
+          
+          DELETE_DB_STATUS=$(echo "$DELETE_DB_RESPONSE" | tail -n 1)
+          if [ "$DELETE_DB_STATUS" = "200" ] || [ "$DELETE_DB_STATUS" = "204" ]; then
+            echo "Existing release record deleted successfully"
+          else
+            echo "No existing release record to delete (status: $DELETE_DB_STATUS)"
+          fi
+          
+          # Now insert the new record
           DB_RESPONSE=$(curl -X POST \
             "${{ secrets.SUPABASE_URL }}/rest/v1/releases" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
