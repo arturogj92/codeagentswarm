@@ -193,7 +193,7 @@ jobs:
           
           echo "Uploading to Supabase Storage at path: $UPLOAD_PATH"
           echo "SUPABASE_URL: ${{ secrets.SUPABASE_URL }}"
-          echo "File size: ${{ steps.release_info.outputs.filesize }} bytes ($(({{ steps.release_info.outputs.filesize }} / 1024 / 1024)) MB)"
+          echo "File size: ${{ steps.release_info.outputs.filesize }} bytes ($((${{ steps.release_info.outputs.filesize }} / 1024 / 1024)) MB)"
           
           # For files over 100MB, use the Node.js script for better handling
           if [ ${{ steps.release_info.outputs.filesize }} -gt 104857600 ]; then
