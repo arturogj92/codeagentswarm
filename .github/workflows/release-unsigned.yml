@@ -254,7 +254,7 @@ jobs:
           PUBLIC_URL="${{ secrets.SUPABASE_URL }}/storage/v1/object/public/releases/$UPLOAD_PATH"
           echo "File uploaded successfully. Public URL: $PUBLIC_URL"
           
-          # Insert release record into database with is_signed = false
+          # Insert release record into database
           RELEASE_DATA=$(cat <<EOF
           {
             "version": "${{ steps.release_info.outputs.version }}",
@@ -266,8 +266,7 @@ jobs:
             "sha512": "${{ steps.release_info.outputs.sha512 }}",
             "release_notes": "UNSIGNED Release ${{ steps.release_info.outputs.version }} - For testing only",
             "is_prerelease": true,
-            "is_active": true,
-            "is_signed": false
+            "is_active": true
           }
           EOF
           )
@@ -277,7 +276,7 @@ jobs:
           # First, try to delete existing release record if it exists
           echo "Checking for existing release record..."
           DELETE_DB_RESPONSE=$(curl -X DELETE \
-            "${{ secrets.SUPABASE_URL }}/rest/v1/releases?version=eq.${{ steps.release_info.outputs.version }}&platform=eq.${{ matrix.platform }}&arch=eq.${{ matrix.arch }}&is_signed=eq.false" \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/releases?version=eq.${{ steps.release_info.outputs.version }}&platform=eq.${{ matrix.platform }}&arch=eq.${{ matrix.arch }}" \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -w "\n%{http_code}" 2>/dev/null || true)
