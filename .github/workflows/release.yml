@@ -379,6 +379,12 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           
+          # Force delete tag locally if it exists
+          git tag -d "${{ needs.calculate-version.outputs.new_tag }}" 2>/dev/null || true
+          
+          # Force delete tag on remote if it exists
+          git push origin --delete "${{ needs.calculate-version.outputs.new_tag }}" 2>/dev/null || true
+          
           # Create tag
           git tag -a "${{ needs.calculate-version.outputs.new_tag }}" -m "Release ${{ needs.calculate-version.outputs.new_version }}"
           
