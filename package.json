@@ -91,11 +91,8 @@
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "notarize": {
-        "teamId": "${APPLE_TEAM_ID}"
-      }
+      "notarize": false
     },
-    "afterSign": "scripts/notarize.js",
     "win": {
       "icon": "logo_prod_512.png"
     },
