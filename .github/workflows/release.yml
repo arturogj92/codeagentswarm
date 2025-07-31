@@ -8,8 +8,8 @@ on:
   workflow_dispatch:
     inputs:
       version_type:
-        description: 'Type of version bump (ignored if manual_version is set)'
-        required: true
+        description: 'Type of version bump (only used if manual_version is empty)'
+        required: false
         type: choice
         options:
           - patch
@@ -17,7 +17,7 @@ on:
           - major
         default: 'patch'
       manual_version:
-        description: 'Manual version (e.g., 1.2.3) - Leave empty to auto-increment'
+        description: 'Manual version (e.g., 1.2.3) - If set, overrides version_type'
         required: false
         type: string
 
