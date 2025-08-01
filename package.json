@@ -83,12 +83,10 @@
       "icon": "logo_prod_512.png",
       "target": [
         {
-          "target": "dmg",
-          "arch": ["x64", "arm64"]
+          "target": "dmg"
         },
         {
-          "target": "zip",
-          "arch": ["x64", "arm64"]
+          "target": "zip"
         }
       ],
       "artifactName": "${productName}-${version}-darwin-${arch}.${ext}",

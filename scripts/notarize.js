@@ -57,6 +57,7 @@ exports.default = async function notarizing(context) {
     );
     
     console.log('Notarization complete');
+    console.log('Notarization script finished successfully');
   } catch (error) {
     console.error('Notarization failed:', error);
     console.error('Error message:', error.message);
@@ -74,4 +75,6 @@ exports.default = async function notarizing(context) {
     
     throw error;
   }
+  
+  console.log('afterSign hook completed for:', appPath);
 };
