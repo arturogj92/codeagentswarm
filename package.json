@@ -109,9 +109,6 @@
     "linux": {
       "icon": "logo_prod_512.png"
     },
-    "publish": {
-      "provider": "generic",
-      "url": "https://codeagentswarm-backend.up.railway.app/update"
-    }
+    "publish": null
   }
 }
