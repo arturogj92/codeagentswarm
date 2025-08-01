@@ -6,7 +6,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "ENABLE_DEBUG_LOGS=true electron . --dev",
-    "build": "export PYTHON=/opt/homebrew/bin/python3.11 && electron-builder",
+    "build": "export PYTHON=/opt/homebrew/bin/python3.11 && electron-builder --publish=never",
     "build:debug": "./build-debug.sh",
     "build:debug:clean": "rm -f debug-config.json",
     "dist": "electron-builder --publish=never",
