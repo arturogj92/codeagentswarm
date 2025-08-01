@@ -170,11 +170,11 @@ jobs:
           VERSION="${{ needs.calculate-version.outputs.new_version }}"
           
           if [ "${{ matrix.platform }}" = "darwin" ]; then
-            # Prioritize DMG files over ZIP
-            FILE=$(find dist -name "*.dmg" | head -1)
+            # Prioritize ZIP files for auto-updates
+            FILE=$(find dist -name "*.zip" | grep -v blockmap | head -1)
             if [ -z "$FILE" ]; then
-              # Fallback to ZIP if no DMG found
-              FILE=$(find dist -name "*.zip" | grep -i mac | head -1)
+              # Fallback to DMG if no ZIP found
+              FILE=$(find dist -name "*.dmg" | head -1)
             fi
             EXT="${FILE##*.}"
           elif [ "${{ matrix.platform }}" = "win32" ]; then
