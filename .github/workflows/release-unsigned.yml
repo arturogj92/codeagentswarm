@@ -192,6 +192,16 @@ jobs:
           echo "filesize=$FILESIZE" >> $GITHUB_OUTPUT
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       
+      - name: Rename file for unsigned release
+        run: |
+          # Copy the original file to a new name with UNSIGNED
+          ORIGINAL_FILE="${{ steps.release_info.outputs.file }}"
+          NEW_FILE="dist/${{ steps.release_info.outputs.filename }}"
+          cp "$ORIGINAL_FILE" "$NEW_FILE"
+          echo "Renamed file from $ORIGINAL_FILE to $NEW_FILE"
+          echo "renamed_file=$NEW_FILE" >> $GITHUB_OUTPUT
+        id: rename_file
+      
       - name: Upload release to Supabase
         shell: bash
         run: |
@@ -238,7 +248,7 @@ jobs:
             -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
             -H "Content-Type: $CONTENT_TYPE" \
             -H "Cache-Control: public, max-age=31536000" \
-            --data-binary "@${{ steps.release_info.outputs.file }}" \
+            --data-binary "@${{ steps.rename_file.outputs.renamed_file }}" \
             -w "\n%{http_code}")
           
           HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
@@ -313,7 +323,7 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v1
         with:
-          files: ${{ steps.release_info.outputs.file }}
+          files: ${{ steps.rename_file.outputs.renamed_file }}
           tag_name: ${{ needs.calculate-version.outputs.new_tag }}
           name: UNSIGNED Release ${{ needs.calculate-version.outputs.new_version }}
           body: |
