@@ -184,20 +184,74 @@
                                     </div>
                                 </div>
                                 
-                                <div class="update-actions">
+                                <!-- Update Available Section -->
+                                <div class="update-available-section" id="update-available-section" style="display: none;">
+                                    <div class="update-details">
+                                        <h4>New Version Available</h4>
+                                        <div class="version-info">
+                                            <span class="new-version">Version <strong id="new-version"></strong></span>
+                                            <span class="release-date" id="release-date"></span>
+                                        </div>
+                                        <div class="release-notes" id="release-notes"></div>
+                                    </div>
+                                    <div class="update-actions">
+                                        <button class="btn btn-primary" id="download-update-btn">
+                                            <i data-lucide="download"></i>
+                                            Download Update
+                                        </button>
+                                        <button class="btn btn-secondary" id="skip-update-btn">
+                                            Skip This Version
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Update Actions -->
+                                <div class="update-actions" id="default-update-actions">
                                     <button class="btn btn-primary" id="check-updates-btn">
                                         <i data-lucide="refresh-cw"></i>
                                         Check for Updates
                                     </button>
                                 </div>
                                 
+                                <!-- Download Progress -->
                                 <div class="update-progress" id="update-progress" style="display: none;">
+                                    <div class="progress-header">
+                                        <h4>Downloading Update...</h4>
+                                        <button class="btn btn-small btn-danger" id="cancel-download-btn">
+                                            <i data-lucide="x"></i>
+                                            Cancel
+                                        </button>
+                                    </div>
                                     <div class="progress-bar">
                                         <div class="progress-fill" id="progress-fill"></div>
                                     </div>
                                     <div class="progress-info">
-                                        <span id="progress-percent">0%</span>
-                                        <span id="progress-speed"></span>
+                                        <div class="progress-stats">
+                                            <span id="progress-percent">0%</span>
+                                            <span id="progress-size"></span>
+                                        </div>
+                                        <div class="progress-speed">
+                                            <span id="progress-speed"></span>
+                                            <span id="progress-eta"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Update Ready -->
+                                <div class="update-ready" id="update-ready" style="display: none;">
+                                    <div class="update-ready-info">
+                                        <i data-lucide="check-circle" class="success-icon"></i>
+                                        <h4>Update Downloaded</h4>
+                                        <p>The update has been downloaded and is ready to install.</p>
+                                    </div>
+                                    <div class="update-actions">
+                                        <button class="btn btn-primary" id="install-update-btn">
+                                            <i data-lucide="power"></i>
+                                            Restart and Install
+                                        </button>
+                                        <button class="btn btn-secondary" id="install-later-btn">
+                                            Install Later
+                                        </button>
                                     </div>
                                 </div>
                                 

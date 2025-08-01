@@ -14,7 +14,7 @@ export ENABLE_DEBUG_LOGS=true
 
 # Run the build
 echo "🏗️ Starting build process..."
-npm run set-build-time && electron-builder
+electron-builder
 
 # Check if build was successful
 if [ $? -eq 0 ]; then

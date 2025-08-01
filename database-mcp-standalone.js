@@ -173,16 +173,17 @@ class DatabaseManagerMCP {
 
   async getAllTasks() {
     try {
-      // Set output mode to list with pipe separator
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling of multiline fields
+      const query = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks ORDER BY sort_order ASC, created_at DESC';
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const result = this.execSQL('SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks ORDER BY sort_order ASC, created_at DESC');
+      if (!result || result.trim() === '') {
+        return [];
+      }
       
-      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at'];
-      const tasks = this.parseRows(result, columns);
+      const tasks = JSON.parse(result);
       
-      // Convert numeric fields
+      // Convert numeric fields and handle nulls
       return tasks.map(task => ({
         ...task,
         id: parseInt(task.id),
@@ -197,14 +198,17 @@ class DatabaseManagerMCP {
 
   async getTasksByStatus(status) {
     try {
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling of multiline fields
+      // SQLite doesn't support parameterized queries with .mode json directly, so we need to escape the status
+      const escapedStatus = status.replace(/'/g, "''");
+      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE status = '${escapedStatus}' ORDER BY sort_order ASC, created_at DESC`;
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const sql = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE status = ? ORDER BY sort_order ASC, created_at DESC';
-      const result = this.execSQL(sql, [status]);
+      if (!result || result.trim() === '') {
+        return [];
+      }
       
-      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at'];
-      const tasks = this.parseRows(result, columns);
+      const tasks = JSON.parse(result);
       
       return tasks.map(task => ({
         ...task,
@@ -220,16 +224,15 @@ class DatabaseManagerMCP {
 
   async getTaskById(taskId) {
     try {
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling of multiline fields
+      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE id = ${parseInt(taskId)}`;
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const sql = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE id = ?';
-      const result = this.execSQL(sql, [taskId]);
+      if (!result || result.trim() === '') {
+        return null;
+      }
       
-      if (!result) return null;
-      
-      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at'];
-      const tasks = this.parseRows(result, columns);
+      const tasks = JSON.parse(result);
       
       if (tasks.length === 0) return null;
       
@@ -373,13 +376,15 @@ class DatabaseManagerMCP {
 
   async getProjects() {
     try {
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling
+      const query = 'SELECT id, name, display_name, color, created_at FROM projects ORDER BY name ASC';
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const result = this.execSQL('SELECT id, name, display_name, color, created_at FROM projects ORDER BY name ASC');
+      if (!result || result.trim() === '') {
+        return [];
+      }
       
-      const columns = ['id', 'name', 'display_name', 'color', 'created_at'];
-      const projects = this.parseRows(result, columns);
+      const projects = JSON.parse(result);
       
       return projects.map(project => ({
         ...project,
@@ -393,16 +398,16 @@ class DatabaseManagerMCP {
 
   async getProjectByName(name) {
     try {
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling
+      const escapedName = name.replace(/'/g, "''");
+      const query = `SELECT id, name, display_name, color, created_at FROM projects WHERE name = '${escapedName}'`;
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const sql = 'SELECT id, name, display_name, color, created_at FROM projects WHERE name = ?';
-      const result = this.execSQL(sql, [name]);
+      if (!result || result.trim() === '') {
+        return null;
+      }
       
-      if (!result) return null;
-      
-      const columns = ['id', 'name', 'display_name', 'color', 'created_at'];
-      const projects = this.parseRows(result, columns);
+      const projects = JSON.parse(result);
       
       if (projects.length === 0) return null;
       
@@ -419,14 +424,16 @@ class DatabaseManagerMCP {
 
   async getTasksByProject(projectName) {
     try {
-      execSync(`sqlite3 "${this.dbPath}" ".mode list"`, { encoding: 'utf8' });
-      execSync(`sqlite3 "${this.dbPath}" ".separator |"`, { encoding: 'utf8' });
+      // Use JSON mode for better handling of multiline fields
+      const escapedProjectName = projectName.replace(/'/g, "''");
+      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE project = '${escapedProjectName}' ORDER BY sort_order ASC, created_at DESC`;
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
-      const sql = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE project = ? ORDER BY sort_order ASC, created_at DESC';
-      const result = this.execSQL(sql, [projectName]);
+      if (!result || result.trim() === '') {
+        return [];
+      }
       
-      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at'];
-      const tasks = this.parseRows(result, columns);
+      const tasks = JSON.parse(result);
       
       return tasks.map(task => ({
         ...task,

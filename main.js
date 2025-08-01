@@ -136,10 +136,71 @@ ipcMain.handle('get-api-key', async () => {
 
 // Handle updater operations
 ipcMain.handle('check-for-updates', async () => {
+  logger.addLog('info', ['Manual update check requested via button']);
   try {
     if (global.updaterService) {
+      logger.addLog('info', ['Updater service exists, calling checkForUpdatesAndNotify()']);
       await global.updaterService.checkForUpdatesAndNotify();
+      logger.addLog('info', ['Update check completed']);
       return { success: true };
+    } else {
+      logger.addLog('error', ['Updater service not initialized']);
+      return { success: false, error: 'Updater service not initialized' };
+    }
+  } catch (error) {
+    logger.addLog('error', ['Update check error:', error.message]);
+    return { success: false, error: error.message };
+  }
+});
+
+// Start update download
+ipcMain.handle('start-update-download', async () => {
+  try {
+    if (global.updaterService) {
+      await global.updaterService.startDownload();
+      return { success: true };
+    } else {
+      return { success: false, error: 'Updater service not initialized' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Cancel update download
+ipcMain.handle('cancel-update-download', async () => {
+  try {
+    if (global.updaterService) {
+      const cancelled = await global.updaterService.cancelDownload();
+      return { success: cancelled };
+    } else {
+      return { success: false, error: 'Updater service not initialized' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Install update and restart
+ipcMain.handle('install-update', async () => {
+  try {
+    if (global.updaterService) {
+      global.updaterService.quitAndInstall();
+      return { success: true };
+    } else {
+      return { success: false, error: 'Updater service not initialized' };
+    }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+// Get current update info
+ipcMain.handle('get-update-info', async () => {
+  try {
+    if (global.updaterService) {
+      const info = global.updaterService.getCurrentUpdateInfo();
+      return { success: true, info };
     } else {
       return { success: false, error: 'Updater service not initialized' };
     }
@@ -151,6 +212,22 @@ ipcMain.handle('check-for-updates', async () => {
 // Get app version
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
+});
+
+// Get update status
+ipcMain.handle('get-update-status', () => {
+  if (global.updaterService) {
+    return {
+      isDownloading: global.updaterService.isDownloadInProgress(),
+      currentVersion: global.updaterService.getCurrentVersion(),
+      updateInfo: global.updaterService.getCurrentUpdateInfo()
+    };
+  }
+  return {
+    isDownloading: false,
+    currentVersion: app.getVersion(),
+    updateInfo: null
+  };
 });
 
 // Handle get shell preference
@@ -2525,25 +2602,46 @@ app.whenReady().then(async () => {
   
   // Initialize Updater Service
   try {
-    global.updaterService = new UpdaterService();
+    // Pass logger to UpdaterService
+    global.updaterService = new UpdaterService(logger);
+    logger.addLog('info', ['Updater service initialized successfully']);
+    
+    // Test update server connection first
+    setTimeout(async () => {
+      try {
+        logger.addLog('info', ['Testing update server connection...']);
+        const testResult = await global.updaterService.testUpdateServerConnection();
+        logger.addLog('info', ['Update server test result:', JSON.stringify(testResult)]);
+      } catch (error) {
+        logger.addLog('error', ['Update server connection test failed:', error.message]);
+      }
+    }, 1000);
     
     // Check for updates after 3 seconds
     setTimeout(() => {
+      logger.addLog('info', ['Auto-update check triggered (3s delay)']);
       if (!process.env.DISABLE_UPDATES) {
-        global.updaterService.checkForUpdatesAndNotify();
+        logger.addLog('info', ['Updates enabled, checking for updates...']);
+        global.updaterService.checkForUpdatesAndNotify().catch(err => {
+          logger.addLog('error', ['Auto-update check failed:', err.message]);
+        });
+      } else {
+        logger.addLog('info', ['Updates disabled via DISABLE_UPDATES env var']);
       }
     }, 3000);
     
     // Check for updates every 4 hours
     setInterval(() => {
+      logger.addLog('info', ['Periodic update check triggered (4h interval)']);
       if (!process.env.DISABLE_UPDATES) {
-        global.updaterService.checkForUpdatesAndNotify();
+        global.updaterService.checkForUpdatesAndNotify().catch(err => {
+          logger.addLog('error', ['Periodic update check failed:', err.message]);
+        });
       }
     }, 4 * 60 * 60 * 1000);
     
-    logger.addLog('info', ['Updater service initialized']);
   } catch (error) {
-    logger.addLog('error', ['Failed to initialize updater service:', error.message]);
+    logger.addLog('error', ['Failed to initialize updater service:', error.message, error.stack]);
   }
   
   // Start MCP Task Server

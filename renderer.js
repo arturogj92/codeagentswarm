@@ -4901,34 +4901,48 @@ class TerminalManager {
             this.updateStatus('checking');
         });
         
-        ipcRenderer.on('update-available', () => {
+        ipcRenderer.on('update-available', (event, info) => {
             this.updateStatus('available');
+            this.showUpdateAvailable(info);
         });
         
-        ipcRenderer.on('update-not-available', () => {
+        ipcRenderer.on('update-not-available', (event, info) => {
             this.updateStatus('up-to-date');
+            this.hideAllUpdateSections();
+            document.getElementById('default-update-actions').style.display = 'flex';
         });
         
         ipcRenderer.on('update-downloading', () => {
             this.updateStatus('downloading');
-            document.getElementById('update-progress').style.display = 'block';
+            this.showDownloadProgress();
         });
         
         ipcRenderer.on('update-progress', (event, progressObj) => {
-            const percent = Math.round(progressObj.percent);
-            document.getElementById('progress-fill').style.width = percent + '%';
-            document.getElementById('progress-percent').textContent = percent + '%';
-            
-            if (progressObj.bytesPerSecond) {
-                const speed = this.formatBytes(progressObj.bytesPerSecond) + '/s';
-                document.getElementById('progress-speed').textContent = speed;
-            }
+            this.updateDownloadProgress(progressObj);
         });
         
-        ipcRenderer.on('update-error', (event, error) => {
-            this.updateStatus('error', error);
-            document.getElementById('update-progress').style.display = 'none';
+        ipcRenderer.on('update-downloaded', (event, info) => {
+            this.updateStatus('ready');
+            this.showUpdateReady(info);
         });
+        
+        ipcRenderer.on('update-error', (event, errorInfo) => {
+            this.updateStatus('error', errorInfo.message);
+            this.hideAllUpdateSections();
+            document.getElementById('default-update-actions').style.display = 'flex';
+            
+            // Show error notification
+            this.showNotification('Update Error', errorInfo.message, 'error');
+        });
+        
+        ipcRenderer.on('update-cancelled', () => {
+            this.updateStatus('cancelled');
+            this.hideAllUpdateSections();
+            document.getElementById('default-update-actions').style.display = 'flex';
+        });
+        
+        // Check update status on startup
+        this.checkUpdateStatusOnStartup();
     }
     
     updateStatus(status, message = '') {
@@ -4938,15 +4952,19 @@ class TerminalManager {
         const statusMessages = {
             'ready': { icon: 'check-circle', text: 'Ready to check for updates' },
             'checking': { icon: 'loader-2', text: 'Checking for updates...', spin: true },
-            'available': { icon: 'download', text: 'Update available!' },
+            'available': { icon: 'download', text: 'Update available!', color: '#10b981' },
             'downloading': { icon: 'download-cloud', text: 'Downloading update...', spin: true },
-            'up-to-date': { icon: 'check-circle', text: 'You\'re up to date!' },
-            'error': { icon: 'alert-circle', text: message || 'Update check failed' }
+            'up-to-date': { icon: 'check-circle', text: 'You\'re up to date!', color: '#10b981' },
+            'ready': { icon: 'package-check', text: 'Update ready to install', color: '#10b981' },
+            'ready-to-install': { icon: 'package', text: 'Update will install on quit', color: '#f59e0b' },
+            'cancelled': { icon: 'x-circle', text: 'Download cancelled', color: '#f59e0b' },
+            'skipped': { icon: 'skip-forward', text: 'Update skipped', color: '#6b7280' },
+            'error': { icon: 'alert-circle', text: message || 'Update check failed', color: '#ef4444' }
         };
         
         const config = statusMessages[status] || statusMessages.ready;
         statusEl.innerHTML = `
-            <i data-lucide="${config.icon}" class="${config.spin ? 'spin' : ''}"></i>
+            <i data-lucide="${config.icon}" class="${config.spin ? 'spin' : ''}" ${config.color ? `style="color: ${config.color};"` : ''}></i>
             <span>${config.text}</span>
         `;
         
@@ -4959,6 +4977,154 @@ class TerminalManager {
         const sizes = ['Bytes', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+    
+    showUpdateAvailable(info) {
+        this.hideAllUpdateSections();
+        
+        const section = document.getElementById('update-available-section');
+        section.style.display = 'block';
+        
+        // Update version info
+        document.getElementById('new-version').textContent = info.version;
+        
+        // Format release date
+        if (info.releaseDate) {
+            const date = new Date(info.releaseDate);
+            document.getElementById('release-date').textContent = `Released ${date.toLocaleDateString()}`;
+        }
+        
+        // Show release notes
+        if (info.releaseNotes) {
+            const notesEl = document.getElementById('release-notes');
+            notesEl.innerHTML = this.formatReleaseNotes(info.releaseNotes);
+            notesEl.style.display = 'block';
+        } else {
+            document.getElementById('release-notes').style.display = 'none';
+        }
+        
+        // Bind download button
+        const downloadBtn = document.getElementById('download-update-btn');
+        downloadBtn.onclick = async () => {
+            await ipcRenderer.invoke('start-update-download');
+        };
+        
+        // Bind skip button
+        const skipBtn = document.getElementById('skip-update-btn');
+        skipBtn.onclick = () => {
+            this.hideAllUpdateSections();
+            document.getElementById('default-update-actions').style.display = 'flex';
+            this.updateStatus('skipped');
+        };
+    }
+    
+    showDownloadProgress() {
+        this.hideAllUpdateSections();
+        document.getElementById('update-progress').style.display = 'block';
+        
+        // Bind cancel button
+        const cancelBtn = document.getElementById('cancel-download-btn');
+        cancelBtn.onclick = async () => {
+            await ipcRenderer.invoke('cancel-update-download');
+        };
+    }
+    
+    updateDownloadProgress(progressObj) {
+        const percent = Math.round(progressObj.percent);
+        document.getElementById('progress-fill').style.width = percent + '%';
+        document.getElementById('progress-percent').textContent = percent + '%';
+        
+        // Show download size
+        if (progressObj.transferredFormatted && progressObj.totalFormatted) {
+            document.getElementById('progress-size').textContent = 
+                `${progressObj.transferredFormatted} / ${progressObj.totalFormatted}`;
+        }
+        
+        // Show speed
+        if (progressObj.speedFormatted) {
+            document.getElementById('progress-speed').textContent = progressObj.speedFormatted;
+        }
+        
+        // Show ETA
+        if (progressObj.eta) {
+            document.getElementById('progress-eta').textContent = `ETA: ${progressObj.eta}`;
+        }
+    }
+    
+    showUpdateReady(info) {
+        this.hideAllUpdateSections();
+        document.getElementById('update-ready').style.display = 'block';
+        
+        // Bind install button
+        const installBtn = document.getElementById('install-update-btn');
+        installBtn.onclick = async () => {
+            await ipcRenderer.invoke('install-update');
+        };
+        
+        // Bind later button
+        const laterBtn = document.getElementById('install-later-btn');
+        laterBtn.onclick = () => {
+            this.hideAllUpdateSections();
+            document.getElementById('default-update-actions').style.display = 'flex';
+            this.updateStatus('ready-to-install');
+            
+            // Show reminder notification
+            this.showNotification(
+                'Update Ready',
+                'The update will be installed when you quit the app.',
+                'info'
+            );
+        };
+    }
+    
+    hideAllUpdateSections() {
+        document.getElementById('update-available-section').style.display = 'none';
+        document.getElementById('update-progress').style.display = 'none';
+        document.getElementById('update-ready').style.display = 'none';
+        document.getElementById('default-update-actions').style.display = 'none';
+    }
+    
+    formatReleaseNotes(notes) {
+        // Convert markdown-style notes to HTML
+        return notes
+            .replace(/\n/g, '<br>')
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            .replace(/^- (.*)/gm, '• $1')
+            .replace(/^\d+\. (.*)/gm, '$1');
+    }
+    
+    async checkUpdateStatusOnStartup() {
+        try {
+            const status = await ipcRenderer.invoke('get-update-status');
+            if (status.updateInfo && status.isDownloading) {
+                // Resume showing download progress
+                this.showDownloadProgress();
+            } else if (status.updateInfo && !status.isDownloading) {
+                // Show update available
+                this.showUpdateAvailable(status.updateInfo);
+            }
+        } catch (error) {
+            console.error('Failed to check update status:', error);
+        }
+    }
+    
+    showNotification(title, message, type = 'info') {
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <strong>${title}</strong>
+                <p>${message}</p>
+            </div>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-hide after 5 seconds
+        setTimeout(() => {
+            notification.remove();
+        }, 5000);
     }
 
 }
