@@ -81,6 +81,8 @@
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "logo_prod_512.png",
+      "appId": "com.codeagentswarm.app",
+      "bundleId": "com.codeagentswarm.app",
       "target": [
         {
           "target": "dmg",
@@ -95,7 +97,8 @@
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
-      "entitlementsInherit": "entitlements.mac.plist"
+      "entitlementsInherit": "entitlements.mac.plist",
+      "notarize": false
     },
     "dmg": {
       "artifactName": "${productName}-${version}-darwin-${arch}.${ext}"
