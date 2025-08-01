@@ -40,6 +40,7 @@
   "build": {
     "appId": "com.codeagentswarm.app",
     "productName": "CodeAgentSwarm",
+    "generateUpdatesFilesForAllChannels": false,
     "directories": {
       "output": "dist"
     },
@@ -94,10 +95,12 @@
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "notarize": false
+      "notarize": false,
+      "electronUpdaterCompatibility": ">=2.16"
     },
     "dmg": {
-      "artifactName": "${productName}-${version}-darwin-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-darwin-${arch}.${ext}",
+      "writeUpdateInfo": false
     },
     "afterSign": "scripts/notarize.js",
     "win": {
