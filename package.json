@@ -76,10 +76,11 @@
       "node_modules/**/*",
       "debug-config.json",
       "build-debug.sh",
-      "services/**/*",
+      "services/**/*"
+    ],
+    "extraResources": [
       "app-update.yml"
     ],
-    "extraResources": [],
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "logo_prod_512.png",
