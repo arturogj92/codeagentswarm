@@ -76,7 +76,8 @@
       "node_modules/**/*",
       "debug-config.json",
       "build-debug.sh",
-      "services/**/*"
+      "services/**/*",
+      "app-update.yml"
     ],
     "extraResources": [],
     "mac": {
