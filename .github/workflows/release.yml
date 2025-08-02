@@ -236,14 +236,14 @@ jobs:
             echo "No existing file to delete or delete failed (status: $DELETE_STATUS)"
           fi
           
-          # For files over 100MB, use the Node.js script for better handling
+          # For files over 100MB, use the script with timeout and retry
           if [ ${{ steps.release_info.outputs.filesize }} -gt 104857600 ]; then
-            echo "Large file detected, using resumable upload..."
-            node scripts/upload-large-file.js \
+            echo "Large file detected, using upload script with timeout and retry..."
+            bash scripts/upload-with-timeout.sh \
               "${{ secrets.SUPABASE_URL }}" \
               "${{ secrets.SUPABASE_SERVICE_KEY }}" \
               "${{ steps.release_info.outputs.file }}" \
-              "releases/$UPLOAD_PATH"
+              "$UPLOAD_PATH"
             
             UPLOAD_RESPONSE="200"  # Set success status
           else
