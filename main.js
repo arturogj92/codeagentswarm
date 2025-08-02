@@ -94,45 +94,7 @@ ipcMain.on('export-logs', (event) => {
   event.sender.send('export-logs-response', logsText);
 });
 
-// Handle shell preference update
-ipcMain.handle('update-shell-preference', async (event, shellConfig) => {
-  try {
-    const result = db.saveSetting('preferred_shell', shellConfig);
-    return { success: result.success };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-// Handle API key management
-ipcMain.handle('save-api-key', async (event, key) => {
-  try {
-    const result = db.saveSetting('deepseek_api_key', key);
-    // Set it in the environment for the current session
-    if (key) {
-      process.env.DEEPSEEK_API_KEY = key;
-      // Reinitialize Git service to use the new API key
-      if (gitService) {
-        gitService.reinitializeDeepSeekService();
-      }
-    } else {
-      // Clear the API key if empty
-      delete process.env.DEEPSEEK_API_KEY;
-    }
-    return { success: result.success };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
-
-ipcMain.handle('get-api-key', async () => {
-  try {
-    const key = db.getSetting('deepseek_api_key');
-    return { success: true, key: key || '' };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// Database-dependent handlers are registered in registerDatabaseHandlers() after db initialization
 
 // Handle updater operations
 ipcMain.handle('check-for-updates', async () => {
@@ -230,47 +192,7 @@ ipcMain.handle('get-update-status', () => {
   };
 });
 
-// Handle get shell preference
-ipcMain.handle('get-shell-preference', async () => {
-  try {
-    const shellConfig = db.getSetting('preferred_shell');
-    
-    // Detect available shells from /etc/shells
-    const availableShells = [];
-    try {
-      const shellsContent = fs.readFileSync('/etc/shells', 'utf8');
-      const shells = shellsContent.split('\n')
-        .filter(line => line && !line.startsWith('#'))
-        .map(line => line.trim())
-        .filter(shell => shell);
-      
-      // Check if each shell exists and is executable
-      for (const shell of shells) {
-        if (fs.existsSync(shell) && fs.statSync(shell).isFile()) {
-          const name = path.basename(shell);
-          availableShells.push({ path: shell, name: name });
-        }
-      }
-    } catch (err) {
-      // Fallback to common shells if /etc/shells is not available
-      const commonShells = ['/bin/bash', '/bin/zsh', '/bin/sh'];
-      for (const shell of commonShells) {
-        if (fs.existsSync(shell)) {
-          availableShells.push({ path: shell, name: path.basename(shell) });
-        }
-      }
-    }
-    
-    return { 
-      success: true, 
-      config: shellConfig || { type: 'system' },
-      currentShell: process.env.SHELL || '/bin/zsh',
-      availableShells: availableShells
-    };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
-});
+// get-shell-preference handler is now in registerDatabaseHandlers()
 
 // Handle MCP diagnostic request
 ipcMain.on('run-mcp-diagnostic', async (event) => {
@@ -2582,10 +2504,119 @@ ipcMain.on('create-task', async (event, taskData) => {
   }
 });
 
+// Function to register IPC handlers that depend on database
+function registerDatabaseHandlers() {
+  // Handle shell preference update
+  ipcMain.handle('update-shell-preference', async (event, shellConfig) => {
+    try {
+      const result = db.saveSetting('preferred_shell', shellConfig);
+      return { success: result.success };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle debug mode preference
+  ipcMain.handle('get-debug-mode', async () => {
+    try {
+      const debugMode = db.getSetting('debug_mode');
+      // getSetting returns the value directly, not an object with a value property
+      const enabled = debugMode === true || debugMode === 'true';
+      return { success: true, enabled: enabled };
+    } catch (error) {
+      return { success: false, enabled: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('set-debug-mode', async (event, enabled) => {
+    try {
+      const result = db.saveSetting('debug_mode', enabled);
+      return { success: result.success };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle API key management
+  ipcMain.handle('save-api-key', async (event, key) => {
+    try {
+      const result = db.saveSetting('deepseek_api_key', key);
+      // Set it in the environment for the current session
+      if (key) {
+        process.env.DEEPSEEK_API_KEY = key;
+        // Reinitialize Git service to use the new API key
+        if (gitService) {
+          gitService.reinitializeDeepSeekService();
+        }
+      } else {
+        // Clear the API key if empty
+        delete process.env.DEEPSEEK_API_KEY;
+      }
+      return { success: result.success };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-api-key', async () => {
+    try {
+      const key = db.getSetting('deepseek_api_key');
+      return { success: true, key: key || '' };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle get shell preference
+  ipcMain.handle('get-shell-preference', async () => {
+    try {
+      const shellConfig = db.getSetting('preferred_shell');
+      
+      // Detect available shells from /etc/shells
+      const availableShells = [];
+      try {
+        const shellsContent = fs.readFileSync('/etc/shells', 'utf8');
+        const shells = shellsContent.split('\n')
+          .filter(line => line && !line.startsWith('#'))
+          .map(line => line.trim())
+          .filter(shell => shell);
+        
+        // Check if each shell exists and is executable
+        for (const shell of shells) {
+          if (fs.existsSync(shell) && fs.statSync(shell).isFile()) {
+            const name = path.basename(shell);
+            availableShells.push({ path: shell, name: name });
+          }
+        }
+      } catch (err) {
+        // Fallback to common shells if /etc/shells is not available
+        const commonShells = ['/bin/bash', '/bin/zsh', '/bin/sh'];
+        for (const shell of commonShells) {
+          if (fs.existsSync(shell)) {
+            availableShells.push({ path: shell, name: path.basename(shell) });
+          }
+        }
+      }
+      
+      return { 
+        success: true, 
+        config: shellConfig || { type: 'system' },
+        currentShell: process.env.SHELL || '/bin/zsh',
+        availableShells: availableShells
+      };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  });
+}
+
 app.whenReady().then(async () => {
   // Initialize database
   try {
     db = new DatabaseManager();
+    
+    // Register IPC handlers that depend on database
+    registerDatabaseHandlers();
     
     // Load API key from database if available
     const savedApiKey = db.getSetting('deepseek_api_key');

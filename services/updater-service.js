@@ -94,6 +94,14 @@ class UpdaterService {
     });
     
     autoUpdater.on('error', (err) => {
+      // Check if this is just a "no updates available" error
+      if (err.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' || 
+          (err.message && err.message.includes('404'))) {
+        dualLog.info('No updates available (404 from server)');
+        this.sendToRenderer('update-not-available');
+        return;
+      }
+      
       dualLog.error('Update error:', err);
       this.isDownloading = false;
       this.downloadCancellationToken = null;
@@ -193,47 +201,21 @@ class UpdaterService {
       
       return result;
     } catch (error) {
-      // Check if this is just a "no updates available" scenario
-      if (error.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' || 
-          (error.message && error.message.includes('404'))) {
-        dualLog.info('No updates available (404 from server)');
-        return null;
-      }
-      
-      // For real errors, log and re-throw
-      dualLog.error('=== UPDATE CHECK ERROR ===');
-      dualLog.error('Error details:', error);
-      dualLog.error('Error message:', error.message);
-      dualLog.error('Error stack:', error.stack);
-      throw error;
+      // The error handler will already process this, just return null
+      return null;
     }
   }
   
   async checkForUpdatesAndNotify() {
-    try {
-      dualLog.info('checkForUpdatesAndNotify called');
-      const result = await this.checkForUpdates();
-      dualLog.info('checkForUpdates returned:', result);
-      
-      if (!result || !result.updateInfo) {
-        dualLog.info('No update info in result, sending update-not-available');
-        this.sendToRenderer('update-not-available');
-      }
-      return result;
-    } catch (error) {
-      // Check if this is a "no updates available" error
-      if (error.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' || 
-          (error.message && error.message.includes('404'))) {
-        dualLog.info('No updates available - server returned 404');
-        this.sendToRenderer('update-not-available');
-        return null;
-      }
-      
-      // For other errors, log and send error to renderer
-      dualLog.error('Error in checkForUpdatesAndNotify:', error.message);
-      dualLog.error('Full error object:', JSON.stringify(error, null, 2));
-      this.sendToRenderer('update-error', error.message);
+    dualLog.info('checkForUpdatesAndNotify called');
+    const result = await this.checkForUpdates();
+    dualLog.info('checkForUpdates returned:', result);
+    
+    if (!result || !result.updateInfo) {
+      // The event handler will have already sent the appropriate notification
+      dualLog.info('No update info in result');
     }
+    return result;
   }
   
   async startDownload() {
