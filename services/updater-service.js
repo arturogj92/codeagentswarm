@@ -193,6 +193,14 @@ class UpdaterService {
       
       return result;
     } catch (error) {
+      // Check if this is just a "no updates available" scenario
+      if (error.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' || 
+          (error.message && error.message.includes('404'))) {
+        dualLog.info('No updates available (404 from server)');
+        return null;
+      }
+      
+      // For real errors, log and re-throw
       dualLog.error('=== UPDATE CHECK ERROR ===');
       dualLog.error('Error details:', error);
       dualLog.error('Error message:', error.message);
@@ -213,6 +221,15 @@ class UpdaterService {
       }
       return result;
     } catch (error) {
+      // Check if this is a "no updates available" error
+      if (error.code === 'ERR_UPDATER_CHANNEL_FILE_NOT_FOUND' || 
+          (error.message && error.message.includes('404'))) {
+        dualLog.info('No updates available - server returned 404');
+        this.sendToRenderer('update-not-available');
+        return null;
+      }
+      
+      // For other errors, log and send error to renderer
       dualLog.error('Error in checkForUpdatesAndNotify:', error.message);
       dualLog.error('Full error object:', JSON.stringify(error, null, 2));
       this.sendToRenderer('update-error', error.message);
