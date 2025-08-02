@@ -15,21 +15,46 @@ upload_file() {
     local attempt=$1
     echo "📤 Upload attempt $attempt/$MAX_RETRIES..."
     
-    # Use timeout command to limit execution time
-    if command -v gtimeout >/dev/null 2>&1; then
-        TIMEOUT_CMD="gtimeout"
+    # On macOS, we need to install coreutils for gtimeout
+    # For GitHub Actions, we'll handle this differently
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # Use a background job with a timer for macOS
+        (
+            node scripts/upload-large-file.js \
+                "$SUPABASE_URL" \
+                "$SERVICE_KEY" \
+                "$FILE_PATH" \
+                "releases/$UPLOAD_PATH"
+        ) &
+        
+        local upload_pid=$!
+        local elapsed=0
+        
+        # Wait for the process or timeout
+        while kill -0 $upload_pid 2>/dev/null; do
+            if [ $elapsed -ge $TIMEOUT_SECONDS ]; then
+                echo "⏱️  Upload timed out after $TIMEOUT_SECONDS seconds"
+                kill -9 $upload_pid 2>/dev/null
+                wait $upload_pid 2>/dev/null
+                return 124  # Same exit code as timeout command
+            fi
+            sleep 1
+            ((elapsed++))
+        done
+        
+        # Get the exit status
+        wait $upload_pid
+        return $?
     else
-        TIMEOUT_CMD="timeout"
+        # On Linux, use timeout command
+        timeout $TIMEOUT_SECONDS node scripts/upload-large-file.js \
+            "$SUPABASE_URL" \
+            "$SERVICE_KEY" \
+            "$FILE_PATH" \
+            "releases/$UPLOAD_PATH"
+        
+        return $?
     fi
-    
-    # Try the upload with timeout
-    $TIMEOUT_CMD $TIMEOUT_SECONDS node scripts/upload-large-file.js \
-        "$SUPABASE_URL" \
-        "$SERVICE_KEY" \
-        "$FILE_PATH" \
-        "releases/$UPLOAD_PATH"
-    
-    return $?
 }
 
 # Main retry loop
