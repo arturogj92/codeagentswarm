@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to CodeAgentSwarm</title>
+    <link rel="stylesheet" href="wizard.css">
+    <link rel="stylesheet" href="wizard-icons.css">
+</head>
+<body>
+    <div class="wizard-container">
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-dots">
+                <span class="dot active" data-screen="1"></span>
+                <span class="dot" data-screen="2"></span>
+                <span class="dot" data-screen="3"></span>
+                <span class="dot" data-screen="4"></span>
+                <span class="dot" data-screen="5"></span>
+            </div>
+        </div>
+
+        <!-- Screen 1: Welcome -->
+        <div class="wizard-screen active" id="screen1">
+            <div class="logo-container">
+                <img src="logo_prod_512.png" alt="CodeAgentSwarm" class="logo animated-logo">
+            </div>
+            <h1 class="welcome-title">Welcome to CodeAgentSwarm</h1>
+            <p class="subtitle">Supercharge your Claude Code workflow with parallel terminal management</p>
+            <div class="productivity-boost">
+                <span class="boost-icon">🚀</span>
+                <span class="boost-text">10x Productivity Boost</span>
+            </div>
+            <div class="features-preview">
+                <div class="feature-pill"><span class="icon-terminal"></span> Up to 6 Terminals</div>
+                <div class="feature-pill"><span class="icon-tasks"></span> Automated Tasks</div>
+                <div class="feature-pill"><span class="icon-notification"></span> Smart Notifications</div>
+                <div class="feature-pill"><span class="icon-ai"></span> AI-Powered Commits</div>
+            </div>
+        </div>
+
+        <!-- Screen 2: Multiple Terminals Demo -->
+        <div class="wizard-screen" id="screen2">
+            <h2>Parallel Terminal Management</h2>
+            <p class="screen-subtitle">Manage multiple AI coding sessions simultaneously</p>
+            <div class="video-container">
+                <video id="terminalsVideo" loop muted playsinline>
+                    <source src="assets/wizard/terminals-demo.mp4" type="video/mp4">
+                    <!-- Fallback to GIF if video doesn't load -->
+                    <img src="assets/wizard/terminals-demo.gif" alt="Multiple terminals demo">
+                </video>
+                <div class="video-overlay" onclick="playVideo('terminalsVideo')">
+                    <div class="play-button">▶</div>
+                </div>
+            </div>
+            <div class="feature-grid-horizontal">
+                <div class="feature-item">
+                    <div class="icon-terminal feature-icon"></div>
+                    <div>
+                        <h3>Up to 6 Terminals</h3>
+                        <p>Run multiple Claude Code instances in parallel</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="icon-notification feature-icon"></div>
+                    <div>
+                        <h3>Smart Notifications</h3>
+                        <p>Get notified when Claude needs your input or completes a task</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="icon-lightning feature-icon"></div>
+                    <div>
+                        <h3>Instant Switching</h3>
+                        <p>Quick navigation with Cmd+1-6 shortcuts</p>
+                    </div>
+                </div>
+                <div class="feature-item">
+                    <div class="icon-shield feature-icon"></div>
+                    <div>
+                        <h3>Persistent Sessions</h3>
+                        <p>Never lose your work - sessions survive restarts</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 3: Task Management -->
+        <div class="wizard-screen" id="screen3">
+            <h2>Automated Task Management</h2>
+            <p class="screen-subtitle">Let Claude manage your tasks automatically via MCP</p>
+            <div class="demo-container">
+                <img src="assets/wizard/kanban-demo.gif" alt="Kanban board demo" class="demo-gif">
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-ai emoji"></div>
+                    <h3>AI-Driven Automation</h3>
+                    <p>Claude creates, updates, and manages tasks automatically through MCP</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-tasks emoji"></div>
+                    <h3>Visual Kanban Board</h3>
+                    <p>See all your tasks organized in an intuitive board layout</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-shield emoji"></div>
+                    <h3>Smart Organization</h3>
+                    <p>Tasks grouped by project with automatic color coding</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-chart emoji"></div>
+                    <h3>Progress Tracking</h3>
+                    <p>Real-time status updates as Claude works on your tasks</p>
+                </div>
+            </div>
+            <div class="mcp-highlight">
+                <div class="icon-link mcp-icon"></div>
+                <div class="mcp-text">
+                    <strong>Powered by MCP</strong>
+                    <p>Model Context Protocol enables seamless AI-task integration</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 4: AI Git Commits -->
+        <div class="wizard-screen" id="screen4">
+            <h2>AI-Powered Git Commits</h2>
+            <div class="video-container">
+                <video id="gitVideo" loop muted playsinline>
+                    <source src="assets/wizard/git-commit-demo.mp4" type="video/mp4">
+                    <img src="assets/wizard/git-commit-demo.gif" alt="Git commit demo">
+                </video>
+                <div class="video-overlay" onclick="playVideo('gitVideo')">
+                    <div class="play-button">▶</div>
+                </div>
+            </div>
+            <div class="commit-example">
+                <div class="commit-box">
+                    <p class="commit-label">AI-generated commit message:</p>
+                    <code>feat: Add multi-terminal support with persistent sessions
+
+- Implement terminal quadrant system (4 terminals)
+- Add session persistence across app restarts
+- Create keyboard shortcuts for quick switching (Cmd+1-4)
+- Update UI to display terminal indicators</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 5: Get Started -->
+        <div class="wizard-screen" id="screen5">
+            <h2>You're All Set! 🎉</h2>
+            <div class="setup-options">
+                <div class="option-card">
+                    <h3>Quick Setup</h3>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="defaultDirectory" checked>
+                        <span class="checkmark"></span>
+                        Set default working directory
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="autoUpdates" checked>
+                        <span class="checkmark"></span>
+                        Enable automatic updates
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="analytics">
+                        <span class="checkmark"></span>
+                        Share anonymous usage data
+                    </label>
+                </div>
+                <div class="shortcuts-preview">
+                    <h3>Essential Shortcuts</h3>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>1-6</kbd>
+                        <span>Switch between terminals</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>K</kbd>
+                        <span>Open task Kanban board</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>G</kbd>
+                        <span>Generate AI commit</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>N</kbd>
+                        <span>New terminal window</span>
+                    </div>
+                </div>
+            </div>
+            <button class="finish-button" onclick="finishWizard()">
+                Start Using CodeAgentSwarm
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="wizard-navigation">
+            <button class="nav-button" id="prevButton" onclick="previousScreen()">
+                ← Back
+            </button>
+            <button class="nav-button primary" id="nextButton" onclick="nextScreen()">
+                Next →
+            </button>
+        </div>
+    </div>
+
+    <script src="wizard.js"></script>
+</body>
+</html>

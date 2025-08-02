@@ -10,6 +10,7 @@ const HooksManager = require('./hooks-manager');
 const WebhookServer = require('./webhook-server');
 const GitService = require('./git-service');
 const UpdaterService = require('./services/updater-service');
+const WizardWindow = require('./wizard-window');
 
 // Initialize the centralized logger
 const logger = require('./logger');
@@ -2611,6 +2612,25 @@ function registerDatabaseHandlers() {
 }
 
 app.whenReady().then(async () => {
+  // Initialize wizard window
+  const wizardWindow = new WizardWindow();
+  
+  // Check if wizard should be shown
+  if (wizardWindow.shouldShowWizard()) {
+    // Show wizard on first run
+    wizardWindow.create();
+    
+    // Wait for wizard completion before continuing
+    app.once('wizard-completed', async () => {
+      await initializeApp();
+    });
+  } else {
+    // Normal app initialization
+    await initializeApp();
+  }
+});
+
+async function initializeApp() {
   // Initialize database
   try {
     db = new DatabaseManager();
@@ -2748,7 +2768,7 @@ app.whenReady().then(async () => {
       createWindow();
     }
   });
-});
+}
 
 app.on('window-all-closed', () => {
   // Mark app as quitting to prevent restarts

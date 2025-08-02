@@ -49,6 +49,12 @@
       "renderer.js",
       "index.html",
       "styles.css",
+      "wizard.html",
+      "wizard.css",
+      "wizard.js",
+      "wizard-window.js",
+      "wizard-preload.js",
+      "assets/wizard/**/*",
       "database.js",
       "database-mcp.js",
       "database-mcp-standalone.js",
@@ -102,7 +108,27 @@
     },
     "dmg": {
       "artifactName": "${productName}-${version}-darwin-${arch}.${ext}",
-      "writeUpdateInfo": false
+      "writeUpdateInfo": false,
+      "title": "Install CodeAgentSwarm",
+      "contents": [
+        {
+          "x": 180,
+          "y": 170,
+          "type": "file"
+        },
+        {
+          "x": 480,
+          "y": 170,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 660,
+        "height": 400
+      },
+      "backgroundColor": "#0d0d0d",
+      "icon": "dmg-icon.icns"
     },
     "afterSign": "scripts/notarize.js",
     "win": {
