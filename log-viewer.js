@@ -7,7 +7,9 @@ class LogViewer {
     this.logList = null;
     this.isVisible = false;
     this.unsubscribe = null;
+    this.button = null;
     
+    // Check if logger is enabled (already synced from database in renderer.js)
     if (logger.isEnabled()) {
       this.init();
     }
@@ -26,13 +28,19 @@ class LogViewer {
     if (typeof window !== 'undefined' && window.require) {
       const { ipcRenderer } = window.require('electron');
       
-      ipcRenderer.on('log-update', (event, log) => {
+      // Store the handler so we can remove it later
+      this.logUpdateHandler = (event, log) => {
+        // Check if LogViewer is still initialized
+        if (!this.logList) return;
+        
         if (log.type === 'clear') {
           this.logList.innerHTML = '';
         } else {
           this.addLogEntry(log);
         }
-      });
+      };
+      
+      ipcRenderer.on('log-update', this.logUpdateHandler);
     }
   }
 
@@ -282,6 +290,9 @@ class LogViewer {
   }
 
   addLogEntry(log) {
+    // Protect against calls after destroy
+    if (!this.logList) return;
+    
     const entry = document.createElement('div');
     entry.className = 'log-entry';
 
@@ -352,16 +363,55 @@ class LogViewer {
     }
   }
 
+  setDebugMode(enabled) {
+    console.log('LogViewer.setDebugMode called with:', enabled, 'button exists:', !!this.button);
+    
+    if (enabled && !this.button) {
+      // Initialize if not already initialized
+      this.init();
+    } else if (!enabled && this.button) {
+      // Completely remove the button and container
+      this.destroy();
+    } else if (enabled && this.button) {
+      // Show the button
+      this.button.style.display = 'flex';
+    } else if (!enabled && !this.button) {
+      // Button doesn't exist but we're trying to hide - check if button exists in DOM
+      const existingButton = document.querySelector('.log-viewer-button');
+      if (existingButton) {
+        console.log('Found orphan button in DOM, removing it');
+        existingButton.remove();
+      }
+      const existingContainer = document.querySelector('.log-viewer-container');
+      if (existingContainer) {
+        console.log('Found orphan container in DOM, removing it');
+        existingContainer.remove();
+      }
+    }
+  }
+
   destroy() {
+    // Remove IPC listener
+    if (this.logUpdateHandler && typeof window !== 'undefined' && window.require) {
+      const { ipcRenderer } = window.require('electron');
+      ipcRenderer.removeListener('log-update', this.logUpdateHandler);
+      this.logUpdateHandler = null;
+    }
+    
     if (this.unsubscribe) {
       this.unsubscribe();
+      this.unsubscribe = null;
     }
     if (this.button) {
       this.button.remove();
+      this.button = null;
     }
     if (this.container) {
       this.container.remove();
+      this.container = null;
     }
+    this.logList = null;
+    this.isVisible = false;
   }
 }
 

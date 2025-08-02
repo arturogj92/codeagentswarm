@@ -22,11 +22,11 @@ class Logger {
     // In renderer process, we need to check differently
     if (typeof window !== 'undefined' && window.require) {
       // We're in renderer process
+      // Don't use localStorage for initial state - it will be synced from database settings
       this.enabled = debugFromConfig ||
                      process.env.ENABLE_DEBUG_LOGS === 'true' || 
                      process.env.NODE_ENV === 'development' || 
-                     window.location.search.includes('dev') ||
-                     localStorage.getItem('debugMode') === 'true';
+                     window.location.search.includes('dev');
     } else {
       // We're in main process
       this.enabled = debugFromConfig ||
@@ -142,16 +142,10 @@ class Logger {
   
   enable() {
     this.enabled = true;
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('debugMode', 'true');
-    }
   }
   
   disable() {
     this.enabled = false;
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('debugMode');
-    }
   }
 }
 

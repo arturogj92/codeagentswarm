@@ -29,7 +29,6 @@
                     <i data-lucide="git-branch-plus"></i>
                 </button>
             </div>
-            <div class="dev-indicator" id="dev-indicator" style="display: none;">DEBUG</div>
             <div class="header-controls">
                 <div class="terminal-management">
                     <div class="layout-selector" id="layout-selector" style="display: none;">
@@ -101,6 +100,18 @@
                     <div class="tab-content">
                         <!-- General Tab -->
                         <div class="tab-panel active" data-panel="general">
+                            <div class="settings-section">
+                                <h3><i data-lucide="bug"></i> Debug Mode</h3>
+                                <label class="checkbox-option" for="debug-mode-checkbox">
+                                    <span>Enable Debug Mode</span>
+                                    <div class="toggle-wrapper">
+                                        <input type="checkbox" id="debug-mode-checkbox">
+                                        <div class="toggle-switch"></div>
+                                    </div>
+                                </label>
+                                <p class="settings-note">Shows the logs button for debugging purposes</p>
+                            </div>
+                            
                             <div class="settings-section">
                                 <h3><i data-lucide="bell"></i> Notifications</h3>
                                 <p>Desktop notifications may not always work properly depending on your system settings:</p>

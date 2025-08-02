@@ -4673,8 +4673,23 @@ class TerminalManager {
             document.getElementById('deepseek-api-key').value = apiKeyResult.key;
         }
         
+        // Get debug mode preference
+        const debugModeResult = await ipcRenderer.invoke('get-debug-mode');
+        if (debugModeResult.success) {
+            const debugCheckbox = document.getElementById('debug-mode-checkbox');
+            debugCheckbox.checked = debugModeResult.enabled;
+        }
+        
         // Initialize Updates tab
         this.initializeUpdatesTab();
+        
+        // Re-render lucide icons after modal content is updated
+        setTimeout(() => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+        }, 10);
         
         if (shellPref.success) {
             // Update system shell display
@@ -4783,6 +4798,7 @@ class TerminalManager {
                     customContainer.style.display = 'none';
                 }
             }
+            
         });
 
         // Toggle API key visibility - using delegation
@@ -4850,6 +4866,31 @@ class TerminalManager {
                 if (!apiKeyResult.success) {
                     hasErrors = true;
                     alert('Failed to save API key: ' + (apiKeyResult.error || 'Unknown error'));
+                }
+                
+                // Save debug mode preference
+                const debugCheckbox = document.getElementById('debug-mode-checkbox');
+                const debugModeEnabled = debugCheckbox.checked;
+                
+                const debugModeResult = await ipcRenderer.invoke('set-debug-mode', debugModeEnabled);
+                
+                if (!debugModeResult.success) {
+                    hasErrors = true;
+                    alert('Failed to save debug mode preference: ' + (debugModeResult.error || 'Unknown error'));
+                } else {
+                    // Update logger state
+                    const logger = require('./logger');
+                    if (debugModeEnabled) {
+                        logger.enable();
+                    } else {
+                        logger.disable();
+                    }
+                    
+                    // Update LogViewer visibility
+                    if (window.logViewer) {
+                        console.log('Setting debug mode to:', debugModeEnabled);
+                        window.logViewer.setDebugMode(debugModeEnabled);
+                    }
                 }
                 
                 if (!hasErrors) {
@@ -5132,18 +5173,9 @@ class TerminalManager {
 // Listen for dev mode status from main process
 ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
     if (isDevMode) {
-        // Store debug mode in localStorage for persistence
-        localStorage.setItem('debugMode', 'true');
-        
         // Enable logger
         const logger = require('./logger');
         logger.enable();
-        
-        // Show dev indicator
-        const devIndicator = document.getElementById('dev-indicator');
-        if (devIndicator) {
-            devIndicator.style.display = 'block';
-        }
         
         // Initialize LogViewer if not already initialized
         if (window.logViewer && !window.logViewer.container) {
@@ -5175,8 +5207,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }, 100);
     
-    // Initialize LogViewer
-    window.logViewer = new LogViewer();
+    // Sync debug mode state from settings FIRST
+    try {
+        const debugModeResult = await ipcRenderer.invoke('get-debug-mode');
+        if (debugModeResult.success) {
+            const logger = require('./logger');
+            if (debugModeResult.enabled) {
+                logger.enable();
+            } else {
+                logger.disable();
+            }
+        }
+    } catch (error) {
+        console.error('Error syncing debug mode:', error);
+    }
+    
+    // Initialize LogViewer AFTER syncing debug mode (only if not already created)
+    if (!window.logViewer) {
+        window.logViewer = new LogViewer();
+    }
     
     // Start performance monitoring in dev mode
     const urlParams = new URLSearchParams(window.location.search);
