@@ -4516,3 +4516,85 @@ h3 i {
   color: #10b981;
 }
 
+/* App Notification Container */
+.notification-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 10000;
+  pointer-events: none;
+}
+
+/* App Notification Styles */
+.app-notification {
+  background: rgba(20, 20, 20, 0.95);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 16px 20px;
+  margin-bottom: 10px;
+  min-width: 300px;
+  max-width: 400px;
+  opacity: 0;
+  transform: translateX(100%);
+  transition: all 0.3s ease;
+  pointer-events: all;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.app-notification.show {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.app-notification .notification-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-notification .notification-message {
+  color: var(--text-primary);
+  font-size: 14px;
+  flex: 1;
+}
+
+.app-notification .notification-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.app-notification .notification-close:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Notification type variations */
+.app-notification.notification-info {
+  border-left: 4px solid #3b82f6;
+}
+
+.app-notification.notification-error {
+  border-left: 4px solid #ef4444;
+}
+
+.app-notification.notification-success {
+  border-left: 4px solid #10b981;
+}
+
+.app-notification.notification-warning {
+  border-left: 4px solid #f59e0b;
+}
+

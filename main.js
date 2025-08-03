@@ -330,6 +330,7 @@ if (process.argv.includes('--dev')) {
 
 let mainWindow;
 let kanbanWindow; // Global reference to kanban window
+let isCreatingKanbanWindow = false; // Flag to prevent concurrent creation
 const terminals = new Map();
 let db;
 let mcpServer;
@@ -2431,10 +2432,13 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
   }
 });
 
-// Open Kanban window
-ipcMain.on('open-kanban-window', (event, options = {}) => {
-  // If kanban window already exists, just focus it
+// Unified function to open or focus Kanban window
+function openOrFocusKanbanWindow(options = {}) {
+  // If kanban window already exists, reload and focus it
   if (kanbanWindow && !kanbanWindow.isDestroyed()) {
+    // Reload the window content to refresh data
+    kanbanWindow.webContents.reload();
+    
     // Bring window to front
     kanbanWindow.show();
     kanbanWindow.focus();
@@ -2445,12 +2449,23 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
       app.focus({ steal: true });
     }
     
+    // Send focus task ID after reload if provided
     if (options.focusTaskId) {
-      kanbanWindow.webContents.send('focus-task', options.focusTaskId);
+      kanbanWindow.webContents.once('did-finish-load', () => {
+        kanbanWindow.webContents.send('focus-task', options.focusTaskId);
+      });
     }
     return;
   }
   
+  // Prevent concurrent window creation
+  if (isCreatingKanbanWindow) {
+    return;
+  }
+  
+  isCreatingKanbanWindow = true;
+  
+  // Create new kanban window if it doesn't exist
   kanbanWindow = new BrowserWindow({
     width: 1200,
     height: 800,
@@ -2472,6 +2487,7 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
     icon: path.join(__dirname, 'assets', 'icon.png'),
     // Focus the window when it opens
     alwaysOnTop: false,
+    center: true,
     focusable: true
   });
 
@@ -2481,6 +2497,7 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
   kanbanWindow.webContents.once('did-finish-load', () => {
     kanbanWindow.show();
     kanbanWindow.focus();
+    isCreatingKanbanWindow = false; // Reset flag after window is ready
     
     // Send focus task ID if provided
     if (options.focusTaskId) {
@@ -2491,8 +2508,13 @@ ipcMain.on('open-kanban-window', (event, options = {}) => {
   // Clean up reference when window is closed
   kanbanWindow.on('closed', () => {
     kanbanWindow = null;
+    isCreatingKanbanWindow = false; // Reset flag when window is closed
   });
-  
+}
+
+// Open Kanban window
+ipcMain.on('open-kanban-window', (event, options = {}) => {
+  openOrFocusKanbanWindow(options);
 });
 
 // Handle task creation from renderer
@@ -2739,45 +2761,7 @@ async function initializeApp() {
   // Register global shortcut for opening task manager
   const shortcut = process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K';
   const ret = globalShortcut.register(shortcut, () => {
-    // If kanban window already exists, just focus it
-    if (kanbanWindow && !kanbanWindow.isDestroyed()) {
-      kanbanWindow.focus();
-    } else {
-      // Create new kanban window
-      kanbanWindow = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        title: 'Task Manager - Kanban Board',
-        webPreferences: {
-          nodeIntegration: true,
-          contextIsolation: false
-        },
-        show: false, // Start hidden to prevent white flash
-        backgroundColor: '#1a1a1a', // Dark background to match theme
-        autoHideMenuBar: true,
-        resizable: true,
-        minimizable: true,
-        maximizable: true,
-        closable: true,
-        alwaysOnTop: false,
-        center: true,
-        frame: true,
-        focusable: true
-      });
-
-      kanbanWindow.loadFile('kanban.html');
-      
-      // Show and focus the window after loading
-      kanbanWindow.webContents.once('did-finish-load', () => {
-        kanbanWindow.show();
-        kanbanWindow.focus();
-      });
-      
-      // Clean up reference when window is closed
-      kanbanWindow.on('closed', () => {
-        kanbanWindow = null;
-      });
-    }
+    openOrFocusKanbanWindow();
   });
 
   if (!ret) {

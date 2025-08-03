@@ -719,7 +719,18 @@ class KanbanManager {
         }
     }
 
+    showSkeletons() {
+        // Show skeleton loaders in all columns
+        const skeletonContainers = document.querySelectorAll('.skeleton-container');
+        skeletonContainers.forEach(skeleton => {
+            skeleton.classList.add('show');
+        });
+    }
+
     async loadTasks() {
+        // Show skeletons while loading
+        this.showSkeletons();
+        
         try {
             const result = await ipcRenderer.invoke('task-get-all');
             if (result.success) {
@@ -743,10 +754,18 @@ class KanbanManager {
     }
 
     renderTasks() {
-        // Clear existing tasks
+        // Hide skeleton loaders and clear existing tasks
         const taskLists = document.querySelectorAll('.task-list');
         taskLists.forEach(list => {
-            list.innerHTML = '';
+            // Hide skeleton containers
+            const skeletonContainers = list.querySelectorAll('.skeleton-container');
+            skeletonContainers.forEach(skeleton => {
+                skeleton.classList.remove('show');
+            });
+            
+            // Remove only task cards, preserve skeleton containers
+            const taskCards = list.querySelectorAll('.task-card');
+            taskCards.forEach(card => card.remove());
         });
 
         // Filter tasks by project if needed

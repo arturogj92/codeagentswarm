@@ -127,8 +127,7 @@
         "width": 660,
         "height": 400
       },
-      "backgroundColor": "#0d0d0d",
-      "icon": "dmg-icon.icns"
+      "backgroundColor": "#0d0d0d"
     },
     "afterSign": "scripts/notarize.js",
     "win": {

@@ -1097,7 +1097,7 @@ class TerminalManager {
     }
 
     showNotification(message, type = 'info') {
-        // Notificaciones internas deshabilitadas - solo notificaciones externas permitidas
+        // Redirect to the main showNotification method at the end of the class
         return;
     }
     
@@ -4598,32 +4598,7 @@ class TerminalManager {
         return resizer;
     }
 
-    showNotification(title, message, type = 'info') {
-        // Simple notification system
-        const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <div class="notification-content">
-                <strong>${title}</strong>
-                <p>${message}</p>
-            </div>
-        `;
-        
-        document.body.appendChild(notification);
-        
-        setTimeout(() => {
-            notification.classList.add('show');
-        }, 100);
-        
-        setTimeout(() => {
-            notification.classList.remove('show');
-            setTimeout(() => {
-                if (notification.parentNode) {
-                    document.body.removeChild(notification);
-                }
-            }, 300);
-        }, 3000);
-    }
+    // Removed duplicate showNotification - using the main one at end of class
 
     // Get which terminals will be swapped for hover preview
     getSwapTargets(currentPosition, action, allTerminals) {
@@ -5212,21 +5187,54 @@ class TerminalManager {
     }
     
     showNotification(title, message, type = 'info') {
+        // Handle both 2-parameter and 3-parameter calls
+        if (typeof message === 'undefined' || (typeof message === 'string' && ['info', 'error', 'warning', 'success'].includes(message))) {
+            // 2-parameter call: showNotification(message, type)
+            type = message || 'info';
+            message = title;
+            title = '';
+        }
+        
+        // Create notification element
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `app-notification notification-${type}`;
         notification.innerHTML = `
             <div class="notification-content">
-                <strong>${title}</strong>
-                <p>${message}</p>
+                ${title ? `<strong>${title}</strong>` : ''}
+                <span class="notification-message">${message}</span>
+                <button class="notification-close">×</button>
             </div>
         `;
         
-        document.body.appendChild(notification);
+        // Add to notification container or create one
+        let container = document.querySelector('.notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'notification-container';
+            document.body.appendChild(container);
+        }
         
-        // Auto-hide after 5 seconds
+        container.appendChild(notification);
+        
+        // Animate in
         setTimeout(() => {
-            notification.remove();
-        }, 5000);
+            notification.classList.add('show');
+        }, 10);
+        
+        // Close button handler
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        });
+        
+        // Auto-hide after 7 seconds
+        setTimeout(() => {
+            if (document.body.contains(notification)) {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }
+        }, 7000);
     }
 
 }

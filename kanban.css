@@ -1707,21 +1707,111 @@ body::before {
     border-color: rgba(76, 175, 80, 0.5);
 }
 
-/* Loading State with modern animation */
+/* Loading State - hide the old loading state */
 .loading-state {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    padding: 2rem;
-    color: var(--text-muted);
-    gap: 1rem;
+    display: none;
 }
 
-.loading-spinner {
-    animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-    color: var(--primary);
-    filter: drop-shadow(0 0 10px rgba(127, 90, 240, 0.5));
+/* Skeleton Loader Styles */
+.skeleton-container {
+    padding: 0.5rem;
+    display: none;
+}
+
+.skeleton-container.show {
+    display: block;
+}
+
+.skeleton-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1rem;
+    margin-bottom: 0.75rem;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -200%;
+    width: 200%;
+    height: 100%;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(127, 90, 240, 0.08) 50%,
+        transparent 100%
+    );
+    animation: skeleton-wave 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-wave {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+.skeleton-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+
+.skeleton-title {
+    height: 20px;
+    width: 70%;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 4px;
+}
+
+.skeleton-badge {
+    height: 24px;
+    width: 50px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 12px;
+}
+
+.skeleton-description {
+    height: 16px;
+    width: 90%;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 4px;
+    margin-bottom: 0.5rem;
+}
+
+.skeleton-description:last-child {
+    width: 60%;
+    margin-bottom: 0;
+}
+
+.skeleton-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 0.75rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.skeleton-project {
+    height: 20px;
+    width: 80px;
+    background: rgba(127, 90, 240, 0.1);
+    border-radius: 10px;
+}
+
+.skeleton-terminal {
+    height: 20px;
+    width: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 50%;
 }
 
 @keyframes spin {
