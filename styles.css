@@ -86,14 +86,32 @@ body::before {
   align-items: center;
   justify-content: space-between;
   padding: 0 16px;
+  padding-left: 80px; /* Space for macOS traffic lights */
   z-index: 1000;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  -webkit-app-region: drag;
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+/* Make interactive elements in header non-draggable */
+.header button,
+.header .btn,
+.header .btn-layout,
+.header .btn-add-terminal,
+.header .action-buttons,
+.header .terminal-management,
+.header .layout-selector,
+.header img {
+  -webkit-app-region: no-drag;
+  -webkit-user-select: auto;
+  user-select: auto;
 }
 
 /* Hooks Status Indicator */

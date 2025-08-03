@@ -366,8 +366,8 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    titleBarStyle: 'default',  // Changed from 'hiddenInset'
-    frame: true,               // Ensure frame is visible
+    titleBarStyle: 'hiddenInset',
+    frame: false,               // Hide OS title bar like wizard
     show: true,
     autoHideMenuBar: false,
     vibrancy: 'under-window',
