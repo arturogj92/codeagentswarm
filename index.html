@@ -321,6 +321,50 @@
     <script src="node_modules/xterm/lib/xterm.js"></script>
     <script src="node_modules/xterm-addon-fit/lib/xterm-addon-fit.js"></script>
     <script src="node_modules/xterm-addon-web-links/lib/xterm-addon-web-links.js"></script>
+    <script>
+        // Handle external links with debouncing to prevent double-click crashes
+        document.addEventListener('DOMContentLoaded', () => {
+            const { shell } = require('electron');
+            let linkClickTimeouts = new Map();
+            let lastClickTimes = new Map();
+            const DOUBLE_CLICK_DELAY = 300; // milliseconds
+            
+            // Intercept all link clicks
+            document.addEventListener('click', (event) => {
+                const link = event.target.closest('a[target="_blank"]');
+                if (!link) return;
+                
+                event.preventDefault();
+                const href = link.href;
+                const currentTime = Date.now();
+                const lastClickTime = lastClickTimes.get(href) || 0;
+                
+                // Ignore rapid clicks
+                if (currentTime - lastClickTime < DOUBLE_CLICK_DELAY) {
+                    console.log('Ignoring rapid link click:', href);
+                    return;
+                }
+                
+                // Clear any pending timeout for this link
+                const existingTimeout = linkClickTimeouts.get(href);
+                if (existingTimeout) {
+                    clearTimeout(existingTimeout);
+                }
+                
+                // Set timeout to handle the click
+                const timeout = setTimeout(() => {
+                    console.log('Opening external link:', href);
+                    shell.openExternal(href).catch(err => {
+                        console.error('Failed to open link:', err);
+                    });
+                    linkClickTimeouts.delete(href);
+                }, 50);
+                
+                linkClickTimeouts.set(href, timeout);
+                lastClickTimes.set(href, currentTime);
+            }, true);
+        });
+    </script>
     <script src="renderer.js"></script>
 </body>
 </html>

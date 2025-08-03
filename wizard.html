@@ -22,78 +22,195 @@
         </div>
 
         <!-- Screen 1: Welcome -->
-        <div class="wizard-screen active" id="screen1">
-            <div class="logo-container">
-                <img src="logo_prod_512.png" alt="CodeAgentSwarm" class="logo animated-logo">
+        <div class="wizard-screen active centered-screen" id="screen1">
+            <div class="screen-particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
             </div>
-            <h1 class="welcome-title">Welcome to CodeAgentSwarm</h1>
-            <p class="subtitle">Supercharge your Claude Code workflow with parallel terminal management</p>
-            <div class="productivity-boost">
-                <span class="boost-icon">🚀</span>
-                <span class="boost-text">10x Productivity Boost</span>
+            <div class="icon-container-large">
+                <div class="logo-glow"></div>
+                <img src="logo_prod_512.png" alt="CodeAgentSwarm" class="logo-large animated-logo">
             </div>
-            <div class="feature-grid-horizontal home-features">
-                <div class="feature-item">
-                    <div class="icon-terminal feature-icon"></div>
-                    <div>
-                        <h3>Up to 6 Terminals</h3>
-                        <p>Run multiple Claude Code instances in parallel</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="icon-notification feature-icon"></div>
-                    <div>
-                        <h3>Smart Notifications</h3>
-                        <p>Get notified when Claude needs your input or completes a task</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="icon-tasks feature-icon"></div>
-                    <div>
-                        <h3>Automated Task Flow</h3>
-                        <p>Claude creates, updates & moves tasks automatically</p>
-                    </div>
-                </div>
-                <div class="feature-item">
-                    <div class="icon-sparkles feature-icon"></div>
-                    <div>
-                        <h3>AI Git Commits</h3>
-                        <p>Generate perfect commit messages automatically</p>
-                    </div>
-                </div>
-            </div>
+            <div class="app-name">CodeAgentSwarm</div>
+            <h1 class="hero-title">Claude Code Without Limits</h1>
+            <p class="hero-subtitle">Command your swarm of Claude agents. Never miss a notification.<br>10x faster development. Finally.</p>
+            <button class="start-setup-button" onclick="nextScreen()">
+                <span class="button-text">Start Setup</span>
+                <span class="button-shine"></span>
+            </button>
         </div>
 
-        <!-- Screen 2: Multiple Terminals Demo -->
+        <!-- Screen 2: Power Features -->
         <div class="wizard-screen" id="screen2">
-            <h2>See It In Action</h2>
-            <p class="screen-subtitle">Watch how multiple terminals boost your productivity</p>
-            <div class="video-container large">
-                <video id="terminalsVideo" loop muted playsinline>
-                    <source src="assets/wizard/terminals-demo.mp4" type="video/mp4">
-                    <!-- Fallback to GIF if video doesn't load -->
-                    <img src="assets/wizard/terminals-demo.gif" alt="Multiple terminals demo">
-                </video>
-                <div class="video-overlay" onclick="playVideo('terminalsVideo')">
-                    <div class="play-button">▶</div>
-                </div>
+            <div class="screen-particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
             </div>
-            <div class="video-features">
-                <div class="video-feature">
-                    <span class="check-icon">✓</span>
-                    <span>Work on frontend and backend simultaneously</span>
+            <div class="feature-showcase">
+                <div class="showcase-header">
+                    <img src="logo_prod_512.png" alt="CodeAgentSwarm" class="showcase-logo">
+                    <h2 class="showcase-title">Unleash The Swarm</h2>
                 </div>
-                <div class="video-feature">
-                    <span class="check-icon">✓</span>
-                    <span>Separate terminals for different projects</span>
-                </div>
-                <div class="video-feature">
-                    <span class="check-icon">✓</span>
-                    <span>Keep tests running while coding</span>
-                </div>
-                <div class="video-feature">
-                    <span class="check-icon">✓</span>
-                    <span>Switch contexts without losing progress</span>
+                <p class="showcase-subtitle">Four game-changing features that multiply your coding power</p>
+                
+                <div class="power-grid">
+                    <div class="power-card has-video" data-feature="terminals">
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-terminal-large"></div>
+                        </div>
+                        <h3>Parallel Terminals</h3>
+                        <p>Run up to 6 Claude Code instances simultaneously. Frontend, backend, tests - all at once.</p>
+                        <div class="power-stat">6x</div>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/terminals.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="notifications">
+                        <!-- Background notification preview -->
+                        <div class="notification-bg-preview">
+                            <div class="notification-visual">
+                                <div class="notification-mock">
+                                    <span class="notification-time">now</span>
+                                    <div class="notification-header">
+                                        <div class="notification-icon-bg">
+                                            <img src="logo_prod_512.png" alt="">
+                                        </div>
+                                        <div class="notification-content">
+                                            <div class="notification-app-name">CodeAgentSwarm</div>
+                                            <div class="notification-title">Terminal finished!</div>
+                                            <div class="notification-body">Terminal 1 has completed</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-bell-large"></div>
+                        </div>
+                        <h3>Smart Notifications</h3>
+                        <p>Never miss when Claude needs you. Visual & audio alerts keep you in the loop.</p>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/notifications.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="tasks">
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-kanban-large"></div>
+                        </div>
+                        <h3>Auto Task Tracking</h3>
+                        <p>Claude creates, updates, and completes tasks automatically via MCP.</p>
+                        <div class="power-stat">∞</div>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/notifications.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="git">
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-git-large"></div>
+                        </div>
+                        <h3>AI Git Commits</h3>
+                        <p>Perfect commit messages generated from your changes. Never think about it again.</p>
+                        <div class="power-stat">AI</div>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/notifications.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

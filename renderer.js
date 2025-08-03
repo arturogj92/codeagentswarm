@@ -791,7 +791,38 @@ class TerminalManager {
         });
 
         const fitAddon = new FitAddon();
-        const webLinksAddon = new WebLinksAddon();
+        
+        // Create WebLinksAddon with custom handler and debouncing
+        let linkClickTimeout = null;
+        let lastClickTime = 0;
+        const DOUBLE_CLICK_DELAY = 300; // milliseconds
+        
+        const webLinksAddon = new WebLinksAddon((event, uri) => {
+            // Prevent double-click crashes with debouncing
+            const currentTime = Date.now();
+            
+            // Ignore if this is a rapid subsequent click
+            if (currentTime - lastClickTime < DOUBLE_CLICK_DELAY) {
+                console.log('Ignoring rapid link click');
+                return;
+            }
+            
+            // Clear any pending timeout
+            if (linkClickTimeout) {
+                clearTimeout(linkClickTimeout);
+            }
+            
+            // Set a timeout to handle the click
+            linkClickTimeout = setTimeout(() => {
+                console.log('Opening link:', uri);
+                require('electron').shell.openExternal(uri).catch(err => {
+                    console.error('Failed to open link:', err);
+                    this.showNotification('Failed to open link', 'error');
+                });
+            }, 50); // Small delay to catch double-clicks
+            
+            lastClickTime = currentTime;
+        });
         
         terminal.loadAddon(fitAddon);
         terminal.loadAddon(webLinksAddon);

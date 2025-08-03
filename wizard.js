@@ -44,6 +44,12 @@ function nextScreen() {
 function previousScreen() {
     if (currentScreen > 1) {
         document.getElementById(`screen${currentScreen}`).classList.remove('active');
+        
+        // Remove completed status from dots that come after the screen we're going to
+        for (let i = currentScreen; i <= totalScreens; i++) {
+            document.querySelector(`.dot[data-screen="${i}"]`).classList.remove('completed');
+        }
+        
         currentScreen--;
         document.getElementById(`screen${currentScreen}`).classList.add('active');
         
@@ -127,6 +133,17 @@ document.querySelectorAll('.dot').forEach(dot => {
         const targetScreen = parseInt(e.target.dataset.screen);
         if (targetScreen < currentScreen || e.target.classList.contains('completed')) {
             document.getElementById(`screen${currentScreen}`).classList.remove('active');
+            
+            // Update completed status for all dots
+            document.querySelectorAll('.dot').forEach(d => {
+                const screen = parseInt(d.dataset.screen);
+                if (screen < targetScreen) {
+                    d.classList.add('completed');
+                } else if (screen >= targetScreen) {
+                    d.classList.remove('completed');
+                }
+            });
+            
             currentScreen = targetScreen;
             document.getElementById(`screen${currentScreen}`).classList.add('active');
             updateNavigation();
@@ -199,6 +216,51 @@ document.querySelectorAll('video').forEach(video => {
             img.style.display = 'block';
         }
     });
+});
+
+// Setup hover video playback for power cards
+document.querySelectorAll('.power-card').forEach(card => {
+    const video = card.querySelector('.hover-video');
+    const progressBar = card.querySelector('.video-progress-fill');
+    const controlsBar = card.querySelector('.video-controls-fill');
+    
+    if (video) {
+        // Update progress bars
+        let animationFrame;
+        const updateProgress = () => {
+            if (video.duration) {
+                const progress = (video.currentTime / video.duration) * 100;
+                if (progressBar) progressBar.style.width = `${progress}%`;
+                if (controlsBar) controlsBar.style.width = `${progress}%`;
+                
+                // Continue updating while playing
+                if (!video.paused) {
+                    animationFrame = requestAnimationFrame(updateProgress);
+                }
+            }
+        };
+        
+        video.addEventListener('play', () => {
+            animationFrame = requestAnimationFrame(updateProgress);
+        });
+        
+        video.addEventListener('pause', () => {
+            if (animationFrame) {
+                cancelAnimationFrame(animationFrame);
+            }
+        });
+        
+        card.addEventListener('mouseenter', () => {
+            video.play().catch(err => console.log('Video play failed:', err));
+        });
+        
+        card.addEventListener('mouseleave', () => {
+            video.pause();
+            video.currentTime = 0; // Reset to beginning
+            if (progressBar) progressBar.style.width = '0%';
+            if (controlsBar) controlsBar.style.width = '0%';
+        });
+    }
 });
 
 // Create placeholder assets notice

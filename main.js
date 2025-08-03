@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut } = require('electron');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
 const path = require('path');
@@ -2717,6 +2717,56 @@ async function initializeApp() {
   
   createWindow();
   
+  // Register global shortcut for opening task manager
+  const shortcut = process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K';
+  const ret = globalShortcut.register(shortcut, () => {
+    // If kanban window already exists, just focus it
+    if (kanbanWindow && !kanbanWindow.isDestroyed()) {
+      kanbanWindow.focus();
+    } else {
+      // Create new kanban window
+      kanbanWindow = new BrowserWindow({
+        width: 1200,
+        height: 800,
+        title: 'Task Manager - Kanban Board',
+        webPreferences: {
+          nodeIntegration: true,
+          contextIsolation: false
+        },
+        show: false, // Start hidden to prevent white flash
+        backgroundColor: '#1a1a1a', // Dark background to match theme
+        autoHideMenuBar: true,
+        resizable: true,
+        minimizable: true,
+        maximizable: true,
+        closable: true,
+        alwaysOnTop: false,
+        center: true,
+        frame: true,
+        focusable: true
+      });
+
+      kanbanWindow.loadFile('kanban.html');
+      
+      // Show and focus the window after loading
+      kanbanWindow.webContents.once('did-finish-load', () => {
+        kanbanWindow.show();
+        kanbanWindow.focus();
+      });
+      
+      // Clean up reference when window is closed
+      kanbanWindow.on('closed', () => {
+        kanbanWindow = null;
+      });
+    }
+  });
+
+  if (!ret) {
+    console.log('Registration of global shortcut failed');
+  } else {
+    console.log(`Global shortcut ${shortcut} registered for opening task manager`);
+  }
+  
   // Initialize hooks manager and webhook server
   try {
     hooksManager = new HooksManager();
@@ -3891,6 +3941,9 @@ ipcMain.handle('git-pull-project', async (event, projectPath) => {
 
 app.on('before-quit', (event) => {
   console.log('App is quitting, cleaning up processes...');
+  
+  // Unregister all global shortcuts
+  globalShortcut.unregisterAll();
   
   // If we're already handling quit, don't do it again
   if (isHandlingQuit) {
