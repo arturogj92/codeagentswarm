@@ -531,9 +531,9 @@ class TerminalManager {
                             ${this.lastSelectedDirectories[quadrant] ? 'Click to select different directory' : 'Click to select directory'}
                         </div>
                         <div class="directory-selector-buttons">
-                            <button class="btn" id="choose-dir-btn">Browse...</button>
-                            ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn">Use Last</button>' : ''}
-                            <button class="btn" id="cancel-btn">Cancel</button>
+                            <button class="btn" id="choose-dir-btn" data-full-text="Browse..." data-short-text="Browse" data-tiny-text="📂">Browse...</button>
+                            ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄">Use Last</button>' : ''}
+                            <button class="btn" id="cancel-btn" data-full-text="Cancel" data-short-text="Cancel" data-tiny-text="❌">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -663,6 +663,44 @@ class TerminalManager {
             }
         };
         document.addEventListener('keydown', handleEscape);
+        
+        // Function to update button text based on container width
+        const updateButtonText = () => {
+            const content = selectorDiv.querySelector('.directory-selector-content');
+            if (!content) return;
+            
+            const width = content.offsetWidth;
+            const buttons = content.querySelectorAll('.directory-selector-buttons .btn');
+            
+            buttons.forEach(btn => {
+                if (width < 400) {
+                    // Use icons for narrow terminals
+                    btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
+                } else if (width < 500) {
+                    // Use short text for medium terminals
+                    btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
+                } else {
+                    // Use full text for wider terminals
+                    btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
+                }
+            });
+        };
+        
+        // Update button text initially and on resize
+        setTimeout(updateButtonText, 0);
+        
+        // Create ResizeObserver to watch for size changes
+        const resizeObserver = new ResizeObserver(() => {
+            updateButtonText();
+        });
+        resizeObserver.observe(selectorDiv.querySelector('.directory-selector-content'));
+        
+        // Clean up observer when selector is removed
+        const originalRestorePlaceholder = restorePlaceholder;
+        restorePlaceholder = () => {
+            resizeObserver.disconnect();
+            originalRestorePlaceholder();
+        };
     }
 
     showSessionSelector(quadrant, selectedDirectory) {
