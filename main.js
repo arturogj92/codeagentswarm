@@ -422,6 +422,7 @@ class SimpleShell {
     this.history = [];
     this.historyIndex = -1;
     this.ready = true;
+    this.isActive = true; // Add flag to track if terminal is active
     
     // Set environment variables for this quadrant globally (1-based)
     process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
@@ -733,6 +734,15 @@ class SimpleShell {
       }
       this.activeInteractiveProcess = null;
     }
+  }
+  
+  kill() {
+    console.log(`SimpleShell ${this.quadrant} kill() called`);
+    this.isActive = false;
+    this.cwd = null; // Clear cwd when killed
+    this.killActiveProcess();
+    // Clean up environment variables
+    delete process.env[`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`];
   }
 }
 
@@ -2425,7 +2435,16 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
 ipcMain.on('open-kanban-window', (event, options = {}) => {
   // If kanban window already exists, just focus it
   if (kanbanWindow && !kanbanWindow.isDestroyed()) {
+    // Bring window to front
+    kanbanWindow.show();
     kanbanWindow.focus();
+    kanbanWindow.moveTop();
+    
+    // On macOS, we might need to use app.focus() to bring the window to front
+    if (process.platform === 'darwin') {
+      app.focus({ steal: true });
+    }
+    
     if (options.focusTaskId) {
       kanbanWindow.webContents.send('focus-task', options.focusTaskId);
     }
@@ -3592,6 +3611,20 @@ ipcMain.handle('scan-git-projects', async () => {
   const fs = require('fs').promises;
   const path = require('path');
   
+  console.log('\n=== GIT SCAN STARTED ===');
+  console.log('Current terminals Map size:', terminals.size);
+  console.log('Terminals Map contents:');
+  for (const [id, term] of terminals) {
+    console.log(`  Terminal ${id}:`, {
+      exists: !!term,
+      type: term?.constructor?.name,
+      hasShell: !!term?.shell,
+      hasCwd: !!term?.cwd,
+      cwd: term?.cwd || 'no cwd',
+      placeholder: term?.placeholder || false
+    });
+  }
+  
   try {
     const projects = [];
     const terminalDirs = new Set();
@@ -3600,25 +3633,38 @@ ipcMain.handle('scan-git-projects', async () => {
     const terminalMap = new Map();
     console.log('[Git Scan] Getting current directories from terminals:');
     console.log('[Git Scan] Active terminals:', terminals.size);
+    console.log('[Git Scan] Terminal entries:', Array.from(terminals.entries()).map(([id, term]) => ({
+      id,
+      cwd: term?.cwd,
+      exists: !!term
+    })));
+    
+    // Clean up any null or placeholder terminals before scanning
+    for (const [terminalId, terminal] of terminals) {
+      if (!terminal || terminal.placeholder) {
+        console.log(`[Git Scan] Removing ${!terminal ? 'null' : 'placeholder'} terminal ${terminalId} from map`);
+        terminals.delete(terminalId);
+      }
+    }
     
     for (const [terminalId, terminal] of terminals) {
       console.log(`[Git Scan] Checking terminal ${terminalId}:`, terminal ? 'exists' : 'null');
-      if (terminal) {
+      console.log(`[Git Scan] Terminal type:`, terminal?.constructor?.name || 'unknown');
+      console.log(`[Git Scan] Terminal properties:`, terminal ? Object.keys(terminal) : 'none');
+      
+      if (terminal && !terminal.placeholder) {
         try {
-          // First try to get current directory from terminal
-          if (terminal.cwd) {
-            console.log(`[Git Scan] Terminal ${terminalId} current directory:`, terminal.cwd);
+          // Only consider active terminals with cwd
+          if (terminal.isActive && terminal.cwd) {
+            console.log(`[Git Scan] Terminal ${terminalId} is ACTIVE with directory:`, terminal.cwd);
+            console.log(`[Git Scan] Adding directory to scan:`, terminal.cwd);
             terminalDirs.add(terminal.cwd);
             terminalMap.set(terminal.cwd, terminalId);
+          } else if (!terminal.isActive) {
+            console.log(`[Git Scan] Terminal ${terminalId} is INACTIVE - removing from map`);
+            terminals.delete(terminalId);
           } else {
-            // Fallback to saved directory from database
-            const savedDir = db.getTerminalDirectory(terminalId);
-            console.log(`[Git Scan] Terminal ${terminalId} saved directory:`, savedDir);
-            if (savedDir) {
-              console.log(`[Git Scan] Terminal ${terminalId}: ${savedDir}`);
-              terminalDirs.add(savedDir);
-              terminalMap.set(savedDir, terminalId);
-            }
+            console.log(`[Git Scan] Terminal ${terminalId} exists but has NO CWD - skipping`);
           }
         } catch (e) {
           console.error(`[Git Scan] Error getting directory for terminal ${terminalId}:`, e);
@@ -3681,52 +3727,91 @@ ipcMain.handle('scan-git-projects', async () => {
           });
         }
         
-        // Also check parent directories up to 3 levels
-        let currentPath = terminalDir;
-        for (let i = 0; i < 3; i++) {
-          const parentPath = path.dirname(currentPath);
-          if (parentPath === currentPath || parentPath === '/') break;
-          
-          try {
-            execSync('git rev-parse --is-inside-work-tree', {
-              cwd: parentPath,
-              encoding: 'utf8',
-              stdio: ['pipe', 'pipe', 'ignore']
-            });
-            
-            // Parent is a git repo, check status
-            const statusOutput = execSync('git status --porcelain', {
-              cwd: parentPath,
-              encoding: 'utf8',
-              stdio: ['pipe', 'pipe', 'ignore']
-            });
-            
-            const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
-            // Check if we already have this project
-            const exists = projects.some(p => p.path === parentPath);
-            if (!exists) {
-              const branch = execSync('git branch --show-current', {
-                cwd: parentPath,
-                encoding: 'utf8',
-                stdio: ['pipe', 'pipe', 'ignore']
-              }).trim();
+        // Also check subdirectories (1 level deep)
+        try {
+          const subdirs = await fs.readdir(terminalDir, { withFileTypes: true });
+          for (const dirent of subdirs) {
+            if (dirent.isDirectory() && !dirent.name.startsWith('.')) {
+              const subdirPath = path.join(terminalDir, dirent.name);
               
-              projects.push({
-                path: parentPath,
-                name: path.basename(parentPath),
-                branch: branch || 'master',
-                changeCount: changes.length,
-                changes: changes.slice(0, 10),
-                fromTerminal: true,
-                terminalId: terminalMap.get(terminalDir) || null
-              });
+              try {
+                // Check if subdirectory has a .git folder
+                const gitPath = path.join(subdirPath, '.git');
+                const hasGitFolder = await fs.access(gitPath).then(() => true).catch(() => false);
+                
+                if (!hasGitFolder) {
+                  console.log(`[Git Scan] Skipping ${subdirPath} - no .git folder`);
+                  continue;
+                }
+                
+                execSync('git rev-parse --is-inside-work-tree', {
+                  cwd: subdirPath,
+                  encoding: 'utf8',
+                  stdio: ['pipe', 'pipe', 'ignore']
+                });
+                
+                console.log(`[Git Scan] Found git repo at ${subdirPath}`);
+                // Subdirectory is a git repo, check status
+                const statusOutput = execSync('git status --porcelain', {
+                  cwd: subdirPath,
+                  encoding: 'utf8',
+                  stdio: ['pipe', 'pipe', 'ignore']
+                });
+                
+                const branch = execSync('git branch --show-current', {
+                  cwd: subdirPath,
+                  encoding: 'utf8',
+                  stdio: ['pipe', 'pipe', 'ignore']
+                }).trim();
+                
+                const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
+                
+                // Check if we already have this project
+                const exists = projects.some(p => p.path === subdirPath);
+                if (!exists) {
+                  // Count unpushed commits
+                  let unpushedCount = 0;
+                  try {
+                    const upstream = execSync('git rev-parse --abbrev-ref @{u}', {
+                      cwd: subdirPath,
+                      encoding: 'utf8',
+                      stdio: ['pipe', 'pipe', 'ignore']
+                    }).trim();
+                    
+                    if (upstream) {
+                      unpushedCount = parseInt(
+                        execSync(`git rev-list ${upstream}..HEAD --count`, {
+                          cwd: subdirPath,
+                          encoding: 'utf8'
+                        }).trim()
+                      ) || 0;
+                    }
+                  } catch (e) {
+                    // No upstream branch
+                  }
+                  
+                  projects.push({
+                    path: subdirPath,
+                    name: dirent.name,
+                    branch: branch || 'master',
+                    changeCount: changes.length,
+                    changes: changes.slice(0, 10),
+                    fromTerminal: true,
+                    terminalId: terminalMap.get(terminalDir) || null,
+                    isSubdir: true,
+                    unpushedCount: unpushedCount
+                  });
+                }
+              } catch (e) {
+                // Not a git repo, continue
+              }
             }
-          } catch (e) {
-            // Not a git repo, continue
           }
-          
-          currentPath = parentPath;
+        } catch (e) {
+          console.error('Error reading subdirectories:', e);
         }
+        
+        // NOTE: Parent directory scanning removed - only showing projects with active terminals
       } catch (e) {
         console.error('Error checking terminal directory:', e);
       }

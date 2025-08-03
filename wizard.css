@@ -744,7 +744,7 @@ video, .demo-gif {
 }
 
 .showcase-title {
-    font-size: 36px;
+    font-size: 32px;
     font-weight: 800;
     margin: 0;
     background: var(--gradient-primary);
@@ -755,9 +755,9 @@ video, .demo-gif {
 }
 
 .showcase-subtitle {
-    font-size: 16px;
+    font-size: 15px;
     color: var(--text-secondary);
-    margin-bottom: 35px;
+    margin-bottom: 30px;
     animation: slideInUp 0.8s ease-out 0.3s both;
     opacity: 0;
 }
@@ -766,15 +766,26 @@ video, .demo-gif {
 .power-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 20px;
+    gap: 16px;
     margin: 0 auto;
-    max-width: 700px;
+    max-width: 600px;
+}
+
+.more-features {
+    text-align: center;
+    margin-top: 25px;
+    font-size: 15px;
+    color: var(--text-secondary);
+    opacity: 0;
+    animation: fadeIn 0.8s ease-out 1s forwards;
+    font-weight: 500;
+    letter-spacing: 0.5px;
 }
 
 .power-card {
     background: rgba(10, 10, 10, 0.8);
     border-radius: 16px;
-    padding: 20px 18px;
+    padding: 16px 14px;
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
@@ -1044,8 +1055,9 @@ video, .demo-gif {
 }
 
 .power-card:hover .play-icon {
-    color: rgba(255, 255, 255, 0.8);
-    transform: scale(1.1);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0s 0.2s;
 }
 
 /* Video progress bar */
@@ -1111,12 +1123,14 @@ video, .demo-gif {
     align-items: center;
     justify-content: center;
     isolation: isolate;
+    overflow: visible;
+    pointer-events: auto;
 }
 
 .hover-video {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     border-radius: 8px;
     opacity: 0;
     transform: scale(0.95);
@@ -1144,6 +1158,96 @@ video, .demo-gif {
     transition: none;
 }
 
+/* Fullscreen button */
+.fullscreen-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    opacity: 0;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+    pointer-events: none;
+}
+
+.fullscreen-btn svg {
+    width: 14px;
+    height: 14px;
+    stroke-width: 2;
+}
+
+.fullscreen-btn:hover {
+    background: rgba(0, 0, 0, 0.4);
+    border-color: rgba(255, 255, 255, 0.4);
+    color: rgba(255, 255, 255, 0.9);
+    transform: scale(1.05);
+}
+
+.power-card:hover .fullscreen-btn {
+    opacity: 1;
+    transition-delay: 0.3s;
+    pointer-events: auto;
+}
+
+/* Fullscreen video container */
+.fullscreen-video-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.fullscreen-video-container.active {
+    opacity: 1;
+}
+
+.fullscreen-video {
+    max-width: 90%;
+    max-height: 90%;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.close-fullscreen {
+    position: absolute;
+    top: 30px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.close-fullscreen:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.1);
+}
+
 .power-card:hover .hover-preview .video-controls {
     opacity: 1;
 }
@@ -1152,6 +1256,7 @@ video, .demo-gif {
     opacity: 1;
     visibility: visible;
     transition: opacity 0.2s ease, visibility 0s;
+    pointer-events: auto;
 }
 
 .power-card:hover .hover-video {
@@ -1170,7 +1275,8 @@ video, .demo-gif {
 .power-card.has-video:hover .power-icon,
 .power-card.has-video:hover h3,
 .power-card.has-video:hover p,
-.power-card.has-video:hover .power-stat {
+.power-card.has-video:hover .power-stat,
+.power-card.has-video:hover .video-indicator {
     opacity: 0.05;
 }
 
@@ -1181,30 +1287,30 @@ video, .demo-gif {
 
 
 .power-icon {
-    width: 45px;
-    height: 45px;
-    margin: 0 auto 12px;
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 10px;
     position: relative;
 }
 
 .power-card h3 {
-    font-size: 17px;
-    margin-bottom: 6px;
+    font-size: 16px;
+    margin-bottom: 5px;
     color: var(--text-primary);
 }
 
 .power-card p {
-    font-size: 13px;
+    font-size: 12px;
     color: var(--text-secondary);
     line-height: 1.4;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .power-stat {
     position: absolute;
-    top: 20px;
-    right: 20px;
-    font-size: 20px;
+    top: 16px;
+    right: 16px;
+    font-size: 18px;
     font-weight: 800;
     color: var(--primary-color);
     opacity: 0.3;

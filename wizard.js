@@ -12,6 +12,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Add keyboard navigation
     document.addEventListener('keydown', handleKeyPress);
+    
+    // Add fullscreen button listeners
+    setupFullscreenButtons();
 });
 
 // Navigation functions
@@ -30,6 +33,14 @@ function nextScreen() {
         
         updateNavigation();
         updateProgress();
+        
+        // Check for fullscreen buttons on screen 2
+        if (currentScreen === 2) {
+            setTimeout(() => {
+                const buttons = document.querySelectorAll('.fullscreen-btn');
+                console.log('Screen 2 loaded, fullscreen buttons found:', buttons.length);
+            }, 100);
+        }
         
         // Auto-play video if present
         const video = document.querySelector(`#screen${currentScreen} video`);
@@ -262,6 +273,119 @@ document.querySelectorAll('.power-card').forEach(card => {
         });
     }
 });
+
+// Setup fullscreen button listeners
+function setupFullscreenButtons() {
+    console.log('Setting up fullscreen buttons...');
+    
+    // Try a different approach - add the function to window object
+    window.openFullscreenVideo = openFullscreenVideo;
+    
+    // Use event delegation on body with capturing
+    document.body.addEventListener('click', (e) => {
+        // Check if clicked element is fullscreen button or its child
+        const button = e.target.closest('.fullscreen-btn');
+        if (button) {
+            console.log('Fullscreen button clicked via delegation!');
+            e.preventDefault();
+            e.stopPropagation();
+            const videoSrc = button.getAttribute('data-video');
+            console.log('Video source:', videoSrc);
+            if (videoSrc) {
+                openFullscreenVideo(videoSrc);
+            }
+            return false;
+        }
+    }, true); // Use capture phase
+    
+    // Also try direct binding when buttons appear
+    const observer = new MutationObserver((mutations) => {
+        const buttons = document.querySelectorAll('.fullscreen-btn:not([data-listener])');
+        buttons.forEach(btn => {
+            btn.setAttribute('data-listener', 'true');
+            btn.addEventListener('click', (e) => {
+                console.log('Direct button click!');
+                e.preventDefault();
+                e.stopPropagation();
+                const videoSrc = btn.getAttribute('data-video');
+                if (videoSrc) {
+                    openFullscreenVideo(videoSrc);
+                }
+            });
+        });
+    });
+    
+    observer.observe(document.body, { childList: true, subtree: true });
+}
+
+// Fullscreen video functionality
+function openFullscreenVideo(videoSrc) {
+    console.log('Opening fullscreen video with source:', videoSrc);
+    
+    // Create fullscreen container
+    const fullscreenContainer = document.createElement('div');
+    fullscreenContainer.className = 'fullscreen-video-container';
+    fullscreenContainer.innerHTML = `
+        <video autoplay loop muted class="fullscreen-video">
+            <source src="${videoSrc}" type="video/mp4">
+        </video>
+        <button class="close-fullscreen">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="18" y1="6" x2="6" y2="18"></line>
+                <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+        </button>
+    `;
+    
+    document.body.appendChild(fullscreenContainer);
+    
+    // Add click handler for close button
+    const closeBtn = fullscreenContainer.querySelector('.close-fullscreen');
+    closeBtn.addEventListener('click', () => {
+        closeFullscreenVideo();
+    });
+    
+    // Add click handler for container (click outside video to close)
+    fullscreenContainer.addEventListener('click', (e) => {
+        if (e.target === fullscreenContainer) {
+            closeFullscreenVideo();
+        }
+    });
+    
+    // Fade in
+    setTimeout(() => {
+        fullscreenContainer.classList.add('active');
+    }, 10);
+    
+    // Handle ESC key
+    const handleEsc = (e) => {
+        if (e.key === 'Escape') {
+            closeFullscreenVideo();
+        }
+    };
+    document.addEventListener('keydown', handleEsc);
+    
+    // Store handler for removal
+    fullscreenContainer._escHandler = handleEsc;
+}
+
+function closeFullscreenVideo() {
+    const container = document.querySelector('.fullscreen-video-container');
+    if (container) {
+        // Remove ESC handler
+        if (container._escHandler) {
+            document.removeEventListener('keydown', container._escHandler);
+        }
+        
+        // Fade out
+        container.classList.remove('active');
+        
+        // Remove after animation
+        setTimeout(() => {
+            container.remove();
+        }, 300);
+    }
+}
 
 // Create placeholder assets notice
 console.log(`

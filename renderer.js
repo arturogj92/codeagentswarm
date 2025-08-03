@@ -228,6 +228,37 @@ class TerminalManager {
                 return false;
             }
             
+            // Handle Cmd+1-6 for switching terminals
+            if (e.metaKey && e.key >= '1' && e.key <= '6') {
+                const terminalId = parseInt(e.key) - 1; // Convert to 0-based index
+                if (this.terminals.has(terminalId)) {
+                    this.setActiveTerminal(terminalId);
+                    e.preventDefault();
+                }
+                return false;
+            }
+            
+            // Handle Cmd+K for opening Kanban board
+            if (e.metaKey && e.key === 'k') {
+                this.showKanban();
+                e.preventDefault();
+                return false;
+            }
+            
+            // Handle Cmd+G for generating AI commit
+            if (e.metaKey && e.key === 'g') {
+                this.showGitStatus();
+                e.preventDefault();
+                return false;
+            }
+            
+            // Handle Cmd+N for new terminal window
+            if (e.metaKey && e.key === 'n') {
+                this.addTerminal();
+                e.preventDefault();
+                return false;
+            }
+            
             // Handle Escape if a terminal is in fullscreen mode
             // This works regardless of which element has focus (terminal, buttons, etc.)
             if (e.key === 'Escape' && this.fullscreenTerminal !== null) {
@@ -2283,13 +2314,12 @@ class TerminalManager {
                                     <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
                                         <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
                                     </span>
-                                    ${project.terminalId ? `
-                                        <span class="project-terminal">
-                                            <i data-lucide="terminal"></i> Terminal ${project.terminalId}
+                                    ${project.unpushedCount > 0 ? `
+                                        <span class="project-unpushed">
+                                            <i data-lucide="upload"></i> ${project.unpushedCount} unpushed
                                         </span>
                                     ` : ''}
                                 </div>
-                                <div class="project-path">${project.path}</div>
                             </div>
                             <button class="btn btn-primary btn-small open-project">
                                 <i data-lucide="arrow-right"></i> Open
@@ -2427,7 +2457,7 @@ class TerminalManager {
                                         gitData.files.map(file => `
                                             <div class="git-file-item" data-file="${file.file}">
                                                 <div class="file-info">
-                                                    <input type="checkbox" class="file-checkbox" ${file.staged ? 'checked' : ''} data-file="${file.file}">
+                                                    <input type="checkbox" class="file-checkbox" checked data-file="${file.file}">
                                                     <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}</span>
                                                     <span class="file-name">${file.file}</span>
                                                 </div>
