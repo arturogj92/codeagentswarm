@@ -402,9 +402,24 @@ jobs:
       - name: Get previous version
         id: prev_version
         run: |
-          # Get the latest tag before the new one
-          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
-          PREVIOUS_VERSION="${LATEST_TAG#v}"
+          # Get all tags sorted by version
+          CURRENT_VERSION="${{ needs.calculate-version.outputs.new_version }}"
+          echo "Current version being released: $CURRENT_VERSION"
+          
+          # Get all version tags, sorted in reverse version order
+          ALL_TAGS=$(git tag -l "v*" | sort -V -r)
+          echo "All tags found: $ALL_TAGS"
+          
+          # Find the previous version (skip the current one if it exists)
+          PREVIOUS_VERSION="0.0.0"
+          for tag in $ALL_TAGS; do
+            VERSION="${tag#v}"
+            if [ "$VERSION" != "$CURRENT_VERSION" ]; then
+              PREVIOUS_VERSION="$VERSION"
+              break
+            fi
+          done
+          
           echo "Previous version: $PREVIOUS_VERSION"
           echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
       

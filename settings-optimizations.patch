@@ -1,0 +1,166 @@
+--- Settings Modal Performance Optimizations ---
+
+1. Replace the formatChangelog function in renderer.js (around line 5318) with:
+
+```javascript
+    formatChangelog(changelog) {
+        // Use the optimized formatter from SettingsOptimizer
+        if (!this.settingsOptimizer) {
+            const SettingsOptimizer = require('./settings-optimizer');
+            this.settingsOptimizer = new SettingsOptimizer();
+        }
+        return this.settingsOptimizer.formatChangelogOptimized(changelog);
+    }
+```
+
+2. Replace the renderVersionHistory function (around line 5511) with:
+
+```javascript
+    async renderVersionHistory(changelogs) {
+        const listEl = document.getElementById('version-history-list');
+        
+        if (!this.settingsOptimizer) {
+            const SettingsOptimizer = require('./settings-optimizer');
+            this.settingsOptimizer = new SettingsOptimizer();
+        }
+        
+        await this.settingsOptimizer.renderVersionHistoryOptimized(changelogs, listEl);
+    }
+```
+
+3. Add debouncing to settings changes in initializeSettingsHandlers:
+
+For the API key input (around where deepseek-api-key is handled):
+```javascript
+// Replace direct save with debounced version
+apiKeyInput.addEventListener('input', (e) => {
+    if (!this.settingsOptimizer) {
+        const SettingsOptimizer = require('./settings-optimizer');
+        this.settingsOptimizer = new SettingsOptimizer();
+    }
+    this.settingsOptimizer.saveSettingDebounced('deepseek-api-key', e.target.value);
+});
+```
+
+4. Optimize the updateStatus function to avoid repeated DOM operations:
+
+```javascript
+    updateStatus(status, message = '') {
+        const statusEl = document.getElementById('update-status');
+        if (!statusEl) return;
+        
+        const statusMessages = {
+            'ready': { icon: 'check-circle', text: 'Ready to check for updates' },
+            'checking': { icon: 'loader-2', text: 'Checking for updates...', spin: true },
+            // ... rest of the status messages
+        };
+        
+        const config = statusMessages[status] || statusMessages.ready;
+        
+        // Create elements instead of using innerHTML
+        statusEl.textContent = ''; // Clear existing content
+        
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', config.icon);
+        if (config.spin) icon.className = 'spin';
+        if (config.color) icon.style.color = config.color;
+        
+        const span = document.createElement('span');
+        span.textContent = config.text;
+        
+        statusEl.appendChild(icon);
+        statusEl.appendChild(span);
+        
+        // Initialize only the new icon
+        if (window.lucide) {
+            window.lucide.createIcons({ el: statusEl });
+        }
+    }
+```
+
+5. Add lazy loading for tab content in showSettingsModal:
+
+```javascript
+    async showSettingsModal(initialTab = null) {
+        const modal = document.getElementById('settings-modal');
+        if (!modal) return;
+        
+        // Only load content for the active tab
+        const loadTabContent = async (tabName) => {
+            switch(tabName) {
+                case 'general':
+                    // Load general tab content
+                    break;
+                case 'shell':
+                    // Load shell preferences
+                    const shellPref = await ipcRenderer.invoke('get-shell-preference');
+                    this.updateShellSettings(shellPref);
+                    break;
+                case 'git':
+                    // Load API key
+                    const apiKeyResult = await ipcRenderer.invoke('get-api-key');
+                    if (apiKeyResult.success && apiKeyResult.key) {
+                        document.getElementById('deepseek-api-key').value = apiKeyResult.key;
+                    }
+                    break;
+                case 'updates':
+                    // Initialize updates tab
+                    this.initializeUpdatesTab();
+                    break;
+            }
+        };
+        
+        // Load initial tab content
+        await loadTabContent(initialTab || 'general');
+        
+        // Show modal
+        modal.style.display = 'block';
+        modal.classList.add('active');
+        
+        // Initialize handlers if not done
+        this.initializeSettingsHandlers();
+    }
+```
+
+6. CSS optimizations to add in styles.css:
+
+```css
+/* Use CSS transforms for better performance */
+.modal.active {
+    display: block;
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Use will-change for elements that will be animated */
+.version-history-content {
+    will-change: height;
+    transition: height 0.3s ease;
+}
+
+/* Optimize scrolling performance */
+.version-history-scroll {
+    -webkit-overflow-scrolling: touch;
+    will-change: scroll-position;
+}
+
+/* Use transform instead of height for accordion */
+.version-history-content:not(.expanded) {
+    max-height: 0;
+    overflow: hidden;
+}
+
+.version-history-content.expanded {
+    max-height: 1000px;
+}
+```

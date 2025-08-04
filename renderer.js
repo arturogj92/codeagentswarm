@@ -4896,6 +4896,8 @@ class TerminalManager {
 
         // Show modal
         modal.style.display = 'block';
+        // Add class to body to prevent scrolling and jumps
+        document.body.classList.add('modal-open');
 
         // Initialize settings modal handlers
         this.initializeSettingsHandlers();
@@ -4914,6 +4916,12 @@ class TerminalManager {
         if (!modal || modal.dataset.handlersInitialized === 'true') return;
         
         modal.dataset.handlersInitialized = 'true';
+        
+        // Initialize settings optimizer for debouncing
+        if (!this.settingsOptimizer) {
+            const SettingsOptimizer = require('./settings-optimizer');
+            this.settingsOptimizer = new SettingsOptimizer();
+        }
         
         // Handle tab switching
         const tabButtons = modal.querySelectorAll('.tab-btn');
@@ -4935,7 +4943,53 @@ class TerminalManager {
             });
         });
 
-        // Event delegation for shell type changes
+        // Add auto-save handlers for settings inputs with debouncing
+        
+        // Auto-save API key with debouncing
+        const apiKeyInput = document.getElementById('deepseek-api-key');
+        if (apiKeyInput && !apiKeyInput.dataset.autoSaveInitialized) {
+            apiKeyInput.dataset.autoSaveInitialized = 'true';
+            apiKeyInput.addEventListener('input', (e) => {
+                const debouncedSave = this.settingsOptimizer.debounce(async (value) => {
+                    const result = await ipcRenderer.invoke('save-api-key', value);
+                    if (!result.success) {
+                        console.error('Failed to auto-save API key:', result.error);
+                    }
+                }, 500, 'api-key');
+                debouncedSave(e.target.value.trim());
+            });
+        }
+        
+        // Auto-save debug mode checkbox
+        const debugCheckbox = document.getElementById('debug-mode-checkbox');
+        if (debugCheckbox && !debugCheckbox.dataset.autoSaveInitialized) {
+            debugCheckbox.dataset.autoSaveInitialized = 'true';
+            debugCheckbox.addEventListener('change', async (e) => {
+                const debugModeEnabled = e.target.checked;
+                const result = await ipcRenderer.invoke('set-debug-mode', debugModeEnabled);
+                
+                if (result.success) {
+                    // Update logger state
+                    const logger = require('./logger');
+                    if (debugModeEnabled) {
+                        logger.enable();
+                    } else {
+                        logger.disable();
+                    }
+                    
+                    // Update LogViewer visibility
+                    if (window.logViewer) {
+                        window.logViewer.setDebugMode(debugModeEnabled);
+                    }
+                } else {
+                    // Revert checkbox on error
+                    e.target.checked = !debugModeEnabled;
+                    console.error('Failed to save debug mode:', result.error);
+                }
+            });
+        }
+
+        // Event delegation for shell type changes with auto-save
         modal.addEventListener('change', (e) => {
             if (e.target.name === 'shell-type') {
                 const customContainer = document.getElementById('custom-shell-container');
@@ -4944,10 +4998,36 @@ class TerminalManager {
                     document.getElementById('custom-shell-path').focus();
                 } else {
                     customContainer.style.display = 'none';
+                    // Auto-save non-custom shell type
+                    const debouncedSaveShell = this.settingsOptimizer.debounce(async (shellType) => {
+                        const shellConfig = { type: shellType };
+                        const result = await ipcRenderer.invoke('update-shell-preference', shellConfig);
+                        if (!result.success) {
+                            console.error('Failed to auto-save shell preference:', result.error);
+                        }
+                    }, 300, 'shell-type');
+                    debouncedSaveShell(e.target.value);
                 }
             }
-            
         });
+        
+        // Auto-save custom shell path with debouncing
+        const customShellPath = document.getElementById('custom-shell-path');
+        if (customShellPath && !customShellPath.dataset.autoSaveInitialized) {
+            customShellPath.dataset.autoSaveInitialized = 'true';
+            customShellPath.addEventListener('input', (e) => {
+                const debouncedSaveCustomShell = this.settingsOptimizer.debounce(async (path) => {
+                    if (path.trim()) {
+                        const shellConfig = { type: 'custom', path: path.trim() };
+                        const result = await ipcRenderer.invoke('update-shell-preference', shellConfig);
+                        if (!result.success) {
+                            console.error('Failed to auto-save custom shell path:', result.error);
+                        }
+                    }
+                }, 500, 'custom-shell-path');
+                debouncedSaveCustomShell(e.target.value);
+            });
+        }
 
         // Toggle API key visibility - using delegation
         modal.addEventListener('click', async (e) => {
@@ -4976,82 +5056,16 @@ class TerminalManager {
             // Handle close button
             if (e.target.id === 'close-settings') {
                 modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
                 return;
             }
 
-            // Handle cancel button
-            if (e.target.id === 'cancel-settings') {
-                modal.style.display = 'none';
-                return;
-            }
-
-            // Handle save button
-            if (e.target.id === 'save-settings') {
-                let hasErrors = false;
-                
-                // Save shell preference
-                const selectedType = document.querySelector('input[name="shell-type"]:checked').value;
-                const shellConfig = { type: selectedType };
-                
-                if (selectedType === 'custom') {
-                    const customPath = document.getElementById('custom-shell-path').value.trim();
-                    if (!customPath) {
-                        alert('Please enter a custom shell path');
-                        return;
-                    }
-                    shellConfig.path = customPath;
-                }
-
-                const shellResult = await ipcRenderer.invoke('update-shell-preference', shellConfig);
-                if (!shellResult.success) {
-                    hasErrors = true;
-                    alert('Failed to save shell preference: ' + (shellResult.error || 'Unknown error'));
-                }
-                
-                // Save API key
-                const apiKey = document.getElementById('deepseek-api-key').value.trim();
-                const apiKeyResult = await ipcRenderer.invoke('save-api-key', apiKey);
-                if (!apiKeyResult.success) {
-                    hasErrors = true;
-                    alert('Failed to save API key: ' + (apiKeyResult.error || 'Unknown error'));
-                }
-                
-                // Save debug mode preference
-                const debugCheckbox = document.getElementById('debug-mode-checkbox');
-                const debugModeEnabled = debugCheckbox.checked;
-                
-                const debugModeResult = await ipcRenderer.invoke('set-debug-mode', debugModeEnabled);
-                
-                if (!debugModeResult.success) {
-                    hasErrors = true;
-                    alert('Failed to save debug mode preference: ' + (debugModeResult.error || 'Unknown error'));
-                } else {
-                    // Update logger state
-                    const logger = require('./logger');
-                    if (debugModeEnabled) {
-                        logger.enable();
-                    } else {
-                        logger.disable();
-                    }
-                    
-                    // Update LogViewer visibility
-                    if (window.logViewer) {
-                        console.log('Setting debug mode to:', debugModeEnabled);
-                        window.logViewer.setDebugMode(debugModeEnabled);
-                    }
-                }
-                
-                if (!hasErrors) {
-                    modal.style.display = 'none';
-                    // Show notification
-                    this.showBadgeNotification('Settings saved successfully');
-                }
-                return;
-            }
+            // Settings are now auto-saved, no need for save/cancel buttons
 
             // Click outside to close
             if (e.target === modal) {
                 modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
             }
         });
     }
@@ -5161,12 +5175,25 @@ class TerminalManager {
         };
         
         const config = statusMessages[status] || statusMessages.ready;
-        statusEl.innerHTML = `
-            <i data-lucide="${config.icon}" class="${config.spin ? 'spin' : ''}" ${config.color ? `style="color: ${config.color};"` : ''}></i>
-            <span>${config.text}</span>
-        `;
         
-        lucide.createIcons();
+        // Create elements instead of using innerHTML for better performance
+        statusEl.textContent = ''; // Clear existing content
+        
+        const icon = document.createElement('i');
+        icon.setAttribute('data-lucide', config.icon);
+        if (config.spin) icon.className = 'spin';
+        if (config.color) icon.style.color = config.color;
+        
+        const span = document.createElement('span');
+        span.textContent = config.text;
+        
+        statusEl.appendChild(icon);
+        statusEl.appendChild(span);
+        
+        // Initialize only the new icon
+        if (window.lucide) {
+            window.lucide.createIcons({ el: statusEl });
+        }
     }
     
     formatBytes(bytes) {
@@ -5310,30 +5337,109 @@ class TerminalManager {
     }
     
     formatChangelog(changelog) {
-        // Format AI-generated changelog with better styling
-        let formatted = changelog
+        // Use the optimized formatter from SettingsOptimizer
+        if (!this.settingsOptimizer) {
+            const SettingsOptimizer = require('./settings-optimizer');
+            this.settingsOptimizer = new SettingsOptimizer();
+        }
+        return this.settingsOptimizer.formatChangelogOptimized(changelog);
+    }
+    
+    formatChangelogOld(changelog) {
+        let listBuffer = [];
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            
             // Headers
-            .replace(/^## (.*?)$/gm, '<h3 class="changelog-version">$1</h3>')
-            .replace(/^### (.*?)$/gm, '<h4 class="changelog-section">$1</h4>')
+            if (line.match(/^## (.*?)$/)) {
+                // Close any open lists
+                if (inSubList) {
+                    listBuffer.push('</ul>');
+                    inSubList = false;
+                }
+                if (inList) {
+                    html += '<ul class="changelog-list">' + listBuffer.join('') + '</ul>';
+                    listBuffer = [];
+                    inList = false;
+                }
+                html += line.replace(/^## (.*?)$/, '<h3 class="changelog-version">$1</h3>');
+            }
+            else if (line.match(/^### (.*?)$/)) {
+                // Close any open lists
+                if (inSubList) {
+                    listBuffer.push('</ul>');
+                    inSubList = false;
+                }
+                if (inList) {
+                    html += '<ul class="changelog-list">' + listBuffer.join('') + '</ul>';
+                    listBuffer = [];
+                    inList = false;
+                }
+                html += line.replace(/^### (.*?)$/, '<h4 class="changelog-section">$1</h4>');
+            }
+            // Main list items (start with "- ")
+            else if (line.match(/^- /)) {
+                if (inSubList) {
+                    listBuffer.push('</ul>');
+                    inSubList = false;
+                }
+                inList = true;
+                let content = line.substring(2);
+                // Apply inline formatting
+                content = this.applyInlineFormatting(content);
+                listBuffer.push('<li>' + content);
+            }
+            // Sub-list items (start with "  • " or "  - ")
+            else if (line.match(/^  [•\-] /)) {
+                if (!inSubList) {
+                    listBuffer.push('<ul class="changelog-sublist">');
+                    inSubList = true;
+                }
+                let content = line.substring(4);
+                // Apply inline formatting
+                content = this.applyInlineFormatting(content);
+                listBuffer.push('<li>' + content + '</li>');
+            }
+            // Empty line or other content
+            else {
+                // Close any open lists
+                if (inSubList) {
+                    listBuffer.push('</ul>');
+                    inSubList = false;
+                }
+                if (inList && listBuffer.length > 0) {
+                    html += '<ul class="changelog-list">' + listBuffer.join('') + '</ul>';
+                    listBuffer = [];
+                    inList = false;
+                }
+                
+                if (line.trim() !== '') {
+                    // Apply inline formatting and add as paragraph
+                    html += '<p>' + this.applyInlineFormatting(line) + '</p>';
+                }
+            }
+        }
+        
+        // Close any remaining open lists
+        if (inSubList) {
+            listBuffer.push('</ul>');
+        }
+        if (inList && listBuffer.length > 0) {
+            html += '<ul class="changelog-list">' + listBuffer.join('') + '</ul>';
+        }
+        
+        return `<div class="changelog-content">${html}</div>`;
+    }
+    
+    applyInlineFormatting(text) {
+        return text
             // Bold text
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             // Italic text
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
-            // Bullet points
-            .replace(/^- (.*?)$/gm, '<li>$1</li>')
-            // Code blocks
-            .replace(/`([^`]+)`/g, '<code>$1</code>')
-            // Line breaks
-            .replace(/\n/g, '<br>')
-            // Horizontal rules for version separators
-            .replace(/---/g, '<hr class="changelog-separator">');
-        
-        // Wrap lists in ul tags
-        formatted = formatted.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, (match) => {
-            return '<ul class="changelog-list">' + match.replace(/<br>/g, '') + '</ul>';
-        });
-        
-        return `<div class="changelog-content">${formatted}</div>`;
+            // Code
+            .replace(/`([^`]+)`/g, '<code>$1</code>');
     }
     
     showFullscreenChangelog() {
@@ -5412,53 +5518,15 @@ class TerminalManager {
         }
     }
     
-    renderVersionHistory(changelogs) {
+    async renderVersionHistory(changelogs) {
         const listEl = document.getElementById('version-history-list');
         
-        // Create all elements first
-        const fragment = document.createDocumentFragment();
+        if (!this.settingsOptimizer) {
+            const SettingsOptimizer = require('./settings-optimizer');
+            this.settingsOptimizer = new SettingsOptimizer();
+        }
         
-        changelogs.forEach((item, index) => {
-            const versionItem = document.createElement('div');
-            versionItem.className = 'version-history-item';
-            
-            // Create header
-            const header = document.createElement('div');
-            header.className = 'version-history-header';
-            header.innerHTML = `
-                <div class="version-history-info">
-                    <span class="version-history-version">Version ${item.version}</span>
-                    <span class="version-history-date">${new Date(item.created_at).toLocaleDateString()}</span>
-                </div>
-                <i data-lucide="chevron-down" class="version-history-chevron"></i>
-            `;
-            
-            // Create content
-            const content = document.createElement('div');
-            content.className = 'version-history-content';
-            content.innerHTML = `
-                <div class="version-history-changelog">
-                    ${this.formatChangelog(item.changelog)}
-                </div>
-            `;
-            
-            // Add click handler
-            header.onclick = () => {
-                const chevron = header.querySelector('.version-history-chevron');
-                content.classList.toggle('expanded');
-                chevron.classList.toggle('expanded');
-            };
-            
-            versionItem.appendChild(header);
-            versionItem.appendChild(content);
-            fragment.appendChild(versionItem);
-        });
-        
-        // Clear and append all at once
-        listEl.innerHTML = '';
-        listEl.appendChild(fragment);
-        
-        // Re-initialize lucide icons after DOM update
+        await this.settingsOptimizer.renderVersionHistoryOptimized(changelogs, listEl);
         requestAnimationFrame(() => {
             if (window.lucide) {
                 window.lucide.createIcons();

@@ -11,10 +11,24 @@
 /* Reset any scroll snapping or stepping */
 html {
   scroll-behavior: auto !important;
+  /* Prevent layout shift when scrollbar appears/disappears */
+  scrollbar-gutter: stable;
 }
 
 body {
   scroll-behavior: auto !important;
+  /* Always show scrollbar space to prevent jumps */
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
+}
+
+/* When modal is open, prevent body scrolling */
+body.modal-open {
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  /* Maintain scrollbar space to prevent jump */
+  scrollbar-gutter: stable;
 }
 
 /* Force hardware acceleration for all scrollable elements */
@@ -25,12 +39,58 @@ body {
 .commits-list,
 .branches,
 .settings-tabs .tab-content {
-  /* Remove all optimizations except the essential ones */
+  /* GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  will-change: scroll-position;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  /* Layout optimization */
   min-height: 0;
   /* Force pixel-perfect scrolling */
   scroll-behavior: auto !important;
   /* Disable scroll anchoring that can cause jumps */
   overflow-anchor: none;
+  /* Smooth scrolling on touch devices */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Additional optimization for modal content children */
+.modal-body > *,
+.version-history-list > * {
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+/* Optimize version history items specifically */
+.version-history-item {
+  will-change: auto; /* Don't pre-optimize unless needed */
+  contain: layout style paint; /* CSS containment for better performance */
+}
+
+/* Reduce repaints during scroll */
+.modal-body::-webkit-scrollbar,
+.version-history-list::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.modal-body::-webkit-scrollbar-track,
+.version-history-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb,
+.version-history-list::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover,
+.version-history-list::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 :root {
@@ -4289,10 +4349,12 @@ h3 i {
   top: 0;
   width: 100%;
   height: 100%;
-  background-color: rgba(0, 0, 0, 0.7); /* Increased opacity to compensate for no blur */
-  /* backdrop-filter: blur(4px); - Removed: causes performance issues in Electron */
+  background-color: rgba(0, 0, 0, 0.85); /* Increased opacity for darker background */
   padding: 20px;
   overflow: hidden;
+  /* Force hardware acceleration with translate3d */
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
 }
 
 .modal-content {
@@ -4309,6 +4371,9 @@ h3 i {
   flex-direction: column;
   position: relative;
   overflow: hidden; /* Prevent overflow in the modal content */
+  transform: translateZ(0); /* Create a new layer */
+  -webkit-transform: translateZ(0);
+  contain: layout; /* Optimize layout calculations */
 }
 
 .modal-header {
@@ -4351,9 +4416,13 @@ h3 i {
 
 .modal-body {
   padding: 20px;
-  overflow-y: auto;
+  overflow-y: scroll; /* Changed to scroll to always show scrollbar */
+  overflow-x: hidden;
   flex: 1;
   min-height: 0;
+  /* Use translate3d for better performance */
+  -webkit-transform: translate3d(0, 0, 0);
+  transform: translate3d(0, 0, 0);
 }
 
 .modal-footer {
@@ -4881,6 +4950,30 @@ h3 i {
   position: absolute;
   left: 0;
   color: var(--primary);
+}
+
+/* Sub-list styling */
+.changelog-sublist {
+  margin: 4px 0 4px 24px;
+  padding: 0;
+  list-style-type: none;
+}
+
+.changelog-sublist li {
+  position: relative;
+  padding-left: 16px;
+  margin: 2px 0;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  font-size: 0.95em;
+}
+
+.changelog-sublist li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--text-tertiary);
+  font-size: 0.8em;
 }
 
 .changelog-separator {
@@ -5493,5 +5586,109 @@ h3 i {
   .version-history-list {
     max-height: 300px;
   }
+}
+
+/* Settings Modal Performance Optimizations */
+
+/* Use CSS transforms for better performance */
+.modal.active {
+    display: block;
+    animation: modalFadeIn 0.2s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Use will-change for elements that will be animated */
+.version-history-content {
+    will-change: height;
+    transition: height 0.3s ease;
+    max-height: 0;
+    overflow: hidden;
+}
+
+.version-history-content.expanded {
+    max-height: 2000px; /* Adjust based on content */
+}
+
+/* Optimize scrolling performance */
+.version-history-scroll {
+    -webkit-overflow-scrolling: touch;
+    will-change: scroll-position;
+    contain: layout style paint;
+}
+
+/* Reduce reflows during tab switching */
+.tab-panel {
+    display: none;
+    contain: layout style paint;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Optimize icon rendering */
+.settings-modal i[data-lucide] {
+    contain: layout style paint;
+    transform: translateZ(0);
+}
+
+/* Optimize changelog rendering */
+.changelog-content {
+    contain: layout style paint;
+}
+
+.changelog-icon {
+    display: inline-block;
+    width: 1.5em;
+    text-align: center;
+}
+
+/* Batch DOM operations with CSS containment */
+.version-history-item {
+    contain: layout style;
+}
+
+/* Optimize input field performance */
+input[type="text"],
+input[type="password"],
+textarea {
+    will-change: transform;
+}
+
+/* Reduce paint areas during hover */
+.version-history-header {
+    will-change: background-color;
+    contain: layout style;
+}
+
+/* Auto-save indicator */
+.auto-save-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--success);
+    font-size: 0.9rem;
+    margin-right: auto;
+}
+
+.auto-save-indicator i {
+    width: 16px;
+    height: 16px;
+}
+
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 

@@ -74,10 +74,14 @@ class ChangelogGenerator {
    */
   async getCommitsBetweenVersions(fromVersion, toVersion, owner, repo) {
     try {
-      console.log(`Fetching commits between v${fromVersion} and v${toVersion}`);
+      console.log(`\n=== FETCHING COMMITS ===`);
+      console.log(`From version: v${fromVersion}`);
+      console.log(`To version: v${toVersion}`);
+      console.log(`Repository: ${owner}/${repo}`);
       
       // If comparing against 0.0.0, get all commits up to the current version
       if (fromVersion === '0.0.0') {
+        console.log('First release detected, fetching all commits...');
         const url = `https://api.github.com/repos/${owner}/${repo}/commits?sha=v${toVersion}&per_page=100`;
         const response = await fetch(url, {
           headers: {
@@ -100,7 +104,9 @@ class ChangelogGenerator {
       }
       
       // Normal comparison between two tags
+      console.log(`Fetching commits using GitHub compare API...`);
       const url = `https://api.github.com/repos/${owner}/${repo}/compare/v${fromVersion}...v${toVersion}`;
+      console.log(`API URL: ${url}`);
       
       const response = await fetch(url, {
         headers: {
@@ -135,7 +141,17 @@ class ChangelogGenerator {
       }
 
       const data = await response.json();
-      return data.commits || [];
+      const commits = data.commits || [];
+      
+      console.log(`Found ${commits.length} commits between versions`);
+      if (commits.length > 0) {
+        console.log('First few commits:');
+        commits.slice(0, 3).forEach(c => {
+          console.log(`  - ${c.sha.substring(0, 7)}: ${c.commit.message.split('\n')[0]}`);
+        });
+      }
+      
+      return commits;
     } catch (error) {
       console.error('Error fetching commits:', error);
       // Return empty array instead of throwing to allow changelog generation to continue
