@@ -203,7 +203,13 @@
                                             <span class="new-version">Version <strong id="new-version"></strong></span>
                                             <span class="release-date" id="release-date"></span>
                                         </div>
-                                        <div class="release-notes" id="release-notes"></div>
+                                        <div class="release-notes-container">
+                                            <div class="release-notes" id="release-notes"></div>
+                                            <button class="btn btn-small btn-secondary" id="view-changelog-fullscreen" style="display: none;">
+                                                <i data-lucide="maximize-2"></i>
+                                                View Fullscreen
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="update-actions">
                                         <button class="btn btn-primary" id="download-update-btn">
@@ -273,6 +279,24 @@
                                         Updates are downloaded in the background and installed when you restart the app.
                                     </p>
                                 </div>
+                                
+                                <!-- Version History Section -->
+                                <div class="settings-section">
+                                    <h4><i data-lucide="history"></i> Version History</h4>
+                                    <div class="version-history-container">
+                                        <div class="version-history-loading" id="version-history-loading" style="display: none;">
+                                            <i data-lucide="loader-2" class="spin"></i>
+                                            <span>Loading version history...</span>
+                                        </div>
+                                        <div class="version-history-error" id="version-history-error" style="display: none;">
+                                            <i data-lucide="alert-circle"></i>
+                                            <span>Failed to load version history</span>
+                                        </div>
+                                        <div class="version-history-list" id="version-history-list">
+                                            <!-- Version history items will be inserted here -->
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -314,6 +338,23 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" id="cancel-settings">Cancel</button>
                 <button class="btn btn-primary" id="save-settings">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fullscreen Changelog Modal -->
+    <div class="modal" id="fullscreen-changelog-modal">
+        <div class="modal-content modal-fullscreen">
+            <div class="modal-header">
+                <h2><i data-lucide="file-text"></i> Changelog</h2>
+                <button class="close-button" id="close-fullscreen-changelog">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="fullscreen-changelog-content" class="changelog-fullscreen-content">
+                    <!-- Changelog content will be inserted here -->
+                </div>
             </div>
         </div>
     </div>

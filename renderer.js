@@ -5085,6 +5085,15 @@ class TerminalManager {
             });
         }
         
+        // Automatically load version history when tab is opened
+        if (!this.versionHistoryLoaded) {
+            this.versionHistoryLoaded = true;
+            // Small delay to ensure UI is ready
+            setTimeout(() => {
+                this.loadVersionHistory();
+            }, 100);
+        }
+        
         // Listen for updater events
         ipcRenderer.on('checking-for-update', () => {
             this.updateStatus('checking');
@@ -5185,16 +5194,28 @@ class TerminalManager {
         
         // Show changelog if available
         const notesEl = document.getElementById('release-notes');
-        if (info.changelog) {
-            // Use the AI-generated changelog
-            notesEl.innerHTML = this.formatChangelog(info.changelog);
-            notesEl.style.display = 'block';
-        } else if (info.releaseNotes) {
-            // Fallback to release notes
-            notesEl.innerHTML = this.formatReleaseNotes(info.releaseNotes);
-            notesEl.style.display = 'block';
+        const fullscreenBtn = document.getElementById('view-changelog-fullscreen');
+        
+        if (info.changelog || info.releaseNotes) {
+            // Store changelog for fullscreen view
+            this.currentChangelog = info.changelog || info.releaseNotes;
+            
+            if (info.changelog) {
+                // Use the AI-generated changelog
+                notesEl.innerHTML = this.formatChangelog(info.changelog);
+                notesEl.style.display = 'block';
+            } else if (info.releaseNotes) {
+                // Fallback to release notes
+                notesEl.innerHTML = this.formatReleaseNotes(info.releaseNotes);
+                notesEl.style.display = 'block';
+            }
+            
+            // Show and bind fullscreen button
+            fullscreenBtn.style.display = 'inline-flex';
+            fullscreenBtn.onclick = () => this.showFullscreenChangelog();
         } else {
             notesEl.style.display = 'none';
+            fullscreenBtn.style.display = 'none';
         }
         
         // Bind download button
@@ -5313,6 +5334,150 @@ class TerminalManager {
         });
         
         return `<div class="changelog-content">${formatted}</div>`;
+    }
+    
+    showFullscreenChangelog() {
+        const modal = document.getElementById('fullscreen-changelog-modal');
+        const contentEl = document.getElementById('fullscreen-changelog-content');
+        
+        // Format and display the changelog
+        if (this.currentChangelog) {
+            contentEl.innerHTML = this.formatChangelog(this.currentChangelog);
+        }
+        
+        // Show modal
+        modal.style.display = 'flex';
+        
+        // Initialize lucide icons
+        setTimeout(() => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }, 10);
+        
+        // Focus on modal for keyboard events
+        modal.focus();
+        
+        // Bind close button
+        const closeBtn = document.getElementById('close-fullscreen-changelog');
+        closeBtn.onclick = () => this.closeFullscreenChangelog();
+        
+        // Close on ESC key
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                this.closeFullscreenChangelog();
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // Close on backdrop click
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                this.closeFullscreenChangelog();
+            }
+        };
+    }
+    
+    closeFullscreenChangelog() {
+        const modal = document.getElementById('fullscreen-changelog-modal');
+        modal.style.display = 'none';
+    }
+    
+    async loadVersionHistory() {
+        const loadingEl = document.getElementById('version-history-loading');
+        const errorEl = document.getElementById('version-history-error');
+        const listEl = document.getElementById('version-history-list');
+        
+        // Show loading state
+        loadingEl.style.display = 'flex';
+        errorEl.style.display = 'none';
+        listEl.innerHTML = '';
+        
+        try {
+            // Fetch version history from backend
+            const history = await ipcRenderer.invoke('fetch-version-history');
+            
+            if (history && history.changelogs && history.changelogs.length > 0) {
+                // Render version history
+                this.renderVersionHistory(history.changelogs);
+                loadingEl.style.display = 'none';
+            } else {
+                throw new Error('No version history available');
+            }
+        } catch (error) {
+            console.error('Failed to load version history:', error);
+            loadingEl.style.display = 'none';
+            errorEl.style.display = 'flex';
+        }
+    }
+    
+    renderVersionHistory(changelogs) {
+        const listEl = document.getElementById('version-history-list');
+        
+        // Create all elements first
+        const fragment = document.createDocumentFragment();
+        
+        changelogs.forEach((item, index) => {
+            const versionItem = document.createElement('div');
+            versionItem.className = 'version-history-item';
+            
+            // Create header
+            const header = document.createElement('div');
+            header.className = 'version-history-header';
+            header.innerHTML = `
+                <div class="version-history-info">
+                    <span class="version-history-version">Version ${item.version}</span>
+                    <span class="version-history-date">${new Date(item.created_at).toLocaleDateString()}</span>
+                </div>
+                <i data-lucide="chevron-down" class="version-history-chevron"></i>
+            `;
+            
+            // Create content
+            const content = document.createElement('div');
+            content.className = 'version-history-content';
+            content.innerHTML = `
+                <div class="version-history-changelog">
+                    ${this.formatChangelog(item.changelog)}
+                </div>
+            `;
+            
+            // Add click handler
+            header.onclick = () => {
+                const chevron = header.querySelector('.version-history-chevron');
+                content.classList.toggle('expanded');
+                chevron.classList.toggle('expanded');
+            };
+            
+            versionItem.appendChild(header);
+            versionItem.appendChild(content);
+            fragment.appendChild(versionItem);
+        });
+        
+        // Clear and append all at once
+        listEl.innerHTML = '';
+        listEl.appendChild(fragment);
+        
+        // Re-initialize lucide icons after DOM update
+        requestAnimationFrame(() => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+            
+            // Force scrollbar repaint for Electron
+            // This is a workaround for Electron scrollbar lag issues
+            const scrollContainer = document.getElementById('version-history-list');
+            if (scrollContainer) {
+                // Force a reflow by temporarily changing a style
+                scrollContainer.style.display = 'none';
+                scrollContainer.offsetHeight; // Force reflow
+                scrollContainer.style.display = '';
+                
+                // Alternative: Force scroll position reset
+                scrollContainer.scrollTop = 1;
+                scrollContainer.scrollTop = 0;
+            }
+        });
     }
     
     async checkUpdateStatusOnStartup() {

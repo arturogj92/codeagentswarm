@@ -208,6 +208,21 @@ ipcMain.handle('get-update-status', () => {
   };
 });
 
+// Fetch version history
+ipcMain.handle('fetch-version-history', async () => {
+  try {
+    if (global.updaterService) {
+      const history = await global.updaterService.fetchVersionHistory();
+      return history;
+    } else {
+      throw new Error('Updater service not initialized');
+    }
+  } catch (error) {
+    logger.addLog('error', ['Failed to fetch version history:', error.message]);
+    throw error;
+  }
+});
+
 // get-shell-preference handler is now in registerDatabaseHandlers()
 
 // Handle MCP diagnostic request

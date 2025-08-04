@@ -441,6 +441,50 @@ class UpdaterService {
       request.end();
     });
   }
+  
+  // Fetch version history (last N versions)
+  async fetchVersionHistory(limit = 10) {
+    const serverUrl = process.env.UPDATE_SERVER_URL || 'https://codeagentswarm-backend-production.up.railway.app';
+    const historyUrl = `${serverUrl}/api/changelog?limit=${limit}`;
+    
+    dualLog.info('Fetching version history from:', historyUrl);
+    
+    return new Promise((resolve, reject) => {
+      const request = net.request({
+        method: 'GET',
+        url: historyUrl
+      });
+      
+      request.on('response', (response) => {
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          try {
+            if (response.statusCode === 200) {
+              const result = JSON.parse(data);
+              resolve(result);
+            } else {
+              dualLog.error('Version history fetch failed:', response.statusCode, data);
+              reject(new Error(`Failed to fetch version history: ${response.statusCode}`));
+            }
+          } catch (error) {
+            dualLog.error('Failed to parse version history response:', error);
+            reject(error);
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        dualLog.error('Version history fetch error:', error);
+        reject(error);
+      });
+      
+      request.end();
+    });
+  }
 }
 
 module.exports = UpdaterService;
