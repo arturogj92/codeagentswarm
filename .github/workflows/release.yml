@@ -367,7 +367,7 @@ jobs:
           body: |
             ## CodeAgentSwarm ${{ steps.release_info.outputs.version }}
             
-            ${{ needs.generate-changelog.outputs.changelog }}
+            ${{ needs.generate-changelog.outputs.changelog || 'No changelog available for this release.' }}
             
             ### Downloads
             - Platform: ${{ matrix.platform }}
@@ -381,6 +381,8 @@ jobs:
   generate-changelog:
     needs: [calculate-version]
     runs-on: ubuntu-latest
+    # Continue even if changelog fails
+    continue-on-error: true
     outputs:
       changelog: ${{ steps.generate.outputs.changelog }}
     
@@ -397,8 +399,7 @@ jobs:
       
       - name: Install dependencies for changelog generator
         run: |
-          cd scripts
-          npm install node-fetch @supabase/supabase-js
+          npm install node-fetch@2 @supabase/supabase-js
       
       - name: Get previous version
         id: prev_version
@@ -417,12 +418,16 @@ jobs:
           DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          cd scripts
-          node changelog-generator.js \
+          # Debug info
+          echo "Current version: ${{ needs.calculate-version.outputs.new_version }}"
+          echo "Previous version: ${{ steps.prev_version.outputs.previous_version }}"
+          echo "Repository: ${{ github.repository }}"
+          
+          node scripts/changelog-generator.js \
             "${{ needs.calculate-version.outputs.new_version }}" \
             "${{ steps.prev_version.outputs.previous_version }}" \
-            "${{ github.repository_owner }}" \
-            "${{ github.event.repository.name }}" > changelog.md
+            "arturogj92" \
+            "codeagentswarm" > changelog.md || echo "## Version ${{ needs.calculate-version.outputs.new_version }}\n\nNo changelog generated." > changelog.md
           
           # Read changelog into output
           CHANGELOG=$(cat changelog.md)
