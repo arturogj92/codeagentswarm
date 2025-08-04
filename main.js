@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification, globalShortcut } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
 const path = require('path');
@@ -411,20 +411,122 @@ function createWindow() {
     mainWindow.webContents.send('dev-mode-status', isDevMode);
   });
   
-  // Clear badge when window gets focus
+  // Clear badge when window gets focus and register shortcuts
   mainWindow.on('focus', () => {
     if (process.platform === 'darwin') {
       app.badgeCount = 0;
     }
+    // Re-register shortcuts when window gains focus
+    registerLocalShortcuts();
     terminalsWaitingForResponse.clear();
     
     // Notify renderer to clear waiting states
     mainWindow.webContents.send('clear-waiting-states');
   });
   
+  // Unregister shortcuts when window loses focus
+  mainWindow.on('blur', () => {
+    unregisterLocalShortcuts();
+  });
+  
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+}
+
+// Local shortcuts management
+let localShortcutsEnabled = false;
+let shortcutHandler = null;
+
+function registerLocalShortcuts() {
+  if (!mainWindow || mainWindow.isDestroyed() || localShortcutsEnabled) return;
+  
+  // Define shortcuts
+  const shortcuts = [
+    {
+      key: process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K',
+      action: () => openOrFocusKanbanWindow(),
+      name: 'Task Manager'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+N' : 'Ctrl+N',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('add-terminal-shortcut');
+        }
+      },
+      name: 'New Terminal'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+T' : 'Ctrl+T',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('create-task-shortcut');
+        }
+      },
+      name: 'Create Task'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+G' : 'Ctrl+G',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('git-status-shortcut');
+        }
+      },
+      name: 'Git Status'
+    }
+  ];
+  
+  // Create the handler function
+  shortcutHandler = (event, input) => {
+    if (input.type !== 'keyDown') return;
+    
+    // Check each shortcut
+    for (const { key, action, name } of shortcuts) {
+      if (matchesShortcut(input, key)) {
+        event.preventDefault();
+        action();
+        break;
+      }
+    }
+  };
+  
+  // Register the handler
+  mainWindow.webContents.on('before-input-event', shortcutHandler);
+  localShortcutsEnabled = true;
+  console.log('Local shortcuts registered');
+}
+
+function unregisterLocalShortcuts() {
+  if (!mainWindow || mainWindow.isDestroyed() || !localShortcutsEnabled) return;
+  
+  // Remove the event listener
+  if (shortcutHandler) {
+    mainWindow.webContents.removeListener('before-input-event', shortcutHandler);
+    shortcutHandler = null;
+  }
+  
+  localShortcutsEnabled = false;
+  console.log('Local shortcuts unregistered');
+}
+
+function matchesShortcut(input, shortcutKey) {
+  const parts = shortcutKey.toLowerCase().split('+');
+  const modifiers = {
+    cmd: input.meta,
+    ctrl: input.control,
+    alt: input.alt,
+    shift: input.shift
+  };
+  
+  // Check modifiers
+  for (const part of parts.slice(0, -1)) {
+    if (!modifiers[part]) return false;
+  }
+  
+  // Check the actual key
+  const key = parts[parts.length - 1];
+  return input.key.toLowerCase() === key.toLowerCase();
 }
 
 // Simple shell simulation without external dependencies
@@ -2726,51 +2828,9 @@ async function initializeApp() {
   
   createWindow();
   
-  // Register global shortcuts
-  const shortcuts = [
-    {
-      key: process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K',
-      action: () => openOrFocusKanbanWindow(),
-      name: 'Task Manager'
-    },
-    {
-      key: process.platform === 'darwin' ? 'Cmd+N' : 'Ctrl+N',
-      action: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('add-terminal-shortcut');
-        }
-      },
-      name: 'New Terminal'
-    },
-    {
-      key: process.platform === 'darwin' ? 'Cmd+T' : 'Ctrl+T',
-      action: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('create-task-shortcut');
-        }
-      },
-      name: 'Create Task'
-    },
-    {
-      key: process.platform === 'darwin' ? 'Cmd+G' : 'Ctrl+G',
-      action: () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.send('git-status-shortcut');
-        }
-      },
-      name: 'Git Status'
-    }
-  ];
-
-  // Register all shortcuts
-  shortcuts.forEach(({ key, action, name }) => {
-    const ret = globalShortcut.register(key, action);
-    if (!ret) {
-      console.log(`Registration of global shortcut ${key} for ${name} failed`);
-    } else {
-      console.log(`Global shortcut ${key} registered for ${name}`);
-    }
-  });
+  // Setup local shortcuts instead of global ones
+  // These will only work when the window is focused
+  registerLocalShortcuts();
   
   // Initialize hooks manager and webhook server
   try {
@@ -4021,8 +4081,8 @@ ipcMain.handle('git-pull-project', async (event, projectPath) => {
 app.on('before-quit', (event) => {
   console.log('App is quitting, cleaning up processes...');
   
-  // Unregister all global shortcuts
-  globalShortcut.unregisterAll();
+  // Unregister all local shortcuts
+  unregisterLocalShortcuts();
   
   // If we're already handling quit, don't do it again
   if (isHandlingQuit) {
