@@ -137,24 +137,30 @@ class ChangelogGenerator {
             }
             
             const prevTagData = await prevTagResponse.json();
-            const prevTagSha = prevTagData.object.sha;
+            let tagCommitSha;
             
-            // Get the commit object for the tag
-            const commitUrl = `https://api.github.com/repos/${owner}/${repo}/git/commits/${prevTagSha}`;
-            const commitResponse = await fetch(commitUrl, {
-              headers: {
-                'Authorization': `token ${this.githubToken}`,
-                'Accept': 'application/vnd.github.v3+json'
+            // Check if it's an annotated tag or a lightweight tag
+            if (prevTagData.object.type === 'tag') {
+              // Annotated tag - need to fetch the actual commit
+              const tagObjectUrl = `https://api.github.com/repos/${owner}/${repo}/git/tags/${prevTagData.object.sha}`;
+              const tagObjectResponse = await fetch(tagObjectUrl, {
+                headers: {
+                  'Authorization': `token ${this.githubToken}`,
+                  'Accept': 'application/vnd.github.v3+json'
+                }
+              });
+              
+              if (!tagObjectResponse.ok) {
+                console.log('Could not get tag object info');
+                return [];
               }
-            });
-            
-            if (!commitResponse.ok) {
-              console.log('Could not get commit info for tag');
-              return [];
+              
+              const tagObject = await tagObjectResponse.json();
+              tagCommitSha = tagObject.object.sha;
+            } else {
+              // Lightweight tag - SHA points directly to commit
+              tagCommitSha = prevTagData.object.sha;
             }
-            
-            const commitData = await commitResponse.json();
-            const tagCommitSha = commitData.sha;
             
             // Get all commits on the default branch
             const allCommitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100`;
