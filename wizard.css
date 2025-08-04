@@ -1926,11 +1926,12 @@ video, .demo-gif {
 /* Hero typography */
 .hero-title {
     font-size: 52px;
-    font-weight: 800;
+    font-weight: 700;
     color: var(--text-primary);
     margin: 0 0 20px 0;
-    letter-spacing: -2px;
-    background: var(--gradient-primary);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -1964,7 +1965,6 @@ video, .demo-gif {
     position: relative;
     overflow: hidden;
     animation: slideInUp 0.8s ease-out 0.7s both, buttonPulse 2s ease-in-out infinite;
-    opacity: 0;
 }
 
 .button-text {

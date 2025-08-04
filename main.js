@@ -710,7 +710,7 @@ class SimpleShell {
     this.claudeWindow = claudeWindow;
   }
   
-  kill() {
+  killActiveProcess() {
     if (this.activeInteractiveProcess) {
       try {
         // For node-pty processes
@@ -1084,8 +1084,9 @@ ipcMain.handle('remove-terminal', async (event, terminalId) => {
       return { success: false, error: 'Terminal not found' };
     }
   } catch (error) {
-    console.error('Error removing terminal:', error);
-    return { success: false, error: error.message };
+    console.error('Error removing terminal:', error.message || error);
+    console.error('Stack trace:', error.stack);
+    return { success: false, error: error.message || 'Unknown error occurred' };
   }
 });
 
