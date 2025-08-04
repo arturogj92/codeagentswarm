@@ -4803,6 +4803,64 @@ h3 i {
   overflow-y: auto;
 }
 
+/* Changelog specific styles */
+.changelog-content {
+  font-family: var(--font-family);
+}
+
+.changelog-version {
+  color: var(--text-primary);
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 12px 0 8px 0;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.changelog-section {
+  color: var(--primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 10px 0 6px 0;
+}
+
+.changelog-list {
+  margin: 4px 0 8px 20px;
+  padding: 0;
+  list-style-type: none;
+}
+
+.changelog-list li {
+  position: relative;
+  padding-left: 16px;
+  margin: 4px 0;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.changelog-list li:before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--primary);
+}
+
+.changelog-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+  opacity: 0.5;
+}
+
+.changelog-content code {
+  background-color: var(--bg-secondary);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-size: 0.85em;
+  font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+  color: var(--primary);
+}
+
 /* Update Progress Bar */
 .update-progress {
   background: var(--surface);
@@ -5088,5 +5146,108 @@ h3 i {
 
 .app-notification.notification-warning {
   border-left: 4px solid #f59e0b;
+}
+
+/* Enhanced Tooltips for Keyboard Shortcuts */
+[data-tooltip] {
+  position: relative;
+}
+
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.8);
+  background: linear-gradient(135deg, rgb(127, 90, 240) 0%, rgb(100, 70, 200) 100%);
+  color: #ffffff;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 8px 24px rgba(127, 90, 240, 0.3),
+    0 2px 8px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  letter-spacing: 0.3px;
+  visibility: hidden;
+  transition-delay: 0s;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+[data-tooltip]::before {
+  content: '';
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%) rotate(45deg);
+  width: 12px;
+  height: 12px;
+  background: linear-gradient(315deg, rgb(127, 90, 240) 0%, rgb(100, 70, 200) 50%);
+  pointer-events: none;
+  z-index: 9998;
+  opacity: 0;
+  visibility: hidden;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  transition-delay: 0s;
+  box-shadow: -2px -2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+  visibility: visible;
+  transition-delay: 0.1s;
+}
+
+[data-tooltip]:hover::before {
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0.1s;
+}
+
+/* Special styling for shortcut part */
+[data-tooltip]::after {
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+}
+
+/* Keyboard shortcut emphasis */
+.tooltip-shortcut {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+  margin-left: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  box-shadow: 
+    0 2px 4px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Ensure buttons have relative positioning for tooltips */
+.btn-layout,
+.btn,
+.git-button {
+  position: relative;
+}
+
+@keyframes tooltipFadeIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(4px) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
 }
 

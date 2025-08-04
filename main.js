@@ -148,7 +148,22 @@ ipcMain.handle('cancel-update-download', async () => {
 ipcMain.handle('install-update', async () => {
   try {
     if (global.updaterService) {
-      global.updaterService.quitAndInstall();
+      logger.addLog('info', ['Install update requested by user']);
+      
+      // Mark app as quitting to prevent any restart attempts
+      app.isQuitting = true;
+      
+      // Close all windows before installing
+      BrowserWindow.getAllWindows().forEach(window => {
+        window.removeAllListeners('close');
+        window.close();
+      });
+      
+      // Small delay to ensure windows are closed
+      setTimeout(() => {
+        global.updaterService.quitAndInstall();
+      }, 500);
+      
       return { success: true };
     } else {
       return { success: false, error: 'Updater service not initialized' };
@@ -434,17 +449,33 @@ class SimpleShell {
   }
   
   sendOutput(data) {
+    // Don't send output if the shell has been killed
+    if (!this.isActive) {
+      return;
+    }
+    
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.send(`terminal-output-${this.quadrant}`, data);
     }
   }
   
   sendPrompt() {
+    // Guard against null cwd
+    if (!this.cwd) {
+      console.warn(`Terminal ${this.quadrant} has null cwd, skipping prompt`);
+      return;
+    }
     const promptText = `\x1b[32m➜\x1b[0m  \x1b[36m${path.basename(this.cwd)}\x1b[0m $ `;
     this.sendOutput(promptText);
   }
   
   handleInput(data) {
+    // Don't process input if the shell has been killed
+    if (!this.isActive) {
+      console.log(`Shell ${this.quadrant} is not active, ignoring input`);
+      return;
+    }
+    
     // If we have an active interactive process, send input directly to it
     if (this.activeInteractiveProcess) {
       // Write directly to the PTY process
@@ -843,21 +874,21 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
 ipcMain.on('terminal-input', (event, quadrant, data) => {
   // Input received for terminal ${quadrant}
   const shell = terminals.get(quadrant);
-  if (shell) {
+  if (shell && shell.isActive) {
     shell.handleInput(data);
   } else {
-    console.error(`Shell ${quadrant} not found`);
+    console.log(`Shell ${quadrant} not found or not active, ignoring input`);
   }
 });
 
 ipcMain.on('send-to-terminal', (event, terminalId, message) => {
   console.log(`Sending message to terminal ${terminalId}`);
   const shell = terminals.get(terminalId);
-  if (shell) {
+  if (shell && shell.isActive) {
     // Send the message as if it was typed
     shell.handleInput(message);
   } else {
-    console.error(`Terminal ${terminalId} not found`);
+    console.error(`Terminal ${terminalId} not found or not active`);
   }
 });
 
@@ -914,9 +945,14 @@ ipcMain.on('terminal-resize', (event, quadrant, cols, rows) => {
 ipcMain.on('kill-terminal', (event, quadrant, force = false) => {
   const shell = terminals.get(quadrant);
   if (shell) {
-    console.log(`Killing terminal ${quadrant} and all child processes... ${force ? '(FORCE)' : ''}`);
+    console.log(`Closing terminal ${quadrant} (placeholder: ${shell.placeholder || false})...`);
     
     try {
+      // Mark shell as inactive first to prevent any further operations
+      if (shell.isActive !== undefined) {
+        shell.isActive = false;
+      }
+      
       // Kill the shell process - check if method exists first
       if (shell.kill && typeof shell.kill === 'function') {
         console.log(`Calling shell.kill() for terminal ${quadrant}`);
@@ -924,92 +960,23 @@ ipcMain.on('kill-terminal', (event, quadrant, force = false) => {
       } else if (shell.activeInteractiveProcess && shell.activeInteractiveProcess.kill) {
         console.log(`Calling activeInteractiveProcess.kill() for terminal ${quadrant}`);
         shell.activeInteractiveProcess.kill('SIGTERM');
-        // Try SIGKILL after a delay if SIGTERM doesn't work
-        setTimeout(() => {
-          if (shell.activeInteractiveProcess && !shell.activeInteractiveProcess.killed) {
-            shell.activeInteractiveProcess.kill('SIGKILL');
-          }
-        }, 1000);
       } else {
-        console.log(`No kill method available for terminal ${quadrant}, will rely on cleanup`);
+        console.log(`No kill method available for terminal ${quadrant} (likely a placeholder)`);
       }
     } catch (error) {
       console.error(`Error killing terminal ${quadrant}:`, error.message);
       // Don't crash the app, continue with cleanup
     }
     
+    // Remove from terminals map
     terminals.delete(quadrant);
     
-    // More aggressive cleanup for force kills
-    const cleanupDelay = force ? 50 : 100;
-    const maxRetries = force ? 3 : 1;
+    // Send success message to renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send(`terminal-closed-${quadrant}`);
+    }
     
-    let retryCount = 0;
-    const cleanup = () => {
-      retryCount++;
-      console.log(`Cleanup attempt ${retryCount} for terminal ${quadrant}`);
-      
-      try {
-        if (process.platform === 'darwin') {
-          // Get the shell PID to be more specific
-          let shellPid = null;
-          if (shell && shell.activeInteractiveProcess && shell.activeInteractiveProcess.pid) {
-            shellPid = shell.activeInteractiveProcess.pid;
-          }
-          
-          if (shellPid) {
-            // Kill specific shell and its children only
-            console.log(`Killing shell ${shellPid} and its children...`);
-            require('child_process').execSync(`pkill -P ${shellPid} 2>/dev/null || true`);
-            require('child_process').execSync(`kill -9 ${shellPid} 2>/dev/null || true`);
-          }
-          
-          // Only look for Claude processes that are NOT part of this main application
-          // Exclude our main Electron process and focus on claude CLI processes
-          try {
-            const { execSync } = require('child_process');
-            // Be very specific: only kill claude CLI processes, not our Electron app
-            execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -TERM 2>/dev/null || true`);
-            
-            // If force is enabled, try SIGKILL after a brief delay
-            if (force) {
-              setTimeout(() => {
-                try {
-                  execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
-                } catch (e) {
-                  // Ignore errors
-                }
-              }, 1000);
-            }
-          } catch (e) {
-            console.warn(`Error during Claude cleanup:`, e.message);
-          }
-        } else if (process.platform === 'linux') {
-          // Similar approach for Linux with more specificity
-          let shellPid = null;
-          if (shell && shell.activeInteractiveProcess && shell.activeInteractiveProcess.pid) {
-            shellPid = shell.activeInteractiveProcess.pid;
-          }
-          
-          if (shellPid) {
-            require('child_process').execSync(`pkill -P ${shellPid} 2>/dev/null || true`);
-            require('child_process').execSync(`kill -9 ${shellPid} 2>/dev/null || true`);
-          }
-          
-          // Kill only standalone claude processes, not our app
-          require('child_process').execSync(`ps aux | grep -E "\\bclaude\\b" | grep -v "electron" | grep -v "codeagentswarm" | grep -v grep | awk '{print $2}' | xargs kill -TERM 2>/dev/null || true`);
-        }
-      } catch (e) {
-        console.warn(`Cleanup error for terminal ${quadrant}:`, e.message);
-      }
-      
-      // Retry if this was a force kill and we haven't exceeded max retries
-      if (force && retryCount < maxRetries) {
-        setTimeout(cleanup, cleanupDelay);
-      }
-    };
-    
-    setTimeout(cleanup, cleanupDelay);
+    console.log(`Terminal ${quadrant} closed successfully`);
   }
 });
 
@@ -1059,26 +1026,26 @@ ipcMain.handle('remove-terminal', async (event, terminalId) => {
     if (shell) {
       console.log(`Removing terminal ${terminalId}...`);
       
+      // Mark shell as inactive first
+      if (shell.isActive !== undefined) {
+        shell.isActive = false;
+      }
+      
       // If it's a real shell (not just a placeholder), kill it
       if (shell.kill && typeof shell.kill === 'function') {
         shell.kill();
+      } else if (shell.activeInteractiveProcess && shell.activeInteractiveProcess.kill) {
+        shell.activeInteractiveProcess.kill('SIGTERM');
       }
       
       terminals.delete(terminalId);
       
-      // Cleanup orphaned processes only if it was a real shell
-      if (!shell.placeholder) {
-        setTimeout(() => {
-          if (process.platform === 'darwin') {
-            try {
-              require('child_process').execSync(`ps aux | grep -E "claude.*${terminalId}" | grep -v grep | awk '{print $2}' | xargs kill -9 2>/dev/null || true`);
-            } catch (e) {
-              // Ignore errors
-            }
-          }
-        }, 100);
+      // Send terminal-closed event to renderer to update UI
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send(`terminal-closed-${terminalId}`);
       }
       
+      console.log(`Terminal ${terminalId} removed successfully`);
       return { success: true };
     } else {
       return { success: false, error: 'Terminal not found' };
@@ -2759,17 +2726,51 @@ async function initializeApp() {
   
   createWindow();
   
-  // Register global shortcut for opening task manager
-  const shortcut = process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K';
-  const ret = globalShortcut.register(shortcut, () => {
-    openOrFocusKanbanWindow();
-  });
+  // Register global shortcuts
+  const shortcuts = [
+    {
+      key: process.platform === 'darwin' ? 'Cmd+K' : 'Ctrl+K',
+      action: () => openOrFocusKanbanWindow(),
+      name: 'Task Manager'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+N' : 'Ctrl+N',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('add-terminal-shortcut');
+        }
+      },
+      name: 'New Terminal'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+T' : 'Ctrl+T',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('create-task-shortcut');
+        }
+      },
+      name: 'Create Task'
+    },
+    {
+      key: process.platform === 'darwin' ? 'Cmd+G' : 'Ctrl+G',
+      action: () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('git-status-shortcut');
+        }
+      },
+      name: 'Git Status'
+    }
+  ];
 
-  if (!ret) {
-    console.log('Registration of global shortcut failed');
-  } else {
-    console.log(`Global shortcut ${shortcut} registered for opening task manager`);
-  }
+  // Register all shortcuts
+  shortcuts.forEach(({ key, action, name }) => {
+    const ret = globalShortcut.register(key, action);
+    if (!ret) {
+      console.log(`Registration of global shortcut ${key} for ${name} failed`);
+    } else {
+      console.log(`Global shortcut ${key} registered for ${name}`);
+    }
+  });
   
   // Initialize hooks manager and webhook server
   try {
@@ -3137,6 +3138,14 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
     });
     
     notification.show();
+    
+    // Send event to renderer to scroll terminal if message contains terminal number
+    const terminalMatch = message.match(/Terminal (\d+)/);
+    if (terminalMatch && mainWindow && !mainWindow.isDestroyed()) {
+      const terminalNumber = parseInt(terminalMatch[1]);
+      const quadrant = terminalNumber - 1; // Convert 1-based to 0-based
+      mainWindow.webContents.send('scroll-terminal-to-bottom', quadrant);
+    }
     
     // Optional: Handle notification click
     notification.on('click', () => {

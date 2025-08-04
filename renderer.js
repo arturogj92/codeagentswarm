@@ -151,9 +151,40 @@ class TerminalManager {
         ipcRenderer.on('display-badge', (event, message) => {
             this.showBadgeNotification(message);
         });
+        
+        // Listen for scroll to bottom events
+        ipcRenderer.on('scroll-terminal-to-bottom', (event, quadrant) => {
+            console.log(`📨 Received scroll-to-bottom event for terminal ${quadrant}`);
+            this.scrollTerminalToBottom(quadrant);
+        });
     }
 
     setupEventListeners() {
+        // Setup terminal-closed listeners for all possible terminals
+        for (let i = 0; i < 6; i++) {
+            ipcRenderer.on(`terminal-closed-${i}`, async () => {
+                console.log(`📨 Received terminal-closed event for terminal ${i}`);
+                // Clean up and remove the terminal from UI
+                if (this.terminals.has(i)) {
+                    const terminal = this.terminals.get(i);
+                    if (terminal && terminal.terminal) {
+                        try {
+                            terminal.terminal.dispose();
+                        } catch (e) {
+                            console.error(`Error disposing terminal ${i}:`, e);
+                        }
+                    }
+                    this.terminals.delete(i);
+                }
+                
+                // Update the UI
+                await this.removeTerminal(i, true);
+                await this.renderTerminals();
+                this.updateGitButtonVisibility();
+                console.log(`✅ Terminal ${i} UI updated after backend close`);
+            });
+        }
+
         document.getElementById('add-terminal-btn').addEventListener('click', () => {
             this.addTerminal();
         });
@@ -252,8 +283,8 @@ class TerminalManager {
                 return false;
             }
             
-            // Handle Cmd+N for creating new task
-            if (e.metaKey && e.key === 'n') {
+            // Handle Cmd+T for creating new task
+            if (e.metaKey && e.key === 't') {
                 this.showCreateTaskDialog();
                 e.preventDefault();
                 return false;
@@ -1014,11 +1045,52 @@ class TerminalManager {
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
             terminal.write(data);
+            
+            // Auto-scroll on certain patterns
+            const dataStr = data.toString();
+            
+            // Patterns that indicate important output requiring attention
+            const scrollPatterns = [
+                'Welcome to Claude Code',
+                'Do you want to',
+                'Would you like to',
+                'Continue?',
+                'Press Enter',
+                'Process exited',
+                'Finished',
+                'Complete',
+                'Error:',
+                'Failed',
+                'Success',
+                '✓',
+                '✗',
+                '⚠',
+                '❌',
+                '✅',
+                '🎉',
+                '🚀',
+                'task completed',
+                'task finished'
+            ];
+            
+            // Check if any pattern matches (case insensitive)
+            const shouldScroll = scrollPatterns.some(pattern => 
+                dataStr.toLowerCase().includes(pattern.toLowerCase())
+            );
+            
+            if (shouldScroll) {
+                // Small delay to ensure content is rendered
+                setTimeout(() => {
+                    this.scrollTerminalToBottom(quadrant);
+                }, 50);
+            }
         });
 
         // Handle terminal exit
         ipcRenderer.on(`terminal-exit-${quadrant}`, (event, code) => {
-            terminal.write(`\r\n\x1b[31mTerminal exited with code: ${code}\x1b[0m\r\n`);
+            terminal.write(`\r\n\x1b[31]Terminal exited with code: ${code}\x1b[0m\r\n`);
+            // Auto-scroll to bottom when terminal exits
+            this.scrollTerminalToBottom(quadrant);
         });
 
         // Handle terminal resize
@@ -1115,22 +1187,37 @@ class TerminalManager {
     scrollTerminalToBottom(quadrant) {
         const terminal = this.terminals.get(quadrant);
         if (terminal && terminal.terminal) {
-            // Use the stored scroll function if available
-            if (terminal.terminal.scrollToBottomFn) {
-                terminal.terminal.scrollToBottomFn();
-            } else {
-                // Fallback: direct scroll
-                terminal.terminal.scrollToBottom();
-                
-                // Also try to scroll the viewport
-                const terminalDiv = terminal.element;
-                if (terminalDiv) {
-                    const viewport = terminalDiv.querySelector('.xterm-viewport');
-                    if (viewport) {
-                        viewport.scrollTop = viewport.scrollHeight;
+            // Use setTimeout to ensure the terminal has rendered any new content
+            setTimeout(() => {
+                try {
+                    // Method 1: Use xterm's scrollToBottom
+                    if (terminal.terminal.scrollToBottom) {
+                        terminal.terminal.scrollToBottom();
                     }
+                    
+                    // Method 2: Also scroll the viewport directly as backup
+                    const terminalDiv = terminal.element || document.querySelector(`[data-quadrant="${quadrant}"] .terminal`);
+                    if (terminalDiv) {
+                        const viewport = terminalDiv.querySelector('.xterm-viewport');
+                        if (viewport) {
+                            viewport.scrollTop = viewport.scrollHeight;
+                        }
+                    }
+                    
+                    // Method 3: Use the scroll button's stored function if available
+                    if (terminal.terminal.scrollToBottomFn) {
+                        terminal.terminal.scrollToBottomFn();
+                    }
+                    
+                    // Update scroll button visibility
+                    const scrollBtn = terminalDiv?.querySelector('.scroll-to-bottom-btn');
+                    if (scrollBtn) {
+                        scrollBtn.classList.remove('show');
+                    }
+                } catch (e) {
+                    console.error(`Error scrolling terminal ${quadrant} to bottom:`, e);
                 }
-            }
+            }, 100); // Small delay to ensure content is rendered
         }
     }
 
@@ -1776,25 +1863,12 @@ class TerminalManager {
             this.claudeCodeReady[quadrant] = false;
         }
         
-        // Dispose xterm.js terminal first
-        if (terminal && terminal.terminal) {
-            console.log(`🗑️ Disposing xterm.js terminal ${quadrant}`);
-            terminal.terminal.dispose();
-        }
+        // Just send kill signal - the terminal-closed event handler will do the cleanup
+        console.log(`🗑️ Sending kill signal for terminal ${quadrant}`);
+        ipcRenderer.send('kill-terminal', quadrant, true);
         
-        // If Claude was active, send force kill to ensure cleanup
-        if (isClaudeActive) {
-            console.log(`🗑️ Sending force kill signal for Claude session in terminal ${quadrant}`);
-            ipcRenderer.send('kill-terminal', quadrant, true);
-        }
-        
-        // Use the standard terminal removal system (like terminals without sessions)
-        await this.removeTerminal(quadrant, true);
-        
-        // Update git button visibility
-        this.updateGitButtonVisibility();
-        
-        console.log(`✅ Terminal ${quadrant} closed completely`);
+        // The UI cleanup will be handled by the terminal-closed event listener
+        console.log(`⏳ Waiting for terminal-closed event to update UI...`);
     }
 
     async showCloseTerminalConfirmation(quadrant, isClaudeActive) {
@@ -5109,13 +5183,18 @@ class TerminalManager {
             document.getElementById('release-date').textContent = `Released ${date.toLocaleDateString()}`;
         }
         
-        // Show release notes
-        if (info.releaseNotes) {
-            const notesEl = document.getElementById('release-notes');
+        // Show changelog if available
+        const notesEl = document.getElementById('release-notes');
+        if (info.changelog) {
+            // Use the AI-generated changelog
+            notesEl.innerHTML = this.formatChangelog(info.changelog);
+            notesEl.style.display = 'block';
+        } else if (info.releaseNotes) {
+            // Fallback to release notes
             notesEl.innerHTML = this.formatReleaseNotes(info.releaseNotes);
             notesEl.style.display = 'block';
         } else {
-            document.getElementById('release-notes').style.display = 'none';
+            notesEl.style.display = 'none';
         }
         
         // Bind download button
@@ -5207,6 +5286,33 @@ class TerminalManager {
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/^- (.*)/gm, '• $1')
             .replace(/^\d+\. (.*)/gm, '$1');
+    }
+    
+    formatChangelog(changelog) {
+        // Format AI-generated changelog with better styling
+        let formatted = changelog
+            // Headers
+            .replace(/^## (.*?)$/gm, '<h3 class="changelog-version">$1</h3>')
+            .replace(/^### (.*?)$/gm, '<h4 class="changelog-section">$1</h4>')
+            // Bold text
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // Italic text
+            .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Bullet points
+            .replace(/^- (.*?)$/gm, '<li>$1</li>')
+            // Code blocks
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // Line breaks
+            .replace(/\n/g, '<br>')
+            // Horizontal rules for version separators
+            .replace(/---/g, '<hr class="changelog-separator">');
+        
+        // Wrap lists in ul tags
+        formatted = formatted.replace(/(<li>.*?<\/li>(?:<br>)?)+/g, (match) => {
+            return '<ul class="changelog-list">' + match.replace(/<br>/g, '') + '</ul>';
+        });
+        
+        return `<div class="changelog-content">${formatted}</div>`;
     }
     
     async checkUpdateStatusOnStartup() {
@@ -5356,4 +5462,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             window.perfMonitor = perfMonitor; // Expose for debugging
         }
     }
+
+    // Listen for keyboard shortcuts from main process
+    ipcRenderer.on('add-terminal-shortcut', () => {
+        const addTerminalBtn = document.getElementById('add-terminal-btn');
+        if (addTerminalBtn) {
+            addTerminalBtn.click();
+        }
+    });
+
+    ipcRenderer.on('create-task-shortcut', () => {
+        const createTaskBtn = document.getElementById('create-task-btn');
+        if (createTaskBtn) {
+            createTaskBtn.click();
+        }
+    });
+
+    ipcRenderer.on('git-status-shortcut', () => {
+        const gitStatusBtn = document.getElementById('git-status-btn');
+        if (gitStatusBtn) {
+            gitStatusBtn.click();
+        }
+    });
 });

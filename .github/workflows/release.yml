@@ -367,6 +367,8 @@ jobs:
           body: |
             ## CodeAgentSwarm ${{ steps.release_info.outputs.version }}
             
+            ${{ needs.generate-changelog.outputs.changelog }}
+            
             ### Downloads
             - Platform: ${{ matrix.platform }}
             - Architecture: ${{ matrix.arch }}
@@ -376,8 +378,60 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  generate-changelog:
+    needs: [calculate-version]
+    runs-on: ubuntu-latest
+    outputs:
+      changelog: ${{ steps.generate.outputs.changelog }}
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies for changelog generator
+        run: |
+          cd scripts
+          npm install node-fetch @supabase/supabase-js
+      
+      - name: Get previous version
+        id: prev_version
+        run: |
+          # Get the latest tag before the new one
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          PREVIOUS_VERSION="${LATEST_TAG#v}"
+          echo "Previous version: $PREVIOUS_VERSION"
+          echo "previous_version=$PREVIOUS_VERSION" >> $GITHUB_OUTPUT
+      
+      - name: Generate changelog
+        id: generate
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd scripts
+          node changelog-generator.js \
+            "${{ needs.calculate-version.outputs.new_version }}" \
+            "${{ steps.prev_version.outputs.previous_version }}" \
+            "${{ github.repository_owner }}" \
+            "${{ github.event.repository.name }}" > changelog.md
+          
+          # Read changelog into output
+          CHANGELOG=$(cat changelog.md)
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
   create-tag:
-    needs: [calculate-version, build-and-release]
+    needs: [calculate-version, build-and-release, generate-changelog]
     runs-on: ubuntu-latest
     if: success()
     

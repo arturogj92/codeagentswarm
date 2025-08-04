@@ -2216,7 +2216,7 @@ document.addEventListener('DOMContentLoaded', () => {
 document.addEventListener('keydown', (e) => {
     if (e.metaKey || e.ctrlKey) {
         switch (e.key) {
-            case 'n':
+            case 't':
                 e.preventDefault();
                 if (kanban) kanban.showCreateTaskModal();
                 break;

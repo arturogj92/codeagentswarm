@@ -44,6 +44,7 @@ class UpdaterService {
     
     // Disable auto-download for more control
     autoUpdater.autoDownload = false;
+    // Enable auto-install on app quit as a fallback
     autoUpdater.autoInstallOnAppQuit = true;
     
     // Track download state
@@ -72,17 +73,34 @@ class UpdaterService {
       this.sendToRenderer('checking-for-update');
     });
     
-    autoUpdater.on('update-available', (info) => {
+    autoUpdater.on('update-available', async (info) => {
       dualLog.info('=== UPDATE AVAILABLE EVENT ===');
       dualLog.info('Update version:', info.version);
       dualLog.info('Full update info:', JSON.stringify(info, null, 2));
       this.currentUpdateInfo = info;
-      this.sendToRenderer('update-available', {
-        version: info.version,
-        releaseDate: info.releaseDate,
-        releaseNotes: info.releaseNotes,
-        files: info.files
-      });
+      
+      // Fetch changelog from backend
+      try {
+        const currentVersion = this.getCurrentVersion();
+        const changelog = await this.fetchChangelog(currentVersion, info.version);
+        
+        this.sendToRenderer('update-available', {
+          version: info.version,
+          releaseDate: info.releaseDate,
+          releaseNotes: info.releaseNotes,
+          files: info.files,
+          changelog: changelog
+        });
+      } catch (error) {
+        dualLog.error('Failed to fetch changelog:', error);
+        // Send update info without changelog
+        this.sendToRenderer('update-available', {
+          version: info.version,
+          releaseDate: info.releaseDate,
+          releaseNotes: info.releaseNotes,
+          files: info.files
+        });
+      }
     });
     
     autoUpdater.on('update-not-available', (info) => {
@@ -142,7 +160,13 @@ class UpdaterService {
     });
     
     autoUpdater.on('update-downloaded', (info) => {
+      dualLog.info('=== UPDATE DOWNLOADED EVENT ===');
       dualLog.info('Update downloaded:', info.version);
+      dualLog.info('Update info stored in autoUpdater');
+      
+      // Store update info in autoUpdater for later verification
+      autoUpdater.updateInfo = info;
+      
       this.isDownloading = false;
       this.downloadCancellationToken = null;
       this.sendToRenderer('update-downloaded', {
@@ -305,8 +329,26 @@ class UpdaterService {
   }
   
   // Method to install and restart
-  quitAndInstall(isSilent = false, isForceRunAfter = false) {
-    autoUpdater.quitAndInstall(isSilent, isForceRunAfter);
+  quitAndInstall(isSilent = false, isForceRunAfter = true) {
+    dualLog.info('=== QUIT AND INSTALL CALLED ===');
+    dualLog.info('Current update state:', {
+      downloaded: autoUpdater.updateInfo ? true : false,
+      version: autoUpdater.updateInfo?.version
+    });
+    
+    // For macOS, use setImmediate to avoid race conditions
+    if (process.platform === 'darwin') {
+      setImmediate(() => {
+        const { app } = require('electron');
+        app.removeAllListeners("window-all-closed");
+        autoUpdater.quitAndInstall(isSilent, isForceRunAfter);
+      });
+    } else {
+      // For Windows/Linux, add a small delay to ensure update is ready
+      setTimeout(() => {
+        autoUpdater.quitAndInstall(isSilent, isForceRunAfter);
+      }, 1000);
+    }
   }
   
   // Get current version
@@ -350,6 +392,50 @@ class UpdaterService {
       request.on('error', (error) => {
         dualLog.error('Connection error:', error);
         reject(error);
+      });
+      
+      request.end();
+    });
+  }
+  
+  // Fetch changelog from backend
+  async fetchChangelog(fromVersion, toVersion) {
+    const serverUrl = process.env.UPDATE_SERVER_URL || 'https://codeagentswarm-backend-production.up.railway.app';
+    const changelogUrl = `${serverUrl}/api/changelog/combined/${fromVersion}/${toVersion}`;
+    
+    dualLog.info('Fetching changelog from:', changelogUrl);
+    
+    return new Promise((resolve, reject) => {
+      const request = net.request({
+        method: 'GET',
+        url: changelogUrl
+      });
+      
+      request.on('response', (response) => {
+        let data = '';
+        response.on('data', (chunk) => {
+          data += chunk;
+        });
+        
+        response.on('end', () => {
+          try {
+            if (response.statusCode === 200) {
+              const result = JSON.parse(data);
+              resolve(result.changelog);
+            } else {
+              dualLog.error('Changelog fetch failed:', response.statusCode, data);
+              resolve(null);
+            }
+          } catch (error) {
+            dualLog.error('Failed to parse changelog response:', error);
+            resolve(null);
+          }
+        });
+      });
+      
+      request.on('error', (error) => {
+        dualLog.error('Changelog fetch error:', error);
+        resolve(null);
       });
       
       request.end();
