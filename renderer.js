@@ -4919,8 +4919,28 @@ class TerminalManager {
         
         // Initialize settings optimizer for debouncing
         if (!this.settingsOptimizer) {
-            const SettingsOptimizer = require('./settings-optimizer');
-            this.settingsOptimizer = new SettingsOptimizer();
+            try {
+                // Try to load settings optimizer if available
+                const SettingsOptimizer = require('./settings-optimizer');
+                this.settingsOptimizer = new SettingsOptimizer();
+            } catch (e) {
+                // Fallback if settings-optimizer is not available in production
+                console.warn('Settings optimizer not available, using fallback');
+                this.settingsOptimizer = {
+                    formatChangelogOptimized: (changelog) => this.formatChangelog(changelog),
+                    debounce: (func, wait) => {
+                        let timeout;
+                        return (...args) => {
+                            clearTimeout(timeout);
+                            timeout = setTimeout(() => func.apply(this, args), wait);
+                        };
+                    },
+                    saveSettingDebounced: (key, value) => {
+                        // Direct save without debouncing
+                        ipcRenderer.invoke('save-setting', key, value);
+                    }
+                };
+            }
         }
         
         // Handle tab switching
