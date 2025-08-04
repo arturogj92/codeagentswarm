@@ -367,7 +367,7 @@ jobs:
           body: |
             ## CodeAgentSwarm ${{ steps.release_info.outputs.version }}
             
-            ${{ needs.generate-changelog.outputs.changelog || 'No changelog available for this release.' }}
+            ${{ needs.generate-changelog.outputs.changelog }}
             
             ### Downloads
             - Platform: ${{ matrix.platform }}
@@ -381,8 +381,6 @@ jobs:
   generate-changelog:
     needs: [calculate-version]
     runs-on: ubuntu-latest
-    # Continue even if changelog fails
-    continue-on-error: true
     outputs:
       changelog: ${{ steps.generate.outputs.changelog }}
     
@@ -427,7 +425,7 @@ jobs:
             "${{ needs.calculate-version.outputs.new_version }}" \
             "${{ steps.prev_version.outputs.previous_version }}" \
             "arturogj92" \
-            "codeagentswarm" > changelog.md || echo "## Version ${{ needs.calculate-version.outputs.new_version }}\n\nNo changelog generated." > changelog.md
+            "codeagentswarm" > changelog.md
           
           # Read changelog into output
           CHANGELOG=$(cat changelog.md)
