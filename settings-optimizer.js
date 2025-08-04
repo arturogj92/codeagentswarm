@@ -58,7 +58,7 @@ class SettingsOptimizer {
 
         const flushList = () => {
             if (listItems.length > 0) {
-                htmlParts.push(`<ul>${listItems.join('')}</ul>`);
+                htmlParts.push(`<ul class="changelog-list">${listItems.join('')}</ul>`);
                 listItems = [];
             }
         };
@@ -71,14 +71,28 @@ class SettingsOptimizer {
                 continue;
             }
 
+            // Check for indented bullet points (before trimming)
+            const isIndented = line.startsWith('  ') && (trimmed.startsWith('• ') || trimmed.startsWith('- ') || trimmed.startsWith('* '));
+
             // Headers
             if (trimmed.startsWith('## ')) {
                 flushList();
                 currentSection = trimmed.substring(3);
-                htmlParts.push(`<h3 class="changelog-section">${this.escapeHtml(currentSection)}</h3>`);
+                htmlParts.push(`<h2 class="changelog-version">${this.escapeHtml(currentSection)}</h2>`);
+            }
+            // H3 headers (### )
+            else if (trimmed.startsWith('### ')) {
+                flushList();
+                const section = trimmed.substring(4);
+                htmlParts.push(`<h3 class="changelog-section">${this.escapeHtml(section)}</h3>`);
+            }
+            // Indented list items (sub-items)
+            else if (isIndented) {
+                const content = trimmed.substring(2);
+                listItems.push(`<li class="changelog-subitem">${this.formatInlineMarkdown(content)}</li>`);
             }
             // List items
-            else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+            else if (trimmed.startsWith('- ') || trimmed.startsWith('* ') || trimmed.startsWith('• ')) {
                 const content = trimmed.substring(2);
                 const iconMatch = content.match(/^(\\[.*?\\]|🔧|⚡|🐛|✨|🚀|📦|🔄|⚠️|🎨)/);
                 

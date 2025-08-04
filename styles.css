@@ -4952,6 +4952,18 @@ h3 i {
   color: var(--primary);
 }
 
+/* Sub-item styling */
+.changelog-list li.changelog-subitem {
+  margin-left: 24px;
+  font-size: 0.95em;
+  color: var(--text-secondary);
+}
+
+.changelog-list li.changelog-subitem:before {
+  color: var(--text-secondary);
+  opacity: 0.7;
+}
+
 /* Sub-list styling */
 .changelog-sublist {
   margin: 4px 0 4px 24px;
@@ -5689,6 +5701,6 @@ textarea {
 .modal-footer {
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-end;
 }
 
