@@ -116,27 +116,86 @@ class ChangelogGenerator {
       });
 
       if (!response.ok) {
-        // If comparison fails, try to get recent commits instead
+        // If comparison fails, it's likely because toVersion tag doesn't exist yet
         if (response.status === 404) {
-          console.log('Comparison failed, getting recent commits instead');
-          const fallbackUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=20`;
-          const fallbackResponse = await fetch(fallbackUrl, {
-            headers: {
-              'Authorization': `token ${this.githubToken}`,
-              'Accept': 'application/vnd.github.v3+json'
-            }
-          });
+          console.log('Tag comparison failed - likely generating changelog for unreleased version');
+          console.log(`Getting all commits after v${fromVersion}...`);
           
-          if (fallbackResponse.ok) {
-            const commits = await fallbackResponse.json();
-            return commits.map(c => ({
-              commit: c.commit,
-              sha: c.sha,
-              author: c.author,
-              committer: c.committer
-            }));
+          try {
+            // Get the SHA of the previous version tag
+            const prevTagUrl = `https://api.github.com/repos/${owner}/${repo}/git/refs/tags/v${fromVersion}`;
+            const prevTagResponse = await fetch(prevTagUrl, {
+              headers: {
+                'Authorization': `token ${this.githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            });
+            
+            if (!prevTagResponse.ok) {
+              console.log(`Previous tag v${fromVersion} not found`);
+              return [];
+            }
+            
+            const prevTagData = await prevTagResponse.json();
+            const prevTagSha = prevTagData.object.sha;
+            
+            // Get the commit object for the tag
+            const commitUrl = `https://api.github.com/repos/${owner}/${repo}/git/commits/${prevTagSha}`;
+            const commitResponse = await fetch(commitUrl, {
+              headers: {
+                'Authorization': `token ${this.githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            });
+            
+            if (!commitResponse.ok) {
+              console.log('Could not get commit info for tag');
+              return [];
+            }
+            
+            const commitData = await commitResponse.json();
+            const tagCommitSha = commitData.sha;
+            
+            // Get all commits on the default branch
+            const allCommitsUrl = `https://api.github.com/repos/${owner}/${repo}/commits?per_page=100`;
+            const allCommitsResponse = await fetch(allCommitsUrl, {
+              headers: {
+                'Authorization': `token ${this.githubToken}`,
+                'Accept': 'application/vnd.github.v3+json'
+              }
+            });
+            
+            if (!allCommitsResponse.ok) {
+              console.log('Could not fetch recent commits');
+              return [];
+            }
+            
+            const allCommits = await allCommitsResponse.json();
+            
+            // Filter commits that come AFTER the previous tag
+            const newCommits = [];
+            for (const commit of allCommits) {
+              // Stop when we reach the previous tag's commit
+              if (commit.sha === tagCommitSha) {
+                break;
+              }
+              newCommits.push({
+                commit: commit.commit,
+                sha: commit.sha,
+                author: commit.author,
+                committer: commit.committer
+              });
+            }
+            
+            console.log(`Found ${newCommits.length} commits since v${fromVersion}`);
+            return newCommits;
+            
+          } catch (error) {
+            console.error('Error getting commits after tag:', error.message);
+            return [];
           }
         }
+        
         throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
       }
 
