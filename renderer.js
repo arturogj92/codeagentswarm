@@ -5165,7 +5165,7 @@ class TerminalManager {
             }
 
             // Handle close button
-            if (e.target.id === 'close-settings') {
+            if (e.target.id === 'close-settings' || e.target.closest('#close-settings')) {
                 modal.style.display = 'none';
                 document.body.classList.remove('modal-open');
                 return;

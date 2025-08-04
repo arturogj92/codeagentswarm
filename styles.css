@@ -4385,6 +4385,8 @@ h3 i {
   flex-shrink: 0;
   background-color: var(--bg-secondary);
   border-radius: 8px 8px 0 0;
+  position: relative;
+  z-index: 10;
 }
 
 .modal-header h2 {
@@ -4407,6 +4409,8 @@ h3 i {
   justify-content: center;
   border-radius: 4px;
   transition: all 0.2s;
+  position: relative;
+  z-index: 20;
 }
 
 .close-modal:hover {
