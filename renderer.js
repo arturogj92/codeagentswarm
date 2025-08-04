@@ -252,9 +252,9 @@ class TerminalManager {
                 return false;
             }
             
-            // Handle Cmd+N for new terminal window
+            // Handle Cmd+N for creating new task
             if (e.metaKey && e.key === 'n') {
-                this.addTerminal();
+                this.showCreateTaskDialog();
                 e.preventDefault();
                 return false;
             }
