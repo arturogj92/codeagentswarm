@@ -720,9 +720,9 @@ video, .demo-gif {
 /* Feature Showcase - Screen 2 */
 .feature-showcase {
     width: 100%;
-    max-width: 900px;
+    max-width: min(90vw, 1200px);
     margin: 0 auto;
-    padding: 30px 20px;
+    padding: clamp(30px, 3vw, 50px) clamp(20px, 2vw, 40px);
     text-align: center;
 }
 
@@ -730,13 +730,13 @@ video, .demo-gif {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 20px;
-    margin-bottom: 15px;
-    margin-top: 30px;
+    gap: clamp(20px, 2vw, 30px);
+    margin-bottom: clamp(15px, 1.5vw, 25px);
+    margin-top: clamp(30px, 3vw, 50px);
 }
 
 .showcase-logo {
-    width: 40px;
+    width: clamp(40px, 4vw, 60px);
     height: 40px;
     object-fit: contain;
     filter: drop-shadow(0 2px 10px rgba(127, 90, 240, 0.3));
@@ -744,7 +744,7 @@ video, .demo-gif {
 }
 
 .showcase-title {
-    font-size: 32px;
+    font-size: clamp(28px, 3vw, 42px);
     font-weight: 800;
     margin: 0;
     background: var(--gradient-primary);
@@ -755,26 +755,58 @@ video, .demo-gif {
 }
 
 .showcase-subtitle {
-    font-size: 15px;
+    font-size: clamp(14px, 1.4vw, 18px);
     color: var(--text-secondary);
-    margin-bottom: 30px;
+    margin-bottom: clamp(30px, 3vw, 45px);
     animation: slideInUp 0.8s ease-out 0.3s both;
     opacity: 0;
+}
+
+@media (min-width: 1600px) {
+    .showcase-title {
+        font-size: 48px;
+    }
+    
+    .showcase-subtitle {
+        font-size: 20px;
+    }
 }
 
 /* Power Grid */
 .power-grid {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+    gap: clamp(16px, 2vw, 24px);
     margin: 0 auto;
-    max-width: 600px;
+    width: 100%;
+    max-width: min(90vw, 900px);
+}
+
+/* Responsive grid adjustments */
+@media (max-width: 768px) {
+    .power-grid {
+        grid-template-columns: 1fr;
+        max-width: 400px;
+    }
+}
+
+@media (min-width: 1200px) {
+    .power-grid {
+        gap: 24px;
+        max-width: 1000px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .power-grid {
+        max-width: 1200px;
+    }
 }
 
 .more-features {
     text-align: center;
-    margin-top: 25px;
-    font-size: 15px;
+    margin-top: clamp(25px, 2.5vw, 40px);
+    font-size: clamp(14px, 1.3vw, 18px);
     color: var(--text-secondary);
     opacity: 0;
     animation: fadeIn 0.8s ease-out 1s forwards;
@@ -785,13 +817,26 @@ video, .demo-gif {
 .power-card {
     background: rgba(10, 10, 10, 0.8);
     border-radius: 16px;
-    padding: 16px 14px;
+    padding: clamp(16px, 2vw, 24px) clamp(14px, 1.8vw, 20px);
     position: relative;
     overflow: hidden;
     transition: all 0.3s ease;
     cursor: pointer;
     opacity: 0;
     animation: fadeInUp 0.6s ease-out forwards;
+    min-height: 180px;
+}
+
+@media (min-width: 1200px) {
+    .power-card {
+        min-height: 200px;
+    }
+}
+
+@media (min-width: 1600px) {
+    .power-card {
+        min-height: 220px;
+    }
 }
 
 .power-card::before {
@@ -1014,12 +1059,170 @@ video, .demo-gif {
     font-weight: 500;
 }
 
+/* Background terminal preview */
+.terminal-bg-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.15;
+    transition: all 0.3s ease;
+}
+
+.terminal-visual {
+    width: 90%;
+    position: relative;
+    transform: perspective(600px) rotateX(10deg) translateY(-10px);
+}
+
+.terminal-grid-mock {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+    background: rgba(15, 15, 15, 0.9);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+                0 0 100px rgba(127, 90, 240, 0.15);
+}
+
+.terminal-mock {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+                0 0 100px rgba(127, 90, 240, 0.15),
+                inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(40px) saturate(1.8);
+    -webkit-backdrop-filter: blur(40px) saturate(1.8);
+}
+
+.terminal-mock.mini {
+    background: rgba(25, 25, 25, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.terminal-header {
+    background: rgba(40, 40, 40, 0.8);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.terminal-mock.mini .terminal-header {
+    padding: 6px 8px;
+}
+
+.terminal-controls {
+    display: flex;
+    gap: 6px;
+}
+
+.terminal-mock.mini .terminal-controls {
+    gap: 4px;
+}
+
+.terminal-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.terminal-mock.mini .terminal-dot {
+    width: 6px;
+    height: 6px;
+}
+
+.terminal-dot.red {
+    background: #ff5f56;
+}
+
+.terminal-dot.yellow {
+    background: #ffbd2e;
+}
+
+.terminal-dot.green {
+    background: #27c93f;
+}
+
+.terminal-title {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    font-weight: 500;
+}
+
+.terminal-mock.mini .terminal-title {
+    font-size: 9px;
+}
+
+.terminal-body {
+    padding: 12px;
+    font-family: 'SF Mono', Monaco, monospace;
+    font-size: 11px;
+}
+
+.terminal-mock.mini .terminal-body {
+    padding: 8px;
+    font-size: 9px;
+}
+
+.terminal-line {
+    margin: 4px 0;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.terminal-mock.mini .terminal-line {
+    margin: 2px 0;
+}
+
+.terminal-prompt {
+    color: #27c93f;
+    margin-right: 6px;
+}
+
+.terminal-command {
+    color: #7f5af0;
+}
+
+.terminal-output {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.terminal-cursor {
+    animation: blink 1s infinite;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes blink {
+    0%, 50% { opacity: 1; }
+    51%, 100% { opacity: 0; }
+}
+
 /* Hover effects for background preview */
-.power-card:hover .notification-bg-preview {
+.power-card:hover .notification-bg-preview,
+.power-card:hover .terminal-bg-preview,
+.power-card:hover .kanban-bg-preview,
+.power-card:hover .git-bg-preview {
     opacity: 0.25;
 }
 
-.power-card:hover .notification-visual {
+.power-card:hover .notification-visual,
+.power-card:hover .terminal-visual,
+.power-card:hover .kanban-visual,
+.power-card:hover .git-visual {
     transform: perspective(600px) rotateX(5deg) translateY(-5px) scale(1.02);
 }
 
@@ -1285,25 +1488,238 @@ video, .demo-gif {
     opacity: 0.35;
 }
 
+/* Ensure terminal preview stays visible on hover */
+.power-card.has-video:hover .terminal-bg-preview {
+    opacity: 0.35;
+}
+
+/* Background kanban preview */
+.kanban-bg-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.15;
+    transition: all 0.3s ease;
+}
+
+.kanban-visual {
+    width: 90%;
+    position: relative;
+    transform: perspective(600px) rotateX(10deg) translateY(-10px);
+}
+
+.kanban-mock {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(20, 20, 20, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+                0 0 100px rgba(127, 90, 240, 0.15);
+}
+
+.kanban-column {
+    flex: 1;
+    background: rgba(30, 30, 30, 0.8);
+    border-radius: 8px;
+    padding: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.kanban-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+    padding: 0 4px;
+}
+
+.kanban-title {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.kanban-count {
+    font-size: 9px;
+    background: rgba(127, 90, 240, 0.3);
+    color: rgba(255, 255, 255, 0.8);
+    padding: 2px 6px;
+    border-radius: 10px;
+}
+
+.kanban-card {
+    background: rgba(40, 40, 40, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 8px;
+    margin-bottom: 6px;
+    transition: all 0.2s ease;
+}
+
+.kanban-card.active {
+    border-color: rgba(127, 90, 240, 0.5);
+    background: rgba(127, 90, 240, 0.1);
+}
+
+.kanban-card-title {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 4px;
+}
+
+.kanban-card-tag {
+    font-size: 8px;
+    color: rgba(127, 90, 240, 0.8);
+    font-weight: 500;
+}
+
+/* Background git commit preview */
+.git-bg-preview {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    z-index: 1;
+    opacity: 0.15;
+    transition: all 0.3s ease;
+}
+
+.git-visual {
+    width: 85%;
+    position: relative;
+    transform: perspective(600px) rotateX(10deg) translateY(-10px);
+}
+
+.git-mock {
+    background: rgba(20, 20, 20, 0.95);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+                0 0 100px rgba(127, 90, 240, 0.15);
+    font-family: 'SF Mono', Monaco, monospace;
+}
+
+.git-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.git-icon {
+    font-size: 16px;
+}
+
+.git-title {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.git-message {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.git-type {
+    color: #27c93f;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.git-summary {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 11px;
+}
+
+.git-body {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.5;
+    margin-bottom: 10px;
+    padding-left: 8px;
+}
+
+.git-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.git-files {
+    font-size: 9px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.git-stats {
+    font-size: 9px;
+    color: rgba(127, 90, 240, 0.8);
+    font-weight: 500;
+}
+
+/* Ensure kanban and git previews stay visible on hover */
+.power-card.has-video:hover .kanban-bg-preview,
+.power-card.has-video:hover .git-bg-preview {
+    opacity: 0.35;
+}
+
 
 .power-icon {
-    width: 40px;
-    height: 40px;
-    margin: 0 auto 10px;
+    width: clamp(40px, 3.5vw, 56px);
+    height: clamp(40px, 3.5vw, 56px);
+    margin: 0 auto clamp(10px, 1vw, 16px);
     position: relative;
 }
 
+@media (min-width: 1600px) {
+    .power-icon {
+        width: 60px;
+        height: 60px;
+    }
+}
+
 .power-card h3 {
-    font-size: 16px;
-    margin-bottom: 5px;
+    font-size: clamp(16px, 1.4vw, 20px);
+    margin-bottom: clamp(5px, 0.5vw, 8px);
     color: var(--text-primary);
 }
 
 .power-card p {
-    font-size: 12px;
+    font-size: clamp(12px, 1.1vw, 15px);
     color: var(--text-secondary);
     line-height: 1.4;
-    margin-bottom: 6px;
+    margin-bottom: clamp(6px, 0.6vw, 10px);
+}
+
+@media (min-width: 1600px) {
+    .power-card h3 {
+        font-size: 22px;
+    }
+    
+    .power-card p {
+        font-size: 16px;
+    }
 }
 
 .power-stat {
@@ -1519,6 +1935,7 @@ video, .demo-gif {
     -webkit-text-fill-color: transparent;
     background-clip: text;
     animation: slideInUp 0.8s ease-out 0.3s both, shimmer 3s ease-in-out infinite;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, sans-serif;
     background-size: 200% 200%;
 }
 

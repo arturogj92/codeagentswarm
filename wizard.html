@@ -91,6 +91,94 @@
                 
                 <div class="power-grid">
                     <div class="power-card has-video" data-feature="terminals">
+                        <!-- Background terminal preview -->
+                        <div class="terminal-bg-preview">
+                            <div class="terminal-visual">
+                                <div class="terminal-grid-mock">
+                                    <!-- Terminal 1 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 1</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">npm run dev</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Running...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 2 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 2</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">npm test</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Tests passed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 3 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 3</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">docker up</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Container up</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 4 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 4</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">git status</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Clean</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="video-indicator">
                             <div class="play-icon">▶</div>
                         </div>
@@ -170,6 +258,48 @@
                     </div>
                     
                     <div class="power-card has-video" data-feature="tasks">
+                        <!-- Background kanban preview -->
+                        <div class="kanban-bg-preview">
+                            <div class="kanban-visual">
+                                <div class="kanban-mock">
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">Pending</span>
+                                            <span class="kanban-count">3</span>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">Fix auth bug</div>
+                                            <div class="kanban-card-tag">Terminal 1</div>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">Add dark mode</div>
+                                            <div class="kanban-card-tag">Terminal 2</div>
+                                        </div>
+                                    </div>
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">In Progress</span>
+                                            <span class="kanban-count">1</span>
+                                        </div>
+                                        <div class="kanban-card active">
+                                            <div class="kanban-card-title">Update API</div>
+                                            <div class="kanban-card-tag">Terminal 3</div>
+                                        </div>
+                                    </div>
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">Testing</span>
+                                            <span class="kanban-count">2</span>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">User login</div>
+                                            <div class="kanban-card-tag">Terminal 4</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="video-indicator">
                             <div class="play-icon">▶</div>
                         </div>
@@ -200,6 +330,32 @@
                     </div>
                     
                     <div class="power-card has-video" data-feature="git">
+                        <!-- Background git commit preview -->
+                        <div class="git-bg-preview">
+                            <div class="git-visual">
+                                <div class="git-mock">
+                                    <div class="git-header">
+                                        <div class="git-icon">🔀</div>
+                                        <div class="git-title">AI-Generated Commit</div>
+                                    </div>
+                                    <div class="git-message">
+                                        <div class="git-type">feat:</div>
+                                        <div class="git-summary">Add authentication system with JWT tokens</div>
+                                    </div>
+                                    <div class="git-body">
+                                        • Implement user registration endpoint<br>
+                                        • Add login with email/password<br>
+                                        • Create JWT token generation<br>
+                                        • Add middleware for protected routes
+                                    </div>
+                                    <div class="git-footer">
+                                        <span class="git-files">📁 4 files changed</span>
+                                        <span class="git-stats">+238 -12</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
                         <div class="video-indicator">
                             <div class="play-icon">▶</div>
                         </div>
