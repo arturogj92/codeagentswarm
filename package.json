@@ -67,6 +67,7 @@
       "webhook-server.js",
       "git-service.js",
       "deepseek-commit-service.js",
+      "settings-optimizer.js",
       "hook-sender.sh",
       "hook-wrapper.sh",
       "test-hooks.js",

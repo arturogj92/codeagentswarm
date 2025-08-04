@@ -574,7 +574,7 @@ class TerminalManager {
         wrapper.appendChild(selectorDiv);
         
         // Function to restore placeholder if cancelled
-        const restorePlaceholder = () => {
+        let restorePlaceholder = () => {
             if (wrapper.contains(selectorDiv)) {
                 wrapper.removeChild(selectorDiv);
             }
@@ -4925,9 +4925,72 @@ class TerminalManager {
                 this.settingsOptimizer = new SettingsOptimizer();
             } catch (e) {
                 // Fallback if settings-optimizer is not available in production
-                console.warn('Settings optimizer not available, using fallback');
+                console.warn('Settings optimizer not available, using fallback:', e.message);
                 this.settingsOptimizer = {
-                    formatChangelogOptimized: (changelog) => this.formatChangelog(changelog),
+                    formatChangelogOptimized: (changelog) => this.formatChangelogFallback(changelog),
+                    formatChangelogFallback: (changelog) => {
+                        // Simple fallback formatting for changelog
+                        if (!changelog) return '';
+                        
+                        // Handle encoding issues
+                        let cleaned = changelog
+                            .replace(/â€™/g, "'")
+                            .replace(/â€œ/g, '"')
+                            .replace(/â€/g, '"')
+                            .replace(/â€"/g, '—')
+                            .replace(/â€"/g, '–')
+                            .replace(/â€¦/g, '...')
+                            .replace(/Â /g, ' ');
+                        
+                        // Convert markdown to HTML
+                        const lines = cleaned.split('\n');
+                        let html = '';
+                        let inList = false;
+                        
+                        lines.forEach(line => {
+                            const trimmed = line.trim();
+                            
+                            if (!trimmed) {
+                                if (inList) {
+                                    html += '</ul>';
+                                    inList = false;
+                                }
+                                return;
+                            }
+                            
+                            // Headers
+                            if (trimmed.startsWith('## ')) {
+                                if (inList) {
+                                    html += '</ul>';
+                                    inList = false;
+                                }
+                                html += `<h3 class="changelog-section">${trimmed.substring(3)}</h3>`;
+                            }
+                            // List items
+                            else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+                                if (!inList) {
+                                    html += '<ul>';
+                                    inList = true;
+                                }
+                                const content = trimmed.substring(2);
+                                html += `<li>${content}</li>`;
+                            }
+                            // Regular paragraphs
+                            else {
+                                if (inList) {
+                                    html += '</ul>';
+                                    inList = false;
+                                }
+                                html += `<p>${trimmed}</p>`;
+                            }
+                        });
+                        
+                        if (inList) {
+                            html += '</ul>';
+                        }
+                        
+                        return html;
+                    },
                     debounce: (func, wait) => {
                         let timeout;
                         return (...args) => {
@@ -4938,6 +5001,34 @@ class TerminalManager {
                     saveSettingDebounced: (key, value) => {
                         // Direct save without debouncing
                         ipcRenderer.invoke('save-setting', key, value);
+                    },
+                    renderVersionHistoryOptimized: async (changelogs, container) => {
+                        // Fallback implementation
+                        container.innerHTML = changelogs.map(changelog => {
+                            // Try different possible field names for the changelog content
+                            const content = changelog.changelog || changelog.changes || changelog.release_notes || '';
+                            return `
+                                <div class="version-history-item">
+                                    <div class="version-history-header" onclick="this.parentElement.classList.toggle('expanded')">
+                                        <div class="version-history-info">
+                                            <span class="version-history-version">Version ${changelog.version}</span>
+                                            <span class="version-history-date">${new Date(changelog.created_at || changelog.date).toLocaleDateString()}</span>
+                                        </div>
+                                        <i data-lucide="chevron-down" class="version-history-chevron"></i>
+                                    </div>
+                                    <div class="version-history-content">
+                                        <div class="version-history-changelog">
+                                            ${this.formatChangelogFallback(content)}
+                                        </div>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('');
+                        
+                        // Initialize lucide icons
+                        if (window.lucide) {
+                            window.lucide.createIcons();
+                        }
                     }
                 };
             }
@@ -5546,7 +5637,19 @@ class TerminalManager {
             this.settingsOptimizer = new SettingsOptimizer();
         }
         
-        await this.settingsOptimizer.renderVersionHistoryOptimized(changelogs, listEl);
+        if (this.settingsOptimizer && this.settingsOptimizer.renderVersionHistoryOptimized) {
+            await this.settingsOptimizer.renderVersionHistoryOptimized(changelogs, listEl);
+        } else {
+            // Fallback if method doesn't exist
+            listEl.innerHTML = changelogs.map(changelog => `
+                <div class="version-history-item">
+                    <div class="version-history-version">${changelog.version}</div>
+                    <div class="version-history-content">
+                        ${this.formatChangelogOld ? this.formatChangelogOld(changelog.changes) : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
         requestAnimationFrame(() => {
             if (window.lucide) {
                 window.lucide.createIcons();
