@@ -2397,50 +2397,52 @@ class TerminalManager {
 
         // Create modal
         const modal = document.createElement('div');
-        modal.className = 'git-project-modal';
+        modal.className = 'modal git-project-modal';
         modal.innerHTML = `
-            <div class="git-project-content">
-                <div class="git-project-header">
-                    <h3><i data-lucide="git-branch"></i> Git Projects</h3>
-                    <button class="close-btn" id="close-project-modal">×</button>
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2><i data-lucide="git-branch"></i> Git Projects</h2>
+                    <button class="close-modal" id="close-project-modal">×</button>
                 </div>
                 
-                <div class="git-project-list">
-                    <div class="project-list-header">
-                        <span>${this.hasActiveTerminals() ? 'Projects from active terminals:' : 'Git projects with changes:'}</span>
-                        <button class="btn btn-small" id="refresh-projects">
-                            <i data-lucide="refresh-cw"></i> Refresh
-                        </button>
-                    </div>
-                    ${projects.map(project => `
-                        <div class="git-project-item" data-path="${project.path}">
-                            <div class="project-info">
-                                <div class="project-name">
-                                    <i data-lucide="folder-git-2"></i>
-                                    <span class="name">${project.name}</span>
-                                </div>
-                                <div class="project-details">
-                                    <span class="project-branch">
-                                        <i data-lucide="git-branch"></i> ${project.branch}
-                                    </span>
-                                    <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
-                                        <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
-                                    </span>
-                                    ${project.unpushedCount > 0 ? `
-                                        <span class="project-unpushed">
-                                            <i data-lucide="upload"></i> ${project.unpushedCount} unpushed
-                                        </span>
-                                    ` : ''}
-                                </div>
-                            </div>
-                            <button class="btn btn-primary btn-small open-project">
-                                <i data-lucide="arrow-right"></i> Open
+                <div class="modal-body">
+                    <div class="git-project-list">
+                        <div class="project-list-header">
+                            <span>${this.hasActiveTerminals() ? 'Projects from active terminals:' : 'Git projects with changes:'}</span>
+                            <button class="btn btn-small" id="refresh-projects">
+                                <i data-lucide="refresh-cw"></i> Refresh
                             </button>
                         </div>
-                    `).join('')}
+                        ${projects.map(project => `
+                            <div class="git-project-item" data-path="${project.path}">
+                                <div class="project-info">
+                                    <div class="project-name">
+                                        <i data-lucide="folder-git-2"></i>
+                                        <span class="name">${project.name}</span>
+                                    </div>
+                                    <div class="project-details">
+                                        <span class="project-branch">
+                                            <i data-lucide="git-branch"></i> ${project.branch}
+                                        </span>
+                                        <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
+                                            <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
+                                        </span>
+                                        ${project.unpushedCount > 0 ? `
+                                            <span class="project-unpushed">
+                                                <i data-lucide="upload"></i> ${project.unpushedCount} unpushed
+                                            </span>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                                <button class="btn btn-primary btn-small open-project">
+                                    <i data-lucide="arrow-right"></i> Open
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
                 </div>
                 
-                <div class="git-project-footer">
+                <div class="modal-footer">
                     <button class="btn btn-secondary" id="use-current-dir">
                         <i data-lucide="folder"></i> Use Current Directory
                     </button>
@@ -2449,24 +2451,49 @@ class TerminalManager {
         `;
 
         document.body.appendChild(modal);
+        document.body.classList.add('modal-open');
+        
+        // Add active class for animation
+        setTimeout(() => {
+            modal.classList.add('active');
+        }, 10);
 
         // Initialize Lucide icons
         if (window.lucide) {
             window.lucide.createIcons();
         }
 
-        // Add event listeners
-        document.getElementById('close-project-modal').addEventListener('click', () => {
-            modal.remove();
+        // Close modal when clicking outside
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeProjectModal();
+            }
         });
 
-        document.getElementById('refresh-projects').addEventListener('click', async () => {
+        // Add event listeners
+        const closeProjectModal = () => {
+            document.body.classList.remove('modal-open');
             modal.remove();
+            document.removeEventListener('keydown', handleProjectEscKey);
+        };
+
+        // Handle Escape key
+        const handleProjectEscKey = (e) => {
+            if (e.key === 'Escape') {
+                closeProjectModal();
+            }
+        };
+        document.addEventListener('keydown', handleProjectEscKey);
+
+        document.getElementById('close-project-modal').addEventListener('click', closeProjectModal);
+
+        document.getElementById('refresh-projects').addEventListener('click', async () => {
+            closeProjectModal();
             await this.showGitStatus();
         });
 
         document.getElementById('use-current-dir').addEventListener('click', async () => {
-            modal.remove();
+            closeProjectModal();
             const result = await ipcRenderer.invoke('get-git-status');
             if (result.success) {
                 this.displayGitStatusModal(result);
@@ -2480,7 +2507,7 @@ class TerminalManager {
             const openBtn = item.querySelector('.open-project');
             openBtn.addEventListener('click', async () => {
                 const projectPath = item.dataset.path;
-                modal.remove();
+                closeProjectModal();
                 
                 // Get git status for selected project
                 const result = await ipcRenderer.invoke('get-project-git-status', projectPath);
@@ -2490,13 +2517,6 @@ class TerminalManager {
                     this.showNotification(result.error || 'Failed to get project status', 'warning');
                 }
             });
-        });
-
-        // Click outside to close
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.remove();
-            }
         });
     }
 
@@ -2519,10 +2539,12 @@ class TerminalManager {
                 
                 <div class="git-info">
                     <div class="git-branch">
+                        <i data-lucide="git-branch"></i>
                         <span class="git-label">Branch:</span>
                         <span class="git-value">${gitData.branch || 'unknown'}</span>
                     </div>
                     <div class="git-directory">
+                        <i data-lucide="folder"></i>
                         <span class="git-label">Directory:</span>
                         <span class="git-value git-path">${gitData.workingDirectory}</span>
                     </div>
@@ -2623,7 +2645,16 @@ class TerminalManager {
         // Add event listeners
         const closeModal = () => {
             modal.remove();
+            document.removeEventListener('keydown', handleEscKey);
         };
+
+        // Handle Escape key
+        const handleEscKey = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        document.addEventListener('keydown', handleEscKey);
 
         // Tab switching
         modal.querySelectorAll('.tab-btn').forEach(btn => {
