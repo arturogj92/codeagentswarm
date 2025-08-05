@@ -484,11 +484,12 @@ body::before {
 .push-button-wrapper {
   position: relative;
   display: inline-block;
+  overflow: visible;
 }
 
 .push-reminder {
   position: absolute;
-  bottom: calc(100% + 10px);
+  bottom: calc(100% + 15px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent);
@@ -500,7 +501,7 @@ body::before {
   white-space: nowrap;
   box-shadow: 0 4px 12px rgba(255, 137, 6, 0.4);
   animation: float 2s ease-in-out infinite;
-  z-index: 1000;
+  z-index: 10000;
   pointer-events: none;
 }
 
@@ -2820,12 +2821,15 @@ body::before {
   gap: 8px;
   margin-bottom: 20px;
   border-bottom: 1px solid var(--border);
+  overflow: visible;
+  padding-top: 30px; /* Espacio para el tooltip */
 }
 
 .tab-actions {
   display: flex;
   align-items: center;
   gap: 6px;
+  overflow: visible;
 }
 
 .tab-btn {
