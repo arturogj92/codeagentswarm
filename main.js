@@ -2129,6 +2129,26 @@ ipcMain.handle('select-directory', async () => {
   return null;
 });
 
+// Handle custom alerts with app icon
+ipcMain.handle('show-alert', async (event, options) => {
+  const { message, type = 'info' } = options;
+  
+  console.log('Showing alert:', message, 'Type:', type); // Debug log
+  
+  const dialogOptions = {
+    type: type, // 'none', 'info', 'error', 'question', 'warning'
+    buttons: ['OK'],
+    defaultId: 0,
+    title: 'CodeAgentSwarm',
+    message: message,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
+    noLink: true
+  };
+  
+  const result = await dialog.showMessageBox(mainWindow, dialogOptions);
+  return result.response;
+});
+
 // Database handlers
 ipcMain.handle('db-save-directory', async (event, terminalId, directory) => {
   try {
@@ -3469,23 +3489,125 @@ ipcMain.handle('git-reset', async (event, commitHash, hard = false) => {
 });
 
 // Git diff handler
-ipcMain.handle('git-diff', async (event, fileName, workingDirectory) => {
+ipcMain.handle('git-diff', async (event, fileName, workingDirectory, options = {}) => {
   const { execSync } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  
   try {
     // Use provided working directory or fallback to getGitWorkingDirectory
     const cwd = workingDirectory || getGitWorkingDirectory();
     
-    // Get diff for specific file or all files
-    const command = fileName ? `git diff "${fileName}"` : 'git diff';
-    const output = execSync(command, { cwd, encoding: 'utf8' });
+    // Check if file is untracked
+    let isUntracked = false;
+    let diffOutput = '';
     
-    return { success: true, diff: output };
+    if (fileName) {
+      try {
+        // Check git status for this specific file
+        const statusOutput = execSync(`git status --porcelain "${fileName}"`, { cwd, encoding: 'utf8' });
+        isUntracked = statusOutput.trim().startsWith('??');
+        
+        if (isUntracked) {
+          // For untracked files, create a diff that shows all lines as additions
+          const filePath = path.join(cwd, fileName);
+          if (fs.existsSync(filePath)) {
+            const content = fs.readFileSync(filePath, 'utf8');
+            const lines = content.split('\n');
+            
+            // Create a unified diff format for the new file
+            diffOutput = `diff --git a/${fileName} b/${fileName}\n`;
+            diffOutput += `new file mode 100644\n`;
+            diffOutput += `index 0000000..0000000\n`;
+            diffOutput += `--- /dev/null\n`;
+            diffOutput += `+++ b/${fileName}\n`;
+            diffOutput += `@@ -0,0 +1,${lines.length} @@\n`;
+            diffOutput += lines.map(line => `+${line}`).join('\n');
+          }
+        } else {
+          // For tracked files, use regular git diff
+          diffOutput = execSync(`git diff "${fileName}"`, { cwd, encoding: 'utf8' });
+        }
+      } catch (e) {
+        // Fallback to regular diff
+        diffOutput = execSync(`git diff "${fileName}"`, { cwd, encoding: 'utf8' });
+      }
+    } else {
+      // Get diff for all files
+      diffOutput = execSync('git diff', { cwd, encoding: 'utf8' });
+    }
+    
+    let result = { success: true, diff: diffOutput };
+    
+    // If requested, also get full file contents for expansion capability
+    if (options.includeFileContents && fileName) {
+      try {
+        // Get the current (modified) content
+        const filePath = path.join(cwd, fileName);
+        const newContent = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+        
+        // Get the original (HEAD) content
+        let oldContent = '';
+        if (!isUntracked) {
+          try {
+            oldContent = execSync(`git show HEAD:"${fileName}"`, { cwd, encoding: 'utf8' });
+          } catch (e) {
+            // File might be new, so no HEAD version exists
+            oldContent = '';
+          }
+        }
+        // For untracked files, oldContent remains empty
+        
+        result.fileContents = {
+          oldContent,
+          newContent
+        };
+        
+        console.log('File contents loaded:', {
+          fileName,
+          oldContentLength: oldContent.length,
+          newContentLength: newContent.length
+        });
+      } catch (e) {
+        console.warn('Could not get file contents for expansion:', e.message);
+      }
+    }
+    
+    return result;
     
   } catch (error) {
     console.error('Git diff error:', error);
     return { 
       success: false, 
       error: error.message || 'Failed to get diff'
+    };
+  }
+});
+
+// Git get file content handler (for diff expansion)
+ipcMain.handle('git-get-file-content', async (event, fileName, workingDirectory, revision = 'HEAD') => {
+  const { execSync } = require('child_process');
+  const fs = require('fs');
+  const path = require('path');
+  
+  try {
+    const cwd = workingDirectory || getGitWorkingDirectory();
+    
+    if (revision === 'WORKING') {
+      // Get current working directory version
+      const filePath = path.join(cwd, fileName);
+      const content = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
+      return { success: true, content };
+    } else {
+      // Get specific revision (usually HEAD)
+      const content = execSync(`git show ${revision}:"${fileName}"`, { cwd, encoding: 'utf8' });
+      return { success: true, content };
+    }
+  } catch (error) {
+    console.error('Git get file content error:', error);
+    return { 
+      success: false, 
+      error: error.message || 'Failed to get file content'
     };
   }
 });
@@ -3528,7 +3650,7 @@ ipcMain.handle('git-discard-file', async (event, fileName, workingDirectory) => 
       // Remove untracked file
       const filePath = path.join(cwd, fileName);
       fs.unlinkSync(filePath);
-      message = `Untracked file ${fileName} deleted`;
+      message = `New file ${fileName} deleted`;
     }
     
     return { success: true, message, output };
@@ -3780,8 +3902,16 @@ ipcMain.handle('scan-git-projects', async () => {
             stdio: ['pipe', 'pipe', 'ignore']
           }).trim();
           
-          // Count changes
-          const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
+          // Count all changes (including directories)
+          const changes = statusOutput.trim().split('\n').filter(line => {
+            if (line.length === 0) return false;
+            
+            // Extract filename from status line
+            const fileName = line.substring(3).trim();
+            if (!fileName) return false;
+            
+            return true;
+          });
           const changeCount = changes.length;
           
           // Always add git projects, even without changes
@@ -3833,7 +3963,15 @@ ipcMain.handle('scan-git-projects', async () => {
                   stdio: ['pipe', 'pipe', 'ignore']
                 }).trim();
                 
-                const changes = statusOutput.trim().split('\n').filter(line => line.length > 0);
+                const changes = statusOutput.trim().split('\n').filter(line => {
+                  if (line.length === 0) return false;
+                  
+                  // Extract filename from status line
+                  const fileName = line.substring(3).trim();
+                  if (!fileName) return false;
+                  
+                  return true;
+                });
                 
                 // Check if we already have this project
                 const exists = projects.some(p => p.path === subdirPath);
@@ -3947,11 +4085,22 @@ ipcMain.handle('get-project-git-status', async (event, projectPath) => {
       } else if (workingStatus === 'T' || indexStatus === 'T') {
         statusText = 'Type Changed';
       } else if (status === '??') {
-        statusText = 'Untracked';
+        statusText = 'New';
       } else if (status === '!!') {
         statusText = 'Ignored';
       } else {
         statusText = 'Modified';
+      }
+      
+      // Check if it's a directory and skip it
+      const filePath = path.join(projectPath, fileName);
+      try {
+        const stats = fs.statSync(filePath);
+        if (stats.isDirectory()) {
+          return; // Skip directories
+        }
+      } catch (e) {
+        // If we can't stat the file, it might be deleted, so include it
       }
       
       files.push({

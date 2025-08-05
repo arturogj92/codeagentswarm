@@ -1671,7 +1671,7 @@ class TerminalManager {
 
         // Add event listeners
         const closeModal = () => {
-            modal.remove();
+            closeModal();
         };
 
         // Close button
@@ -2287,9 +2287,7 @@ class TerminalManager {
             <div class="create-task-content">
                 <div class="create-task-header">
                     <h3><i data-lucide="plus-square"></i> Create New Task</h3>
-                    <button class="close-btn" id="close-create-task-modal">
-                        <i data-lucide="x"></i>
-                    </button>
+                    <button class="close-btn" id="close-create-task-modal">×</button>
                 </div>
                 <div class="create-task-body">
                     <form id="create-task-form">
@@ -2329,6 +2327,11 @@ class TerminalManager {
 
         document.body.appendChild(modal);
         
+        // Add show class for animation
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
+        
         // Initialize Lucide icons
         if (window.lucide) {
             window.lucide.createIcons();
@@ -2342,22 +2345,38 @@ class TerminalManager {
         titleInput.focus();
 
         // Event listeners
-        document.getElementById('close-create-task-modal').addEventListener('click', () => {
-            modal.remove();
-        });
+        const closeModal = () => {
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 200);
+            document.removeEventListener('keydown', handleEscKey);
+        };
 
-        document.getElementById('cancel-create-task').addEventListener('click', () => {
-            modal.remove();
-        });
+        // Handle Escape key
+        const handleEscKey = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        document.addEventListener('keydown', handleEscKey);
 
-        document.getElementById('confirm-create-task').addEventListener('click', () => {
+        document.getElementById('close-create-task-modal').addEventListener('click', closeModal);
+        document.getElementById('cancel-create-task').addEventListener('click', closeModal);
+
+        const self = this;
+        document.getElementById('confirm-create-task').addEventListener('click', async () => {
             const title = document.getElementById('task-title').value.trim();
             const description = document.getElementById('task-description').value.trim();
             const project = document.getElementById('task-project').value;
             const terminalId = document.getElementById('task-terminal').value;
 
             if (!title) {
-                alert('Please enter a task title');
+                // Use notification for now while we debug the alert
+                self.showNotification('Please enter a task title', 'warning');
+                document.getElementById('task-title').focus();
+                document.getElementById('task-title').classList.add('error');
+                setTimeout(() => {
+                    document.getElementById('task-title').classList.remove('error');
+                }, 2000);
                 return;
             }
 
@@ -2369,7 +2388,7 @@ class TerminalManager {
                 terminal_id: terminalId ? parseInt(terminalId) : undefined
             });
 
-            modal.remove();
+            closeModal();
         });
 
         // Allow Enter key to create task
@@ -2383,7 +2402,7 @@ class TerminalManager {
         // Click outside to close
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                modal.remove();
+                closeModal();
             }
         });
     }
@@ -2521,6 +2540,12 @@ class TerminalManager {
     }
 
     displayGitStatusModal(gitData) {
+        // Debug log
+        console.log('Git data in modal:', gitData);
+        console.log('Files:', gitData.files);
+        const directories = gitData.files?.filter(f => f.isDirectory) || [];
+        console.log('Directories found:', directories);
+        
         // Remove existing modal if present
         const existingModal = document.querySelector('.git-status-modal');
         if (existingModal) {
@@ -2576,7 +2601,7 @@ class TerminalManager {
                         <div class="tab-panel active" id="changes-tab">
                             <div class="git-files-section">
                                 <div class="files-header">
-                                    <h4>Modified Files (${gitData.files.length})</h4>
+                                    <h4>Changed Files (${gitData.files.length})</h4>
                                     ${gitData.files.length > 0 ? `
                                         <div class="file-selection-controls">
                                             <button class="btn-small" id="select-all-files">Select All</button>
@@ -2592,11 +2617,11 @@ class TerminalManager {
                                             <div class="git-file-item" data-file="${file.file}">
                                                 <div class="file-info">
                                                     <input type="checkbox" class="file-checkbox" checked data-file="${file.file}">
-                                                    <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}</span>
-                                                    <span class="file-name">${file.file}</span>
+                                                    <span class="file-status file-status-${file.status.toLowerCase()}">${file.status}${file.isDirectory ? ' (Directory)' : ''}</span>
+                                                    <span class="file-name">${file.isDirectory ? '<i data-lucide="folder"></i> ' : ''}${file.file}</span>
                                                 </div>
                                                 <div class="file-actions">
-                                                    <button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}', '${gitData.workingDirectory}')"><i data-lucide="eye"></i> Diff</button>
+                                                    ${!file.isDirectory ? `<button class="btn-small" onclick="terminalManager.showFileDiff('${file.file}', '${gitData.workingDirectory}')"><i data-lucide="eye"></i> Diff</button>` : ''}
                                                     <button class="btn-small btn-danger" onclick="terminalManager.discardFileChanges('${file.file}', '${file.status}', '${gitData.workingDirectory}')"><i data-lucide="x"></i> Discard</button>
                                                 </div>
                                             </div>
@@ -2641,10 +2666,16 @@ class TerminalManager {
         `;
 
         document.body.appendChild(modal);
+        
+        // Add show class for animation
+        setTimeout(() => {
+            modal.classList.add('show');
+        }, 10);
 
         // Add event listeners
         const closeModal = () => {
-            modal.remove();
+            modal.classList.remove('show');
+            setTimeout(() => modal.remove(), 200);
             document.removeEventListener('keydown', handleEscKey);
         };
 
@@ -2674,7 +2705,7 @@ class TerminalManager {
         // Git action handlers
         modal.querySelector('#close-git-modal').addEventListener('click', closeModal);
         modal.querySelector('#refresh-git-status').addEventListener('click', () => {
-            modal.remove();
+            closeModal();
             this.showGitStatus();
         });
         
@@ -2955,10 +2986,12 @@ class TerminalManager {
     
     async showFileDiff(fileName, workingDirectory) {
         try {
-            const result = await ipcRenderer.invoke('git-diff', fileName, workingDirectory);
+            // Get diff with file contents for expansion capability
+            const result = await ipcRenderer.invoke('git-diff', fileName, workingDirectory, { includeFileContents: true });
             
             if (result.success) {
-                this.displayDiffModal(fileName, result.diff);
+                // Use new split view diff modal with working directory for file list
+                this.displayDiffModalSplitView(fileName, result.diff, result.fileContents, workingDirectory);
             } else {
                 this.showInlineNotification(`❌ Failed to get diff: ${result.error}`, 'error');
             }
@@ -2980,9 +3013,6 @@ class TerminalManager {
                 <div class="diff-body">
                     <pre class="diff-text">${this.formatDiff(diff)}</pre>
                 </div>
-                <div class="diff-actions">
-                    <button class="btn" id="close-diff-btn">Close</button>
-                </div>
             </div>
         `;
         
@@ -2990,11 +3020,19 @@ class TerminalManager {
         
         const closeModal = () => modal.remove();
         modal.querySelector('#close-diff-modal').addEventListener('click', closeModal);
-        modal.querySelector('#close-diff-btn').addEventListener('click', closeModal);
         
         modal.addEventListener('click', (e) => {
             if (e.target === modal) closeModal();
         });
+        
+        // Handle Escape key
+        const handleEscKey = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+                document.removeEventListener('keydown', handleEscKey);
+            }
+        };
+        document.addEventListener('keydown', handleEscKey);
         
         setTimeout(() => {
             modal.classList.add('show');
@@ -3031,9 +3069,676 @@ class TerminalManager {
         return div.innerHTML;
     }
     
+    async displayDiffModalSplitView(fileName, diff, fileContents, workingDirectory) {
+        // Load the diff parser if not already loaded
+        const DiffParser = require('./diff-parser.js');
+        const parser = new DiffParser();
+        
+        // Parse the diff
+        console.log('File contents available:', !!fileContents, fileContents ? Object.keys(fileContents) : 'none');
+        const parsedDiff = parser.parseDiff(diff, fileName, fileContents);
+        const { leftLines, rightLines } = parser.createSideBySideView(parsedDiff.chunks);
+        
+        // Get all modified files if workingDirectory is provided
+        let modifiedFiles = [];
+        if (workingDirectory) {
+            try {
+                const gitStatus = await ipcRenderer.invoke('get-project-git-status', workingDirectory);
+                if (gitStatus.success && gitStatus.files) {
+                    modifiedFiles = gitStatus.files;
+                }
+            } catch (error) {
+                console.error('Error getting git status:', error);
+            }
+        }
+        
+        const modal = document.createElement('div');
+        modal.className = 'diff-modal diff-modal-split';
+        
+        // Store parser and parsed diff for expansion functionality
+        modal.parser = parser;
+        modal.parsedDiff = parsedDiff;
+        modal.workingDirectory = workingDirectory;
+        // Store original state for resetting when switching views
+        modal.originalParsedDiff = JSON.parse(JSON.stringify(parsedDiff));
+        
+        modal.innerHTML = `
+            <div class="diff-modal-container">
+                ${modifiedFiles.length > 1 ? `
+                    <div class="diff-file-sidebar" id="diff-file-sidebar">
+                        <div class="diff-file-header">
+                            <span>Modified Files (${modifiedFiles.length})</span>
+                        </div>
+                        <div class="diff-file-list">
+                            ${modifiedFiles.map(file => `
+                                <div class="diff-file-item ${file.file === fileName ? 'active' : ''}" data-file="${file.file}" data-status="${file.status}">
+                                    <span class="diff-file-status ${file.status.toLowerCase()}">${file.status.charAt(0)}</span>
+                                    <span class="diff-file-path">${file.file}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    <button class="sidebar-toggle" id="sidebar-toggle" title="Toggle sidebar (Ctrl+B)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="15 18 9 12 15 6"></polyline>
+                        </svg>
+                    </button>
+                ` : ''}
+                <div class="diff-content diff-content-split ${modifiedFiles.length > 1 ? 'with-sidebar' : ''}">
+                    <div class="diff-header">
+                        <h3><i data-lucide="file-diff"></i> ${fileName}</h3>
+                        <div class="diff-view-toggle">
+                            <button class="btn btn-small active" id="split-view-btn">Split View</button>
+                            <button class="btn btn-small" id="unified-view-btn">Unified View</button>
+                        </div>
+                        <button class="close-btn" id="close-diff-modal">×</button>
+                    </div>
+                    <div class="diff-stats">
+                        <span class="stat-added">+${parsedDiff.stats.added}</span>
+                        <span class="stat-modified">~${parsedDiff.stats.modified}</span>
+                        <span class="stat-removed">-${parsedDiff.stats.removed}</span>
+                    </div>
+                    <div class="diff-body-split">
+                        <div class="diff-panel diff-panel-left">
+                            <div class="diff-panel-header">Original</div>
+                            <div class="diff-panel-content" id="diff-left-content">
+                                ${this.renderDiffLines(leftLines, 'left', parsedDiff)}
+                            </div>
+                        </div>
+                        <div class="diff-resize-handle" id="diff-resize-handle"></div>
+                        <div class="diff-panel diff-panel-right">
+                            <div class="diff-panel-header">Modified</div>
+                            <div class="diff-panel-content" id="diff-right-content">
+                                ${this.renderDiffLines(rightLines, 'right', parsedDiff)}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Store parsed diff data on modal for expansion
+        modal.parsedDiff = parsedDiff;
+        modal.parser = parser;
+        
+        // Set up event handlers
+        const closeModal = () => {
+            // Clean up resize handlers if they exist
+            if (modal.resizeHandlers) {
+                document.removeEventListener('mousemove', modal.resizeHandlers.handleMouseMove);
+                document.removeEventListener('mouseup', modal.resizeHandlers.handleMouseUp);
+            }
+            // Clean up escape key listener
+            document.removeEventListener('keydown', handleEscKey);
+            // Dispatch close event for cleanup
+            modal.dispatchEvent(new Event('close'));
+            modal.remove();
+        };
+        modal.querySelector('#close-diff-modal').addEventListener('click', closeModal);
+        
+        // Handle Escape key
+        const handleEscKey = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        document.addEventListener('keydown', handleEscKey);
+        
+        // View toggle handlers
+        modal.querySelector('#unified-view-btn').addEventListener('click', () => {
+            // Switch to unified view
+            this.switchToUnifiedView(modal, parsedDiff);
+        });
+        
+        // Sync scrolling between panels
+        const leftPanel = modal.querySelector('#diff-left-content');
+        const rightPanel = modal.querySelector('#diff-right-content');
+        let isSyncing = false;
+        
+        const syncScroll = (source, target) => {
+            if (!isSyncing) {
+                isSyncing = true;
+                target.scrollTop = source.scrollTop;
+                // Don't sync horizontal scroll to allow independent horizontal scrolling
+                // target.scrollLeft = source.scrollLeft;
+                setTimeout(() => isSyncing = false, 10);
+            }
+        };
+        
+        leftPanel.addEventListener('scroll', () => syncScroll(leftPanel, rightPanel));
+        rightPanel.addEventListener('scroll', () => syncScroll(rightPanel, leftPanel));
+        
+        // Resize handle functionality
+        const resizeHandle = modal.querySelector('#diff-resize-handle');
+        const leftPanelDiv = modal.querySelector('.diff-panel-left');
+        const rightPanelDiv = modal.querySelector('.diff-panel-right');
+        const diffBody = modal.querySelector('.diff-body-split');
+        
+        let isResizing = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+        
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.pageX;
+            
+            const leftRect = leftPanelDiv.getBoundingClientRect();
+            const rightRect = rightPanelDiv.getBoundingClientRect();
+            startLeftWidth = leftRect.width;
+            startRightWidth = rightRect.width;
+            
+            // Add resizing class for visual feedback
+            diffBody.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            
+            // Prevent text selection during resize
+            e.preventDefault();
+        });
+        
+        const handleMouseMove = (e) => {
+            if (!isResizing) return;
+            
+            const deltaX = e.pageX - startX;
+            const containerWidth = diffBody.getBoundingClientRect().width;
+            
+            // Calculate new widths
+            let newLeftWidth = startLeftWidth + deltaX;
+            let newRightWidth = startRightWidth - deltaX;
+            
+            // Apply minimum width constraints
+            const minWidth = 150;
+            if (newLeftWidth < minWidth) {
+                newLeftWidth = minWidth;
+                newRightWidth = containerWidth - minWidth - resizeHandle.offsetWidth;
+            }
+            if (newRightWidth < minWidth) {
+                newRightWidth = minWidth;
+                newLeftWidth = containerWidth - minWidth - resizeHandle.offsetWidth;
+            }
+            
+            // Calculate percentages
+            const totalPanelWidth = containerWidth - resizeHandle.offsetWidth;
+            const leftPercent = (newLeftWidth / totalPanelWidth) * 100;
+            const rightPercent = (newRightWidth / totalPanelWidth) * 100;
+            
+            // Apply new widths
+            leftPanelDiv.style.flex = `0 0 ${leftPercent}%`;
+            rightPanelDiv.style.flex = `0 0 ${rightPercent}%`;
+        };
+        
+        const handleMouseUp = () => {
+            if (isResizing) {
+                isResizing = false;
+                diffBody.classList.remove('resizing');
+                document.body.style.cursor = '';
+            }
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        
+        // Store handlers for cleanup
+        modal.resizeHandlers = { handleMouseMove, handleMouseUp };
+        
+        // Expansion handlers
+        modal.addEventListener('click', async (e) => {
+            if (e.target === modal) {
+                closeModal();
+            } else if (e.target.classList.contains('expand-btn')) {
+                await this.handleDiffExpansion(e.target, modal);
+            }
+        });
+        
+        // Sidebar toggle functionality
+        const sidebarToggle = modal.querySelector('#sidebar-toggle');
+        const sidebar = modal.querySelector('#diff-file-sidebar');
+        const diffContent = modal.querySelector('.diff-content-split');
+        
+        if (sidebarToggle && sidebar && diffContent) {
+            // Load collapsed state from localStorage
+            const isCollapsed = localStorage.getItem('diffSidebarCollapsed') === 'true';
+            if (isCollapsed) {
+                sidebar.classList.add('collapsed');
+                diffContent.classList.add('sidebar-collapsed');
+                sidebarToggle.style.left = '0px';
+            }
+            
+            sidebarToggle.addEventListener('click', () => {
+                const isCollapsed = sidebar.classList.toggle('collapsed');
+                diffContent.classList.toggle('sidebar-collapsed');
+                localStorage.setItem('diffSidebarCollapsed', isCollapsed);
+                
+                // Update button position
+                if (isCollapsed) {
+                    sidebarToggle.style.left = '0px';
+                } else {
+                    sidebarToggle.style.left = '226px';
+                }
+            });
+            
+            // Keyboard shortcut (Ctrl+B)
+            const handleKeyboard = (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
+                    e.preventDefault();
+                    sidebarToggle.click();
+                }
+            };
+            
+            document.addEventListener('keydown', handleKeyboard);
+            
+            // Clean up keyboard listener when modal closes
+            modal.addEventListener('close', () => {
+                document.removeEventListener('keydown', handleKeyboard);
+            });
+        }
+        
+        // File sidebar click handlers
+        if (modifiedFiles.length > 1) {
+            modal.querySelectorAll('.diff-file-item').forEach(item => {
+                item.addEventListener('click', async () => {
+                    const fileName = item.dataset.file;
+                    const currentActive = modal.querySelector('.diff-file-item.active');
+                    
+                    // Don't reload if clicking the same file
+                    if (currentActive === item) return;
+                    
+                    // Update active state
+                    if (currentActive) currentActive.classList.remove('active');
+                    item.classList.add('active');
+                    
+                    // Load the new file diff
+                    try {
+                        const result = await ipcRenderer.invoke('git-diff', fileName, workingDirectory, { includeFileContents: true });
+                        if (result.success) {
+                            // Parse the new diff
+                            const newParsedDiff = parser.parseDiff(result.diff, fileName, result.fileContents);
+                            const { leftLines: newLeftLines, rightLines: newRightLines } = parser.createSideBySideView(newParsedDiff.chunks);
+                            
+                            // Update modal data
+                            modal.parsedDiff = newParsedDiff;
+                            modal.originalParsedDiff = JSON.parse(JSON.stringify(newParsedDiff));
+                            
+                            // Update header
+                            modal.querySelector('.diff-header h3').innerHTML = `<i data-lucide="file-diff"></i> ${fileName}`;
+                            
+                            // Update stats
+                            modal.querySelector('.stat-added').textContent = `+${newParsedDiff.stats.added}`;
+                            modal.querySelector('.stat-modified').textContent = `~${newParsedDiff.stats.modified}`;
+                            modal.querySelector('.stat-removed').textContent = `-${newParsedDiff.stats.removed}`;
+                            
+                            // Update content
+                            modal.querySelector('#diff-left-content').innerHTML = this.renderDiffLines(newLeftLines, 'left', newParsedDiff);
+                            modal.querySelector('#diff-right-content').innerHTML = this.renderDiffLines(newRightLines, 'right', newParsedDiff);
+                            
+                            // Re-initialize lucide icons
+                            if (typeof lucide !== 'undefined') {
+                                lucide.createIcons();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error loading file diff:', error);
+                    }
+                });
+            });
+        }
+        
+        setTimeout(() => {
+            modal.classList.add('show');
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+        }, 10);
+    }
+    
+    renderDiffLines(lines, side, parsedDiff) {
+        return lines.map((line, index) => {
+            if (line.type === 'expand') {
+                return `
+                    <div class="diff-line diff-line-expand">
+                        <span class="line-number"></span>
+                        <button class="expand-btn" 
+                            data-chunk="${line.chunkIndex}" 
+                            data-direction="${line.direction}"
+                            data-side="${side}">
+                            ${line.content}
+                        </button>
+                    </div>
+                `;
+            } else if (line.type === 'separator') {
+                return '<div class="diff-line diff-line-separator">...</div>';
+            } else if (line.type === 'empty') {
+                return `
+                    <div class="diff-line diff-line-empty">
+                        <span class="line-number"></span>
+                        <span class="line-content"></span>
+                    </div>
+                `;
+            } else {
+                const lineClass = `diff-line diff-line-${line.type}`;
+                const lineNumber = line.number || '';
+                return `
+                    <div class="${lineClass}">
+                        <span class="line-number">${lineNumber}</span>
+                        <span class="line-content">${this.escapeHtml(line.content)}</span>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+    
+    async handleDiffExpansion(button, modal) {
+        const chunkIndex = parseInt(button.dataset.chunk);
+        const direction = button.dataset.direction;
+        const side = button.dataset.side;
+        
+        console.log('Expanding diff:', {
+            hasParser: !!modal.parser,
+            hasParsedDiff: !!modal.parsedDiff,
+            hasFileContents: !!(modal.parsedDiff && modal.parsedDiff.fileContents),
+            chunkIndex,
+            direction
+        });
+        
+        // Disable button during expansion
+        button.disabled = true;
+        button.textContent = 'Loading...';
+        
+        try {
+            // Expand the chunk in the parsed diff
+            const expandedDiff = modal.parser.expandChunkContext(
+                modal.parsedDiff, 
+                chunkIndex, 
+                direction, 
+                50 // Expand 50 lines at a time
+            );
+            
+            // Update stored diff
+            modal.parsedDiff = expandedDiff;
+            
+            // Re-render both panels
+            const { leftLines, rightLines } = modal.parser.createSideBySideView(expandedDiff.chunks);
+            
+            const leftContent = modal.querySelector('#diff-left-content');
+            const rightContent = modal.querySelector('#diff-right-content');
+            
+            // Store scroll positions
+            const leftScroll = leftContent.scrollTop;
+            const rightScroll = rightContent.scrollTop;
+            
+            // Update content
+            leftContent.innerHTML = this.renderDiffLines(leftLines, 'left', expandedDiff);
+            rightContent.innerHTML = this.renderDiffLines(rightLines, 'right', expandedDiff);
+            
+            // Restore scroll positions
+            leftContent.scrollTop = leftScroll;
+            rightContent.scrollTop = rightScroll;
+            
+        } catch (error) {
+            console.error('Error expanding diff:', error);
+            button.textContent = 'Error - Click to retry';
+            button.disabled = false;
+        }
+    }
+    
+    switchToUnifiedView(modal, parsedDiff) {
+        // Update toggle buttons
+        modal.querySelector('#split-view-btn').classList.remove('active');
+        modal.querySelector('#unified-view-btn').classList.add('active');
+        
+        // Reset to original parsed diff (remove expansions)
+        const originalDiff = modal.originalParsedDiff || parsedDiff;
+        modal.parsedDiff = JSON.parse(JSON.stringify(originalDiff)); // Deep clone
+        
+        // Create unified view lines from original state
+        const unifiedLines = this.createUnifiedViewLines(modal.parsedDiff.chunks);
+        
+        // Update the modal content
+        const diffBody = modal.querySelector('.diff-body-split');
+        diffBody.className = 'diff-body-unified';
+        diffBody.innerHTML = `
+            <div class="diff-panel diff-panel-unified">
+                <div class="diff-panel-content" id="diff-unified-content">
+                    ${this.renderUnifiedDiffLines(unifiedLines, modal.parsedDiff)}
+                </div>
+            </div>
+        `;
+        
+        // Update split view button handler
+        modal.querySelector('#split-view-btn').addEventListener('click', () => {
+            this.switchToSplitView(modal, modal.parsedDiff);
+        });
+        
+        // Add expansion click handler for unified view
+        modal.querySelector('#diff-unified-content').addEventListener('click', async (e) => {
+            if (e.target.classList.contains('expand-btn')) {
+                await this.handleDiffExpansion(e.target, modal);
+                // Re-render unified view after expansion
+                const expandedDiff = modal.parsedDiff;
+                const unifiedLines = this.createUnifiedViewLines(expandedDiff.chunks);
+                modal.querySelector('#diff-unified-content').innerHTML = this.renderUnifiedDiffLines(unifiedLines, expandedDiff);
+                // Re-initialize icons
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+            }
+        });
+        
+        // Re-initialize lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+    
+    switchToSplitView(modal, parsedDiff) {
+        // Update toggle buttons
+        modal.querySelector('#unified-view-btn').classList.remove('active');
+        modal.querySelector('#split-view-btn').classList.add('active');
+        
+        // Reset to original parsed diff (remove expansions)
+        const originalDiff = modal.originalParsedDiff || parsedDiff;
+        modal.parsedDiff = JSON.parse(JSON.stringify(originalDiff)); // Deep clone
+        
+        // Recreate split view from original state
+        const { leftLines, rightLines } = modal.parser.createSideBySideView(modal.parsedDiff.chunks);
+        
+        // Update the modal content
+        const diffBody = modal.querySelector('.diff-body-unified, .diff-body-split');
+        diffBody.className = 'diff-body-split';
+        diffBody.innerHTML = `
+            <div class="diff-panel diff-panel-left">
+                <div class="diff-panel-header">Original</div>
+                <div class="diff-panel-content" id="diff-left-content">
+                    ${this.renderDiffLines(leftLines, 'left', modal.parsedDiff)}
+                </div>
+            </div>
+            <div class="diff-resize-handle" id="diff-resize-handle"></div>
+            <div class="diff-panel diff-panel-right">
+                <div class="diff-panel-header">Modified</div>
+                <div class="diff-panel-content" id="diff-right-content">
+                    ${this.renderDiffLines(rightLines, 'right', modal.parsedDiff)}
+                </div>
+            </div>
+        `;
+        
+        // Re-setup sync scrolling
+        const leftPanel = modal.querySelector('#diff-left-content');
+        const rightPanel = modal.querySelector('#diff-right-content');
+        let isSyncing = false;
+        
+        const syncScroll = (source, target) => {
+            if (!isSyncing) {
+                isSyncing = true;
+                target.scrollTop = source.scrollTop;
+                // Don't sync horizontal scroll to allow independent horizontal scrolling
+                // target.scrollLeft = source.scrollLeft;
+                setTimeout(() => isSyncing = false, 10);
+            }
+        };
+        
+        leftPanel.addEventListener('scroll', () => syncScroll(leftPanel, rightPanel));
+        rightPanel.addEventListener('scroll', () => syncScroll(rightPanel, leftPanel));
+        
+        // Re-setup resize handle functionality
+        const resizeHandle = modal.querySelector('#diff-resize-handle');
+        const leftPanelDiv = modal.querySelector('.diff-panel-left');
+        const rightPanelDiv = modal.querySelector('.diff-panel-right');
+        
+        let isResizing = false;
+        let startX = 0;
+        let startLeftWidth = 0;
+        let startRightWidth = 0;
+        
+        resizeHandle.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            startX = e.pageX;
+            
+            const leftRect = leftPanelDiv.getBoundingClientRect();
+            const rightRect = rightPanelDiv.getBoundingClientRect();
+            startLeftWidth = leftRect.width;
+            startRightWidth = rightRect.width;
+            
+            diffBody.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            e.preventDefault();
+        });
+        
+        const handleMouseMove = (e) => {
+            if (!isResizing) return;
+            
+            const deltaX = e.pageX - startX;
+            const containerWidth = diffBody.getBoundingClientRect().width;
+            
+            let newLeftWidth = startLeftWidth + deltaX;
+            let newRightWidth = startRightWidth - deltaX;
+            
+            const minWidth = 150;
+            if (newLeftWidth < minWidth) {
+                newLeftWidth = minWidth;
+                newRightWidth = containerWidth - minWidth - resizeHandle.offsetWidth;
+            }
+            if (newRightWidth < minWidth) {
+                newRightWidth = minWidth;
+                newLeftWidth = containerWidth - minWidth - resizeHandle.offsetWidth;
+            }
+            
+            const totalPanelWidth = containerWidth - resizeHandle.offsetWidth;
+            const leftPercent = (newLeftWidth / totalPanelWidth) * 100;
+            const rightPercent = (newRightWidth / totalPanelWidth) * 100;
+            
+            leftPanelDiv.style.flex = `0 0 ${leftPercent}%`;
+            rightPanelDiv.style.flex = `0 0 ${rightPercent}%`;
+        };
+        
+        const handleMouseUp = () => {
+            if (isResizing) {
+                isResizing = false;
+                diffBody.classList.remove('resizing');
+                document.body.style.cursor = '';
+            }
+        };
+        
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+        
+        // Store handlers for cleanup
+        modal.resizeHandlers = { handleMouseMove, handleMouseUp };
+        
+        // Update unified view button handler
+        modal.querySelector('#unified-view-btn').addEventListener('click', () => {
+            this.switchToUnifiedView(modal, modal.parsedDiff);
+        });
+        
+        // Re-initialize lucide icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+    
+    createUnifiedViewLines(chunks) {
+        const unifiedLines = [];
+        
+        chunks.forEach((chunk, chunkIndex) => {
+            // Add expansion placeholder at the top if expandable
+            if (chunk.expandableTop && (chunk.trimmedTop > 0 || chunk.hiddenTopLines > 0)) {
+                unifiedLines.push({
+                    type: 'expand',
+                    direction: 'top',
+                    chunkIndex,
+                    content: '↑ Show more lines'
+                });
+            }
+            
+            // Add chunk lines
+            chunk.lines.forEach(line => {
+                unifiedLines.push({
+                    type: line.type,
+                    oldLine: line.oldLine,
+                    newLine: line.newLine,
+                    content: line.content
+                });
+            });
+            
+            // Add expansion placeholder at the bottom if expandable
+            if (chunk.expandableBottom && (chunk.trimmedBottom > 0 || chunk.hiddenBottomLines > 0)) {
+                unifiedLines.push({
+                    type: 'expand',
+                    direction: 'bottom',
+                    chunkIndex,
+                    content: '↓ Show more lines'
+                });
+            }
+            
+            // Add chunk separator if not last chunk
+            if (chunkIndex < chunks.length - 1) {
+                unifiedLines.push({ type: 'separator' });
+            }
+        });
+        
+        return unifiedLines;
+    }
+    
+    renderUnifiedDiffLines(lines, parsedDiff) {
+        return lines.map((line, index) => {
+            if (line.type === 'expand') {
+                return `
+                    <div class="diff-line diff-line-expand">
+                        <button class="expand-btn" data-chunk="${line.chunkIndex}" data-direction="${line.direction}">
+                            ${line.content}
+                        </button>
+                    </div>
+                `;
+            } else if (line.type === 'separator') {
+                return '<div class="diff-chunk-separator">...</div>';
+            } else {
+                const lineClass = line.type === 'added' ? 'diff-line-added' : 
+                                 line.type === 'removed' ? 'diff-line-removed' : 
+                                 'diff-line-unchanged';
+                const prefix = line.type === 'added' ? '+' : 
+                              line.type === 'removed' ? '-' : 
+                              ' ';
+                const lineNumber = line.type === 'removed' ? line.oldLine : line.newLine;
+                const otherNumber = line.type === 'removed' ? '' : 
+                                   line.type === 'added' ? '' : 
+                                   line.oldLine;
+                
+                return `
+                    <div class="diff-line ${lineClass}">
+                        <span class="line-number">${otherNumber || ''}</span>
+                        <span class="line-number">${lineNumber || ''}</span>
+                        <span class="line-prefix">${prefix}</span>
+                        <span class="line-content">${this.escapeHtml(line.content)}</span>
+                    </div>
+                `;
+            }
+        }).join('');
+    }
+
     async discardFileChanges(fileName, fileStatus = 'Modified', workingDirectory) {
-        const isUntracked = fileStatus === 'Untracked';
-        const action = isUntracked ? 'delete' : 'discard all changes to';
+        const isNew = fileStatus === 'New';
+        const action = isNew ? 'delete' : 'discard all changes to';
         const confirmMessage = `Are you sure you want to ${action} '${fileName}'? This action cannot be undone.`;
         
         if (!confirm(confirmMessage)) {
@@ -3041,7 +3746,7 @@ class TerminalManager {
         }
         
         try {
-            const actionText = isUntracked ? 'Deleting' : 'Discarding changes to';
+            const actionText = isNew ? 'Deleting' : 'Discarding changes to';
             this.showInlineNotification(`🔄 ${actionText} ${fileName}...`, 'info');
             const result = await ipcRenderer.invoke('git-discard-file', fileName, workingDirectory);
             
@@ -3061,18 +3766,18 @@ class TerminalManager {
     async discardAllChanges() {
         // First, get git status to check if there are untracked files
         const gitStatus = await ipcRenderer.invoke('get-git-status');
-        const hasUntrackedFiles = gitStatus.success && gitStatus.files.some(f => f.status === 'Untracked');
+        const hasNewFiles = gitStatus.success && gitStatus.files.some(f => f.status === 'New');
         
-        let includeUntracked = false;
+        let includeNew = false;
         
-        if (hasUntrackedFiles) {
+        if (hasNewFiles) {
             // Create a custom dialog for three options
-            const confirmMessage = 'You have untracked files. What would you like to do?\n\n' +
-                '• Click OK to discard ALL changes INCLUDING untracked files (⚠️ untracked files will be permanently deleted)\n' +
-                '• Click Cancel to discard ONLY changes to tracked files (untracked files will remain)\n\n' +
+            const confirmMessage = 'You have new files. What would you like to do?\n\n' +
+                '• Click OK to discard ALL changes INCLUDING new files (⚠️ new files will be permanently deleted)\n' +
+                '• Click Cancel to discard ONLY changes to tracked files (new files will remain)\n\n' +
                 'Close this dialog to cancel the operation.';
             
-            includeUntracked = confirm(confirmMessage);
+            includeNew = confirm(confirmMessage);
         } else {
             const confirmMessage = 'Are you sure you want to discard ALL changes? This action cannot be undone and will remove all modifications to tracked files.';
             
@@ -3083,11 +3788,11 @@ class TerminalManager {
         
         try {
             this.showInlineNotification('🔄 Discarding changes...', 'info');
-            const result = await ipcRenderer.invoke('git-discard-all', includeUntracked);
+            const result = await ipcRenderer.invoke('git-discard-all', includeNew);
             
             if (result.success) {
-                const message = includeUntracked ? 
-                    '✅ All changes and untracked files discarded' : 
+                const message = includeNew ? 
+                    '✅ All changes and new files discarded' : 
                     '✅ All changes to tracked files discarded';
                 this.showInlineNotification(message, 'success');
                 // Refresh the git status
@@ -3230,7 +3935,7 @@ class TerminalManager {
         
         // Event listeners
         const closeModal = () => {
-            modal.remove();
+            closeModal();
         };
         
         modal.querySelector('#close-branch-modal').addEventListener('click', closeModal);
@@ -4948,6 +5653,20 @@ class TerminalManager {
         
         modal.dataset.handlersInitialized = 'true';
         
+        // Add escape key handler for settings modal
+        const handleEscapeKey = (e) => {
+            if (e.key === 'Escape' && modal.style.display === 'block') {
+                modal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            }
+        };
+        
+        // Add the event listener when modal is shown
+        if (!modal.dataset.escapeHandlerAdded) {
+            document.addEventListener('keydown', handleEscapeKey);
+            modal.dataset.escapeHandlerAdded = 'true';
+        }
+        
         // Initialize settings optimizer for debouncing
         if (!this.settingsOptimizer) {
             try {
@@ -5766,6 +6485,15 @@ class TerminalManager {
                 setTimeout(() => notification.remove(), 300);
             }
         }, 7000);
+    }
+    
+    async showAlert(message, type = 'info') {
+        // Use Electron's dialog with app icon
+        const result = await ipcRenderer.invoke('show-alert', {
+            message,
+            type
+        });
+        return result;
     }
 
 }

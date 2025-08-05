@@ -364,11 +364,109 @@ The recommended flow for new features:
   - "document" → notion-documenter
   - "commit" → git-committer
 
+## Development Best Practices - MANDATORY
+
+### 🧪 Testing Requirements
+**ALL new functionality MUST include tests**. No exceptions.
+
+1. **Before implementing any feature:**
+   - Write tests first (TDD approach)
+   - Define expected behavior
+   - Cover edge cases
+
+2. **Test coverage requirements:**
+   - Unit tests for all new functions/methods
+   - Integration tests for feature workflows
+   - E2E tests for user-facing features
+   - Minimum 80% code coverage
+
+3. **Test execution:**
+   - Run `npm test` before marking any task as complete
+   - Fix all failing tests
+   - Add new tests for bug fixes
+
+### 🏗️ Code Architecture Rules
+**MANDATORY: Extract complex functionality to separate classes/modules**
+
+1. **Class extraction criteria:**
+   - If a class/file exceeds 300 lines → split it
+   - If a method exceeds 50 lines → extract to smaller methods
+   - If adding new feature to existing class → consider new class
+
+2. **Architecture principles:**
+   - Single Responsibility Principle (SRP)
+   - Separation of concerns
+   - Dependency injection
+   - Modular design
+
+3. **File organization:**
+   ```
+   feature/
+   ├── feature.js          # Main class
+   ├── feature.test.js     # Tests
+   ├── feature-service.js  # Business logic
+   ├── feature-utils.js    # Utilities
+   └── README.md          # Documentation
+   ```
+
+4. **Refactoring checklist:**
+   - [ ] New functionality in separate class?
+   - [ ] Tests written and passing?
+   - [ ] Dependencies injected?
+   - [ ] Documentation updated?
+   - [ ] Code review completed?
+
+### Example Implementation Pattern
+```javascript
+// ❌ BAD: Everything in renderer.js
+class TerminalManager {
+    // 500+ lines of mixed concerns
+    handleDiff() { /* complex logic */ }
+    handleGit() { /* complex logic */ }
+    handleUI() { /* complex logic */ }
+}
+
+// ✅ GOOD: Separated concerns
+// diff-manager.js
+class DiffManager {
+    constructor(gitService, uiService) {
+        this.gitService = gitService;
+        this.uiService = uiService;
+    }
+    // Focused diff logic
+}
+
+// diff-manager.test.js
+describe('DiffManager', () => {
+    test('should handle diff expansion', () => {
+        // Test implementation
+    });
+});
+```
+
+### Testing Commands
+- `npm test` - Run all tests
+- `npm run test:unit` - Run unit tests only
+- `npm run test:coverage` - Generate coverage report
+- `npm run test:watch` - Run tests in watch mode
+
+### Code Review Checklist
+Before completing any task:
+- [ ] Tests written and passing
+- [ ] Complex logic extracted to separate classes
+- [ ] No methods longer than 50 lines
+- [ ] No classes longer than 300 lines
+- [ ] Dependencies properly injected
+- [ ] Code follows existing patterns
+- [ ] Documentation updated
+
 # important-instruction-reminders
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+ALWAYS write tests for new functionality - NO EXCEPTIONS.
+ALWAYS extract complex functionality to separate classes/modules.
 
 <!-- CODEAGENTSWARM CONFIG END -->
 

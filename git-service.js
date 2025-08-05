@@ -60,6 +60,16 @@ class GitService {
                 
                 let statusText = 'unknown';
                 let staged = false;
+                let isDirectory = false;
+                
+                // Check if it's a directory
+                try {
+                    const filePath = path.join(cwd, file);
+                    const stats = fs.statSync(filePath);
+                    isDirectory = stats.isDirectory();
+                } catch (e) {
+                    // If we can't stat, assume it's a file
+                }
                 
                 if (status[0] === 'M' || status[0] === 'A' || status[0] === 'D' || status[0] === 'R') {
                     staged = true;
@@ -72,7 +82,7 @@ class GitService {
                     statusText = 'untracked';
                 }
                 
-                return { file, status: statusText, staged };
+                return { file, status: statusText, staged, isDirectory };
             });
 
             // Get commits

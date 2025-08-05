@@ -2596,10 +2596,10 @@ body::before {
   border: 1px solid rgba(220, 53, 69, 0.3);
 }
 
-.file-status-untracked {
-  background: rgba(108, 117, 125, 0.2);
-  color: #6c757d;
-  border: 1px solid rgba(108, 117, 125, 0.3);
+.file-status-new {
+  background: rgba(40, 167, 69, 0.2);
+  color: #28a745;
+  border: 1px solid rgba(40, 167, 69, 0.3);
 }
 
 .file-status-renamed {
@@ -2638,19 +2638,39 @@ body::before {
   border-top: 1px solid var(--border);
 }
 
-/* Create Task Modal - Matching Kanban style */
+/* Error state for inputs */
+.form-group input.error,
+.form-group textarea.error {
+  border-color: var(--error) !important;
+  animation: shake 0.3s ease-in-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+/* Create Task Modal - Matching Git modals style */
 .create-task-modal {
+  display: none;
   position: fixed;
-  top: 0;
+  z-index: 1000;
   left: 0;
+  top: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.85);
-  z-index: 10000;
-  display: flex;
-  justify-content: center;
+  background-color: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   align-items: center;
-  animation: fadeIn 0.3s ease;
+  justify-content: center;
+  padding: 40px;
+}
+
+.create-task-modal.show {
+  display: flex !important;
+  animation: modalFadeIn 0.2s ease-out;
 }
 
 @keyframes fadeIn {
@@ -2663,17 +2683,21 @@ body::before {
 }
 
 .create-task-content {
-  background: rgba(30, 30, 30, 0.98);
-  border-radius: 16px;
-  border: 1px solid var(--border);
+  background-color: var(--bg-secondary);
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
   width: 90%;
   max-width: 500px;
-  max-height: 80vh;
-  overflow: hidden;
+  max-height: 85vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-  animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  /* Force GPU acceleration */
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+  contain: layout;
 }
 
 @keyframes slideUp {
@@ -2688,28 +2712,37 @@ body::before {
 }
 
 .create-task-header {
-  padding: 1.5rem;
-  border-bottom: 1px solid var(--border);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: rgba(255, 255, 255, 0.02);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.02) 0%, transparent 100%);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  z-index: 10;
 }
 
 .create-task-header h3 {
-  color: var(--text-primary);
   margin: 0;
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+}
+
+.create-task-header h3 svg {
+  width: 24px;
+  height: 24px;
+  color: var(--primary);
 }
 
 .create-task-body {
-  padding: 1.5rem;
+  padding: 20px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .create-task-body::-webkit-scrollbar {
@@ -2772,38 +2805,13 @@ body::before {
 }
 
 .create-task-footer {
-  padding: 1.5rem;
-  border-top: 1px solid var(--border);
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-color);
   display: flex;
   justify-content: flex-end;
-  gap: 0.75rem;
-  background: rgba(255, 255, 255, 0.02);
+  gap: 8px;
 }
 
-/* Close button matching kanban style */
-.create-task-header .close-btn {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: 8px;
-  transition: all 0.3s ease;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.2rem;
-  line-height: 1;
-}
-
-.create-task-header .close-btn:hover {
-  color: var(--text-primary);
-  background: var(--surface-hover);
-  border-color: var(--border-hover);
-  transform: rotate(90deg);
-}
 
 /* Git Tabs */
 .git-tabs {
@@ -3128,7 +3136,6 @@ body::before {
   padding: 24px;
   width: 800px;
   max-width: 90vw;
-  max-height: 80vh;
   overflow: hidden;
   backdrop-filter: blur(20px);
   box-shadow: var(--shadow-card);
@@ -5904,3 +5911,34 @@ textarea {
   }
 }
 
+
+
+/* Responsive adjustments for Create Task Modal */
+@media (max-width: 768px) {
+  .create-task-modal {
+    padding: 20px;
+  }
+  
+  .create-task-content {
+    width: 95%;
+    max-width: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .create-task-modal {
+    padding: 0;
+  }
+  
+  .create-task-content {
+    width: 100%;
+    height: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+  }
+  
+  .create-task-header {
+    border-radius: 0;
+  }
+}
+EOF < /dev/null

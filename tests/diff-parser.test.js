@@ -1,0 +1,249 @@
+/**
+ * Unit tests for DiffParser
+ * Tests the diff parsing functionality for split view
+ */
+
+const DiffParser = require('../diff-parser.js');
+
+describe('DiffParser', () => {
+    describe('parseDiff', () => {
+        test('should handle empty diff', () => {
+            const parser = new DiffParser();
+            const result = parser.parseDiff('', 'test.js');
+            expect(result.hasChanges).toBe(false);
+            expect(result.chunks).toEqual([]);
+            expect(result.fileName).toBe('test.js');
+        });
+
+        test('should parse simple diff with additions and deletions', () => {
+            const parser = new DiffParser();
+            const diff = `diff --git a/test.js b/test.js
+index abc123..def456 100644
+--- a/test.js
++++ b/test.js
+@@ -1,5 +1,5 @@
+ function hello() {
+-    console.log('Hello');
++    console.log('Hello World');
+ }
+ 
+ hello();`;
+
+            const result = parser.parseDiff(diff, 'test.js');
+            expect(result.hasChanges).toBe(true);
+            expect(result.chunks).toHaveLength(1);
+            expect(result.stats.removed).toBe(0);
+            expect(result.stats.added).toBe(0);
+            expect(result.stats.modified).toBe(1);
+        });
+
+        test('should parse diff with multiple chunks', () => {
+            const parser = new DiffParser();
+            const diff = `@@ -1,3 +1,3 @@
+ line1
+-line2
++line2-modified
+ line3
+@@ -10,3 +10,4 @@
+ line10
+ line11
+ line12
++line13`;
+
+            const result = parser.parseDiff(diff, 'test.js');
+            expect(result.chunks).toHaveLength(2);
+        });
+
+        test('should handle file contents for expansion', () => {
+            const parser = new DiffParser();
+            const diff = `@@ -1,3 +1,3 @@
+ line1
+-line2
++line2-modified
+ line3`;
+
+            const fileContents = {
+                oldContent: 'line1\nline2\nline3\nline4\nline5',
+                newContent: 'line1\nline2-modified\nline3\nline4\nline5'
+            };
+
+            const result = parser.parseDiff(diff, 'test.js', fileContents);
+            expect(result.canExpand).toBe(true);
+            expect(result.fileContents).toBe(fileContents);
+        });
+    });
+
+    describe('getLineType', () => {
+        test('should identify line types correctly', () => {
+            const parser = new DiffParser();
+            expect(parser.getLineType('+added')).toBe('added');
+            expect(parser.getLineType('-removed')).toBe('removed');
+            expect(parser.getLineType(' unchanged')).toBe('unchanged');
+            expect(parser.getLineType('@@')).toBe('meta');
+            expect(parser.getLineType('')).toBe('unchanged');
+            expect(parser.getLineType(null)).toBe('unchanged');
+        });
+    });
+
+    describe('optimizeChunks', () => {
+        test('should trim excessive context lines', () => {
+            const parser = new DiffParser();
+            const chunks = [{
+                lines: [
+                    { type: 'unchanged', content: 'line1' },
+                    { type: 'unchanged', content: 'line2' },
+                    { type: 'unchanged', content: 'line3' },
+                    { type: 'unchanged', content: 'line4' },
+                    { type: 'unchanged', content: 'line5' },
+                    { type: 'removed', content: 'line6' },
+                    { type: 'added', content: 'line6-new' },
+                    { type: 'unchanged', content: 'line7' },
+                    { type: 'unchanged', content: 'line8' },
+                    { type: 'unchanged', content: 'line9' },
+                    { type: 'unchanged', content: 'line10' }
+                ]
+            }];
+
+            const optimized = parser.optimizeChunks(chunks);
+            expect(optimized[0].lines.length).toBeLessThan(chunks[0].lines.length);
+            expect(optimized[0].trimmedTop).toBeGreaterThan(0);
+            expect(optimized[0].trimmedBottom).toBeGreaterThan(0);
+        });
+    });
+
+    describe('calculateStats', () => {
+        test('should calculate correct statistics', () => {
+            const parser = new DiffParser();
+            const chunks = [{
+                lines: [
+                    { type: 'added' },
+                    { type: 'added' },
+                    { type: 'removed' },
+                    { type: 'unchanged' }
+                ]
+            }];
+
+            const stats = parser.calculateStats(chunks);
+            expect(stats.added).toBe(1);
+            expect(stats.removed).toBe(0);
+            expect(stats.modified).toBe(1);
+            expect(stats.total).toBe(3);
+        });
+    });
+
+    describe('createSideBySideView', () => {
+        test('should create side-by-side view correctly', () => {
+            const parser = new DiffParser();
+            const chunks = [{
+                lines: [
+                    { type: 'unchanged', oldLine: 1, newLine: 1, content: 'line1' },
+                    { type: 'removed', oldLine: 2, newLine: null, content: 'line2' },
+                    { type: 'added', oldLine: null, newLine: 2, content: 'line2-new' },
+                    { type: 'unchanged', oldLine: 3, newLine: 3, content: 'line3' }
+                ],
+                expandableTop: false,
+                expandableBottom: false
+            }];
+
+            const { leftLines, rightLines } = parser.createSideBySideView(chunks);
+            
+            expect(leftLines).toHaveLength(4);
+            expect(rightLines).toHaveLength(4);
+            
+            expect(leftLines[0].type).toBe('unchanged');
+            expect(leftLines[1].type).toBe('removed');
+            expect(leftLines[2].type).toBe('empty');
+            
+            expect(rightLines[0].type).toBe('unchanged');
+            expect(rightLines[1].type).toBe('empty');
+            expect(rightLines[2].type).toBe('added');
+        });
+
+        test('should add expansion placeholders', () => {
+            const parser = new DiffParser();
+            const chunks = [{
+                lines: [{ type: 'unchanged', oldLine: 10, newLine: 10, content: 'line' }],
+                expandableTop: true,
+                expandableBottom: true,
+                trimmedTop: 5,
+                trimmedBottom: 3,
+                hiddenTopLines: 9,
+                hiddenBottomLines: 20
+            }];
+
+            const { leftLines, rightLines } = parser.createSideBySideView(chunks);
+            
+            expect(leftLines[0].type).toBe('expand');
+            expect(leftLines[0].direction).toBe('top');
+            expect(leftLines[leftLines.length - 1].type).toBe('expand');
+            expect(leftLines[leftLines.length - 1].direction).toBe('bottom');
+        });
+    });
+
+    describe('expandChunkContext', () => {
+        test('should expand context when file contents available', () => {
+            const parser = new DiffParser();
+            const fileContents = {
+                oldContent: Array.from({ length: 100 }, (_, i) => `line${i + 1}`).join('\n'),
+                newContent: Array.from({ length: 100 }, (_, i) => `line${i + 1}`).join('\n')
+            };
+
+            const parsedDiff = {
+                chunks: [{
+                    lines: [
+                        { type: 'unchanged', oldLine: 50, newLine: 50, content: 'line50' }
+                    ],
+                    displayOldStart: 50,
+                    displayNewStart: 50,
+                    hiddenTopLines: 49,
+                    expandableTop: true
+                }],
+                fileContents
+            };
+
+            const expanded = parser.expandChunkContext(parsedDiff, 0, 'top', 5);
+            
+            expect(expanded.chunks[0].lines.length).toBe(6); // 5 new + 1 existing
+            expect(expanded.chunks[0].lines[0].oldLine).toBe(45);
+            expect(expanded.chunks[0].hiddenTopLines).toBe(44);
+        });
+
+        test('should handle expansion at boundaries', () => {
+            const parser = new DiffParser();
+            const fileContents = {
+                oldContent: 'line1\nline2\nline3',
+                newContent: 'line1\nline2\nline3'
+            };
+
+            const parsedDiff = {
+                chunks: [{
+                    lines: [
+                        { type: 'unchanged', oldLine: 2, newLine: 2, content: 'line2' }
+                    ],
+                    displayOldStart: 2,
+                    displayNewStart: 2,
+                    hiddenTopLines: 1,
+                    expandableTop: true
+                }],
+                fileContents
+            };
+
+            const expanded = parser.expandChunkContext(parsedDiff, 0, 'top', 10);
+            
+            expect(expanded.chunks[0].lines.length).toBe(2); // Can only expand 1 line
+            expect(expanded.chunks[0].hiddenTopLines).toBe(0);
+            expect(expanded.chunks[0].expandableTop).toBe(false);
+        });
+
+        test('should return original diff when no file contents', () => {
+            const parser = new DiffParser();
+            const parsedDiff = {
+                chunks: [{ lines: [] }],
+                fileContents: null
+            };
+
+            const expanded = parser.expandChunkContext(parsedDiff, 0, 'top', 10);
+            expect(expanded).toEqual(parsedDiff);
+        });
+    });
+});
