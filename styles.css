@@ -486,9 +486,9 @@ body::before {
   display: inline-block;
   overflow: visible;
 }
-
+ 
 .push-reminder {
-  position: absolute;
+  position: absolute; 
   bottom: calc(100% + 15px);
   left: 50%;
   transform: translateX(-50%);
