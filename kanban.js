@@ -1145,11 +1145,7 @@ class KanbanManager {
             if (result.success) {
                 this.hideTaskModal();
                 await this.loadTasks();
-                
-                if (!this.editingTaskId) {
-                    // Show notification for new task
-                    this.showNotification('Task created successfully', 'success');
-                }
+                // No notification when creating or updating tasks
             } else {
                 alert(`Failed to save task: ${result.error}`);
             }
