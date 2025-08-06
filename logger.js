@@ -4,7 +4,7 @@ class Logger {
     this.logs = [];
     this.maxLogs = 1000; // Límite de logs en memoria
     this.listeners = [];
-    
+     
     // Check for debug config file first
     let debugFromConfig = false;
     try {

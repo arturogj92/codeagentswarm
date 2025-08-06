@@ -8,7 +8,7 @@ class LogViewer {
     this.isVisible = false;
     this.unsubscribe = null;
     this.button = null;
-    
+     
     // Check if logger is enabled (already synced from database in renderer.js)
     if (logger.isEnabled()) {
       this.init();

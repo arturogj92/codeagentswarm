@@ -1,6 +1,6 @@
 const { ipcRenderer } = require('electron');
 const path = require('path');
-
+ 
 class KanbanManager {
     constructor() {
         this.tasks = [];

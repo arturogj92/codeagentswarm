@@ -6164,7 +6164,7 @@ class TerminalManager {
         document.getElementById('current-version').textContent = version || 'Unknown';
         
         // Set initial status
-        this.updateStatus('ready');
+        this.updateStatus('idle');
         
         // Handle check updates button
         const checkUpdatesBtn = document.getElementById('check-updates-btn');
@@ -6250,7 +6250,7 @@ class TerminalManager {
         if (!statusEl) return;
         
         const statusMessages = {
-            'ready': { icon: 'check-circle', text: 'Ready to check for updates' },
+            'idle': { icon: 'check-circle', text: 'Ready to check for updates' },
             'checking': { icon: 'loader-2', text: 'Checking for updates...', spin: true },
             'available': { icon: 'download', text: 'Update available!', color: '#10b981' },
             'downloading': { icon: 'download-cloud', text: 'Downloading update...', spin: true },
@@ -6262,7 +6262,7 @@ class TerminalManager {
             'error': { icon: 'alert-circle', text: message || 'Update check failed', color: '#ef4444' }
         };
         
-        const config = statusMessages[status] || statusMessages.ready;
+        const config = statusMessages[status] || statusMessages.idle;
         
         // Create elements instead of using innerHTML for better performance
         statusEl.textContent = ''; // Clear existing content
