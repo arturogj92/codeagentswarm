@@ -448,42 +448,23 @@ class DatabaseManagerMCP {
 
     deleteTask(taskId) {
         try {
-            // Start transaction
-            this.db.run('BEGIN TRANSACTION');
+            // Delete the task directly (no task_history table exists)
+            const stmt = this.db.prepare(`
+                DELETE FROM tasks WHERE id = ?
+            `);
+            const result = stmt.run(taskId);
+            stmt.finalize();
             
-            try {
-                // First clean up task history due to foreign key constraint
-                const historyStmt = this.db.prepare(`
-                    DELETE FROM task_history WHERE task_id = ?
-                `);
-                historyStmt.run(taskId);
-                historyStmt.finalize();
-                
-                // Then delete the task
-                const stmt = this.db.prepare(`
-                    DELETE FROM tasks WHERE id = ?
-                `);
-                const result = stmt.run(taskId);
-                stmt.finalize();
-                
-                if (result.changes === 0) {
-                    this.db.run('ROLLBACK');
-                    return {
-                        success: false,
-                        error: 'Task not found'
-                    };
-                }
-                
-                // Commit transaction
-                this.db.run('COMMIT');
-                
+            if (result.changes === 0) {
                 return {
-                    success: true
+                    success: false,
+                    error: 'Task not found'
                 };
-            } catch (error) {
-                this.db.run('ROLLBACK');
-                throw error;
             }
+            
+            return {
+                success: true
+            };
         } catch (error) {
             return {
                 success: false,

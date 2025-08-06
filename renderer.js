@@ -135,7 +135,7 @@ class TerminalManager {
         ipcRenderer.on('task-created', (event, result) => {
             if (result.success) {
                 // Only refresh task indicators, no internal notification
-                this.updateTaskIndicators();
+                this.updateCurrentTaskIndicators();
             } else {
                 // Keep error notification as it's important
                 this.showNotification(`Failed to create task: ${result.error}`, 'error');
@@ -144,7 +144,7 @@ class TerminalManager {
         
         // Listen for refresh tasks
         ipcRenderer.on('refresh-tasks', () => {
-            this.updateTaskIndicators();
+            this.updateCurrentTaskIndicators();
         });
         
         // Listen for badge notifications
@@ -241,15 +241,39 @@ class TerminalManager {
         document.querySelectorAll('.terminal-control-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const action = e.target.dataset.action;
+                const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
                 const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
                 
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
                 } else if (action === 'close') {
                     this.closeTerminal(quadrant);  // async pero no necesita await aquí
+                } else if (action === 'more-options') {
+                    this.toggleDropdownMenu(quadrant);
                 }
             });
+        });
+
+        // Handle dropdown menu item clicks using event delegation
+        document.addEventListener('click', (e) => {
+            const dropdownItem = e.target.closest('.terminal-dropdown-item');
+            if (dropdownItem) {
+                e.stopPropagation();
+                const action = dropdownItem.dataset.action;
+                const quadrant = parseInt(dropdownItem.dataset.terminal);
+                
+                if (action === 'open-terminal-here') {
+                    this.handleOpenTerminalInPath(quadrant);
+                    // Close the dropdown
+                    const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
+                    if (dropdown) dropdown.style.display = 'none';
+                } else if (action === 'open-folder') {
+                    this.handleOpenFolder(quadrant);
+                    // Close the dropdown
+                    const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
+                    if (dropdown) dropdown.style.display = 'none';
+                }
+            }
         });
 
         document.addEventListener('keydown', (e) => {
@@ -943,6 +967,11 @@ class TerminalManager {
         // Create PTY terminal process with selected directory
         try {
             await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
+            
+            // Update only the terminal header to show the "More Options" button
+            setTimeout(() => {
+                this.updateTerminalHeader(quadrant);
+            }, 100);
         } catch (error) {
             console.error('Failed to create terminal:', error);
             this.showNotification('Failed to create terminal', 'error');
@@ -1806,6 +1835,152 @@ class TerminalManager {
             setTimeout(() => {
                 this.forceTerminalResize(quadrant);
             }, 500);
+        }
+    }
+
+    updateTerminalHeader(quadrant) {
+        const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+        if (!quadrantElement) return;
+        
+        const terminalHeader = quadrantElement.querySelector('.terminal-header');
+        if (!terminalHeader) return;
+        
+        // Check if terminal is active
+        const hasActiveTerminal = this.terminals.has(quadrant);
+        
+        // Check if More Options button already exists
+        const existingMoreOptions = terminalHeader.querySelector('.terminal-more-options-container');
+        
+        if (hasActiveTerminal && !existingMoreOptions) {
+            // Terminal is active but button doesn't exist - add it
+            const controlsDiv = terminalHeader.querySelector('.terminal-controls');
+            if (controlsDiv) {
+                // Find the fullscreen button to insert before it
+                const fullscreenBtn = controlsDiv.querySelector('[data-action="fullscreen"]');
+                
+                // Create the More Options container
+                const moreOptionsContainer = document.createElement('div');
+                moreOptionsContainer.className = 'terminal-more-options-container';
+                moreOptionsContainer.innerHTML = `
+                    <button class="terminal-control-btn terminal-more-btn" data-action="more-options" data-terminal="${quadrant}" title="More Options">⋯</button>
+                    <div class="terminal-dropdown-menu" data-terminal="${quadrant}" style="display: none;">
+                        <button class="terminal-dropdown-item" data-action="open-terminal-here" data-terminal="${quadrant}">
+                            <i data-lucide="terminal"></i>
+                            <span>Open Terminal in Project Path</span>
+                        </button>
+                        <button class="terminal-dropdown-item" data-action="open-folder" data-terminal="${quadrant}">
+                            <i data-lucide="folder-open"></i>
+                            <span>Open Folder</span>
+                        </button>
+                    </div>
+                `;
+                
+                // Insert before the fullscreen button
+                if (fullscreenBtn) {
+                    controlsDiv.insertBefore(moreOptionsContainer, fullscreenBtn);
+                } else {
+                    // If no fullscreen button, append to controls
+                    controlsDiv.appendChild(moreOptionsContainer);
+                }
+                
+                // Add event listener to the new button
+                const moreBtn = moreOptionsContainer.querySelector('.terminal-more-btn');
+                moreBtn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    console.log('More button clicked for terminal:', quadrant);
+                    this.toggleDropdownMenu(quadrant);
+                });
+                
+                // Add event listeners to dropdown items
+                const dropdownItems = moreOptionsContainer.querySelectorAll('.terminal-dropdown-item');
+                dropdownItems.forEach(item => {
+                    item.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        const action = item.dataset.action;
+                        
+                        if (action === 'open-terminal-here') {
+                            this.handleOpenTerminalInPath(quadrant);
+                        } else if (action === 'open-folder') {
+                            this.handleOpenFolder(quadrant);
+                        }
+                        
+                        // Close the dropdown
+                        const dropdown = moreOptionsContainer.querySelector('.terminal-dropdown-menu');
+                        if (dropdown) dropdown.style.display = 'none';
+                    });
+                });
+                
+                // Initialize Lucide icons for the new elements
+                if (typeof lucide !== 'undefined') {
+                    lucide.createIcons();
+                }
+                
+                console.log(`Added More Options button to terminal ${quadrant}`);
+            }
+        } else if (!hasActiveTerminal && existingMoreOptions) {
+            // Terminal is not active but button exists - remove it
+            existingMoreOptions.remove();
+            console.log(`Removed More Options button from terminal ${quadrant}`);
+        }
+    }
+
+    toggleDropdownMenu(quadrant) {
+        console.log('toggleDropdownMenu called for quadrant:', quadrant);
+        const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
+        console.log('Dropdown found:', dropdown);
+        if (!dropdown) {
+            console.error('No dropdown found for terminal:', quadrant);
+            return;
+        }
+        
+        // Close all other dropdowns first
+        document.querySelectorAll('.terminal-dropdown-menu').forEach(menu => {
+            if (menu !== dropdown) {
+                menu.style.display = 'none';
+            }
+        });
+        
+        // Toggle this dropdown
+        const currentDisplay = dropdown.style.display;
+        console.log('Current display:', currentDisplay);
+        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        console.log('New display:', dropdown.style.display);
+        
+        // Close dropdown when clicking outside
+        if (dropdown.style.display === 'block') {
+            const closeDropdown = (e) => {
+                if (!e.target.closest('.terminal-more-options-container')) {
+                    dropdown.style.display = 'none';
+                    document.removeEventListener('click', closeDropdown);
+                }
+            };
+            setTimeout(() => {
+                document.addEventListener('click', closeDropdown);
+            }, 0);
+        }
+    }
+
+    async handleOpenTerminalInPath(quadrant) {
+        try {
+            const result = await ipcRenderer.invoke('open-terminal-in-path', quadrant);
+            if (!result.success) {
+                this.showNotification('Failed to open terminal', 'error');
+            }
+        } catch (error) {
+            console.error('Error opening terminal:', error);
+            this.showNotification('Failed to open terminal', 'error');
+        }
+    }
+
+    async handleOpenFolder(quadrant) {
+        try {
+            const result = await ipcRenderer.invoke('open-folder', quadrant);
+            if (!result.success) {
+                this.showNotification('Failed to open folder', 'error');
+            }
+        } catch (error) {
+            console.error('Error opening folder:', error);
+            this.showNotification('Failed to open folder', 'error');
         }
     }
 
@@ -4510,6 +4685,12 @@ class TerminalManager {
         }
     }
 
+    async forceRenderUpdate() {
+        // Force a complete re-render of all terminals
+        await this.renderTerminals();
+        console.log('Terminals re-rendered with updated UI');
+    }
+
     async renderTerminals() {
         try {
             console.log('🔄 Rendering terminals...');
@@ -4660,6 +4841,21 @@ class TerminalManager {
                             ▶
                         </button>
                     </div>
+                    ${hasActiveTerminal ? `
+                    <div class="terminal-more-options-container">
+                        <button class="terminal-control-btn terminal-more-btn" data-action="more-options" data-terminal="${terminalId}" title="More Options">⋯</button>
+                        <div class="terminal-dropdown-menu" data-terminal="${terminalId}" style="display: none;">
+                            <button class="terminal-dropdown-item" data-action="open-terminal-here" data-terminal="${terminalId}">
+                                <i data-lucide="terminal"></i>
+                                <span>Open Terminal in Project Path</span>
+                            </button>
+                            <button class="terminal-dropdown-item" data-action="open-folder" data-terminal="${terminalId}">
+                                <i data-lucide="folder-open"></i>
+                                <span>Open Folder</span>
+                            </button>
+                        </div>
+                    </div>
+                    ` : ''}
                     <button class="terminal-control-btn" data-action="fullscreen" title="Fullscreen">⛶</button>
                     <button class="terminal-control-btn" data-action="close" title="Close">×</button>
                 </div>
@@ -4708,13 +4904,15 @@ class TerminalManager {
         document.querySelectorAll('.terminal-control-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const action = e.target.dataset.action;
+                const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
                 const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
                 
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
                 } else if (action === 'close') {
-                    this.closeTerminal(quadrant);  // async pero no necesita await aquí
+                    this.closeTerminal(quadrant);  // async pero no necesario await aquí
+                } else if (action === 'more-options') {
+                    this.toggleDropdownMenu(quadrant);
                 }
             });
         });

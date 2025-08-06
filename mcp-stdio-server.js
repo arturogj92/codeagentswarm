@@ -618,6 +618,17 @@ class MCPStdioServer {
         let result;
         switch (name) {
             case 'create_task':
+                // Auto-detect terminal_id from environment variable if not provided
+                if (!args.terminal_id) {
+                    const envTerminalId = process.env.CODEAGENTSWARM_CURRENT_QUADRANT;
+                    if (envTerminalId) {
+                        args.terminal_id = parseInt(envTerminalId);
+                        this.logError(`Auto-detected terminal_id from environment: ${args.terminal_id}`);
+                    } else {
+                        this.logError('Warning: No terminal_id provided and CODEAGENTSWARM_CURRENT_QUADRANT not set');
+                    }
+                }
+                
                 // Auto-detect project if not provided
                 if (!args.project && args.terminal_id) {
                     try {
@@ -651,6 +662,17 @@ class MCPStdioServer {
                 break;
                 
             case 'start_task':
+                // Auto-assign terminal to task when starting if environment variable is set
+                const currentTerminalId = process.env.CODEAGENTSWARM_CURRENT_QUADRANT;
+                if (currentTerminalId) {
+                    // First update the terminal assignment
+                    await this.updateTaskTerminal({ 
+                        task_id: args.task_id, 
+                        terminal_id: parseInt(currentTerminalId).toString() 
+                    });
+                    this.logError(`Auto-assigned task ${args.task_id} to terminal ${currentTerminalId}`);
+                }
+                
                 result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_progress' });
                 break;
                 

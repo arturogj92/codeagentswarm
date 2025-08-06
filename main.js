@@ -546,8 +546,8 @@ function matchesShortcut(input, shortcutKey) {
 
 // Simple shell simulation without external dependencies
 class SimpleShell {
-  constructor(quadrant, workingDir) {
-    console.log('SimpleShell constructor called:', { quadrant, workingDir });
+  constructor(quadrant, workingDir, sessionType = 'new') {
+    console.log('SimpleShell constructor called:', { quadrant, workingDir, sessionType });
     this.quadrant = quadrant;
     this.cwd = workingDir;
     this.buffer = '';
@@ -556,13 +556,14 @@ class SimpleShell {
     this.historyIndex = -1;
     this.ready = true;
     this.isActive = true; // Add flag to track if terminal is active
+    this.sessionType = sessionType;
     
     // Set environment variables for this quadrant globally (1-based)
     process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
     process.env.CODEAGENTSWARM_CURRENT_QUADRANT = (quadrant + 1).toString();
     
-    this.sendOutput(`\r\n🚀 Terminal ${quadrant + 1} ready! (Quadrant: ${quadrant})\r\n`);
-    this.sendPrompt();
+    // Don't show any output initially - let Claude handle all output when it loads
+    // Terminal remains blank until Claude is ready
   }
   
   sendOutput(data) {
@@ -585,6 +586,7 @@ class SimpleShell {
     const promptText = `\x1b[32m➜\x1b[0m  \x1b[36m${path.basename(this.cwd)}\x1b[0m $ `;
     this.sendOutput(promptText);
   }
+  
   
   handleInput(data) {
     // Don't process input if the shell has been killed
@@ -957,7 +959,7 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
       // Global PATH updated
     }
     
-    const shell = new SimpleShell(quadrant, workingDir);
+    const shell = new SimpleShell(quadrant, workingDir, sessionType);
     terminals.set(quadrant, shell);
     console.log(`Terminal ${quadrant} created and added to terminals map`);
     
@@ -4445,6 +4447,104 @@ ipcMain.handle('open-log-directory', () => {
   const { shell } = require('electron');
   shell.openPath(logDir);
   return { success: true };
+});
+
+// Handle opening terminal in project path
+ipcMain.handle('open-terminal-in-path', async (event, terminalId) => {
+  try {
+    const { shell, app } = require('electron');
+    const { exec } = require('child_process');
+    const path = require('path');
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    const platform = process.platform;
+    
+    if (platform === 'darwin') {
+      // macOS - Open Terminal.app in the specific directory
+      exec(`open -a Terminal "${cwd}"`, (error) => {
+        if (error) {
+          console.error('Error opening Terminal:', error);
+          // Try with iTerm2 as fallback
+          exec(`open -a iTerm "${cwd}"`, (error2) => {
+            if (error2) {
+              console.error('Error opening iTerm:', error2);
+            }
+          });
+        }
+      });
+    } else if (platform === 'win32') {
+      // Windows - Open Command Prompt or PowerShell
+      exec(`start cmd /K "cd /d ${cwd}"`, (error) => {
+        if (error) {
+          console.error('Error opening Command Prompt:', error);
+          // Try PowerShell as fallback
+          exec(`start powershell -NoExit -Command "cd '${cwd}'"`, (error2) => {
+            if (error2) {
+              console.error('Error opening PowerShell:', error2);
+            }
+          });
+        }
+      });
+    } else {
+      // Linux - Try various terminal emulators
+      const terminals = ['gnome-terminal', 'konsole', 'xterm', 'terminator', 'xfce4-terminal'];
+      let opened = false;
+      
+      for (const term of terminals) {
+        try {
+          if (term === 'gnome-terminal') {
+            exec(`${term} --working-directory="${cwd}"`, (error) => {
+              if (!error) opened = true;
+            });
+          } else {
+            exec(`${term} --workdir "${cwd}"`, (error) => {
+              if (!error) opened = true;
+            });
+          }
+          if (opened) break;
+        } catch (e) {
+          continue;
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening terminal:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle opening folder in file explorer
+ipcMain.handle('open-folder', async (event, terminalId) => {
+  try {
+    const { shell } = require('electron');
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    // Open the folder in the system's file explorer
+    await shell.openPath(cwd);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening folder:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('show-log-notification', () => {

@@ -36,21 +36,24 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 1. **First check** if a similar task already exists using \`list_tasks\` from MCP
 2. If no similar task exists, **create a new task** using \`create_task\` from MCP:
-   - **MANDATORY specify the correct terminal_id**
+   - **Terminal ID is AUTO-DETECTED** from environment variable \`CODEAGENTSWARM_CURRENT_QUADRANT\`
+   - If terminal_id is not provided, the MCP server will automatically use the current terminal
    - **MANDATORY: Read the project name from the CLAUDE.md file** in the current directory
    - Look for the "Project Name:" field in the "Project Configuration" section
    - If no project name is found in CLAUDE.md, use the directory name as fallback
 3. **Start the task** using \`start_task\` before beginning any work
+   - **Terminal is AUTO-ASSIGNED** when starting a task if environment variable is set
 4. **MANDATORY: Update the plan** using \`update_task_plan\` when starting a task with a detailed step plan
 5. **CRITICAL: Tasks ALWAYS go to testing first** - Use \`complete_task\` when finished (automatically goes to "in_testing" state, NEVER directly to "completed") or use \`submit_for_testing\` for direct testing submission
 6. **If you detect the current task deviates from focus or significantly changes objective, create a new task and continue work under that new task.**
 
 ### IMPORTANT: Terminal ID - Automatic Detection
-- **ALWAYS** specify the \`terminal_id\` when creating a task with \`create_task\`
+- **Terminal ID is NOW AUTO-DETECTED** by the MCP server from \`CODEAGENTSWARM_CURRENT_QUADRANT\` environment variable
 - Each terminal has a unique ID (1, 2, 3, 4, etc.) based on 1-based numbering
-- **AUTOMATIC DETECTION:** To get the current terminal, execute: \`echo $CODEAGENTSWARM_CURRENT_QUADRANT\` using the Bash tool
-- **NEVER ask the user** which terminal - always use automatic detection
-- Tasks must be associated with the correct terminal for proper tracking
+- **No need to manually specify terminal_id** when creating tasks - it's automatic!
+- **When starting a task:** Terminal is automatically assigned to the current terminal
+- **NEVER ask the user** which terminal - it's handled automatically
+- Tasks are automatically associated with the correct terminal for proper tracking
 
 ### MANDATORY: PLAN Field Management
 
@@ -172,7 +175,7 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 The following MCP tools are available for task management:
 
-- **\`create_task\`**: Create new task (requires terminal_id, project is auto-detected)
+- **\`create_task\`**: Create new task (terminal_id and project are auto-detected)
 - **\`start_task\`**: Mark task as "in_progress"
 - **\`complete_task\`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **\`submit_for_testing\`**: Mark task as "in_testing"
@@ -199,8 +202,8 @@ The following MCP tools are available for task management:
 **Usage example:**
 \`\`\`
 # Task management
-create_task(title="Implement new feature", description="Add user authentication", terminal_id=1)
-# Note: project is auto-detected from terminal's working directory
+create_task(title="Implement new feature", description="Add user authentication")
+# Note: terminal_id and project are auto-detected from environment and working directory
 
 update_task_plan(task_id=123, plan="1. Review existing code\\n2. Implement new functionality\\n3. Write tests")
 
