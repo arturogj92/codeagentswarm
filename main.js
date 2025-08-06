@@ -3416,10 +3416,10 @@ ipcMain.handle('git-commit', async (event, message, files) => {
 });
 
 // Generate AI commit message handler
-ipcMain.handle('generate-ai-commit-message', async (event, workingDirectory) => {
+ipcMain.handle('generate-ai-commit-message', async (event, workingDirectory, style) => {
   try {
     const cwd = workingDirectory || getGitWorkingDirectory();
-    return await gitService.generateCommitMessage(cwd);
+    return await gitService.generateCommitMessage(cwd, style);
   } catch (error) {
     console.error('Generate AI commit message error:', error);
     return { 
@@ -3491,6 +3491,10 @@ ipcMain.handle('git-reset', async (event, commitHash, hard = false) => {
 });
 
 // Git diff handler
+// Note: Using 'git diff HEAD' to show all changes (both staged and unstaged)
+// - 'git diff' only shows unstaged changes
+// - 'git diff --cached' only shows staged changes  
+// - 'git diff HEAD' shows all changes compared to last commit
 ipcMain.handle('git-diff', async (event, fileName, workingDirectory, options = {}) => {
   const { execSync } = require('child_process');
   const fs = require('fs');
@@ -3527,16 +3531,16 @@ ipcMain.handle('git-diff', async (event, fileName, workingDirectory, options = {
             diffOutput += lines.map(line => `+${line}`).join('\n');
           }
         } else {
-          // For tracked files, use regular git diff
-          diffOutput = execSync(`git diff "${fileName}"`, { cwd, encoding: 'utf8' });
+          // For tracked files, get diff against HEAD to show all changes (staged and unstaged)
+          diffOutput = execSync(`git diff HEAD "${fileName}"`, { cwd, encoding: 'utf8' });
         }
       } catch (e) {
-        // Fallback to regular diff
-        diffOutput = execSync(`git diff "${fileName}"`, { cwd, encoding: 'utf8' });
+        // Fallback to regular diff against HEAD
+        diffOutput = execSync(`git diff HEAD "${fileName}"`, { cwd, encoding: 'utf8' });
       }
     } else {
-      // Get diff for all files
-      diffOutput = execSync('git diff', { cwd, encoding: 'utf8' });
+      // Get diff for all files against HEAD
+      diffOutput = execSync('git diff HEAD', { cwd, encoding: 'utf8' });
     }
     
     let result = { success: true, diff: diffOutput };

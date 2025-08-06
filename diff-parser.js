@@ -25,7 +25,8 @@ class DiffParser {
                 hasChanges: false,
                 oldFile: { lines: [] },
                 newFile: { lines: [] },
-                fileContents: fileContents
+                fileContents: fileContents,
+                stats: { added: 0, removed: 0, modified: 0, total: 0 }
             };
         }
 

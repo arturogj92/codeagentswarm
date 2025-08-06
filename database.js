@@ -602,6 +602,22 @@ class DatabaseManager {
             return null;
         }
     }
+    
+    // Set app setting
+    setSetting(key, value) {
+        try {
+            const stmt = this.db.prepare(`
+                INSERT OR REPLACE INTO app_settings (key, value, updated_at)
+                VALUES (?, ?, datetime('now'))
+            `);
+            const valueStr = typeof value === 'string' ? value : JSON.stringify(value);
+            stmt.run(key, valueStr);
+            return true;
+        } catch (err) {
+            console.error('Error setting preference:', err);
+            return false;
+        }
+    }
 
     // Get user's preferred shell
     getUserShell() {

@@ -177,9 +177,9 @@ class TerminalManager {
                     this.terminals.delete(i);
                 }
                 
-                // Update the UI
-                await this.removeTerminal(i, true);
+                // Update the UI - just render and update buttons since terminal is already removed
                 await this.renderTerminals();
+                await this.updateTerminalManagementButtons();
                 this.updateGitButtonVisibility();
                 console.log(`✅ Terminal ${i} UI updated after backend close`);
             });
@@ -2918,7 +2918,8 @@ class TerminalManager {
             lucide.createIcons();
             
             try {
-                const result = await ipcRenderer.invoke('generate-ai-commit-message', this.currentGitProject);
+                // Always use detailed style
+                const result = await ipcRenderer.invoke('generate-ai-commit-message', this.currentGitProject, 'detailed');
                 
                 if (result.success) {
                     messageTextarea.value = result.message;
