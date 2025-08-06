@@ -2473,12 +2473,21 @@ body::before {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 1.5rem;
   cursor: pointer;
-  padding: 4px;
+  padding: 8px;
   border-radius: 4px;
   transition: all 0.3s ease;
-  line-height: 1;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn svg {
+  pointer-events: none;
+  width: 16px;
+  height: 16px;
 }
 
 .close-btn:hover {
@@ -4554,12 +4563,11 @@ h3 i {
 .close-modal {
   background: none;
   border: none;
-  font-size: 24px;
   color: var(--text-secondary);
   cursor: pointer;
-  padding: 0;
-  width: 30px;
-  height: 30px;
+  padding: 8px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -4567,6 +4575,13 @@ h3 i {
   transition: all 0.2s;
   position: relative;
   z-index: 20;
+  -webkit-app-region: no-drag; /* ¡IMPORTANTE! Hacer el botón clickable */
+}
+
+.close-modal svg {
+  pointer-events: none;
+  width: 20px;
+  height: 20px;
 }
 
 .close-modal:hover {
@@ -4577,6 +4592,21 @@ h3 i {
 .modal-body {
   padding: 20px;
   overflow-y: scroll; /* Changed to scroll to always show scrollbar */
+}
+
+/* Asegurar que todos los elementos interactivos en modales sean clickables */
+.modal button,
+.modal input,
+.modal textarea,
+.modal select,
+.modal a,
+.modal .clickable {
+  -webkit-app-region: no-drag;
+  -webkit-user-select: auto;
+  user-select: auto;
+}
+
+.modal-body {
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
@@ -5417,16 +5447,21 @@ h3 i {
   background: none;
   border: none;
   color: var(--text-secondary);
-  font-size: 20px;
   cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
+  padding: 4px;
+  width: 32px;
+  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
   transition: all 0.2s ease;
+}
+
+.app-notification .notification-close svg {
+  pointer-events: none;
+  width: 14px;
+  height: 14px;
 }
 
 .app-notification .notification-close:hover {

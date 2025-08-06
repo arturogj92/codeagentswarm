@@ -58,8 +58,8 @@
   left: 226px; /* 250px sidebar - 24px button width */
   top: 50%;
   transform: translateY(-50%);
-  width: 24px;
-  height: 48px;
+  width: 32px;
+  height: 64px;
   background: var(--background-secondary);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -70,6 +70,7 @@
   transition: left 0.3s ease, background 0.2s ease;
   z-index: 1050;
   box-shadow: 2px 0 6px rgba(0, 0, 0, 0.2);
+  padding: 0;
 }
 
 .sidebar-toggle:hover {
@@ -440,7 +441,7 @@
 
 .expand-btn {
   width: 100%;
-  padding: 4px 12px;
+  padding: 8px 16px;
   background: transparent;
   border: none;
   color: var(--primary);
@@ -452,6 +453,11 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: normal;
 }
 
 .expand-btn:hover {

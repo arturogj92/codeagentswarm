@@ -59,7 +59,7 @@ class TerminalManager {
                 return result.directories || {};
             } else {
                 console.warn('Failed to load directories:', result);
-                return {};
+                return {};   
             }
         } catch (error) {
             console.warn('Error loading directories:', error);
@@ -1612,7 +1612,11 @@ class TerminalManager {
             <div class="color-picker-content">
                 <div class="color-picker-header">
                     <h3><i data-lucide="palette"></i> Choose Color for "${projectName}"</h3>
-                    <button class="close-btn" id="close-color-picker">×</button>
+                    <button class="close-btn" id="close-color-picker">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="color-picker-body">
                     <div class="color-options">
@@ -1670,8 +1674,15 @@ class TerminalManager {
         modalContent.style.left = `${Math.min(rect.left, window.innerWidth - 350)}px`;
 
         // Add event listeners
+        const handleEscape = (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        };
+        
         const closeModal = () => {
-            closeModal();
+            modal.remove();
+            document.removeEventListener('keydown', handleEscape);
         };
 
         // Close button
@@ -1700,12 +1711,6 @@ class TerminalManager {
         });
 
         // Close on Escape key
-        const handleEscape = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-                document.removeEventListener('keydown', handleEscape);
-            }
-        };
         document.addEventListener('keydown', handleEscape);
 
         // Show modal with animation
@@ -2287,7 +2292,11 @@ class TerminalManager {
             <div class="create-task-content">
                 <div class="create-task-header">
                     <h3><i data-lucide="plus-square"></i> Create New Task</h3>
-                    <button class="close-btn" id="close-create-task-modal">×</button>
+                    <button class="close-btn" id="close-create-task-modal">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="create-task-body">
                     <form id="create-task-form">
@@ -2421,7 +2430,11 @@ class TerminalManager {
             <div class="modal-content">
                 <div class="modal-header">
                     <h2><i data-lucide="git-branch"></i> Git Projects</h2>
-                    <button class="close-modal" id="close-project-modal">×</button>
+                    <button class="close-modal" id="close-project-modal">
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 
                 <div class="modal-body">
@@ -2559,7 +2572,11 @@ class TerminalManager {
             <div class="git-status-content">
                 <div class="git-status-header">
                     <h3><i data-lucide="git-branch"></i> Git Manager${gitData.projectName ? ` - ${gitData.projectName}` : ''}</h3>
-                    <button class="close-btn" id="close-git-modal">×</button>
+                    <button class="close-btn" id="close-git-modal">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 
                 <div class="git-info">
@@ -3008,7 +3025,11 @@ class TerminalManager {
             <div class="diff-content">
                 <div class="diff-header">
                     <h3><i data-lucide="file-diff"></i> Diff: ${fileName}</h3>
-                    <button class="close-btn" id="close-diff-modal">×</button>
+                    <button class="close-btn" id="close-diff-modal">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 <div class="diff-body">
                     <pre class="diff-text">${this.formatDiff(diff)}</pre>
@@ -3131,7 +3152,11 @@ class TerminalManager {
                             <button class="btn btn-small active" id="split-view-btn">Split View</button>
                             <button class="btn btn-small" id="unified-view-btn">Unified View</button>
                         </div>
-                        <button class="close-btn" id="close-diff-modal">×</button>
+                        <button class="close-btn" id="close-diff-modal">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                     </div>
                     <div class="diff-stats">
                         <span class="stat-added">+${parsedDiff.stats.added}</span>
@@ -3882,7 +3907,11 @@ class TerminalManager {
             <div class="branch-selector-content">
                 <div class="branch-selector-header">
                     <h3><i data-lucide="git-branch"></i> Git Branches - Terminal ${terminalId + 1}</h3>
-                    <button class="close-btn" id="close-branch-modal">×</button>
+                    <button class="close-btn" id="close-branch-modal">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                        </svg>
+                    </button>
                 </div>
                 
                 <div class="branch-current">
@@ -6452,7 +6481,11 @@ class TerminalManager {
             <div class="notification-content">
                 ${title ? `<strong>${title}</strong>` : ''}
                 <span class="notification-message">${message}</span>
-                <button class="notification-close">×</button>
+                <button class="notification-close">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M10.5 3.5L3.5 10.5M3.5 3.5L10.5 10.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
             </div>
         `;
         

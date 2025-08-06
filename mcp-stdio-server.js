@@ -8,7 +8,7 @@
 const readline = require('readline');
 const path = require('path');
 const fs = require('fs');
-
+  
 // Initialize child process logger
 const ChildProcessLogger = require('./child-process-logger');
 const childLogger = new ChildProcessLogger('MCP-Server');
