@@ -225,9 +225,18 @@ class ChangelogGenerator {
   }
 
   /**
-   * Generate changelog using DeepSeek AI
+   * Generate changelog using DeepSeek AI (optional for CI/CD)
+   * Note: This is used in GitHub Actions, not in the app
+   * If DEEPSEEK_API_KEY is not set in GitHub secrets, falls back to simple generation
    */
   async generateChangelogWithAI(currentVersion, previousVersion, commits) {
+    // If no DeepSeek API key, use simple changelog
+    if (!this.deepseekApiKey) {
+      console.log('No DeepSeek API key provided, using simple changelog generation');
+      console.log('To get better changelogs, add DEEPSEEK_API_KEY to GitHub secrets');
+      return this.generateSimpleChangelog(currentVersion, commits);
+    }
+
     // Prepare commit information for AI
     const commitInfo = commits.map(commit => ({
       message: commit.commit.message,

@@ -2686,35 +2686,7 @@ function registerDatabaseHandlers() {
     }
   });
 
-  // Handle API key management
-  ipcMain.handle('save-api-key', async (event, key) => {
-    try {
-      const result = db.saveSetting('deepseek_api_key', key);
-      // Set it in the environment for the current session
-      if (key) {
-        process.env.DEEPSEEK_API_KEY = key;
-        // Reinitialize Git service to use the new API key
-        if (gitService) {
-          gitService.reinitializeDeepSeekService();
-        }
-      } else {
-        // Clear the API key if empty
-        delete process.env.DEEPSEEK_API_KEY;
-      }
-      return { success: result.success };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  ipcMain.handle('get-api-key', async () => {
-    try {
-      const key = db.getSetting('deepseek_api_key');
-      return { success: true, key: key || '' };
-    } catch (error) {
-      return { success: false, error: error.message };
-    }
-  });
+  // API key handlers removed - Claude Code doesn't need API keys
 
   // Handle get shell preference
   ipcMain.handle('get-shell-preference', async () => {
@@ -2786,11 +2758,7 @@ async function initializeApp() {
     // Register IPC handlers that depend on database
     registerDatabaseHandlers();
     
-    // Load API key from database if available
-    const savedApiKey = db.getSetting('deepseek_api_key');
-    if (savedApiKey) {
-      process.env.DEEPSEEK_API_KEY = savedApiKey;
-    }
+    // No longer need to load API keys - Claude Code works locally
   } catch (error) {
     console.error('Failed to initialize database:', error);
     db = null;
@@ -2798,6 +2766,15 @@ async function initializeApp() {
   
   // Initialize Git service
   gitService = new GitService();
+  
+  // Ensure PATH includes common locations for Claude
+  if (!process.env.PATH.includes('/opt/homebrew/bin')) {
+    process.env.PATH = `/opt/homebrew/bin:${process.env.PATH}`;
+  }
+  if (!process.env.PATH.includes('/usr/local/bin')) {
+    process.env.PATH = `/usr/local/bin:${process.env.PATH}`;
+  }
+  console.log('[Main] PATH environment:', process.env.PATH);
   
   // Initialize Updater Service
   try {

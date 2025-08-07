@@ -1,27 +1,35 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const DeepSeekCommitService = require('./deepseek-commit-service');
+const commitServiceFactory = require('./infrastructure/commit/commit-service-factory');
 
 class GitService {
     constructor() {
+        this.initializeCommitService();
+    }
+    
+    // Initialize commit service with factory
+    async initializeCommitService() {
         try {
-            this.deepSeekService = new DeepSeekCommitService();
+            await commitServiceFactory.initialize({
+                logger: console
+            });
+            
+            console.log('[GitService] Commit service initialized with Claude CLI');
         } catch (error) {
-            console.warn('[GitService] DeepSeek service initialization failed:', error.message);
-            this.deepSeekService = null;
+            console.warn('[GitService] Commit service initialization failed:', error.message);
+            console.warn('[GitService] Please install Claude Code to use commit generation');
         }
     }
     
-    // Method to reinitialize DeepSeek service (for when API key is updated)
-    reinitializeDeepSeekService() {
+    // Method to reinitialize commit service (for when settings are updated)
+    async reinitializeCommitService() {
         try {
-            this.deepSeekService = new DeepSeekCommitService();
-            console.log('[GitService] DeepSeek service reinitialized');
+            await this.initializeCommitService();
+            console.log('[GitService] Commit service reinitialized');
             return true;
         } catch (error) {
-            console.error('[GitService] Failed to reinitialize DeepSeek service:', error);
-            this.deepSeekService = null;
+            console.error('[GitService] Failed to reinitialize commit service:', error);
             return false;
         }
     }
@@ -132,20 +140,28 @@ class GitService {
     }
 
     // Generate commit message with AI
-    async generateCommitMessage(cwd) {
+    async generateCommitMessage(cwd, style = 'detailed') {
         try {
             if (!this.isGitRepository(cwd)) {
                 return { success: false, error: 'Not a git repository' };
             }
 
-            if (!this.deepSeekService) {
-                return { 
-                    success: false, 
-                    error: 'AI commit generation is not available. Please set DEEPSEEK_API_KEY environment variable.' 
-                };
+            // Ensure commit service is initialized
+            if (!commitServiceFactory.getDefaultAdapterName()) {
+                await this.initializeCommitService();
+                
+                if (!commitServiceFactory.getDefaultAdapterName()) {
+                    return { 
+                        success: false, 
+                        error: 'Commit generation service not available. Please install Claude Code to use AI-powered commit messages.' 
+                    };
+                }
             }
 
-            const result = await this.deepSeekService.generateCommitMessage(cwd);
+            // Create use case and execute
+            const useCase = commitServiceFactory.createUseCase();
+            const result = await useCase.execute({ workingDirectory: cwd, style });
+            
             return result;
         } catch (error) {
             console.error('Generate commit message error:', error);

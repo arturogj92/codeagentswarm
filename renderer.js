@@ -5779,11 +5779,7 @@ class TerminalManager {
         // Get current shell preference
         const shellPref = await ipcRenderer.invoke('get-shell-preference');
         
-        // Get API key
-        const apiKeyResult = await ipcRenderer.invoke('get-api-key');
-        if (apiKeyResult.success && apiKeyResult.key) {
-            document.getElementById('deepseek-api-key').value = apiKeyResult.key;
-        }
+        // No longer need to load API key - Claude Code is used instead
         
         // Get debug mode preference
         const debugModeResult = await ipcRenderer.invoke('get-debug-mode');
@@ -6034,20 +6030,7 @@ class TerminalManager {
 
         // Add auto-save handlers for settings inputs with debouncing
         
-        // Auto-save API key with debouncing
-        const apiKeyInput = document.getElementById('deepseek-api-key');
-        if (apiKeyInput && !apiKeyInput.dataset.autoSaveInitialized) {
-            apiKeyInput.dataset.autoSaveInitialized = 'true';
-            apiKeyInput.addEventListener('input', (e) => {
-                const debouncedSave = this.settingsOptimizer.debounce(async (value) => {
-                    const result = await ipcRenderer.invoke('save-api-key', value);
-                    if (!result.success) {
-                        console.error('Failed to auto-save API key:', result.error);
-                    }
-                }, 500, 'api-key');
-                debouncedSave(e.target.value.trim());
-            });
-        }
+        // API key input removed - Claude Code doesn't need API keys
         
         // Auto-save debug mode checkbox
         const debugCheckbox = document.getElementById('debug-mode-checkbox');
@@ -6120,21 +6103,7 @@ class TerminalManager {
 
         // Toggle API key visibility - using delegation
         modal.addEventListener('click', async (e) => {
-            // Handle toggle API key visibility
-            if (e.target.closest('#toggle-api-key-visibility')) {
-                const input = document.getElementById('deepseek-api-key');
-                const icon = document.querySelector('#toggle-api-key-visibility i');
-                
-                if (input.type === 'password') {
-                    input.type = 'text';
-                    icon.setAttribute('data-lucide', 'eye-off');
-                } else {
-                    input.type = 'password';
-                    icon.setAttribute('data-lucide', 'eye');
-                }
-                lucide.createIcons();
-                return;
-            }
+            // API key visibility toggle removed - no longer needed
             
             // Handle open system notifications button
             if (e.target.closest('#open-system-notifications')) {
