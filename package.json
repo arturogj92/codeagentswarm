@@ -48,22 +48,22 @@
       "output": "dist"
     },
     "files": [
-      "*.js",
-      "*.html", 
-      "*.css",
-      "*.sh",
-      "*.py",
-      "*.png",
-      "*.json",
-      "assets/**/*",
-      "services/**/*",
-      "node_modules/**/*",
+      "**/*",
+      "!tests/**/*",
       "!test-*.js",
       "!test-*.sh",
       "!*.test.js",
       "!*.bak",
       "!*.db",
-      "!*.db-journal"
+      "!*.db-journal",
+      "!dist/**/*",
+      "!.git/**/*",
+      "!.github/**/*",
+      "!.idea/**/*",
+      "!docs/**/*",
+      "!scripts/**/*",
+      "!*.log",
+      "!.DS_Store"
     ],
     "extraResources": [
       "app-update.yml"
