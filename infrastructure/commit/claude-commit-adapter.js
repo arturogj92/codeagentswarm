@@ -238,12 +238,12 @@ class ClaudeCommitAdapter extends CommitRepository {
                 .substring(0, 300);
         }
         
-        const basePrompt = `Generate a git commit message. Files: ${filesStr}${hasMoreFiles}. Changes: ${changeDescription}. Rules: 1) Use conventional commit format (feat/fix/docs/style/refactor/test/chore). 2) Be literal about what changed. 3) Don't interpret intent. 4) Focus on WHAT changed, not WHY.`;
+        const basePrompt = `Generate a git commit message. Files: ${filesStr}${hasMoreFiles}. Changes: ${changeDescription}. Rules: 1) Use conventional commit format (feat/fix/docs/style/refactor/test/chore). 2) Be concise and clear. 3) Focus on WHAT changed, not line numbers or implementation details.`;
 
         if (style === 'concise') {
             return `${basePrompt} Output: Single line only, max 72 chars. Example: feat(auth): add login validation`;
         } else {
-            return `${basePrompt} Format: Title line, blank line, then bullet points describing changes.`;
+            return `${basePrompt} Format: Title line, blank line, then brief bullet points. Keep bullets short and essential. Example bullets: "- Added user authentication", "- Removed deprecated API endpoints", "- Updated test expectations". NO line numbers, NO file paths in bullets, just describe the changes.`;
         }
     }
 
