@@ -82,8 +82,8 @@ const spawnAsync = (command, args, options) => {
 class ClaudeCommitAdapter extends CommitRepository {
     constructor() {
         super();
-        this.maxRetries = 2;
-        this.timeout = 45000; // 45 seconds - balanced for most systems
+        this.maxRetries = 1; // Reduce retries to save time
+        this.timeout = 60000; // 60 seconds - generous timeout
         this.claudePath = 'claude'; // Default path, will be updated when checking availability
     }
 
@@ -110,9 +110,58 @@ class ClaudeCommitAdapter extends CommitRepository {
                 return CommitMessage.fromString(message);
             } catch (fallbackError) {
                 console.error('[ClaudeCommitAdapter] Fallback also failed:', fallbackError.message);
-                throw new Error(`Failed to generate commit message: ${error.message}`);
+                
+                // Last resort: Generate a basic message locally
+                console.log('[ClaudeCommitAdapter] Using local fallback message generation...');
+                const localMessage = this.generateLocalFallback(modifiedFiles);
+                return CommitMessage.fromString(localMessage);
             }
         }
+    }
+
+    /**
+     * Generate a basic commit message locally without Claude
+     * @private
+     */
+    generateLocalFallback(modifiedFiles) {
+        if (!modifiedFiles || modifiedFiles.length === 0) {
+            return 'chore: update files';
+        }
+
+        const actions = modifiedFiles.map(f => f.status);
+        const fileNames = modifiedFiles.slice(0, 3).map(f => {
+            const parts = f.path.split('/');
+            return parts[parts.length - 1];
+        });
+        
+        let type = 'chore';
+        let action = 'update';
+        
+        if (actions.every(a => a === 'added')) {
+            type = 'feat';
+            action = 'add';
+        } else if (actions.every(a => a === 'deleted')) {
+            type = 'chore';
+            action = 'remove';
+        } else if (actions.some(a => a === 'modified')) {
+            // Try to guess type from file extensions
+            if (fileNames.some(f => f.includes('.test.') || f.includes('.spec.'))) {
+                type = 'test';
+            } else if (fileNames.some(f => f.includes('.md') || f.includes('.txt'))) {
+                type = 'docs';
+            } else if (fileNames.some(f => f.includes('.css') || f.includes('.scss'))) {
+                type = 'style';
+            } else {
+                type = 'refactor';
+            }
+            action = 'update';
+        }
+        
+        const fileStr = fileNames.length === 1 
+            ? fileNames[0] 
+            : `${fileNames.length} files`;
+            
+        return `${type}: ${action} ${fileStr}`;
     }
 
     /**
@@ -158,18 +207,43 @@ class ClaudeCommitAdapter extends CommitRepository {
         
         // Create a single-line prompt to avoid shell escaping issues
         const filesStr = fileList.replace(/\n/g, ', ');
-        const diffPreview = truncatedDiff
-            .split('\n')
-            .slice(0, 10)  // Take only first 10 lines
-            .join(' | ')   // Join with pipe separator
-            .substring(0, 500); // Limit to 500 chars
         
-        const basePrompt = `Write a git commit message for these changes: ${filesStr}${hasMoreFiles}. Key changes: ${diffPreview}. Use conventional format (type(scope): description). English only, no AI mentions.`;
+        // Extract actual changes from diff more literally
+        const addedLines = [];
+        const removedLines = [];
+        const diffLines = truncatedDiff.split('\n');
+        
+        for (const line of diffLines) {
+            if (line.startsWith('+') && !line.startsWith('+++')) {
+                addedLines.push(line.substring(1).trim());
+            } else if (line.startsWith('-') && !line.startsWith('---')) {
+                removedLines.push(line.substring(1).trim());
+            }
+        }
+        
+        // Build a more literal description of changes
+        let changeDescription = '';
+        if (addedLines.length > 0 && removedLines.length === 0) {
+            changeDescription = `Added: ${addedLines.slice(0, 3).join(', ')}`;
+        } else if (removedLines.length > 0 && addedLines.length === 0) {
+            changeDescription = `Removed: ${removedLines.slice(0, 3).join(', ')}`;
+        } else if (addedLines.length > 0 && removedLines.length > 0) {
+            changeDescription = `Modified: added ${addedLines.length} lines, removed ${removedLines.length} lines`;
+        } else {
+            // Fallback to diff preview
+            changeDescription = truncatedDiff
+                .split('\n')
+                .slice(0, 5)
+                .join(' | ')
+                .substring(0, 300);
+        }
+        
+        const basePrompt = `Generate a git commit message. Files: ${filesStr}${hasMoreFiles}. Changes: ${changeDescription}. Rules: 1) Use conventional commit format (feat/fix/docs/style/refactor/test/chore). 2) Be literal about what changed. 3) Don't interpret intent. 4) Focus on WHAT changed, not WHY.`;
 
         if (style === 'concise') {
-            return `${basePrompt} Output: Single line commit title only (max 72 chars).`;
+            return `${basePrompt} Output: Single line only, max 72 chars. Example: feat(auth): add login validation`;
         } else {
-            return `${basePrompt} Format: Title, blank line, then bullet points for body.`;
+            return `${basePrompt} Format: Title line, blank line, then bullet points describing changes.`;
         }
     }
 
@@ -186,7 +260,7 @@ class ClaudeCommitAdapter extends CommitRepository {
             // Use stdin for prompt
             const { stdout, stderr } = await this.spawnWithStdin(claudeCmd, ['-p'], prompt, {
                 cwd: workingDirectory,
-                timeout: 20000, // 20 seconds for simple prompt
+                timeout: 30000, // 30 seconds for simple prompt (half of main timeout)
                 env: { 
                     ...process.env, 
                     CLAUDE_NO_COLOR: '1',

@@ -44,6 +44,7 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 6. **If you detect the current task deviates from focus or significantly changes objective, create a new task and continue work under that new task.**
 
 ### IMPORTANT: Terminal ID - Automatic Detection
+
 - **ALWAYS** specify the `terminal_id` when creating a task with `create_task`
 - Each terminal has a unique ID (1, 2, 3, 4, etc.) based on 1-based numbering
 - **AUTOMATIC DETECTION:** To get the current terminal, execute: `echo $CODEAGENTSWARM_CURRENT_QUADRANT` using the Bash tool
@@ -55,17 +56,20 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 **Each task MUST have a detailed plan** that is updated when the agent takes it:
 
 1. **When starting an existing task:**
+
    - Use `update_task_plan` to establish a clear and detailed plan
    - The plan must include specific steps you will follow
    - Suggested format: numbered list of concrete actions
 
 2. **Plan content:**
+
    - Step-by-step implementation breakdown
    - Files to be modified or created
    - Dependencies or prerequisites
    - Success/completion criteria
 
 3. **Example of well-structured plan:**
+
    ```
    1. Review current code structure in src/components/
    2. Create new UserProfile.jsx component
@@ -77,6 +81,7 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
    ```
 
 4. **Plan updates:**
+
    - If plan changes during execution, update it using `update_task_plan`
    - Keep plan updated so other agents can continue if needed
 
@@ -96,11 +101,13 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 ### Workflow
 
 1. **When receiving a user request:**
+
    - Review existing tasks with `list_tasks`
    - If related task exists, use it
    - If not, create a new descriptive task
 
 2. **During work:**
+
    - Current task will show in terminal bar
    - **Update plan** using `update_task_plan` when starting with detailed plan
    - Keep task status updated
@@ -128,17 +135,20 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 **CRITICAL: All tasks MUST go through testing phase before completion. Tasks can NEVER go directly from "in_progress" to "completed" status:**
 
 1. **🚨 Mandatory transition to testing (NO EXCEPTIONS):**
+
    - When finishing task implementation, use `complete_task`
    - This ALWAYS and AUTOMATICALLY moves task to `in_testing` state
    - **PROHIBITED:** Going directly from `in_progress` to `completed`
    - **REMEMBER:** Unless the user EXPLICITLY asks to mark as completed, tasks ALWAYS go to testing first
 
 2. **Requirements to complete from testing:**
+
    - Task must have `implementation` field documented
    - User must manually review and approve
    - Only then use `complete_task` again to mark as `completed`
 
 3. **If needing to send directly to testing:**
+
    - Use `submit_for_testing` to move directly to `in_testing`
    - Useful when another agent or person will perform tests
 
@@ -157,12 +167,13 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 2. **Ask which to start:** Request user specify which task they want you to begin
 3. **Don't assume:** NEVER automatically choose a task without user confirmation
 4. **Response example:**
+
    ```
    Found several pending tasks for this terminal:
    - ID 70: Fix all this
    - ID 58: Make terminal document the task
    - ID 41: Corrected dummy test task
-   
+
    Which of these tasks would you like me to start?
    ```
 
@@ -183,18 +194,22 @@ The following MCP tools are available for task management:
 - **`get_project_tasks`**: Get all tasks for a specific project
 
 **`update_task_plan` parameters:**
+
 - `task_id` (number, required): Task ID
 - `plan` (string, required): Detailed plan text
 
 **`update_task_implementation` parameters:**
+
 - `task_id` (number, required): Task ID
 - `implementation` (string, required): Implementation details including modified files and summary
 
 **`update_task_terminal` parameters:**
+
 - `task_id` (number, required): Task ID
 - `terminal_id` (string, required): Terminal ID (1, 2, 3, 4, etc.) or empty string to unassign
 
 **Usage example:**
+
 ```
 # Task management
 create_task(title="Implement new feature", description="Add user authentication", terminal_id=1)
@@ -230,6 +245,7 @@ Tasks are automatically organized by project based on the CLAUDE.md configuratio
 4. **Project Filtering**: Use `get_project_tasks` to see tasks for a specific project
 
 ### How to detect the project name (for agents):
+
 ```bash
 # 1. First, check if CLAUDE.md exists
 if [ -f "CLAUDE.md" ]; then
@@ -242,10 +258,13 @@ fi
 ## IMPORTANT: MCP Token Limits
 
 ### Known issue with list_tasks
+
 When there are many tasks in the database (30+), the `list_tasks` MCP command can exceed allowed token limit (25000 tokens).
 
 ### Recommended solution:
+
 1. **ALWAYS use status filters** when listing tasks:
+
    - `mcp__codeagentswarm-tasks__list_tasks` with parameter `status: "pending"`
    - `mcp__codeagentswarm-tasks__list_tasks` with parameter `status: "in_progress"`
    - This significantly reduces number of returned tasks
@@ -258,6 +277,7 @@ When there are many tasks in the database (30+), the `list_tasks` MCP command ca
    - Consider default limits in getAllTasks()
 
 ### Technical notes:
+
 - MCP server has multiple routes (`tasks/get_all` and `tools/call`) that must stay synchronized
 - MCP server changes require server restart to apply
 - Claude Code can cache MCP connections
@@ -303,18 +323,22 @@ When there are many tasks in the database (30+), the `list_tasks` MCP command ca
 ## Specialized Agents for Development
 
 ### 📋 Task Manager Agent
+
 **Usage**: MUST BE USED for all task-related operations
+
 - **Automatically prevents duplicate tasks** by checking existing ones
 - Creates tasks before any development work
 - Updates plans and tracks implementation
 - Manages task lifecycle (pending → in_progress → in_testing → completed)
 
 **Key Features**:
+
 - **Duplicate Detection**: Searches similar tasks across all statuses
 - **Auto Terminal Detection**: No need to specify terminal
 - **Project Detection**: Reads from CLAUDE.md automatically
 
 **Example invocation**:
+
 ```
 "Create a task for implementing user authentication"
 "List my current tasks"
@@ -323,31 +347,39 @@ When there are many tasks in the database (30+), the `list_tasks` MCP command ca
 ```
 
 ### 🏗️ Hexagonal Architecture Developer
+
 **Usage**: When implementing new features or refactoring code
+
 - Automatically follows hexagonal architecture patterns
 - Separates domain, application, and infrastructure layers
 - **ALWAYS calls test-writer agent after implementation**
 
 **Example invocation**:
+
 ```
 "Implement a new user authentication feature"
 "Refactor the task management to use hexagonal architecture"
 ```
 
 ### 🧪 Test Writer Agent
+
 **Usage**: Automatically invoked after hexagonal-developer, or manually for existing code
+
 - Writes comprehensive tests for all layers
 - Follows TDD principles
 - Creates unit, integration, and E2E tests
 
 **Manual invocation**:
+
 ```
 "Write tests for the notification service"
 "Add missing tests for the task repository"
 ```
 
 ### 🔄 Development Flow
+
 The recommended flow for new features:
+
 1. **task-manager** → Creates/manages the task
 2. **hexagonal-developer** → Implements with clean architecture
 3. **test-writer** → Automatically writes tests
@@ -356,6 +388,7 @@ The recommended flow for new features:
 6. **git-committer** → Creates semantic commit
 
 ### 💡 Tips for Better Agent Usage
+
 - Use specific keywords to trigger the right agent:
   - "create task", "list tasks" → task-manager
   - "implement", "create feature" → hexagonal-developer
@@ -367,14 +400,17 @@ The recommended flow for new features:
 ## Development Best Practices - MANDATORY
 
 ### 🧪 Testing Requirements
+
 **ALL new functionality MUST include tests**. No exceptions.
 
 1. **Before implementing any feature:**
+
    - Write tests first (TDD approach)
    - Define expected behavior
    - Cover edge cases
 
 2. **Test coverage requirements:**
+
    - Unit tests for all new functions/methods
    - Integration tests for feature workflows
    - E2E tests for user-facing features
@@ -386,20 +422,24 @@ The recommended flow for new features:
    - Add new tests for bug fixes
 
 ### 🏗️ Code Architecture Rules
+
 **MANDATORY: Extract complex functionality to separate classes/modules**
 
 1. **Class extraction criteria:**
+
    - If a class/file exceeds 300 lines → split it
    - If a method exceeds 50 lines → extract to smaller methods
    - If adding new feature to existing class → consider new class
 
 2. **Architecture principles:**
+
    - Single Responsibility Principle (SRP)
    - Separation of concerns
    - Dependency injection
    - Modular design
 
 3. **File organization:**
+
    ```
    feature/
    ├── feature.js          # Main class
@@ -417,41 +457,51 @@ The recommended flow for new features:
    - [ ] Code review completed?
 
 ### Example Implementation Pattern
+
 ```javascript
 // ❌ BAD: Everything in renderer.js
 class TerminalManager {
-    // 500+ lines of mixed concerns
-    handleDiff() { /* complex logic */ }
-    handleGit() { /* complex logic */ }
-    handleUI() { /* complex logic */ }
+  // 500+ lines of mixed concerns
+  handleDiff() {
+    /* complex logic */
+  }
+  handleGit() {
+    /* complex logic */
+  }
+  handleUI() {
+    /* complex logic */
+  }
 }
 
 // ✅ GOOD: Separated concerns
 // diff-manager.js
 class DiffManager {
-    constructor(gitService, uiService) {
-        this.gitService = gitService;
-        this.uiService = uiService;
-    }
-    // Focused diff logic
+  constructor(gitService, uiService) {
+    this.gitService = gitService;
+    this.uiService = uiService;
+  }
+  // Focused diff logic
 }
 
 // diff-manager.test.js
-describe('DiffManager', () => {
-    test('should handle diff expansion', () => {
-        // Test implementation
-    });
+describe("DiffManager", () => {
+  test("should handle diff expansion", () => {
+    // Test implementation
+  });
 });
 ```
 
 ### Testing Commands
+
 - `npm test` - Run all tests
 - `npm run test:unit` - Run unit tests only
 - `npm run test:coverage` - Generate coverage report
 - `npm run test:watch` - Run tests in watch mode
 
 ### Code Review Checklist
+
 Before completing any task:
+
 - [ ] Tests written and passing
 - [ ] Complex logic extracted to separate classes
 - [ ] No methods longer than 50 lines
@@ -461,12 +511,12 @@ Before completing any task:
 - [ ] Documentation updated
 
 # important-instruction-reminders
+
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
+NEVER proactively create documentation files (\*.md) or README files. Only create documentation files if explicitly requested by the User.
 ALWAYS write tests for new functionality - NO EXCEPTIONS.
 ALWAYS extract complex functionality to separate classes/modules.
 
 <!-- CODEAGENTSWARM CONFIG END -->
-

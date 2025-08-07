@@ -2912,9 +2912,18 @@ class TerminalManager {
             const button = modal.querySelector('#generate-ai-commit');
             const messageTextarea = modal.querySelector('#commit-message');
             
-            // Show loading state
+            // Show loading state with informative message
             button.disabled = true;
-            button.innerHTML = '<i data-lucide="loader-2" class="spinning"></i>';
+            const originalButtonContent = button.innerHTML;
+            button.innerHTML = '<i data-lucide="loader-2" class="spinning"></i> <span style="font-size: 11px;">AI analyzing (5-30s)...</span>';
+            lucide.createIcons();
+            
+            // Also add a more detailed status message
+            const statusDiv = document.createElement('div');
+            statusDiv.className = 'ai-status-message';
+            statusDiv.style.cssText = 'margin-top: 8px; padding: 8px; background: rgba(123, 97, 255, 0.1); border-radius: 4px; font-size: 12px; color: #7b61ff; display: flex; align-items: center; gap: 8px;';
+            statusDiv.innerHTML = '<i data-lucide="brain" style="width: 14px; height: 14px;"></i> Claude is analyzing your changes to generate a semantic commit message...';
+            button.parentElement.appendChild(statusDiv);
             lucide.createIcons();
             
             try {
@@ -2929,16 +2938,29 @@ class TerminalManager {
                     setTimeout(() => {
                         messageTextarea.style.animation = '';
                     }, 500);
+                    
+                    // Show success briefly
+                    statusDiv.style.background = 'rgba(34, 197, 94, 0.1)';
+                    statusDiv.style.color = '#22c55e';
+                    statusDiv.innerHTML = '<i data-lucide="check-circle" style="width: 14px; height: 14px;"></i> Commit message generated successfully!';
+                    lucide.createIcons();
+                    
+                    // Remove status after a delay
+                    setTimeout(() => {
+                        statusDiv.remove();
+                    }, 2000);
                 } else {
                     this.showNotification(`Failed to generate commit message: ${result.error}`, 'error');
+                    statusDiv.remove();
                 }
             } catch (error) {
                 console.error('Error calling AI service:', error);
                 this.showNotification('Failed to connect to AI service', 'error');
+                statusDiv.remove();
             } finally {
                 // Restore button
                 button.disabled = false;
-                button.innerHTML = '<i data-lucide="sparkles"></i>';
+                button.innerHTML = originalButtonContent;
                 lucide.createIcons();
             }
         });
