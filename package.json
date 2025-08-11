@@ -43,6 +43,7 @@
   "build": {
     "appId": "com.codeagentswarm.app",
     "productName": "CodeAgentSwarm",
+    "afterSign": "./afterSign.js",
     "generateUpdatesFilesForAllChannels": false,
     "directories": {
       "output": "dist"
@@ -84,7 +85,9 @@
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "notarize": false,
+      "notarize": {
+        "teamId": "${env.APPLE_TEAM_ID}"
+      },
       "electronUpdaterCompatibility": ">=2.16"
     },
     "dmg": {
