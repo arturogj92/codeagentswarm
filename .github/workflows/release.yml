@@ -173,13 +173,33 @@ jobs:
           VERSION="${{ needs.calculate-version.outputs.new_version }}"
           
           if [ "${{ matrix.platform }}" = "darwin" ]; then
-            # Prioritize ZIP files for auto-updates
-            FILE=$(find dist -name "*.zip" | grep -v blockmap | head -1)
-            if [ -z "$FILE" ]; then
-              # Fallback to DMG if no ZIP found
-              FILE=$(find dist -name "*.dmg" | head -1)
+            # For macOS, we need both ZIP (for auto-updates) and DMG (for manual download)
+            ZIP_FILE=$(find dist -name "*.zip" | grep -v blockmap | head -1)
+            DMG_FILE=$(find dist -name "*.dmg" | head -1)
+            
+            # Primary file is ZIP for auto-updates
+            if [ -n "$ZIP_FILE" ]; then
+              FILE="$ZIP_FILE"
+              EXT="zip"
+            elif [ -n "$DMG_FILE" ]; then
+              FILE="$DMG_FILE"
+              EXT="dmg"
             fi
-            EXT="${FILE##*.}"
+            
+            # Store DMG info for second upload
+            if [ -n "$DMG_FILE" ]; then
+              echo "dmg_file=$DMG_FILE" >> $GITHUB_OUTPUT
+              DMG_FILENAME="CodeAgentSwarm-${VERSION}-${{ matrix.platform }}-${{ matrix.arch }}.dmg"
+              echo "dmg_filename=$DMG_FILENAME" >> $GITHUB_OUTPUT
+              if command -v shasum >/dev/null 2>&1; then
+                DMG_SHA512=$(shasum -a 512 "$DMG_FILE" | cut -d' ' -f1)
+              else
+                DMG_SHA512=$(sha512sum "$DMG_FILE" | cut -d' ' -f1)
+              fi
+              echo "dmg_sha512=$DMG_SHA512" >> $GITHUB_OUTPUT
+              DMG_FILESIZE=$(stat -f%z "$DMG_FILE" 2>/dev/null || stat -c%s "$DMG_FILE")
+              echo "dmg_filesize=$DMG_FILESIZE" >> $GITHUB_OUTPUT
+            fi
           elif [ "${{ matrix.platform }}" = "win32" ]; then
             FILE=$(find dist -name "*.exe" | grep -v "blockmap" | head -1)
             EXT="exe"
@@ -359,6 +379,92 @@ jobs:
             fi
           else
             echo "Release registered successfully in database"
+          fi
+      
+      - name: Upload DMG to Supabase (macOS only)
+        if: matrix.platform == 'darwin' && steps.release_info.outputs.dmg_file != ''
+        shell: bash
+        run: |
+          echo "Uploading DMG for manual distribution..."
+          
+          # Upload DMG file to Supabase Storage
+          DMG_UPLOAD_PATH="releases/${{ matrix.platform }}/${{ matrix.arch }}/${{ steps.release_info.outputs.version }}/${{ steps.release_info.outputs.dmg_filename }}"
+          
+          echo "Uploading DMG to Supabase Storage at path: $DMG_UPLOAD_PATH"
+          echo "DMG file size: ${{ steps.release_info.outputs.dmg_filesize }} bytes ($((${{ steps.release_info.outputs.dmg_filesize }} / 1024 / 1024)) MB)"
+          
+          # First, try to delete existing DMG if it exists
+          echo "Checking if DMG already exists..."
+          DELETE_RESPONSE=$(curl -X DELETE \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$DMG_UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -w "\n%{http_code}" 2>/dev/null || true)
+          
+          DELETE_STATUS=$(echo "$DELETE_RESPONSE" | tail -n 1)
+          if [ "$DELETE_STATUS" = "200" ]; then
+            echo "Existing DMG deleted successfully"
+          else
+            echo "No existing DMG to delete or delete failed (status: $DELETE_STATUS)"
+          fi
+          
+          # Upload DMG
+          UPLOAD_RESPONSE=$(curl -X POST \
+            "${{ secrets.SUPABASE_URL }}/storage/v1/object/releases/$DMG_UPLOAD_PATH" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+            -H "Content-Type: application/x-apple-diskimage" \
+            -H "Cache-Control: public, max-age=31536000" \
+            --data-binary "@${{ steps.release_info.outputs.dmg_file }}" \
+            -w "\n%{http_code}")
+          
+          HTTP_STATUS=$(echo "$UPLOAD_RESPONSE" | tail -n 1)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          
+          if [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "DMG upload failed with status $HTTP_STATUS"
+            echo "Response: $RESPONSE_BODY"
+            # Don't fail the build if DMG upload fails
+            echo "Warning: DMG upload failed, but continuing with build"
+          else
+            # Get public URL for DMG
+            DMG_PUBLIC_URL="${{ secrets.SUPABASE_URL }}/storage/v1/object/public/releases/$DMG_UPLOAD_PATH"
+            echo "DMG uploaded successfully. Public URL: $DMG_PUBLIC_URL"
+            
+            # Insert DMG release record into database
+            DMG_RELEASE_DATA=$(cat <<EOF
+          {
+            "version": "${{ steps.release_info.outputs.version }}",
+            "platform": "${{ matrix.platform }}",
+            "arch": "${{ matrix.arch }}",
+            "file_name": "${{ steps.release_info.outputs.dmg_filename }}",
+            "file_url": "$DMG_PUBLIC_URL",
+            "file_size": ${{ steps.release_info.outputs.dmg_filesize }},
+            "sha512": "${{ steps.release_info.outputs.dmg_sha512 }}",
+            "release_notes": "DMG for manual installation - Release ${{ steps.release_info.outputs.version }}",
+            "is_manual_download": true
+          }
+          EOF
+          )
+            
+            echo "Inserting DMG release record into database..."
+            DB_RESPONSE=$(curl -X POST \
+              "${{ secrets.SUPABASE_URL }}/rest/v1/releases" \
+              -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              -H "apikey: ${{ secrets.SUPABASE_SERVICE_KEY }}" \
+              -H "Content-Type: application/json" \
+              -H "Prefer: return=minimal" \
+              -d "$DMG_RELEASE_DATA" \
+              -w "\n%{http_code}")
+            
+            DB_HTTP_STATUS=$(echo "$DB_RESPONSE" | tail -n 1)
+            
+            if [ "$DB_HTTP_STATUS" -ne 201 ] && [ "$DB_HTTP_STATUS" -ne 200 ]; then
+              echo "DMG database insert failed with status $DB_HTTP_STATUS"
+              echo "Warning: DMG database insert failed, but DMG is uploaded to storage"
+            else
+              echo "DMG release registered successfully in database"
+            fi
           fi
       
       - name: Create GitHub Release
