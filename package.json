@@ -85,7 +85,9 @@
       "gatekeeperAssess": false,
       "entitlements": "entitlements.mac.plist",
       "entitlementsInherit": "entitlements.mac.plist",
-      "notarize": false,
+      "notarize": {
+        "teamId": "${env.APPLE_TEAM_ID}"
+      },
       "electronUpdaterCompatibility": ">=2.16"
     },
     "dmg": {
