@@ -552,11 +552,16 @@ class SimpleShell {
     this.cwd = workingDir;
     this.buffer = '';
     this.currentLine = '';
+    this.cursorPosition = 0;
     this.history = [];
-    this.historyIndex = -1;
+    this.historyIndex = 0;
     this.ready = true;
     this.isActive = true; // Add flag to track if terminal is active
     this.sessionType = sessionType;
+    this.shellEnv = null; // Cache for shell environment
+    this.shellConfigFile = null; // Cache for shell config file path
+    this.codeAgentSwarmConfig = null; // Cache for CodeAgentSwarm config file path
+    this.initializeShellConfig();
     
     // Set environment variables for this quadrant globally (1-based)
     process.env[`CODEAGENTSWARM_QUADRANT_${quadrant + 1}`] = 'true';
@@ -564,6 +569,103 @@ class SimpleShell {
     
     // Don't show any output initially - let Claude handle all output when it loads
     // Terminal remains blank until Claude is ready
+  }
+
+  initializeShellConfig() {
+    // Detect and cache shell configuration file
+    const userShell = db.getUserShell();
+    
+    if (userShell.includes('zsh')) {
+      this.shellConfigFile = path.join(os.homedir(), '.zshrc');
+    } else if (userShell.includes('bash')) {
+      // Check for .bash_profile first, then .bashrc
+      const bashProfile = path.join(os.homedir(), '.bash_profile');
+      const bashrc = path.join(os.homedir(), '.bashrc');
+      if (fs.existsSync(bashProfile)) {
+        this.shellConfigFile = bashProfile;
+      } else if (fs.existsSync(bashrc)) {
+        this.shellConfigFile = bashrc;
+      }
+    }
+    
+    console.log(`Shell config file detected for terminal ${this.quadrant}: ${this.shellConfigFile}`);
+    
+    // Initialize CodeAgentSwarm's own shell configuration
+    this.initializeCodeAgentSwarmConfig();
+    
+    // Cache important paths from shell environment
+    this.cachedPaths = this.getShellPaths();
+  }
+  
+  initializeCodeAgentSwarmConfig() {
+    // Create our own config file to avoid modifying user's shell config
+    const configDir = path.join(os.homedir(), '.codeagentswarm');
+    const configFile = path.join(configDir, 'shell-config.sh');
+    
+    try {
+      // Create directory if it doesn't exist
+      if (!fs.existsSync(configDir)) {
+        fs.mkdirSync(configDir, { recursive: true });
+        console.log(`Created CodeAgentSwarm config directory: ${configDir}`);
+      }
+      
+      // Create/update our shell configuration
+      const configContent = `#!/bin/bash
+# CodeAgentSwarm Shell Configuration
+# This file is automatically sourced before command execution
+# It optimizes the terminal behavior without modifying user's shell config
+
+# Detect if we're in a CodeAgentSwarm terminal
+if [[ -n "$CODEAGENTSWARM_CURRENT_QUADRANT" ]]; then
+    # For zsh: Disable job notifications to prevent [1] 12345 messages
+    if [[ -n "$ZSH_VERSION" ]]; then
+        unsetopt NOTIFY 2>/dev/null || true
+        unsetopt MONITOR 2>/dev/null || true
+        # Also ensure aliases are enabled
+        setopt ALIASES 2>/dev/null || true
+    fi
+    
+    # For bash: Disable job control notifications
+    if [[ -n "$BASH_VERSION" ]]; then
+        set +m 2>/dev/null || true
+        # Ensure aliases are expanded
+        shopt -s expand_aliases 2>/dev/null || true
+    fi
+fi
+
+# Load any user's custom CodeAgentSwarm settings if they exist
+if [[ -f "$HOME/.codeagentswarm/user-config.sh" ]]; then
+    source "$HOME/.codeagentswarm/user-config.sh"
+fi
+`;
+
+      // Write the config file
+      fs.writeFileSync(configFile, configContent, { mode: 0o755 });
+      this.codeAgentSwarmConfig = configFile;
+      console.log(`CodeAgentSwarm shell config initialized: ${configFile}`);
+      
+    } catch (error) {
+      console.error('Failed to initialize CodeAgentSwarm config:', error);
+      // Not critical - app will work without this
+      this.codeAgentSwarmConfig = null;
+    }
+  }
+  
+  getShellPaths() {
+    // Get PATH from a login shell to cache it
+    try {
+      const userShell = db.getUserShell();
+      const result = require('child_process').execSync(
+        `${userShell} -l -c 'echo $PATH'`,
+        { encoding: 'utf8', timeout: 2000 }
+      ).trim();
+      
+      console.log(`Cached PATH for terminal ${this.quadrant}`);
+      return result;
+    } catch (e) {
+      console.log(`Failed to cache PATH for terminal ${this.quadrant}, using default`);
+      return process.env.PATH;
+    }
   }
   
   sendOutput(data) {
@@ -583,8 +685,8 @@ class SimpleShell {
       console.warn(`Terminal ${this.quadrant} has null cwd, skipping prompt`);
       return;
     }
-    const promptText = `\x1b[32m➜\x1b[0m  \x1b[36m${path.basename(this.cwd)}\x1b[0m $ `;
-    this.sendOutput(promptText);
+    this.prompt = `\x1b[32m➜\x1b[0m  \x1b[36m${path.basename(this.cwd)}\x1b[0m $ `;
+    this.sendOutput(this.prompt);
   }
   
   
@@ -597,12 +699,20 @@ class SimpleShell {
     
     // If we have an active interactive process, send input directly to it
     if (this.activeInteractiveProcess) {
+      // Debug: Log when sending to interactive process
+      console.log(`[DEBUG] Sending to interactive process: ${JSON.stringify(data)}`);
       // Write directly to the PTY process
       if (typeof this.activeInteractiveProcess.write === 'function') {
         this.activeInteractiveProcess.write(data);
       } else if (this.activeInteractiveProcess.stdin) {
         this.activeInteractiveProcess.stdin.write(data);
       }
+      return;
+    }
+    
+    // Check for ANSI escape sequences (arrow keys, etc.)
+    if (data.startsWith('\x1b[') || data.startsWith('\x1b')) {
+      this.handleEscapeSequence(data);
       return;
     }
     
@@ -615,19 +725,82 @@ class SimpleShell {
         this.sendOutput('\r\n');
         this.executeCommand(this.currentLine.trim());
         this.currentLine = '';
+        this.cursorPosition = 0;
       } else if (charCode === 127 || charCode === 8) { // Backspace
-        if (this.currentLine.length > 0) {
-          this.currentLine = this.currentLine.slice(0, -1);
-          this.sendOutput('\b \b'); // Move back, write space, move back again
+        if (this.cursorPosition > 0) {
+          // Remove character at cursor position
+          this.currentLine = this.currentLine.slice(0, this.cursorPosition - 1) + 
+                            this.currentLine.slice(this.cursorPosition);
+          this.cursorPosition--;
+          // Redraw the line
+          this.redrawLine();
         }
       } else if (charCode === 3) { // Ctrl+C
         this.sendOutput('^C\r\n');
         this.currentLine = '';
+        this.cursorPosition = 0;
         this.sendPrompt();
       } else if (charCode >= 32 && charCode <= 126) { // Printable characters
-        this.currentLine += char;
-        this.sendOutput(char); // Echo the character
+        // Insert character at cursor position
+        this.currentLine = this.currentLine.slice(0, this.cursorPosition) + 
+                          char + 
+                          this.currentLine.slice(this.cursorPosition);
+        this.cursorPosition++;
+        // Redraw the line
+        this.redrawLine();
       }
+    }
+  }
+  
+  handleEscapeSequence(data) {
+    // Handle arrow keys and other escape sequences
+    if (data === '\x1b[A' || data === '\x1bOA') { // Up arrow
+      if (this.historyIndex > 0) {
+        this.historyIndex--;
+        this.currentLine = this.history[this.historyIndex] || '';
+        this.cursorPosition = this.currentLine.length;
+        this.redrawLine();
+      }
+    } else if (data === '\x1b[B' || data === '\x1bOB') { // Down arrow
+      if (this.historyIndex < this.history.length - 1) {
+        this.historyIndex++;
+        this.currentLine = this.history[this.historyIndex] || '';
+        this.cursorPosition = this.currentLine.length;
+        this.redrawLine();
+      } else {
+        this.historyIndex = this.history.length;
+        this.currentLine = '';
+        this.cursorPosition = 0;
+        this.redrawLine();
+      }
+    } else if (data === '\x1b[C' || data === '\x1bOC') { // Right arrow
+      if (this.cursorPosition < this.currentLine.length) {
+        this.cursorPosition++;
+        this.sendOutput('\x1b[C'); // Move cursor right
+      }
+    } else if (data === '\x1b[D' || data === '\x1bOD') { // Left arrow
+      if (this.cursorPosition > 0) {
+        this.cursorPosition--;
+        this.sendOutput('\x1b[D'); // Move cursor left
+      }
+    } else if (data === '\x1b[H' || data === '\x1b[1~') { // Home
+      this.cursorPosition = 0;
+      this.redrawLine();
+    } else if (data === '\x1b[F' || data === '\x1b[4~') { // End
+      this.cursorPosition = this.currentLine.length;
+      this.redrawLine();
+    }
+  }
+  
+  redrawLine() {
+    // Clear current line and redraw
+    this.sendOutput('\r\x1b[K'); // Move to start and clear line
+    this.sendOutput(this.prompt);
+    this.sendOutput(this.currentLine);
+    // Position cursor correctly
+    const moveBack = this.currentLine.length - this.cursorPosition;
+    if (moveBack > 0) {
+      this.sendOutput(`\x1b[${moveBack}D`); // Move cursor back
     }
   }
   
@@ -638,6 +811,7 @@ class SimpleShell {
     }
     
     this.history.push(command);
+    this.historyIndex = this.history.length;
     
     // Handle built-in commands
     if (command === 'clear') {
@@ -712,58 +886,66 @@ class SimpleShell {
     // For interactive commands like claude code, use script to create a PTY
     // Check if it's claude (including full paths)
     const isClaudeCommand = cmd === 'claude' || cmd.includes('claude') || cmd.includes('.nvm');
-    const isInteractiveCommand = isClaudeCommand || cmd === 'vim' || cmd === 'nano';
+    // Also include shell functions like nvm, rbenv, pyenv that need shell context
+    const isShellFunction = ['nvm', 'rbenv', 'pyenv', 'jenv', 'nodenv', 'volta'].includes(cmd);
+    // IMPORTANT: Always use PTY for all commands to support aliases and shell features
+    // This ensures .zshrc/.bashrc is loaded and aliases work
+    const isInteractiveCommand = true; // Force PTY for all commands
     
     let childProcess;
     if (isInteractiveCommand) {
       // Create a real PTY using node-pty for interactive commands
-      const env = { ...process.env };
-      if (app.isPackaged) {
-        // Add directories to PATH for packaged app
-        const additionalPaths = [
-          '/usr/local/bin',
-          '/opt/homebrew/bin',
-          '/usr/bin',
-          path.join(os.homedir(), '.local/bin'),
-          path.join(os.homedir(), '.volta/bin'), // Volta
-          path.join(os.homedir(), 'bin') // Custom bin
-        ];
-        
-        // Dynamically add all nvm node versions to PATH
-        const nvmPath = path.join(os.homedir(), '.nvm/versions/node');
-        if (fs.existsSync(nvmPath)) {
-          try {
-            const nodeVersions = fs.readdirSync(nvmPath);
-            nodeVersions.forEach(version => {
-              additionalPaths.push(path.join(nvmPath, version, 'bin'));
-              additionalPaths.push(path.join(nvmPath, version, 'lib/node_modules/@anthropic-ai/claude-code/bin'));
-            });
-          } catch (e) {
-            console.log('Error adding nvm paths:', e);
-          }
-        }
-        
-        // Add yarn and pnpm global bin paths
-        try {
-          const yarnBin = require('child_process').execSync('yarn global bin', { encoding: 'utf8' }).trim();
-          if (yarnBin) additionalPaths.push(yarnBin);
-        } catch (e) {}
-        
-        try {
-          const pnpmBin = require('child_process').execSync('pnpm bin -g', { encoding: 'utf8' }).trim();
-          if (pnpmBin) additionalPaths.push(pnpmBin);
-        } catch (e) {}
+      // Use a minimal env to let the shell load its own configuration
+      const env = { 
+        // Start with clean environment
+        HOME: process.env.HOME,
+        USER: process.env.USER,
+        SHELL: userShell,
+        TERM: 'xterm-256color',
+        LANG: process.env.LANG || 'en_US.UTF-8',
+        LC_ALL: process.env.LC_ALL || 'en_US.UTF-8',
+        // Add quadrant identification (1-based)
+        [`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`]: 'true',
+        CODEAGENTSWARM_CURRENT_QUADRANT: (this.quadrant + 1).toString()
+      };
 
-        const currentPath = env.PATH || '';
-        env.PATH = [...additionalPaths, currentPath].join(':');
+      // Use cached shell configuration file
+      const shellConfigFile = this.shellConfigFile;
+
+      // Wrap command to ensure shell configuration is loaded
+      // IMPORTANT: Order matters! Load our config FIRST to set options, then user's config
+      let wrappedCommand = fullCommand;
+      
+      // Build the command in the correct order:
+      // 1. First load CodeAgentSwarm config to set shell options
+      // 2. Then load user's shell config for aliases
+      // 3. Finally execute the command
+      const configCommands = [];
+      
+      if (this.codeAgentSwarmConfig && fs.existsSync(this.codeAgentSwarmConfig)) {
+        configCommands.push(`source "${this.codeAgentSwarmConfig}" 2>/dev/null`);
+      }
+      
+      if (shellConfigFile && fs.existsSync(shellConfigFile)) {
+        configCommands.push(`source "${shellConfigFile}" 2>/dev/null`);
+      }
+      
+      if (configCommands.length > 0) {
+        wrappedCommand = `${configCommands.join('; ')}; ${fullCommand}`;
       }
 
-      // Add quadrant identification to environment (1-based)
-      env[`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`] = 'true';
-      env.CODEAGENTSWARM_CURRENT_QUADRANT = (this.quadrant + 1).toString();
-
-      childProcess = pty.spawn(userShell, ['-l', '-c', fullCommand], {
-        name: 'xterm-color',
+      // Now we can ALWAYS use interactive mode for all commands
+      // Our config will suppress job notifications
+      const shellArgs = isClaudeCommand 
+        ? ['-l', '-c', wrappedCommand]  // Claude: non-interactive (it handles its own terminal)
+        : ['-lic', wrappedCommand];      // Everything else: interactive (aliases work!)
+      
+      console.log(`[DEBUG] Command: "${cmd}", Mode: ${isClaudeCommand ? 'non-interactive (Claude)' : 'interactive (with job suppression)'}`);
+      console.log(`[DEBUG] CodeAgentSwarm config exists: ${this.codeAgentSwarmConfig && fs.existsSync(this.codeAgentSwarmConfig)}`);
+      console.log(`[DEBUG] Final wrapped command:`, wrappedCommand.substring(0, 300));
+      
+      childProcess = pty.spawn(userShell, shellArgs, {
+        name: 'xterm-256color',
         cwd: this.cwd,
         env: env,
         cols: 80,
@@ -773,24 +955,36 @@ class SimpleShell {
       // Mark this as active interactive process
       this.activeInteractiveProcess = childProcess;
       
-      // Disable bracketed paste mode to prevent ~200/~201 sequences
-      // Skip for claude commands as they handle this internally
-      if (!isClaudeCommand) {
-        childProcess.write('\x1b[?2004l');
-      }
+      // Only disable bracketed paste mode for non-Claude commands
+      // Claude handles its own terminal modes
+      console.log(`[DEBUG] Terminal ${this.quadrant}: isClaudeCommand=${isClaudeCommand}, command="${fullCommand}"`);
+      // REMOVED: Don't send any terminal init sequences - they appear in output
+      // The PTY will handle its own terminal modes
+      // Don't modify cursor modes - let the shell handle them naturally
     } else {
-      // Regular commands use the normal approach
-      childProcess = spawn(userShell, ['-l', '-c', fullCommand], {
+      // NOTE: This block is currently unreachable because isInteractiveCommand is always true
+      // Keeping it for potential future optimization if we want to selectively use PTY
+      // Regular commands - optimize for speed
+      // Only source config for commands that need it
+      let wrappedCommand = fullCommand;
+      
+      // Only wrap with shell config for commands that might need special paths
+      const needsShellConfig = ['npm', 'node', 'python', 'pip', 'ruby', 'gem', 'cargo', 'go'].some(
+        tool => cmd.includes(tool)
+      );
+      
+      if (needsShellConfig && this.shellConfigFile && fs.existsSync(this.shellConfigFile)) {
+        wrappedCommand = `source "${this.shellConfigFile}" 2>/dev/null && ${fullCommand}`;
+      }
+
+      // Use simple execution for better performance with cached PATH
+      childProcess = spawn(userShell, ['-c', wrappedCommand], {
         cwd: this.cwd,
         env: {
-          ...process.env,
-          PATH: process.env.PATH,
-          TERM: 'xterm-256color',
-          SHELL: userShell,
-          HOME: process.env.HOME,
+          ...process.env, // Use current process environment as base
+          PATH: this.cachedPaths || process.env.PATH, // Use cached PATH
           [`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`]: 'true',
           CODEAGENTSWARM_CURRENT_QUADRANT: (this.quadrant + 1).toString(),
-          USER: process.env.USER,
           FORCE_COLOR: '1',
           CLICOLOR: '1',
           CLICOLOR_FORCE: '1'
@@ -801,7 +995,25 @@ class SimpleShell {
     
     if (childProcess.onData) {
       childProcess.onData((data) => {
-        this.sendOutput(data);
+        // Filter out job notifications like [1] 12345
+        let dataStr = data.toString();
+        
+        // Split by lines and filter each line
+        const lines = dataStr.split(/\r?\n/);
+        const filteredLines = lines.filter(line => {
+          // Filter out job notifications: [1] 12345 or [1] + 12345 running...
+          if (/^\[\d+\][\s+-]*\d+/.test(line)) {
+            console.log(`[DEBUG] Filtered job notification: ${line}`);
+            return false;
+          }
+          return true;
+        });
+        
+        // Only send if there's content after filtering
+        if (filteredLines.length > 0 && filteredLines.some(line => line.trim())) {
+          const filteredData = filteredLines.join('\n');
+          this.sendOutput(filteredData);
+        }
       });
     } else {
       childProcess.stdout.on('data', (data) => {
@@ -818,6 +1030,17 @@ class SimpleShell {
 
     const exitHandler = (code) => {
       if (this.activeInteractiveProcess === childProcess) {
+        // Reset terminal state after interactive commands (especially Claude)
+        console.log(`[DEBUG] Resetting terminal state after interactive command exit (Claude or other)`);
+        
+        // Claude Code leaves the terminal in a bad state, we need to restart the shell
+        if (isClaudeCommand) {
+          console.log(`[DEBUG] Claude Code exited - need to restart shell for proper terminal state`);
+          
+          // Kill the current shell and restart it
+          this.restartShell();
+        }
+        
         this.activeInteractiveProcess = null;
       }
 
@@ -894,6 +1117,27 @@ class SimpleShell {
     this.killActiveProcess();
     // Clean up environment variables
     delete process.env[`CODEAGENTSWARM_QUADRANT_${this.quadrant + 1}`];
+  }
+  
+  restartShell() {
+    console.log(`[DEBUG] Restarting shell for terminal ${this.quadrant} to fix terminal state`);
+    
+    // Save current directory
+    const savedCwd = this.cwd;
+    
+    // Kill any active processes
+    this.killActiveProcess();
+    
+    // Clear the terminal
+    this.sendOutput('\x1b[2J\x1b[H'); // Clear screen and move cursor to top
+    
+    // Restore working directory
+    this.cwd = savedCwd;
+    
+    // Send a fresh prompt
+    this.sendPrompt();
+    
+    console.log(`[DEBUG] Shell restarted for terminal ${this.quadrant}`);
   }
 }
 
@@ -3203,12 +3447,16 @@ ipcMain.on('show-badge-notification', (event, message) => {
 
 ipcMain.on('show-desktop-notification', (event, title, message) => {
   if (Notification.isSupported()) {
+    // Use the app logo as notification icon
+    const iconPath = path.join(__dirname, 'logo_prod_512.png');
+    
     const notification = new Notification({
       title: title,
       body: message,
-      icon: path.join(__dirname, 'assets', 'icon.png'), // Optional: Add app icon
+      icon: iconPath,
       sound: true,
-      urgency: 'critical'
+      urgency: 'normal', // Changed from 'critical' to 'normal' for less intrusive notifications
+      timeoutType: 'default' // Auto-dismiss after system default timeout
     });
     
     notification.show();

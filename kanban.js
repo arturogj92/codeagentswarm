@@ -1145,7 +1145,12 @@ class KanbanManager {
             if (result.success) {
                 this.hideTaskModal();
                 await this.loadTasks();
-                // No notification when creating or updating tasks
+                
+                // Show notification for new tasks only (not updates)
+                if (!taskId) {
+                    const terminalInfo = terminalId ? ` for Terminal ${terminalId}` : '';
+                    this.showNotification(`New task created: "${title}"${terminalInfo}`, 'success');
+                }
             } else {
                 alert(`Failed to save task: ${result.error}`);
             }
@@ -1271,7 +1276,29 @@ class KanbanManager {
                     // Update counts
                     this.updateColumnCounts();
                     
-                    // Notifications removed for cleaner UX
+                    // Show desktop notification for important status changes
+                    if (oldStatus !== newStatus) {
+                        let notificationMessage = '';
+                        let notificationType = 'info';
+                        
+                        // Create meaningful notification messages
+                        if (newStatus === 'in_progress' && oldStatus === 'pending') {
+                            notificationMessage = `Task "${task.title}" started`;
+                            notificationType = 'info';
+                        } else if (newStatus === 'in_testing') {
+                            notificationMessage = `Task "${task.title}" is ready for testing`;
+                            notificationType = 'warning';
+                        } else if (newStatus === 'completed') {
+                            notificationMessage = `Task "${task.title}" completed! 🎉`;
+                            notificationType = 'success';
+                        } else if (newStatus === 'pending' && oldStatus !== 'pending') {
+                            notificationMessage = `Task "${task.title}" moved back to pending`;
+                            notificationType = 'warning';
+                        }
+                        
+                        // Only show notification for meaningful status changes
+                        // Eliminado - no mostrar notificaciones al mover tareas
+                    }
                 }
             } else {
                 alert(`Failed to update task status: ${result.error}`);
@@ -1525,11 +1552,30 @@ class KanbanManager {
     }
 
     showNotification(message, type = 'info') {
-        // You can implement a toast notification system here
-        // For now, we'll use a simple console log
+        // Console log for debugging
         console.log(`${type.toUpperCase()}: ${message}`);
         
-        // Show in-app notification
+        // Determine notification title based on type
+        let notificationTitle = 'CodeAgentSwarm';
+        switch(type) {
+            case 'success':
+                notificationTitle = '✅ Success';
+                break;
+            case 'error':
+                notificationTitle = '❌ Error';
+                break;
+            case 'warning':
+                notificationTitle = '⚠️ Warning';
+                break;
+            case 'info':
+                notificationTitle = 'ℹ️ Info';
+                break;
+        }
+        
+        // Send desktop notification for all types
+        ipcRenderer.send('show-desktop-notification', notificationTitle, message);
+        
+        // Also show in-app notification for errors
         if (type === 'error') {
             // Create a temporary error notification
             const notification = document.createElement('div');
@@ -1553,8 +1599,6 @@ class KanbanManager {
                 notification.style.animation = 'slideOut 0.3s ease';
                 setTimeout(() => notification.remove(), 300);
             }, 3000);
-        } else if (type === 'success') {
-            ipcRenderer.send('show-desktop-notification', 'Task Update', message);
         }
     }
     

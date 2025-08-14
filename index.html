@@ -32,6 +32,11 @@
             </div>
             <div class="header-controls">
                 <div class="terminal-management">
+                    <!-- Tabbed Layout Toggle Button (Hidden for now) -->
+                    <button class="btn btn-layout btn-tabbed-mode" id="tabbed-mode-btn" title="Tabbed Fullscreen Mode" style="display: none;">
+                        <i data-lucide="square-stack"></i>
+                    </button>
+                    
                     <div class="layout-selector" id="layout-selector" style="display: none;">
                         <!-- 2 terminals layouts -->
                         <div class="layout-group" id="layout-2-terminals" style="display: none;">
@@ -75,6 +80,21 @@
                 </button>
             </div>
         </header>
+
+        <!-- Tabbed Layout Container -->
+        <div class="tabbed-layout-container" id="tabbed-layout-container" style="display: none;">
+            <div class="terminal-tabs-bar">
+                <div class="terminal-tabs" id="terminal-tabs">
+                    <!-- Tabs will be dynamically generated here -->
+                </div>
+                <button class="btn-new-tab" id="new-tab-btn" title="New Terminal">
+                    <i data-lucide="plus"></i>
+                </button>
+            </div>
+            <div class="tabbed-terminal-content" id="tabbed-terminal-content">
+                <!-- Active terminal will be shown here -->
+            </div>
+        </div>
 
         <main class="terminals-container" id="terminals-container">
             <!-- Terminals will be dynamically generated here -->

@@ -6047,4 +6047,287 @@ textarea {
     border-radius: 0;
   }
 }
+
+/* ==================== TABBED LAYOUT STYLES ==================== */
+
+/* Container for the entire tabbed layout */
+.tabbed-layout-container {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 60px); /* Full height minus header */
+  background: var(--surface);
+}
+
+/* Tab bar container */
+.terminal-tabs-bar {
+  display: flex;
+  align-items: center;
+  background: #1a1a1f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0 10px;
+  height: 40px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+
+.terminal-tabs-bar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.terminal-tabs-bar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+}
+
+/* Tabs container */
+.terminal-tabs {
+  display: flex;
+  gap: 2px;
+  flex: 1;
+  align-items: center;
+}
+
+/* Individual tab styling - Chrome-like appearance */
+.terminal-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 28px 8px 12px;
+  background: #2a2a32;
+  border: none;
+  border-radius: 8px 8px 0 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  cursor: pointer;
+  min-width: 150px;
+  max-width: 250px;
+  transition: all 0.2s ease;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+
+.terminal-tab:hover {
+  background: #35353f;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* Active tab */
+.terminal-tab.active {
+  background: var(--surface);
+  color: white;
+  z-index: 2;
+}
+
+.terminal-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--primary);
+}
+
+/* Tab content */
+.terminal-tab-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Terminal number badge */
+.tab-terminal-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 4px;
+  background: rgba(127, 90, 240, 0.2);
+  color: var(--primary);
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.terminal-tab.active .tab-terminal-number {
+  background: var(--primary);
+  color: white;
+}
+
+/* Tab title */
+.tab-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Activity spinner */
+.tab-activity-spinner {
+  display: none;
+  width: 14px;
+  height: 14px;
+  border: 2px solid transparent;
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: tabSpinner 0.8s linear infinite;
+}
+
+.terminal-tab.working .tab-activity-spinner {
+  display: block;
+}
+
+@keyframes tabSpinner {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Close button */
+.tab-close-btn {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.2s ease;
+  opacity: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.terminal-tab:hover .tab-close-btn {
+  opacity: 1;
+}
+
+.tab-close-btn:hover {
+  background: rgba(255, 0, 0, 0.2);
+  color: #ff4444;
+}
+
+/* Notification glow effect */
+.terminal-tab.notification {
+  animation: tabGlow 1.5s ease-in-out infinite;
+}
+
+@keyframes tabGlow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 20px 2px var(--accent);
+    background: rgba(255, 137, 6, 0.1);
+  }
+}
+
+/* New tab button */
+.btn-new-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 8px;
+}
+
+.btn-new-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+/* Tabbed terminal content area */
+.tabbed-terminal-content {
+  flex: 1;
+  position: relative;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.tabbed-terminal-content .terminal-quadrant {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: none;
+  flex-direction: column;
+  border: none;
+  border-radius: 0;
+  margin: 0;
+}
+
+.tabbed-terminal-content .terminal-quadrant.active {
+  display: flex;
+}
+
+/* Fullscreen terminal adjustments */
+.tabbed-terminal-content .terminal-wrapper {
+  flex: 1;
+  position: relative;
+}
+
+.tabbed-terminal-content .terminal {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+/* Hide grid layout controls in tabbed mode */
+.tabbed-layout-active .layout-selector {
+  display: none !important;
+}
+
+/* Hide reorder and fullscreen buttons in tabbed mode */
+.tabbed-layout-active .terminal-reorder-controls {
+  display: none !important;
+}
+
+.tabbed-layout-active .terminal-control-btn[data-action="fullscreen"] {
+  display: none !important;
+}
+
+.tabbed-layout-active .terminal-control-btn[data-action="close"] {
+  display: none !important;
+}
+
+/* Highlight tabbed mode button when active */
+.btn-tabbed-mode.active {
+  background: var(--primary);
+  color: white;
+}
+
+/* Drag and drop styles for tab reordering */
+.terminal-tab.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.terminal-tab.drag-over {
+  background: rgba(127, 90, 240, 0.2);
+}
 EOF < /dev/null

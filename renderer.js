@@ -22,6 +22,8 @@ class TerminalManager {
         this.activeTerminal = null;
         this.fullscreenTerminal = null;
         this.currentLayout = 'horizontal'; // Default layout for 2 terminals
+        this.layoutMode = 'grid'; // 'grid' or 'tabbed'
+        this.activeTabTerminal = null; // Currently active terminal in tabbed mode
         this.visualOrder = null; // Track visual order after swaps
         this.lastSelectedDirectories = {}; // Initialize empty, will load async
         this.notificationBlocked = new Map(); // Block notifications until user interaction
@@ -33,6 +35,7 @@ class TerminalManager {
         this.terminalsNeedingAttention = new Set(); // Track terminals that need user attention
         this.isChangingLayout = false; // Flag to prevent re-parsing during layout changes
         this.hooksStatus = { installed: false, webhookRunning: false }; // Track hooks status
+        this.terminalActivity = new Map(); // Track activity state for each terminal
         
         this.init();
         // Load directories asynchronously with error handling
@@ -189,6 +192,16 @@ class TerminalManager {
             this.addTerminal();
         });
 
+        // Tabbed mode button
+        document.getElementById('tabbed-mode-btn').addEventListener('click', () => {
+            this.toggleLayoutMode();
+        });
+
+        // New tab button in tabbed mode
+        document.getElementById('new-tab-btn').addEventListener('click', () => {
+            this.addTerminal();
+        });
+
         // Layout selector event listeners for 2 terminals
         document.getElementById('layout-horizontal-btn').addEventListener('click', () => {
             this.setLayout('horizontal');
@@ -286,9 +299,40 @@ class TerminalManager {
             // Handle Cmd+1-6 for switching terminals
             if (e.metaKey && e.key >= '1' && e.key <= '6') {
                 const terminalId = parseInt(e.key) - 1; // Convert to 0-based index
+                
+                // In tabbed mode, switch tabs
+                if (this.layoutMode === 'tabbed') {
+                    if (this.terminals.has(terminalId)) {
+                        this.switchToTab(terminalId);
+                        e.preventDefault();
+                    }
+                    return;
+                }
+                
+                // In grid mode, focus terminal
                 if (this.terminals.has(terminalId)) {
                     this.setActiveTerminal(terminalId);
                     e.preventDefault();
+                }
+                return false;
+            }
+            
+            // Handle Ctrl+Tab / Ctrl+Shift+Tab for cycling through tabs in tabbed mode
+            if (this.layoutMode === 'tabbed' && e.ctrlKey && e.key === 'Tab') {
+                e.preventDefault();
+                const activeTerminals = Array.from(this.terminals.keys()).sort((a, b) => a - b);
+                const currentIndex = activeTerminals.indexOf(this.activeTabTerminal);
+                
+                if (currentIndex !== -1 && activeTerminals.length > 1) {
+                    let nextIndex;
+                    if (e.shiftKey) {
+                        // Previous tab
+                        nextIndex = currentIndex === 0 ? activeTerminals.length - 1 : currentIndex - 1;
+                    } else {
+                        // Next tab
+                        nextIndex = (currentIndex + 1) % activeTerminals.length;
+                    }
+                    this.switchToTab(activeTerminals[nextIndex]);
                 }
                 return false;
             }
@@ -825,7 +869,19 @@ class TerminalManager {
     }
 
     async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
-        const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+        // In tabbed mode, we need to handle this differently
+        let quadrantElement;
+        if (this.layoutMode === 'tabbed') {
+            quadrantElement = document.querySelector(`.tabbed-terminal-content [data-quadrant="${quadrant}"]`);
+        } else {
+            quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+        }
+        
+        if (!quadrantElement) {
+            console.error(`Terminal element not found for quadrant ${quadrant}`);
+            return;
+        }
+        
         const wrapper = quadrantElement.querySelector('.terminal-wrapper');
         const placeholder = wrapper.querySelector('.terminal-placeholder');
         
@@ -910,8 +966,15 @@ class TerminalManager {
             allowTransparency: true,
             cols: 100,
             rows: 30,
-            // Disable bracketed paste mode to prevent ~200/~201 escape sequences
-            bracketedPasteMode: false
+            // Terminal behavior settings
+            macOptionIsMeta: true,
+            macOptionClickForcesSelection: true,
+            rightClickSelectsWord: false,
+            // Ensure proper handling of special keys
+            convertEol: true,
+            windowsMode: false,
+            // Force terminal to send correct escape sequences
+            termName: 'xterm-256color'
         });
 
         const fitAddon = new FitAddon();
@@ -981,9 +1044,20 @@ class TerminalManager {
         // Focus the terminal
         terminal.focus();
         
-        // Handle terminal input with debug
+        // DEBUG: Confirm no custom key handler
+        console.log(`[DEBUG] Terminal ${quadrant}: No custom arrow key handler - letting xterm.js handle naturally`);
+        
+        // Handle terminal input - let xterm.js handle everything naturally
         terminal.onData(data => {
-            ipcRenderer.send('terminal-input', quadrant, data);
+            // Filter out bracketed paste sequences from input
+            let filteredData = data;
+            
+            // Remove bracketed paste markers if present
+            filteredData = filteredData.replace(/\x1b\[200~/g, '');
+            filteredData = filteredData.replace(/\x1b\[201~/g, '');
+            
+            // Send filtered data
+            ipcRenderer.send('terminal-input', quadrant, filteredData);
             
             // Block notifications temporarily when user is typing
             this.blockNotificationsWhileTyping(quadrant);
@@ -1073,7 +1147,29 @@ class TerminalManager {
 
         // Handle terminal output
         ipcRenderer.on(`terminal-output-${quadrant}`, (event, data) => {
-            terminal.write(data);
+            // Filter out problematic escape sequences
+            let filteredData = data;
+            
+            // Remove bracketed paste mode sequences if they appear
+            filteredData = filteredData.replace(/\x1b\[\?2004[hl]/g, '');
+            
+            // Write filtered data to terminal
+            terminal.write(filteredData);
+            
+            // Set terminal activity for spinner in tabbed mode
+            this.setTerminalActivity(quadrant, true);
+            
+            // Clear activity after a short delay
+            if (this.activityTimers && this.activityTimers.has(quadrant)) {
+                clearTimeout(this.activityTimers.get(quadrant));
+            }
+            if (!this.activityTimers) {
+                this.activityTimers = new Map();
+            }
+            const timer = setTimeout(() => {
+                this.setTerminalActivity(quadrant, false);
+            }, 500);
+            this.activityTimers.set(quadrant, timer);
             
             // Auto-scroll on certain patterns
             const dataStr = data.toString();
@@ -1199,17 +1295,41 @@ class TerminalManager {
         setTimeout(() => {
             this.updateBranchDisplay(quadrant);
         }, 2000);
+        
+        // If in tabbed mode, refresh the tabs to show the new terminal is active
+        if (this.layoutMode === 'tabbed') {
+            setTimeout(async () => {
+                const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                if (activeResult.success) {
+                    this.renderTabbedLayout(activeResult.terminals);
+                }
+            }, 500);
+        }
 
     }
 
 
     highlightTerminal(quadrant) {
-        const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
-        if (terminalElement) {
-            terminalElement.classList.add('confirmation-highlight');
-            setTimeout(() => {
-                terminalElement.classList.remove('confirmation-highlight');
-            }, 3000);
+        // In tabbed mode, show notification on tab
+        if (this.layoutMode === 'tabbed') {
+            this.showTerminalNotification(quadrant);
+            // Switch to the tab if it's not active
+            if (this.activeTabTerminal !== quadrant) {
+                // Just show notification, don't auto-switch
+                const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"]`);
+                if (tab) {
+                    tab.classList.add('notification');
+                }
+            }
+        } else {
+            // Grid mode - highlight the terminal element
+            const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+            if (terminalElement) {
+                terminalElement.classList.add('confirmation-highlight');
+                setTimeout(() => {
+                    terminalElement.classList.remove('confirmation-highlight');
+                }, 3000);
+            }
         }
     }
 
@@ -1370,6 +1490,14 @@ class TerminalManager {
     }
 
     highlightTerminalForConfirmation(quadrant) {
+        // In tabbed mode, show notification on tab
+        if (this.layoutMode === 'tabbed') {
+            this.showTerminalNotification(quadrant);
+            this.highlightedTerminal = quadrant;
+            return;
+        }
+        
+        // Grid mode - existing behavior
         const terminalElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         if (terminalElement) {
             // Add pulsing highlight effect
@@ -1432,11 +1560,27 @@ class TerminalManager {
     }
 
     updateTerminalTitle(quadrant, title) {
+        // Update grid mode terminal title
         const titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
         if (titleElement) {
             // Add terminal number before the title
             const terminalNumber = quadrant + 1;
             titleElement.textContent = `${terminalNumber} · ${title}`;
+        }
+        
+        // Update tabbed mode tab title and refresh to apply colors
+        if (this.layoutMode === 'tabbed') {
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"] .tab-title`);
+            if (tab) {
+                tab.textContent = title;
+            }
+            // Refresh tabs to update colors
+            setTimeout(async () => {
+                const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                if (activeResult.success) {
+                    this.renderTabbedLayout(activeResult.terminals);
+                }
+            }, 100);
         }
         
         // Update terminal header color based on project
@@ -1506,26 +1650,26 @@ class TerminalManager {
 
     // Update terminal header color based on project
     updateTerminalHeaderColor(quadrant) {
+        // Update grid mode header
         const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
-        if (!terminalHeader) return;
-        
-        // Only apply colors if terminal is actually running
-        if (!this.terminals.has(quadrant)) {
-            // Reset to default colors for inactive terminals
-            terminalHeader.style.background = 'rgba(255, 255, 255, 0.03)';
-            terminalHeader.style.borderBottomColor = 'var(--border)';
-            terminalHeader.style.borderBottomWidth = '1px';
-            terminalHeader.style.boxShadow = '';
-            
-            const titleElement = terminalHeader.querySelector('.terminal-title');
-            if (titleElement) {
-                titleElement.style.background = '';
-                titleElement.style.webkitBackgroundClip = '';
-                titleElement.style.webkitTextFillColor = '';
-                titleElement.style.backgroundClip = '';
-                titleElement.style.color = 'var(--text-secondary)';
-                titleElement.style.fontWeight = '600';
-                titleElement.style.textShadow = '';
+        if (terminalHeader) {
+            // Only apply colors if terminal is actually running
+            if (!this.terminals.has(quadrant)) {
+                // Reset to default colors for inactive terminals
+                terminalHeader.style.background = 'rgba(255, 255, 255, 0.03)';
+                terminalHeader.style.borderBottomColor = 'var(--border)';
+                terminalHeader.style.borderBottomWidth = '1px';
+                terminalHeader.style.boxShadow = '';
+                
+                const titleElement = terminalHeader.querySelector('.terminal-title');
+                if (titleElement) {
+                    titleElement.style.background = '';
+                    titleElement.style.webkitBackgroundClip = '';
+                    titleElement.style.webkitTextFillColor = '';
+                    titleElement.style.backgroundClip = '';
+                    titleElement.style.color = 'var(--text-secondary)';
+                    titleElement.style.fontWeight = '600';
+                    titleElement.style.textShadow = '';
                 titleElement.style.filter = '';
             }
             return;
@@ -1606,6 +1750,18 @@ class TerminalManager {
             if (taskIndicator) {
                 taskIndicator.style.color = 'rgba(255, 255, 255, 0.7)';
             }
+        }
+        }
+        
+        // Update tab color if in tabbed mode
+        if (this.layoutMode === 'tabbed') {
+            // Simply re-render tabs to apply the new colors
+            setTimeout(async () => {
+                const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                if (activeResult.success) {
+                    this.renderTabbedLayout(activeResult.terminals);
+                }
+            }, 100);
         }
     }
 
@@ -2492,7 +2648,7 @@ class TerminalManager {
                         <div class="form-group">
                             <label for="task-terminal">Terminal</label>
                             <select id="task-terminal">
-                                <option value="">No terminal assigned</option>
+                                <option value="">Terminal no seleccionado</option>
                                 ${Array.from(this.terminals.entries()).map(([quadrant, term]) => {
                                     const num = quadrant + 1;
                                     const isActive = activeTerminalId === quadrant;
@@ -4591,9 +4747,26 @@ class TerminalManager {
         try {
             const result = await ipcRenderer.invoke('add-terminal');
             if (result.success) {
+                // Get the new terminal ID from the result
+                const newTerminalId = result.terminalId;
+                
+                // Render based on current layout mode
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
-                // Sin notificación al añadir terminal
+                
+                // In tabbed mode, switch to the new terminal
+                if (this.layoutMode === 'tabbed' && newTerminalId !== undefined) {
+                    this.activeTabTerminal = newTerminalId;
+                    // Re-render tabbed layout to show new terminal
+                    const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                    if (activeResult.success) {
+                        this.renderTabbedLayout(activeResult.terminals);
+                        // Switch to the new tab
+                        setTimeout(() => {
+                            this.switchToTab(newTerminalId);
+                        }, 100);
+                    }
+                }
                 
                 // Reparar controles de todos los terminales después de re-renderizar
                 // Esto asegura que los botones de scroll se muestren correctamente
@@ -4685,6 +4858,18 @@ class TerminalManager {
             if (result.success) {
                 // Remove from local terminals map
                 this.terminals.delete(terminalId);
+                
+                // In tabbed mode, switch to another tab if removing the active one
+                if (this.layoutMode === 'tabbed' && this.activeTabTerminal === terminalId) {
+                    const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                    if (activeResult.success && activeResult.terminals.length > 0) {
+                        // Switch to first available terminal
+                        this.activeTabTerminal = activeResult.terminals[0];
+                    } else {
+                        this.activeTabTerminal = null;
+                    }
+                }
+                
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
                 
@@ -4694,6 +4879,7 @@ class TerminalManager {
                 }, 200);
                 
                 if (!silent) {
+                    // Notification removed as requested
                 }
             } else {
                 if (!silent) {
@@ -4725,10 +4911,16 @@ class TerminalManager {
                 return;
             }
 
-            const container = document.getElementById('terminals-container');
             const activeTerminals = activeResult.terminals;
-
             console.log(`📋 Found ${activeTerminals.length} active terminals:`, activeTerminals);
+
+            // If in tabbed mode, render tabbed layout instead
+            if (this.layoutMode === 'tabbed') {
+                this.renderTabbedLayout(activeTerminals);
+                return;
+            }
+
+            const container = document.getElementById('terminals-container');
 
             // Preserve existing terminal information before clearing
             const preservedInfo = {};
@@ -4786,8 +4978,8 @@ class TerminalManager {
             // Create terminal elements with resizers
             this.createTerminalLayoutWithResizers(container, activeTerminals);
 
-            // Restore preserved terminal information
-            console.log('🔄 Restoring terminal information...');
+            // Restore preserved terminal information and colors
+            console.log('🔄 Restoring terminal information and colors...');
             activeTerminals.forEach(terminalId => {
                 const info = preservedInfo[terminalId];
                 if (info) {
@@ -4795,11 +4987,11 @@ class TerminalManager {
                     if (info.title !== `Terminal ${terminalId + 1}`) {
                         this.updateTerminalTitle(terminalId, info.title);
                     }
-                    
-                    // Restore project styling if it existed
-                    if (info.directory && info.hasProjectStyling) {
-                        this.updateTerminalHeaderColor(terminalId);
-                    }
+                }
+                
+                // Always restore project styling if directory exists (whether info exists or not)
+                if (this.lastSelectedDirectories[terminalId]) {
+                    this.updateTerminalHeaderColor(terminalId);
                 }
             });
 
@@ -5074,6 +5266,337 @@ class TerminalManager {
             // Clear the flag after layout change is complete
             this.isChangingLayout = false;
         }, 200);
+    }
+
+    toggleLayoutMode() {
+        console.log('Toggling layout mode from:', this.layoutMode);
+        
+        if (this.layoutMode === 'grid') {
+            this.switchToTabbedMode();
+        } else {
+            this.switchToGridMode();
+        }
+    }
+
+    switchToTabbedMode() {
+        this.layoutMode = 'tabbed';
+        
+        // Hide grid container and show tabbed container
+        const gridContainer = document.getElementById('terminals-container');
+        const tabbedContainer = document.getElementById('tabbed-layout-container');
+        const tabbedBtn = document.getElementById('tabbed-mode-btn');
+        
+        gridContainer.style.display = 'none';
+        tabbedContainer.style.display = 'flex';
+        
+        // Update button state
+        tabbedBtn.classList.add('active');
+        document.body.classList.add('tabbed-layout-active');
+        
+        // Get first terminal as active if none selected
+        const activeResult = ipcRenderer.invoke('get-active-terminals').then(result => {
+            if (result.success && result.terminals.length > 0) {
+                if (!this.activeTabTerminal && result.terminals.length > 0) {
+                    this.activeTabTerminal = result.terminals[0];
+                }
+                this.renderTabbedLayout(result.terminals);
+            }
+        });
+    }
+
+    switchToGridMode() {
+        this.layoutMode = 'grid';
+        
+        // Show grid container and hide tabbed container
+        const gridContainer = document.getElementById('terminals-container');
+        const tabbedContainer = document.getElementById('tabbed-layout-container');
+        const tabbedBtn = document.getElementById('tabbed-mode-btn');
+        
+        gridContainer.style.display = '';
+        tabbedContainer.style.display = 'none';
+        
+        // Update button state
+        tabbedBtn.classList.remove('active');
+        document.body.classList.remove('tabbed-layout-active');
+        
+        // Re-render grid layout
+        this.renderTerminals().then(() => {
+            // After rendering, restore all terminal states
+            this.restoreAllTerminalStates();
+        });
+    }
+
+    restoreAllTerminalStates() {
+        console.log('Restoring all terminal states after mode switch...');
+        
+        // Get all active terminals
+        ipcRenderer.invoke('get-active-terminals').then(result => {
+            if (result.success && result.terminals) {
+                result.terminals.forEach(terminalId => {
+                    // Restore terminal title if it exists
+                    const terminal = this.terminals.get(terminalId);
+                    if (terminal && terminal.terminal) {
+                        const projectPath = this.lastSelectedDirectories[terminalId];
+                        if (projectPath) {
+                            const projectName = projectPath.split('/').pop() || projectPath;
+                            this.updateTerminalTitle(terminalId, projectName);
+                        }
+                    }
+                    
+                    // Restore header color
+                    if (this.lastSelectedDirectories[terminalId]) {
+                        this.updateTerminalHeaderColor(terminalId);
+                    }
+                    
+                    // Restore current task indicator
+                    const currentTaskElement = document.getElementById(`current-task-${terminalId}`);
+                    if (currentTaskElement && this.currentTasks[terminalId]) {
+                        const taskText = currentTaskElement.querySelector('.task-text');
+                        if (taskText) {
+                            taskText.textContent = this.currentTasks[terminalId];
+                            currentTaskElement.style.display = 'flex';
+                        }
+                    }
+                    
+                    // Restore git branch display
+                    this.updateGitBranchDisplay(terminalId);
+                });
+            }
+        });
+    }
+
+    renderTabbedLayout(activeTerminals) {
+        console.log('Rendering tabbed layout with terminals:', activeTerminals);
+        
+        const tabsContainer = document.getElementById('terminal-tabs');
+        const contentContainer = document.getElementById('tabbed-terminal-content');
+        
+        // Clear existing tabs and content
+        tabsContainer.innerHTML = '';
+        contentContainer.innerHTML = '';
+        
+        // Ensure we have an active tab
+        if (!this.activeTabTerminal && activeTerminals.length > 0) {
+            this.activeTabTerminal = activeTerminals[0];
+        }
+        
+        // Create tabs and terminal elements
+        activeTerminals.forEach(terminalId => {
+            // Create tab
+            const tab = this.createTerminalTab(terminalId);
+            tabsContainer.appendChild(tab);
+            
+            // Create terminal element
+            const terminalElement = this.createTerminalElement(terminalId);
+            if (terminalId === this.activeTabTerminal) {
+                terminalElement.classList.add('active');
+            }
+            contentContainer.appendChild(terminalElement);
+            
+            // Reattach terminal if it exists
+            const existingTerminal = this.terminals.get(terminalId);
+            if (existingTerminal && existingTerminal.terminal) {
+                setTimeout(() => {
+                    const terminalDiv = terminalElement.querySelector(`#terminal-${terminalId}`);
+                    if (terminalDiv && existingTerminal.terminal) {
+                        terminalDiv.style.display = 'block';
+                        existingTerminal.terminal.open(terminalDiv);
+                        if (existingTerminal.fitAddon) {
+                            existingTerminal.fitAddon.fit();
+                        }
+                    }
+                }, 0);
+            }
+        });
+        
+        // Attach tab event listeners
+        this.attachTabEventListeners();
+        
+        // Attach terminal event listeners (for placeholders, etc)
+        this.attachTerminalEventListeners();
+        
+        // Re-initialize icons
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+        
+        // Update task indicators
+        this.updateCurrentTaskIndicators();
+    }
+
+    createTerminalTab(terminalId) {
+        const tab = document.createElement('button');
+        tab.className = 'terminal-tab';
+        tab.dataset.terminalId = terminalId;
+        // Also add as attribute for easier CSS selection
+        tab.setAttribute('data-terminal-id', terminalId);
+        
+        if (terminalId === this.activeTabTerminal) {
+            tab.classList.add('active');
+        }
+        
+        // Check for activity or notifications
+        if (this.terminalActivity.get(terminalId)) {
+            tab.classList.add('working');
+        }
+        if (this.terminalsNeedingAttention.has(terminalId)) {
+            tab.classList.add('notification');
+        }
+        
+        // Get terminal title and apply project color
+        let title = `Terminal ${terminalId + 1}`;
+        let projectColor = null;
+        
+        // Only show project/task name if terminal is actually running
+        const terminal = this.terminals.get(terminalId);
+        if (terminal && terminal.terminal) {
+            // Terminal is active, check for task or directory
+            const currentTask = document.querySelector(`#current-task-${terminalId} .task-text`);
+            if (currentTask && currentTask.textContent) {
+                title = currentTask.textContent;
+                // Also try to get project color from directory
+                if (this.lastSelectedDirectories[terminalId]) {
+                    const dir = this.lastSelectedDirectories[terminalId];
+                    const projectName = dir.split('/').pop() || dir;
+                    // Get project color even when showing task
+                    if (this.customProjectColors[projectName]) {
+                        projectColor = this.customProjectColors[projectName];
+                    } else {
+                        const colors = this.generateProjectColor(projectName);
+                        projectColor = colors ? colors.primary : null;
+                    }
+                }
+            } else if (this.lastSelectedDirectories[terminalId]) {
+                const dir = this.lastSelectedDirectories[terminalId];
+                const projectName = dir.split('/').pop() || dir;
+                title = projectName;
+                
+                // Get or generate project color
+                if (this.customProjectColors[projectName]) {
+                    projectColor = this.customProjectColors[projectName];
+                } else {
+                    const colors = this.generateProjectColor(projectName);
+                    projectColor = colors ? colors.primary : null;
+                }
+            }
+            
+            console.log(`Tab ${terminalId}: title="${title}", projectColor="${projectColor}"`);
+        }
+        // If terminal is not active (placeholder), just show "Terminal X"
+        
+        tab.innerHTML = `
+            <div class="terminal-tab-content">
+                <span class="tab-terminal-number">${terminalId + 1}</span>
+                <span class="tab-title">${title}</span>
+                <div class="tab-activity-spinner"></div>
+            </div>
+            <button class="tab-close-btn" data-terminal="${terminalId}">
+                ×
+            </button>
+        `;
+        
+        // Apply color styles directly to the tab button
+        if (projectColor) {
+            console.log(`Applying color ${projectColor} to tab ${terminalId}`);
+            const tabNumber = tab.querySelector('.tab-terminal-number');
+            
+            // Apply gradient directly to the tab button
+            tab.style.background = `linear-gradient(135deg, ${projectColor}40 0%, ${projectColor}15 100%)`;
+            tab.style.borderLeft = `3px solid ${projectColor}`;
+            
+            if (tabNumber) {
+                tabNumber.style.background = `${projectColor}`;
+                tabNumber.style.color = 'white';
+                tabNumber.style.fontWeight = 'bold';
+            }
+        }
+        
+        return tab;
+    }
+
+    attachTabEventListeners() {
+        // Tab click to switch
+        document.querySelectorAll('.terminal-tab').forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                // Don't switch if clicking close button
+                if (e.target.classList.contains('tab-close-btn')) {
+                    return;
+                }
+                
+                const terminalId = parseInt(tab.dataset.terminalId);
+                this.switchToTab(terminalId);
+            });
+        });
+        
+        // Tab close buttons
+        document.querySelectorAll('.tab-close-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const terminalId = parseInt(btn.dataset.terminal);
+                this.closeTerminal(terminalId);
+            });
+        });
+    }
+
+    switchToTab(terminalId) {
+        if (this.activeTabTerminal === terminalId) return;
+        
+        console.log('Switching to tab:', terminalId);
+        this.activeTabTerminal = terminalId;
+        
+        // Update tab states
+        document.querySelectorAll('.terminal-tab').forEach(tab => {
+            const tabId = parseInt(tab.dataset.terminalId);
+            tab.classList.toggle('active', tabId === terminalId);
+        });
+        
+        // Update terminal visibility - use quadrant attribute which is what createTerminalElement sets
+        document.querySelectorAll('.tabbed-terminal-content .terminal-quadrant').forEach(terminal => {
+            const tId = parseInt(terminal.dataset.quadrant);
+            terminal.classList.toggle('active', tId === terminalId);
+        });
+        
+        // Clear notification state for this terminal
+        if (this.terminalsNeedingAttention.has(terminalId)) {
+            this.terminalsNeedingAttention.delete(terminalId);
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+            if (tab) {
+                tab.classList.remove('notification');
+            }
+        }
+        
+        // Resize terminal
+        const terminal = this.terminals.get(terminalId);
+        if (terminal && terminal.fitAddon) {
+            setTimeout(() => {
+                terminal.fitAddon.fit();
+            }, 100);
+        }
+    }
+
+    // Update existing methods to work with tabbed mode
+    setTerminalActivity(terminalId, isActive) {
+        this.terminalActivity.set(terminalId, isActive);
+        
+        // Update tab if in tabbed mode
+        if (this.layoutMode === 'tabbed') {
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+            if (tab) {
+                tab.classList.toggle('working', isActive);
+            }
+        }
+    }
+
+    showTerminalNotification(terminalId) {
+        this.terminalsNeedingAttention.add(terminalId);
+        
+        // Update tab if in tabbed mode
+        if (this.layoutMode === 'tabbed') {
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+            if (tab && terminalId !== this.activeTabTerminal) {
+                tab.classList.add('notification');
+            }
+        }
     }
 
     updateLayoutButtonGroups(terminalCount) {

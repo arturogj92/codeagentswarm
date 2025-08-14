@@ -4,7 +4,7 @@
 
 ## Project Configuration
 
-**Project Name**: CodeAgentSwarm
+**Project Name**: codeagentswarm-app
 
 _This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
 
@@ -34,42 +34,41 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 1. **First check** if a similar task already exists using `list_tasks` from MCP
 2. If no similar task exists, **create a new task** using `create_task` from MCP:
-   - **MANDATORY specify the correct terminal_id**
+   - **Terminal ID is AUTO-DETECTED** from environment variable `CODEAGENTSWARM_CURRENT_QUADRANT`
+   - If terminal_id is not provided, the MCP server will automatically use the current terminal
    - **MANDATORY: Read the project name from the CLAUDE.md file** in the current directory
    - Look for the "Project Name:" field in the "Project Configuration" section
    - If no project name is found in CLAUDE.md, use the directory name as fallback
 3. **Start the task** using `start_task` before beginning any work
+   - **Terminal is AUTO-ASSIGNED** when starting a task if environment variable is set
 4. **MANDATORY: Update the plan** using `update_task_plan` when starting a task with a detailed step plan
 5. **CRITICAL: Tasks ALWAYS go to testing first** - Use `complete_task` when finished (automatically goes to "in_testing" state, NEVER directly to "completed") or use `submit_for_testing` for direct testing submission
 6. **If you detect the current task deviates from focus or significantly changes objective, create a new task and continue work under that new task.**
 
 ### IMPORTANT: Terminal ID - Automatic Detection
-
-- **ALWAYS** specify the `terminal_id` when creating a task with `create_task`
+- **Terminal ID is NOW AUTO-DETECTED** by the MCP server from `CODEAGENTSWARM_CURRENT_QUADRANT` environment variable
 - Each terminal has a unique ID (1, 2, 3, 4, etc.) based on 1-based numbering
-- **AUTOMATIC DETECTION:** To get the current terminal, execute: `echo $CODEAGENTSWARM_CURRENT_QUADRANT` using the Bash tool
-- **NEVER ask the user** which terminal - always use automatic detection
-- Tasks must be associated with the correct terminal for proper tracking
+- **No need to manually specify terminal_id** when creating tasks - it's automatic!
+- **When starting a task:** Terminal is automatically assigned to the current terminal
+- **NEVER ask the user** which terminal - it's handled automatically
+- Tasks are automatically associated with the correct terminal for proper tracking
 
 ### MANDATORY: PLAN Field Management
 
 **Each task MUST have a detailed plan** that is updated when the agent takes it:
 
 1. **When starting an existing task:**
-
    - Use `update_task_plan` to establish a clear and detailed plan
    - The plan must include specific steps you will follow
    - Suggested format: numbered list of concrete actions
 
 2. **Plan content:**
-
    - Step-by-step implementation breakdown
    - Files to be modified or created
    - Dependencies or prerequisites
    - Success/completion criteria
 
 3. **Example of well-structured plan:**
-
    ```
    1. Review current code structure in src/components/
    2. Create new UserProfile.jsx component
@@ -81,7 +80,6 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
    ```
 
 4. **Plan updates:**
-
    - If plan changes during execution, update it using `update_task_plan`
    - Keep plan updated so other agents can continue if needed
 
@@ -101,13 +99,11 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 ### Workflow
 
 1. **When receiving a user request:**
-
    - Review existing tasks with `list_tasks`
    - If related task exists, use it
    - If not, create a new descriptive task
 
 2. **During work:**
-
    - Current task will show in terminal bar
    - **Update plan** using `update_task_plan` when starting with detailed plan
    - Keep task status updated
@@ -135,20 +131,17 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 **CRITICAL: All tasks MUST go through testing phase before completion. Tasks can NEVER go directly from "in_progress" to "completed" status:**
 
 1. **🚨 Mandatory transition to testing (NO EXCEPTIONS):**
-
    - When finishing task implementation, use `complete_task`
    - This ALWAYS and AUTOMATICALLY moves task to `in_testing` state
    - **PROHIBITED:** Going directly from `in_progress` to `completed`
    - **REMEMBER:** Unless the user EXPLICITLY asks to mark as completed, tasks ALWAYS go to testing first
 
 2. **Requirements to complete from testing:**
-
    - Task must have `implementation` field documented
    - User must manually review and approve
    - Only then use `complete_task` again to mark as `completed`
 
 3. **If needing to send directly to testing:**
-
    - Use `submit_for_testing` to move directly to `in_testing`
    - Useful when another agent or person will perform tests
 
@@ -167,13 +160,12 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 2. **Ask which to start:** Request user specify which task they want you to begin
 3. **Don't assume:** NEVER automatically choose a task without user confirmation
 4. **Response example:**
-
    ```
    Found several pending tasks for this terminal:
    - ID 70: Fix all this
    - ID 58: Make terminal document the task
    - ID 41: Corrected dummy test task
-
+   
    Which of these tasks would you like me to start?
    ```
 
@@ -181,7 +173,7 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 The following MCP tools are available for task management:
 
-- **`create_task`**: Create new task (requires terminal_id, project is auto-detected)
+- **`create_task`**: Create new task (terminal_id and project are auto-detected)
 - **`start_task`**: Mark task as "in_progress"
 - **`complete_task`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **`submit_for_testing`**: Mark task as "in_testing"
@@ -194,26 +186,22 @@ The following MCP tools are available for task management:
 - **`get_project_tasks`**: Get all tasks for a specific project
 
 **`update_task_plan` parameters:**
-
 - `task_id` (number, required): Task ID
 - `plan` (string, required): Detailed plan text
 
 **`update_task_implementation` parameters:**
-
 - `task_id` (number, required): Task ID
 - `implementation` (string, required): Implementation details including modified files and summary
 
 **`update_task_terminal` parameters:**
-
 - `task_id` (number, required): Task ID
 - `terminal_id` (string, required): Terminal ID (1, 2, 3, 4, etc.) or empty string to unassign
 
 **Usage example:**
-
 ```
 # Task management
-create_task(title="Implement new feature", description="Add user authentication", terminal_id=1)
-# Note: project is auto-detected from terminal's working directory
+create_task(title="Implement new feature", description="Add user authentication")
+# Note: terminal_id and project are auto-detected from environment and working directory
 
 update_task_plan(task_id=123, plan="1. Review existing code\n2. Implement new functionality\n3. Write tests")
 
@@ -245,7 +233,6 @@ Tasks are automatically organized by project based on the CLAUDE.md configuratio
 4. **Project Filtering**: Use `get_project_tasks` to see tasks for a specific project
 
 ### How to detect the project name (for agents):
-
 ```bash
 # 1. First, check if CLAUDE.md exists
 if [ -f "CLAUDE.md" ]; then
@@ -258,13 +245,10 @@ fi
 ## IMPORTANT: MCP Token Limits
 
 ### Known issue with list_tasks
-
 When there are many tasks in the database (30+), the `list_tasks` MCP command can exceed allowed token limit (25000 tokens).
 
 ### Recommended solution:
-
 1. **ALWAYS use status filters** when listing tasks:
-
    - `mcp__codeagentswarm-tasks__list_tasks` with parameter `status: "pending"`
    - `mcp__codeagentswarm-tasks__list_tasks` with parameter `status: "in_progress"`
    - This significantly reduces number of returned tasks
@@ -277,7 +261,6 @@ When there are many tasks in the database (30+), the `list_tasks` MCP command ca
    - Consider default limits in getAllTasks()
 
 ### Technical notes:
-
 - MCP server has multiple routes (`tasks/get_all` and `tools/call`) that must stay synchronized
 - MCP server changes require server restart to apply
 - Claude Code can cache MCP connections
@@ -320,203 +303,11 @@ When there are many tasks in the database (30+), the `list_tasks` MCP command ca
 
 **This documentation is CRITICAL to maintain the knowledge base updated and facilitate other developers' work.**
 
-## Specialized Agents for Development
-
-### 📋 Task Manager Agent
-
-**Usage**: MUST BE USED for all task-related operations
-
-- **Automatically prevents duplicate tasks** by checking existing ones
-- Creates tasks before any development work
-- Updates plans and tracks implementation
-- Manages task lifecycle (pending → in_progress → in_testing → completed)
-
-**Key Features**:
-
-- **Duplicate Detection**: Searches similar tasks across all statuses
-- **Auto Terminal Detection**: No need to specify terminal
-- **Project Detection**: Reads from CLAUDE.md automatically
-
-**Example invocation**:
-
-```
-"Create a task for implementing user authentication"
-"List my current tasks"
-"Update the plan for the current task"
-"Complete this task"
-```
-
-### 🏗️ Hexagonal Architecture Developer
-
-**Usage**: When implementing new features or refactoring code
-
-- Automatically follows hexagonal architecture patterns
-- Separates domain, application, and infrastructure layers
-- **ALWAYS calls test-writer agent after implementation**
-
-**Example invocation**:
-
-```
-"Implement a new user authentication feature"
-"Refactor the task management to use hexagonal architecture"
-```
-
-### 🧪 Test Writer Agent
-
-**Usage**: Automatically invoked after hexagonal-developer, or manually for existing code
-
-- Writes comprehensive tests for all layers
-- Follows TDD principles
-- Creates unit, integration, and E2E tests
-
-**Manual invocation**:
-
-```
-"Write tests for the notification service"
-"Add missing tests for the task repository"
-```
-
-### 🔄 Development Flow
-
-The recommended flow for new features:
-
-1. **task-manager** → Creates/manages the task
-2. **hexagonal-developer** → Implements with clean architecture
-3. **test-writer** → Automatically writes tests
-4. **code-reviewer** → Reviews the implementation
-5. **notion-documenter** → Updates documentation
-6. **git-committer** → Creates semantic commit
-
-### 💡 Tips for Better Agent Usage
-
-- Use specific keywords to trigger the right agent:
-  - "create task", "list tasks" → task-manager
-  - "implement", "create feature" → hexagonal-developer
-  - "write tests", "add tests" → test-writer
-  - "review code" → code-reviewer
-  - "document" → notion-documenter
-  - "commit" → git-committer
-
-## Development Best Practices - MANDATORY
-
-### 🧪 Testing Requirements
-
-**ALL new functionality MUST include tests**. No exceptions.
-
-1. **Before implementing any feature:**
-
-   - Write tests first (TDD approach)
-   - Define expected behavior
-   - Cover edge cases
-
-2. **Test coverage requirements:**
-
-   - Unit tests for all new functions/methods
-   - Integration tests for feature workflows
-   - E2E tests for user-facing features
-   - Minimum 80% code coverage
-
-3. **Test execution:**
-   - Run `npm test` before marking any task as complete
-   - Fix all failing tests
-   - Add new tests for bug fixes
-
-### 🏗️ Code Architecture Rules
-
-**MANDATORY: Extract complex functionality to separate classes/modules**
-
-1. **Class extraction criteria:**
-
-   - If a class/file exceeds 300 lines → split it
-   - If a method exceeds 50 lines → extract to smaller methods
-   - If adding new feature to existing class → consider new class
-
-2. **Architecture principles:**
-
-   - Single Responsibility Principle (SRP)
-   - Separation of concerns
-   - Dependency injection
-   - Modular design
-
-3. **File organization:**
-
-   ```
-   feature/
-   ├── feature.js          # Main class
-   ├── feature.test.js     # Tests
-   ├── feature-service.js  # Business logic
-   ├── feature-utils.js    # Utilities
-   └── README.md          # Documentation
-   ```
-
-4. **Refactoring checklist:**
-   - [ ] New functionality in separate class?
-   - [ ] Tests written and passing?
-   - [ ] Dependencies injected?
-   - [ ] Documentation updated?
-   - [ ] Code review completed?
-
-### Example Implementation Pattern
-
-```javascript
-// ❌ BAD: Everything in renderer.js
-class TerminalManager {
-  // 500+ lines of mixed concerns
-  handleDiff() {
-    /* complex logic */
-  }
-  handleGit() {
-    /* complex logic */
-  }
-  handleUI() {
-    /* complex logic */
-  }
-}
-
-// ✅ GOOD: Separated concerns
-// diff-manager.js
-class DiffManager {
-  constructor(gitService, uiService) {
-    this.gitService = gitService;
-    this.uiService = uiService;
-  }
-  // Focused diff logic
-}
-
-// diff-manager.test.js
-describe("DiffManager", () => {
-  test("should handle diff expansion", () => {
-    // Test implementation
-  });
-});
-```
-
-### Testing Commands
-
-- `npm test` - Run all tests
-- `npm run test:unit` - Run unit tests only
-- `npm run test:coverage` - Generate coverage report
-- `npm run test:watch` - Run tests in watch mode
-
-### Code Review Checklist
-
-Before completing any task:
-
-- [ ] Tests written and passing
-- [ ] Complex logic extracted to separate classes
-- [ ] No methods longer than 50 lines
-- [ ] No classes longer than 300 lines
-- [ ] Dependencies properly injected
-- [ ] Code follows existing patterns
-- [ ] Documentation updated
-
 # important-instruction-reminders
-
 Do what has been asked; nothing more, nothing less.
 NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
-NEVER proactively create documentation files (\*.md) or README files. Only create documentation files if explicitly requested by the User.
-ALWAYS write tests for new functionality - NO EXCEPTIONS.
-ALWAYS extract complex functionality to separate classes/modules.
+NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
 <!-- CODEAGENTSWARM CONFIG END -->
+
