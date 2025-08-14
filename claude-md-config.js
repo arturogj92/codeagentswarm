@@ -102,6 +102,9 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 1. **When receiving a user request:**
    - Review existing tasks with \`list_tasks\`
+   - **CHECK FIRST:** Is this a bug fix or modification of a recently completed task?
+     - If YES → Ask if should continue with the existing task
+     - If NO → Check if a related task exists
    - If related task exists, use it
    - If not, create a new descriptive task
 
@@ -152,6 +155,41 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
    pending → in_progress → in_testing → completed
                      ↑                    ↓
                      └── (requires documentation and manual approval)
+   \`\`\`
+
+### 🔄 BUG FIXES AND MODIFICATIONS - CONTINUE WITH SAME TASK
+
+**CRITICAL: When bugs are found or modifications are requested AFTER a task is in testing or completed:**
+
+1. **🚨 DO NOT CREATE A NEW TASK for bug fixes or minor modifications:**
+   - If the user reports a bug or requests changes related to the current/recent task
+   - **ASK THE USER:** "Should I continue with the current task [ID: X] or create a new one?"
+   - Default to continuing with the same task unless:
+     - The change is a completely different feature
+     - The user explicitly asks for a new task
+     - More than 24 hours have passed since the task was completed
+
+2. **How to handle bug fixes in existing tasks:**
+   - If task is \`in_testing\`: Move back to \`in_progress\` using \`start_task\`
+   - If task is \`completed\` and user reports bug immediately: 
+     - Ask: "I found task [ID: X - Title] that was just completed. Should I reopen it for these fixes?"
+     - If yes: Move back to \`in_progress\` and update plan with bug fixes
+   - Update the plan to include the bug fix steps using \`update_task_plan\`
+   - Continue working on the same task ID
+
+3. **When to create a new task:**
+   - The modification is a NEW feature (not a fix)
+   - The original task has been completed for more than 24 hours
+   - The user explicitly requests a new task
+   - The scope significantly changes (e.g., from "fix button color" to "redesign entire UI")
+
+4. **Example dialogue for bug fixes:**
+   \`\`\`
+   User: "The feature we just implemented has a bug when clicking the button"
+   Agent: "I see you found a bug in the task we just completed (Task #123: Add button feature). 
+           Should I reopen this task to fix the bug, or would you prefer a new task?"
+   User: "Continue with the same task"
+   Agent: [Moves task back to in_progress and fixes the bug]
    \`\`\`
 
 ### Handling Multiple Pending Tasks

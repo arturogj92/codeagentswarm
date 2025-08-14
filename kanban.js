@@ -8,6 +8,8 @@ class KanbanManager {
         this.currentTask = null;
         this.editingTaskId = null;
         this.currentProjectFilter = 'all';
+        this.searchQuery = '';
+        this.searchDebounceTimer = null;
         this.isSelectingDirectory = false;
         this.sortStates = {
             pending: 'default',
@@ -22,8 +24,50 @@ class KanbanManager {
         this.setupEventListeners();
         this.initializeLucideIcons();
         this.initializeColorGradients();
-        await this.loadProjects();
-        await this.loadTasks();
+        
+        // Check for preloaded data first
+        const usePreloadedData = await this.checkForPreloadedData();
+        
+        if (!usePreloadedData) {
+            // Load data normally if no preloaded data
+            await this.loadProjects();
+            await this.loadTasks(true); // Show skeletons on initial load
+        }
+    }
+    
+    checkForPreloadedData() {
+        return new Promise((resolve) => {
+            // Set a timeout to wait for preloaded data
+            let dataReceived = false;
+            
+            const preloadHandler = (event, data) => {
+                if (data && data.tasks && data.projects) {
+                    dataReceived = true;
+                    // Use preloaded data
+                    this.tasks = data.tasks;
+                    this.projects = data.projects;
+                    
+                    // Update UI immediately
+                    this.updateProjectSelects();
+                    this.renderTasks();
+                    
+                    // Remove listener
+                    ipcRenderer.removeListener('preloaded-data', preloadHandler);
+                    resolve(true);
+                }
+            };
+            
+            // Listen for preloaded data
+            ipcRenderer.once('preloaded-data', preloadHandler);
+            
+            // Wait max 100ms for preloaded data, then load normally
+            setTimeout(() => {
+                if (!dataReceived) {
+                    ipcRenderer.removeListener('preloaded-data', preloadHandler);
+                    resolve(false);
+                }
+            }, 100);
+        });
     }
 
     initializeLucideIcons() {
@@ -46,6 +90,65 @@ class KanbanManager {
     }
 
     setupEventListeners() {
+        // Search functionality
+        const searchInput = document.getElementById('search-input');
+        const clearSearchBtn = document.getElementById('clear-search-btn');
+        
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            
+            // Show/hide clear button immediately
+            if (query) {
+                clearSearchBtn.style.display = 'flex';
+            } else {
+                clearSearchBtn.style.display = 'none';
+                document.getElementById('search-results-count').style.display = 'none';
+            }
+            
+            // Clear existing timer
+            if (this.searchDebounceTimer) {
+                clearTimeout(this.searchDebounceTimer);
+            }
+            
+            // Set new timer for debounced search (300ms delay)
+            this.searchDebounceTimer = setTimeout(() => {
+                this.searchQuery = query;
+                this.renderTasks();
+                
+                // Update results count after rendering
+                const resultsCount = document.getElementById('search-results-count');
+                if (this.searchQuery) {
+                    const filteredCount = this.getFilteredTasksCount();
+                    resultsCount.textContent = `${filteredCount}`;
+                    resultsCount.style.display = 'inline-block';
+                } else {
+                    resultsCount.style.display = 'none';
+                }
+            }, 300);
+        });
+        
+        clearSearchBtn.addEventListener('click', () => {
+            // Clear any pending search
+            if (this.searchDebounceTimer) {
+                clearTimeout(this.searchDebounceTimer);
+            }
+            
+            this.searchQuery = '';
+            searchInput.value = '';
+            clearSearchBtn.style.display = 'none';
+            document.getElementById('search-results-count').style.display = 'none';
+            this.renderTasks();
+        });
+        
+        // Add keyboard shortcut for search (Cmd/Ctrl + F)
+        document.addEventListener('keydown', (e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'f') {
+                e.preventDefault();
+                searchInput.focus();
+                searchInput.select();
+            }
+        });
+        
         // Header buttons
         document.getElementById('add-task-btn').addEventListener('click', () => {
             this.showCreateTaskModal();
@@ -727,9 +830,11 @@ class KanbanManager {
         });
     }
 
-    async loadTasks() {
-        // Show skeletons while loading
-        this.showSkeletons();
+    async loadTasks(showLoading = false) {
+        // Only show skeletons during initial load or when explicitly requested
+        if (showLoading) {
+            this.showSkeletons();
+        }
         
         try {
             const result = await ipcRenderer.invoke('task-get-all');
@@ -763,15 +868,35 @@ class KanbanManager {
                 skeleton.classList.remove('show');
             });
             
-            // Remove only task cards, preserve skeleton containers
+            // Remove task cards and empty states, preserve skeleton containers
             const taskCards = list.querySelectorAll('.task-card');
             taskCards.forEach(card => card.remove());
+            const emptyStates = list.querySelectorAll('.empty-state');
+            emptyStates.forEach(state => state.remove());
         });
 
         // Filter tasks by project if needed
         let filteredTasks = this.tasks;
         if (this.currentProjectFilter !== 'all') {
             filteredTasks = this.tasks.filter(task => task.project === this.currentProjectFilter);
+        }
+        
+        // Filter by search query if present
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            filteredTasks = filteredTasks.filter(task => {
+                // Search in title
+                if (task.title && task.title.toLowerCase().includes(query)) return true;
+                // Search in description
+                if (task.description && task.description.toLowerCase().includes(query)) return true;
+                // Search in plan
+                if (task.plan && task.plan.toLowerCase().includes(query)) return true;
+                // Search in implementation
+                if (task.implementation && task.implementation.toLowerCase().includes(query)) return true;
+                // Search in task ID
+                if (task.id && task.id.toString().includes(query)) return true;
+                return false;
+            });
         }
 
         // Group tasks by status
@@ -800,10 +925,14 @@ class KanbanManager {
             count.textContent = tasks.length;
 
             if (tasks.length === 0) {
+                let emptyMessage = 'No tasks ' + status.replace('_', ' ');
+                if (this.searchQuery) {
+                    emptyMessage = 'No matching tasks found';
+                }
                 container.innerHTML = `
                     <div class="empty-state">
                         <i data-lucide="inbox"></i>
-                        <p>No tasks ${status.replace('_', ' ')}</p>
+                        <p>${emptyMessage}</p>
                     </div>
                 `;
             } else {
@@ -1145,12 +1274,7 @@ class KanbanManager {
             if (result.success) {
                 this.hideTaskModal();
                 await this.loadTasks();
-                
-                // Show notification for new tasks only (not updates)
-                if (!taskId) {
-                    const terminalInfo = terminalId ? ` for Terminal ${terminalId}` : '';
-                    this.showNotification(`New task created: "${title}"${terminalInfo}`, 'success');
-                }
+                // No notifications for create or update
             } else {
                 alert(`Failed to save task: ${result.error}`);
             }
@@ -1891,6 +2015,29 @@ class KanbanManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    getFilteredTasksCount() {
+        // Filter tasks by project if needed
+        let filteredTasks = this.tasks;
+        if (this.currentProjectFilter !== 'all') {
+            filteredTasks = this.tasks.filter(task => task.project === this.currentProjectFilter);
+        }
+        
+        // Filter by search query
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            filteredTasks = filteredTasks.filter(task => {
+                if (task.title && task.title.toLowerCase().includes(query)) return true;
+                if (task.description && task.description.toLowerCase().includes(query)) return true;
+                if (task.plan && task.plan.toLowerCase().includes(query)) return true;
+                if (task.implementation && task.implementation.toLowerCase().includes(query)) return true;
+                if (task.id && task.id.toString().includes(query)) return true;
+                return false;
+            });
+        }
+        
+        return filteredTasks.length;
     }
 
     showPlanEditMode() {

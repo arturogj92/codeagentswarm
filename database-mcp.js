@@ -56,6 +56,7 @@ class DatabaseManagerMCP {
             CREATE TABLE IF NOT EXISTS projects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
+                path TEXT UNIQUE,
                 display_name TEXT,
                 color TEXT NOT NULL,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -83,6 +84,12 @@ class DatabaseManagerMCP {
                 timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (task_id) REFERENCES tasks (id)
             );
+
+            -- Create indexes for better performance
+            CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
+            CREATE INDEX IF NOT EXISTS idx_tasks_terminal_id ON tasks(terminal_id);
+            CREATE INDEX IF NOT EXISTS idx_tasks_project ON tasks(project);
+            CREATE INDEX IF NOT EXISTS idx_tasks_sort_order ON tasks(sort_order, created_at DESC);
         `;
 
         this.db.exec(createTables, (err) => {
@@ -99,10 +106,11 @@ class DatabaseManagerMCP {
                 this.updateStatusConstraintIfNeeded();
                 // Add project column if it doesn't exist
                 this.addProjectColumnIfNeeded();
-                // Initialize default project if needed
-                this.initializeDefaultProject();
+                // Default project initialization removed - projects are created on demand
                 // Add display_name column if it doesn't exist
                 this.addDisplayNameColumnIfNeeded();
+                // Add path column if it doesn't exist
+                this.addPathColumnIfNeeded();
             }
         });
     }
@@ -212,40 +220,14 @@ class DatabaseManagerMCP {
                         console.error('Error adding project column:', err);
                     } else {
                         console.log('Added project column to tasks table');
-                        // Update existing tasks with default project
-                        this.db.run("UPDATE tasks SET project = 'CodeAgentSwarm' WHERE project IS NULL", (err) => {
-                            if (err) {
-                                console.error('Error updating existing tasks with default project:', err);
-                            } else {
-                                console.log('Updated existing tasks with default project');
-                            }
-                        });
+                        // Tasks without projects remain NULL - will be assigned based on directory
                     }
                 });
             }
         });
     }
     
-    initializeDefaultProject() {
-        // Check if default project exists
-        this.db.get("SELECT * FROM projects WHERE name = ?", ['CodeAgentSwarm'], (err, row) => {
-            if (err) {
-                console.error('Error checking for default project:', err);
-                return;
-            }
-            
-            if (!row) {
-                // Create default project with a nice blue color
-                this.db.run("INSERT INTO projects (name, display_name, color) VALUES (?, ?, ?)", ['CodeAgentSwarm', 'CodeAgentSwarm', '#007ACC'], (err) => {
-                    if (err) {
-                        console.error('Error creating default project:', err);
-                    } else {
-                        console.log('Created default project: CodeAgentSwarm');
-                    }
-                });
-            }
-        });
-    }
+    // Removed initializeDefaultProject - projects are created on demand based on directory
     
     addDisplayNameColumnIfNeeded() {
         // Check if display_name column exists
@@ -269,6 +251,44 @@ class DatabaseManagerMCP {
                             } else {
                                 console.log('Updated existing projects with display_name');
                             }
+                        });
+                    }
+                });
+            }
+        });
+    }
+    
+    addPathColumnIfNeeded() {
+        // Check if path column exists
+        this.db.all("PRAGMA table_info(projects)", (err, columns) => {
+            if (err) {
+                console.error('Failed to check table info:', err);
+                return;
+            }
+            
+            const hasPath = columns.some(col => col.name === 'path');
+            if (!hasPath) {
+                this.db.run("ALTER TABLE projects ADD COLUMN path TEXT", (err) => {
+                    if (err) {
+                        console.error('Failed to add path column:', err);
+                    } else {
+                        console.log('Added path column to projects table');
+                        // Update existing projects with a path based on their name
+                        this.db.all("SELECT id, name FROM projects WHERE path IS NULL", (err, projects) => {
+                            if (err) {
+                                console.error('Failed to fetch projects for path update:', err);
+                                return;
+                            }
+                            
+                            projects.forEach(project => {
+                                // Convert project name to slug for path
+                                const path = project.name.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+                                this.db.run("UPDATE projects SET path = ? WHERE id = ?", [path, project.id], (err) => {
+                                    if (err) {
+                                        console.error(`Failed to update path for project ${project.name}:`, err);
+                                    }
+                                });
+                            });
                         });
                     }
                 });
@@ -726,6 +746,11 @@ class DatabaseManagerMCP {
         });
     }
     
+    // Alias for consistency with getAllTasks
+    async getAllProjects() {
+        return this.getProjects();
+    }
+    
     async getProjectByName(name) {
         return new Promise((resolve, reject) => {
             this.db.get(
@@ -834,11 +859,7 @@ class DatabaseManagerMCP {
     
     async deleteProject(name) {
         return new Promise((resolve, reject) => {
-            // Don't allow deleting the default project
-            if (name === 'CodeAgentSwarm') {
-                resolve({ success: false, error: 'Cannot delete the default project' });
-                return;
-            }
+            // No default project protection needed anymore
             
             this.db.run(
                 `DELETE FROM projects WHERE name = ?`,

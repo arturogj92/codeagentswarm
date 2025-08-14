@@ -269,7 +269,7 @@ class MCPStdioServer {
             title,
             description,
             terminal_id,
-            project: project || 'CodeAgentSwarm',
+            project: project || null,
             status: 'pending'
         };
     }
@@ -630,21 +630,40 @@ class MCPStdioServer {
                 }
                 
                 // Auto-detect project if not provided
-                if (!args.project && args.terminal_id) {
+                if (!args.project) {
                     try {
-                        // Try to get the working directory for this terminal
-                        const workingDir = await this.getTerminalWorkingDirectory(args.terminal_id);
-                        if (workingDir) {
-                            // First, try to get project name from CLAUDE.md
-                            let projectName = await this.getProjectFromClaudeMd(workingDir);
-                            
-                            // If not found in CLAUDE.md, use directory name as fallback
-                            if (!projectName) {
-                                projectName = path.basename(workingDir);
-                                this.logError(`No project found in CLAUDE.md, using directory name: ${projectName}`);
+                        let projectName = null;
+                        
+                        // If terminal_id is provided, try to get project from terminal's working directory
+                        if (args.terminal_id) {
+                            const workingDir = await this.getTerminalWorkingDirectory(args.terminal_id);
+                            if (workingDir) {
+                                // First, try to get project name from CLAUDE.md
+                                projectName = await this.getProjectFromClaudeMd(workingDir);
+                                
+                                // If not found in CLAUDE.md, use directory name as fallback
+                                if (!projectName) {
+                                    projectName = path.basename(workingDir);
+                                    this.logError(`No project found in CLAUDE.md, using directory name: ${projectName}`);
+                                }
                             }
+                        }
+                        
+                        // If still no project name, try current working directory
+                        if (!projectName) {
+                            const cwd = process.cwd();
+                            // Try CLAUDE.md in current directory first
+                            projectName = await this.getProjectFromClaudeMd(cwd);
                             
-                            // Check if project exists, create if not
+                            // If not found, use current directory name
+                            if (!projectName) {
+                                projectName = path.basename(cwd);
+                                this.logError(`No terminal or project specified, using current directory name: ${projectName}`);
+                            }
+                        }
+                        
+                        // Check if project exists, create if not
+                        if (projectName) {
                             const existingProject = await this.db.getProjectByName(projectName);
                             if (!existingProject) {
                                 await this.db.createProject(projectName);
@@ -655,7 +674,7 @@ class MCPStdioServer {
                         }
                     } catch (error) {
                         this.logError('Failed to auto-detect project:', error.message);
-                        // Continue with default project
+                        // Will fall back to 'General' in createTask
                     }
                 }
                 result = await this.createTask(args);

@@ -359,6 +359,7 @@ if (process.argv.includes('--dev')) {
 }
 
 let mainWindow;
+let splashWindow; // Splash screen window
 let kanbanWindow; // Global reference to kanban window
 let isCreatingKanbanWindow = false; // Flag to prevent concurrent creation
 const terminals = new Map();
@@ -380,6 +381,48 @@ process.on('uncaughtException', (error) => {
   console.error('Uncaught Exception:', error);
 });
 
+function createSplashWindow() {
+  splashWindow = new BrowserWindow({
+    width: 400,
+    height: 500,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    resizable: false,
+    movable: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false
+    },
+    show: true, // Show splash immediately
+    center: true,
+    backgroundColor: '#1a1a1a'
+  });
+
+  splashWindow.loadFile('splash.html');
+  
+  // Update splash status function
+  global.updateSplashStatus = (message, progress) => {
+    if (splashWindow && !splashWindow.isDestroyed()) {
+      if (message) {
+        splashWindow.webContents.send('splash-status', message);
+      }
+      if (progress !== undefined) {
+        splashWindow.webContents.send('splash-progress', progress);
+      }
+    }
+  };
+  
+  return splashWindow;
+}
+
+function closeSplashWindow() {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    splashWindow.close();
+    splashWindow = null;
+  }
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1400,
@@ -394,17 +437,43 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
-      enableRemoteModule: true
+      enableRemoteModule: true,
+      // Optimize rendering performance
+      backgroundThrottling: false,
+      webgl: true,
+      offscreen: false
     },
     titleBarStyle: 'hiddenInset',
     frame: false,               // Hide OS title bar like wizard
-    show: true,
+    show: false,                // Don't show until ready
     autoHideMenuBar: false,
     vibrancy: 'under-window',
-    visualEffectState: 'active'
+    visualEffectState: 'active',
+    backgroundColor: '#1a1a1a'  // Prevent white flash
   });
 
+  // Load the HTML file
   mainWindow.loadFile('index.html');
+  
+  // Show window only when completely ready with all resources loaded
+  mainWindow.once('ready-to-show', () => {
+    // Update splash to 90%
+    global.updateSplashStatus && global.updateSplashStatus('Finalizing...', 90);
+    
+    // Add a small delay to ensure icons and all resources are fully rendered
+    setTimeout(() => {
+      // Update splash to 100%
+      global.updateSplashStatus && global.updateSplashStatus('Ready!', 100);
+      
+      // Small delay for the 100% to be visible
+      setTimeout(() => {
+        closeSplashWindow();
+        mainWindow.show();
+        mainWindow.focus();
+        console.log(`[Startup] Window shown after ${Date.now() - startTime}ms`);
+      }, 300);
+    }, 200); // 200ms delay to ensure everything is loaded
+  });
   
   // Send dev mode status to renderer after the page loads
   mainWindow.webContents.once('did-finish-load', () => {
@@ -2487,9 +2556,10 @@ ipcMain.handle('task-update-status', async (event, taskId, status) => {
 ipcMain.handle('task-get-all', async () => {
   try {
     if (!db) return { success: true, tasks: [] };
-    const tasks = db.getAllTasks();
+    const tasks = await db.getAllTasks(); // Make sure to await the Promise
     return { success: true, tasks };
   } catch (error) {
+    console.error('Error fetching tasks:', error);
     return { success: true, tasks: [] };
   }
 });
@@ -2737,6 +2807,16 @@ ipcMain.handle('project-delete', async (event, name) => {
   }
 });
 
+ipcMain.handle('project-update-last-opened', async (event, projectPath) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateProjectLastOpened(projectPath);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.handle('get-mcp-port', async () => {
   try {
     if (!mcpServer) return { success: false, error: 'MCP server not started' };
@@ -2783,6 +2863,27 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
   }
 });
 
+// Cache for preloaded data
+let preloadedTaskData = null;
+let preloadedProjectData = null;
+
+// Preload data for faster Task Manager opening
+async function preloadTaskManagerData() {
+  try {
+    if (db) {
+      // Preload tasks and projects in background
+      // Note: These methods are synchronous in database.js
+      const tasks = db.getAllTasks();
+      const projects = db.getProjects();
+      
+      preloadedTaskData = tasks;
+      preloadedProjectData = projects;
+    }
+  } catch (error) {
+    console.error('Error preloading Task Manager data:', error);
+  }
+}
+
 // Unified function to open or focus Kanban window
 function openOrFocusKanbanWindow(options = {}) {
   // If kanban window already exists, reload and focus it
@@ -2816,6 +2917,9 @@ function openOrFocusKanbanWindow(options = {}) {
   
   isCreatingKanbanWindow = true;
   
+  // Preload data before opening window
+  preloadTaskManagerData();
+  
   // Create new kanban window if it doesn't exist
   kanbanWindow = new BrowserWindow({
     width: 1200,
@@ -2823,7 +2927,10 @@ function openOrFocusKanbanWindow(options = {}) {
     title: 'Task Manager - Kanban Board',
     webPreferences: {
       nodeIntegration: true,
-      contextIsolation: false
+      contextIsolation: false,
+      // Enable hardware acceleration for better performance
+      webgl: true,
+      offscreen: false
     },
     // Remove parent relationship to prevent minimizing main window
     modal: false,
@@ -2843,6 +2950,16 @@ function openOrFocusKanbanWindow(options = {}) {
   });
 
   kanbanWindow.loadFile('kanban.html');
+  
+  // Send preloaded data immediately when DOM is ready
+  kanbanWindow.webContents.once('dom-ready', () => {
+    if (preloadedTaskData && preloadedProjectData) {
+      kanbanWindow.webContents.send('preloaded-data', {
+        tasks: preloadedTaskData,
+        projects: preloadedProjectData
+      });
+    }
+  });
   
   // Show and focus the window after loading
   kanbanWindow.webContents.once('did-finish-load', () => {
@@ -2995,146 +3112,208 @@ app.whenReady().then(async () => {
 });
 
 async function initializeApp() {
-  // Initialize database
-  try {
-    db = new DatabaseManager();
-    
-    // Register IPC handlers that depend on database
-    registerDatabaseHandlers();
-    
-    // No longer need to load API keys - Claude Code works locally
-  } catch (error) {
-    console.error('Failed to initialize database:', error);
-    db = null;
-  }
+  // Start time measurement
+  const startTime = Date.now();
+  console.log('[Startup] Initializing app...');
   
-  // Initialize Git service
-  gitService = new GitService();
-  
-  // Ensure PATH includes common locations for Claude
+  // Set PATH early (synchronous)
   if (!process.env.PATH.includes('/opt/homebrew/bin')) {
     process.env.PATH = `/opt/homebrew/bin:${process.env.PATH}`;
   }
   if (!process.env.PATH.includes('/usr/local/bin')) {
     process.env.PATH = `/usr/local/bin:${process.env.PATH}`;
   }
-  console.log('[Main] PATH environment:', process.env.PATH);
   
-  // Initialize Updater Service
-  try {
-    // Pass logger to UpdaterService
-    global.updaterService = new UpdaterService(logger);
-    logger.addLog('info', ['Updater service initialized successfully']);
-    
-    // Test update server connection first
-    setTimeout(async () => {
-      try {
-        logger.addLog('info', ['Testing update server connection...']);
-        const testResult = await global.updaterService.testUpdateServerConnection();
-        logger.addLog('info', ['Update server test result:', JSON.stringify(testResult)]);
-      } catch (error) {
-        logger.addLog('error', ['Update server connection test failed:', error.message]);
-      }
-    }, 1000);
-    
-    // Check for updates after 3 seconds
-    setTimeout(() => {
-      logger.addLog('info', ['Auto-update check triggered (3s delay)']);
-      if (!process.env.DISABLE_UPDATES) {
-        logger.addLog('info', ['Updates enabled, checking for updates...']);
-        global.updaterService.checkForUpdatesAndNotify().catch(err => {
-          logger.addLog('error', ['Auto-update check failed:', err.message]);
-        });
-      } else {
-        logger.addLog('info', ['Updates disabled via DISABLE_UPDATES env var']);
-      }
-    }, 3000);
-    
-    // Check for updates every 4 hours
-    setInterval(() => {
-      logger.addLog('info', ['Periodic update check triggered (4h interval)']);
-      if (!process.env.DISABLE_UPDATES) {
-        global.updaterService.checkForUpdatesAndNotify().catch(err => {
-          logger.addLog('error', ['Periodic update check failed:', err.message]);
-        });
-      }
-    }, 4 * 60 * 60 * 1000);
-    
-  } catch (error) {
-    logger.addLog('error', ['Failed to initialize updater service:', error.message, error.stack]);
-  }
+  // Create splash window FIRST for immediate feedback
+  createSplashWindow();
+  console.log(`[Startup] Splash window created in ${Date.now() - startTime}ms`);
   
-  // Start MCP Task Server
-  try {
-    mcpServer = new MCPTaskServer();
-    const port = await mcpServer.start();
-    console.log(`MCP Task Server running on port ${port}`);
-    
-    // Create MCP configuration file for Claude Code
-    // Note: We don't use WebSocket MCP anymore, we use stdio MCP
-    // createMCPConfig(port);
-  } catch (error) {
-    console.error('Failed to start MCP Task Server:', error);
-    mcpServer = null;
-  }
+  // Update splash status
+  global.updateSplashStatus('Initializing...', 10);
   
-  // Find claude binary on startup
-  CLAUDE_BINARY_PATH = findClaudeBinary();
-  if (!CLAUDE_BINARY_PATH) {
-    console.warn('Claude Code not found - users will need to install it');
-  }
-  
+  // Create main window (hidden)
   createWindow();
+  console.log(`[Startup] Main window created in ${Date.now() - startTime}ms`);
   
-  // Setup local shortcuts instead of global ones
-  // These will only work when the window is focused
+  // Initialize critical services in parallel
+  const criticalInit = Promise.all([
+    // Initialize database
+    (async () => {
+      try {
+        global.updateSplashStatus('Loading database...', 20);
+        db = new DatabaseManager();
+        registerDatabaseHandlers();
+        console.log(`[Startup] Database initialized in ${Date.now() - startTime}ms`);
+        global.updateSplashStatus('Database ready', 30);
+      } catch (error) {
+        console.error('Failed to initialize database:', error);
+        db = null;
+      }
+    })(),
+    
+    // Initialize Git service
+    (async () => {
+      global.updateSplashStatus('Initializing Git service...', 40);
+      gitService = new GitService();
+      console.log(`[Startup] Git service initialized in ${Date.now() - startTime}ms`);
+      global.updateSplashStatus('Git service ready', 50);
+    })(),
+    
+    // Find Claude binary
+    (async () => {
+      global.updateSplashStatus('Checking Claude Code...', 60);
+      CLAUDE_BINARY_PATH = findClaudeBinary();
+      if (!CLAUDE_BINARY_PATH) {
+        console.warn('Claude Code not found - users will need to install it');
+      }
+      console.log(`[Startup] Claude binary search completed in ${Date.now() - startTime}ms`);
+      global.updateSplashStatus('Environment ready', 70);
+    })()
+  ]);
+  
+  // Wait for critical services
+  await criticalInit;
+  
+  // Setup local shortcuts
   registerLocalShortcuts();
   
-  // Initialize hooks manager and webhook server
-  try {
-    hooksManager = new HooksManager();
-    webhookServer = new WebhookServer(mainWindow);
-    
-    // Start webhook server
-    const webhookResult = await webhookServer.start();
-    if (webhookResult.success) {
-      console.log(`Webhook server started on port ${webhookResult.port}`);
-      
-      // Install hooks automatically
-      const hooksStatus = await hooksManager.checkHooksStatus();
-      if (!hooksStatus.installed) {
-        console.log('Installing CodeAgentSwarm hooks...');
-        const installResult = await hooksManager.installHooks();
-        if (installResult.success) {
-          console.log('Hooks installed successfully');
-        } else {
-          console.error('Failed to install hooks:', installResult.error);
-        }
-      } else {
-        console.log('Hooks already installed');
-      }
-    } else {
-      console.error('Failed to start webhook server:', webhookResult.error);
-    }
-  } catch (error) {
-    console.error('Failed to initialize hooks system:', error);
-  }
+  // Defer non-critical initialization
+  setTimeout(() => {
+    // Preload Task Manager data
+    preloadTaskManagerData();
+    // Refresh preloaded data every 30 seconds
+    setInterval(() => {
+      preloadTaskManagerData();
+    }, 30000);
+  }, 2000);
   
-  // Start MCP server and register with Claude Code
-  try {
-    startMCPServerAndRegister();
-    
-    // Check and install Claude Code if needed
-    console.log('🔍 Checking Claude Code installation on startup...');
-    checkClaudeInstallation();
-    
-    // Auto-configure MCP in Claude CLI (non-blocking)
-    configureMCPInClaudeCLI().catch(error => {
-      console.error('MCP auto-configuration error:', error);
-    });
-  } catch (error) {
-    console.error('Failed to start MCP server and register:', error);
-  }
+  // Defer updater initialization to not block startup
+  setTimeout(() => {
+    try {
+      // Pass logger to UpdaterService
+      global.updaterService = new UpdaterService(logger);
+      logger.addLog('info', ['Updater service initialized successfully']);
+      
+      // Test update server connection after 5 seconds
+      setTimeout(async () => {
+        try {
+          logger.addLog('info', ['Testing update server connection...']);
+          const testResult = await global.updaterService.testUpdateServerConnection();
+          logger.addLog('info', ['Update server test result:', JSON.stringify(testResult)]);
+        } catch (error) {
+          logger.addLog('error', ['Update server connection test failed:', error.message]);
+        }
+      }, 5000);
+      
+      // Check for updates after 10 seconds
+      setTimeout(() => {
+        logger.addLog('info', ['Auto-update check triggered (10s delay)']);
+        if (!process.env.DISABLE_UPDATES) {
+          logger.addLog('info', ['Updates enabled, checking for updates...']);
+          global.updaterService.checkForUpdatesAndNotify().catch(err => {
+            logger.addLog('error', ['Auto-update check failed:', err.message]);
+          });
+        } else {
+          logger.addLog('info', ['Updates disabled via DISABLE_UPDATES env var']);
+        }
+      }, 10000);
+      
+      // Check for updates every 4 hours
+      setInterval(() => {
+        logger.addLog('info', ['Periodic update check triggered (4h interval)']);
+        if (!process.env.DISABLE_UPDATES) {
+          global.updaterService.checkForUpdatesAndNotify().catch(err => {
+            logger.addLog('error', ['Periodic update check failed:', err.message]);
+          });
+        }
+      }, 4 * 60 * 60 * 1000);
+      
+    } catch (error) {
+      logger.addLog('error', ['Failed to initialize updater service:', error.message, error.stack]);
+    }
+  }, 1000); // Defer by 1 second
+  
+  // Start non-critical services in background
+  const backgroundInit = Promise.all([
+    // Start MCP Task Server
+    (async () => {
+      try {
+        mcpServer = new MCPTaskServer();
+        const port = await mcpServer.start();
+        console.log(`[Startup] MCP Task Server running on port ${port} - ${Date.now() - startTime}ms`);
+      } catch (error) {
+        console.error('Failed to start MCP Task Server:', error);
+        mcpServer = null;
+      }
+    })()
+  ]);
+  
+  // Don't wait for background services
+  backgroundInit.catch(error => {
+    console.error('Background service initialization failed:', error);
+  });
+  
+  // Defer hooks initialization - move to background
+  setTimeout(async () => {
+    try {
+      hooksManager = new HooksManager();
+      webhookServer = new WebhookServer(mainWindow);
+      
+      // Start webhook server asynchronously without awaiting
+      webhookServer.start().then(webhookResult => {
+        if (webhookResult.success) {
+          console.log(`[Background] Webhook server started on port ${webhookResult.port}`);
+        } else {
+          console.error('[Background] Failed to start webhook server:', webhookResult.error);
+        }
+      }).catch(error => {
+        console.error('[Background] Webhook server error:', error);
+      });
+      
+      // Install hooks automatically (also async)
+      hooksManager.checkHooksStatus().then(async hooksStatus => {
+        if (!hooksStatus.installed) {
+          console.log('Installing CodeAgentSwarm hooks...');
+          const installResult = await hooksManager.installHooks();
+          if (installResult.success) {
+            console.log('Hooks installed successfully');
+          } else {
+            console.error('Failed to install hooks:', installResult.error);
+          }
+        } else {
+          console.log('Hooks already installed');
+        }
+      }).catch(error => {
+        console.error('Failed to check hooks status:', error);
+      });
+    } catch (error) {
+      console.error('Failed to initialize hooks system:', error);
+    }
+  }, 3000); // Defer by 3 seconds
+  
+  // Defer MCP server registration
+  setTimeout(() => {
+    try {
+      startMCPServerAndRegister();
+      console.log(`[Startup] MCP server registration initiated - ${Date.now() - startTime}ms`);
+    } catch (error) {
+      console.error('Failed to start MCP server:', error);
+    }
+  }, 2000);
+  
+  // Check and install Claude Code if needed (defer)
+  setTimeout(async () => {
+    try {
+      console.log('🔍 Checking Claude Code installation on startup...');
+      checkClaudeInstallation();
+      // MCP configuration is already called inside checkClaudeInstallation, no need to duplicate
+    } catch (error) {
+      console.error('Failed to check Claude installation:', error);
+    }
+  }, 5000); // Defer by 5 seconds
+  
+  // Log final startup time
+  console.log(`[Startup] ✅ App initialization completed in ${Date.now() - startTime}ms`);
   
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

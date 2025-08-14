@@ -106,7 +106,7 @@ class DatabaseManager {
         this.addProjectColumnIfNeeded();
         
         // Initialize default project if needed
-        this.initializeDefaultProject();
+        // Default project initialization removed - projects are created on demand
         
         // Add display_name column if it doesn't exist (migration)
         this.addDisplayNameColumnIfNeeded();
@@ -116,6 +116,9 @@ class DatabaseManager {
         
         // Enforce path constraints (migration)
         this.enforcePathConstraints();
+        
+        // Add last_opened column if it doesn't exist (migration)
+        this.addLastOpenedColumnIfNeeded();
         
         console.log('✅ DatabaseManager initialization completed');
     }
@@ -305,7 +308,7 @@ class DatabaseManager {
                         task.created_at,
                         task.updated_at,
                         task.implementation,
-                        task.project || 'CodeAgentSwarm'
+                        task.project || null
                     );
                 }
             }
@@ -334,7 +337,7 @@ class DatabaseManager {
                 console.log('Added project column to tasks table');
                 
                 // Update existing tasks with default project
-                this.db.prepare("UPDATE tasks SET project = 'CodeAgentSwarm' WHERE project IS NULL").run();
+                // Tasks without projects remain NULL - will be assigned based on directory
                 console.log('Updated existing tasks with default project');
             }
         } catch (error) {
@@ -342,20 +345,7 @@ class DatabaseManager {
         }
     }
 
-    initializeDefaultProject() {
-        try {
-            // Check if default project exists
-            const defaultProject = this.db.prepare("SELECT * FROM projects WHERE name = ?").get('CodeAgentSwarm');
-            
-            if (!defaultProject) {
-                // Create default project with a nice blue color
-                this.db.prepare("INSERT INTO projects (name, display_name, color) VALUES (?, ?, ?)").run('CodeAgentSwarm', 'CodeAgentSwarm', '#007ACC');
-                console.log('Created default project: CodeAgentSwarm');
-            }
-        } catch (error) {
-            console.error('Error initializing default project:', error);
-        }
-    }
+    // Removed initializeDefaultProject - projects are created on demand based on directory
     
     addDisplayNameColumnIfNeeded() {
         try {
@@ -454,6 +444,25 @@ class DatabaseManager {
             }
         } catch (error) {
             console.error('Error updating path column constraint:', error);
+        }
+    }
+
+    addLastOpenedColumnIfNeeded() {
+        try {
+            // Check if last_opened column exists
+            const columns = this.db.prepare("PRAGMA table_info(projects)").all();
+            const hasLastOpened = columns.some(col => col.name === 'last_opened');
+            
+            if (!hasLastOpened) {
+                this.db.exec("ALTER TABLE projects ADD COLUMN last_opened DATETIME");
+                console.log('Added last_opened column to projects table');
+                
+                // Initialize last_opened with created_at for existing projects
+                this.db.prepare("UPDATE projects SET last_opened = created_at WHERE last_opened IS NULL").run();
+                console.log('Initialized last_opened for existing projects');
+            }
+        } catch (error) {
+            console.error('Error checking/adding last_opened column:', error);
         }
     }
 
@@ -917,12 +926,40 @@ class DatabaseManager {
         try {
             const stmt = this.db.prepare(`
                 SELECT * FROM projects
-                ORDER BY name ASC
+                ORDER BY 
+                    CASE 
+                        WHEN last_opened IS NOT NULL THEN last_opened 
+                        ELSE created_at 
+                    END DESC
             `);
             
             return stmt.all();
         } catch (err) {
             return [];
+        }
+    }
+    
+    // Update project last opened timestamp
+    updateProjectLastOpened(projectPath) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE projects 
+                SET last_opened = CURRENT_TIMESTAMP 
+                WHERE path = ?
+            `);
+            
+            const result = stmt.run(projectPath);
+            
+            if (result.changes > 0) {
+                console.log(`Updated last_opened for project at path: ${projectPath}`);
+                return { success: true };
+            } else {
+                console.log(`No project found at path: ${projectPath}`);
+                return { success: false, error: 'Project not found' };
+            }
+        } catch (err) {
+            console.error('Error updating project last_opened:', err);
+            return { success: false, error: err.message };
         }
     }
     
@@ -1064,9 +1101,7 @@ class DatabaseManager {
     deleteProject(name) {
         try {
             // Don't allow deleting the default project
-            if (name === 'CodeAgentSwarm') {
-                return { success: false, error: 'Cannot delete the default project' };
-            }
+            // No default project protection needed anymore
             
             const deleteProject = this.db.prepare(`DELETE FROM projects WHERE name = ?`);
             const result = deleteProject.run(name);

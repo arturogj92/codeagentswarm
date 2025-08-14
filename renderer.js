@@ -586,11 +586,11 @@ class TerminalManager {
         const selectorDiv = document.createElement('div');
         selectorDiv.className = 'directory-selector';
         
-        // Build recent projects HTML - Show only last 4 projects
+        // Build recent projects HTML - Show first 6 projects (already sorted by most recent)
         let recentProjectsHTML = '';
         if (projects.length > 0) {
-            // Take only the last 4 projects
-            const recentProjects = projects.slice(-4);
+            // Take only the first 6 projects (already sorted by most recent first)
+            const recentProjects = projects.slice(0, 6);
             recentProjectsHTML = `
                 <div class="recent-projects-section">
                     <h4>Recent Projects</h4>
@@ -667,6 +667,9 @@ class TerminalManager {
                 this.lastSelectedDirectories[quadrant] = selectedDir;
                 this.saveDirectoryToStorage(quadrant, selectedDir); // Save to database
                 
+                // Update last opened if this directory corresponds to a project
+                await ipcRenderer.invoke('project-update-last-opened', selectedDir);
+                
                 // After selecting directory, show session selector
                 wrapper.removeChild(selectorDiv);
                 this.showSessionSelector(quadrant, selectedDir);
@@ -685,7 +688,10 @@ class TerminalManager {
         // Handle last directory click (if exists)
         const lastDirectoryDisplay = selectorDiv.querySelector('#last-directory-display');
         if (lastDirectoryDisplay) {
-            lastDirectoryDisplay.addEventListener('click', () => {
+            lastDirectoryDisplay.addEventListener('click', async () => {
+                // Update last opened if this directory corresponds to a project
+                await ipcRenderer.invoke('project-update-last-opened', this.lastSelectedDirectories[quadrant]);
+                
                 wrapper.removeChild(selectorDiv);
                 this.showSessionSelector(quadrant, this.lastSelectedDirectories[quadrant]);
             });
@@ -694,7 +700,10 @@ class TerminalManager {
         // Handle use last button if it exists
         const useLastBtn = selectorDiv.querySelector('#use-last-btn');
         if (useLastBtn) {
-            useLastBtn.addEventListener('click', () => {
+            useLastBtn.addEventListener('click', async () => {
+                // Update last opened if this directory corresponds to a project
+                await ipcRenderer.invoke('project-update-last-opened', this.lastSelectedDirectories[quadrant]);
+                
                 wrapper.removeChild(selectorDiv);
                 this.showSessionSelector(quadrant, this.lastSelectedDirectories[quadrant]);
             });
@@ -707,7 +716,7 @@ class TerminalManager {
         
         // Handle recent project clicks
         selectorDiv.querySelectorAll('.recent-project-item').forEach(projectItem => {
-            projectItem.addEventListener('click', (e) => {
+            projectItem.addEventListener('click', async (e) => {
                 // Don't trigger if clicking on delete button
                 if (e.target.classList.contains('delete-project-btn')) {
                     return;
@@ -715,6 +724,9 @@ class TerminalManager {
                 
                 const projectPath = projectItem.dataset.projectPath;
                 const projectName = projectItem.dataset.projectName;
+                
+                // Update last opened timestamp for this project
+                await ipcRenderer.invoke('project-update-last-opened', projectPath);
                 
                 // Update last selected directory
                 this.lastSelectedDirectories[quadrant] = projectPath;
@@ -4318,7 +4330,7 @@ class TerminalManager {
         
         // Event listeners
         const closeModal = () => {
-            closeModal();
+            modal.remove();
         };
         
         modal.querySelector('#close-branch-modal').addEventListener('click', closeModal);
@@ -5114,6 +5126,24 @@ class TerminalManager {
             });
         });
 
+        // Re-attach color picker event listeners to terminal headers
+        document.querySelectorAll('.terminal-header').forEach(terminalHeader => {
+            const quadrantElement = terminalHeader.closest('.terminal-quadrant');
+            if (quadrantElement) {
+                const quadrant = parseInt(quadrantElement.dataset.quadrant);
+                // Only add listener if terminal is active (has a terminal instance)
+                if (this.terminals.has(quadrant)) {
+                    terminalHeader.addEventListener('click', (e) => {
+                        // Only show color picker if clicking on the header itself (not controls)
+                        if (!e.target.closest('.terminal-controls') && 
+                            !e.target.closest('.git-branch-display') && 
+                            !e.target.closest('.current-task')) {
+                            this.showColorPicker(quadrant, e);
+                        }
+                    });
+                }
+            }
+        });
 
         // Re-attach control button listeners
         document.querySelectorAll('.terminal-control-btn').forEach(btn => {
@@ -7264,22 +7294,42 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
 
 // Initialize the terminal manager when the DOM is loaded
 document.addEventListener('DOMContentLoaded', async () => {
-    window.terminalManager = new TerminalManager();
+    // Get loading screen element
+    const loadingScreen = document.getElementById('loading-screen');
     
-    // Initialize dynamic terminals
-    await window.terminalManager.initializeDynamicTerminals();
-    
-    // Initialize Lucide icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-    
-    // Re-initialize icons after a short delay to ensure all elements are rendered
-    setTimeout(() => {
+    try {
+        window.terminalManager = new TerminalManager();
+        
+        // Initialize dynamic terminals
+        await window.terminalManager.initializeDynamicTerminals();
+        
+        // Initialize Lucide icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
         }
-    }, 100);
+        
+        // Re-initialize icons after a short delay to ensure all elements are rendered
+        setTimeout(() => {
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
+            
+            // Hide loading screen after everything is ready
+            if (loadingScreen) {
+                loadingScreen.style.transition = 'opacity 0.3s';
+                loadingScreen.style.opacity = '0';
+                setTimeout(() => {
+                    loadingScreen.style.display = 'none';
+                }, 300);
+            }
+        }, 100);
+    } catch (error) {
+        console.error('Error during initialization:', error);
+        // Still hide loading screen on error
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+    }
     
     // Sync debug mode state from settings FIRST
     try {

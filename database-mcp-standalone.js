@@ -108,6 +108,7 @@ class DatabaseManagerMCP {
         CREATE TABLE IF NOT EXISTS projects (
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           name TEXT UNIQUE NOT NULL,
+          path TEXT UNIQUE,
           display_name TEXT,
           color TEXT NOT NULL,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -138,7 +139,7 @@ class DatabaseManagerMCP {
   async createTask(title, description, terminalId, project = null) {
     try {
       const sql = `INSERT INTO tasks (title, description, terminal_id, project) VALUES (?, ?, ?, ?)`;
-      this.execSQL(sql, [title, description || '', terminalId || 0, project || 'CodeAgentSwarm']);
+      this.execSQL(sql, [title, description || '', terminalId || 0, project || null]);
       
       // Get the last inserted ID in a separate command
       const lastId = execSync(`sqlite3 "${this.dbPath}" "SELECT seq FROM sqlite_sequence WHERE name='tasks';"`, {

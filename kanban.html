@@ -11,6 +11,14 @@
         <header class="kanban-header">
             <h1><i data-lucide="list-checks"></i> Task Manager</h1>
             <div class="header-controls">
+                <div class="search-container">
+                    <i data-lucide="search" class="search-icon"></i>
+                    <input type="text" id="search-input" class="search-input" placeholder="Search tasks...">
+                    <span class="search-results-count" id="search-results-count" style="display: none;"></span>
+                    <button class="clear-search-btn" id="clear-search-btn" style="display: none;">
+                        <i data-lucide="x"></i>
+                    </button>
+                </div>
                 <div class="project-filter">
                     <label for="project-filter-select">
                         <i data-lucide="folder"></i> Project:
@@ -50,7 +58,7 @@
                         <i data-lucide="loader-2" class="loading-spinner"></i>
                         <p>Loading tasks...</p>
                     </div>
-                    <div class="skeleton-container show">
+                    <div class="skeleton-container">
                         <div class="skeleton-card">
                             <div class="skeleton-header">
                                 <div class="skeleton-title"></div>
@@ -93,7 +101,7 @@
                         <i data-lucide="loader-2" class="loading-spinner"></i>
                         <p>Loading tasks...</p>
                     </div>
-                    <div class="skeleton-container show">
+                    <div class="skeleton-container">
                         <div class="skeleton-card">
                             <div class="skeleton-header">
                                 <div class="skeleton-title"></div>
@@ -125,7 +133,7 @@
                         <i data-lucide="loader-2" class="loading-spinner"></i>
                         <p>Loading tasks...</p>
                     </div>
-                    <div class="skeleton-container show">
+                    <div class="skeleton-container">
                         <div class="skeleton-card">
                             <div class="skeleton-header">
                                 <div class="skeleton-title"></div>
@@ -156,7 +164,7 @@
                         <i data-lucide="loader-2" class="loading-spinner"></i>
                         <p>Loading tasks...</p>
                     </div>
-                    <div class="skeleton-container show">
+                    <div class="skeleton-container">
                         <div class="skeleton-card">
                             <div class="skeleton-header">
                                 <div class="skeleton-title"></div>
