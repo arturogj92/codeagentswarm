@@ -9,10 +9,8 @@ class LogViewer {
     this.unsubscribe = null;
     this.button = null;
      
-    // Check if logger is enabled (already synced from database in renderer.js)
-    if (logger.isEnabled()) {
-      this.init();
-    }
+    // Don't auto-initialize based on logger state
+    // The debug mode will be explicitly set via setDebugMode() after settings are loaded
   }
 
   init() {

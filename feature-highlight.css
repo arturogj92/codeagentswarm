@@ -1,0 +1,242 @@
+/* Feature Highlight Styles */
+#feature-highlight-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 99999;
+}
+
+.feature-highlight {
+    position: absolute;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    pointer-events: auto;
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+    transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.feature-highlight.show {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+}
+
+.feature-highlight.hide {
+    opacity: 0;
+    transform: scale(0.8) translateY(10px);
+}
+
+/* Arrow styles */
+.feature-highlight-arrow {
+    color: #10b981;
+    filter: drop-shadow(0 2px 8px rgba(16, 185, 129, 0.4));
+    animation: arrow-bounce 2s ease-in-out infinite;
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.feature-highlight-arrow svg {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+/* Position-specific arrow animations */
+.feature-highlight-bottom .feature-highlight-arrow {
+    animation: arrow-bounce-down 2s ease-in-out infinite;
+}
+
+.feature-highlight-top .feature-highlight-arrow {
+    animation: arrow-bounce-up 2s ease-in-out infinite;
+}
+
+.feature-highlight-left .feature-highlight-arrow {
+    animation: arrow-bounce-left 2s ease-in-out infinite;
+}
+
+.feature-highlight-right .feature-highlight-arrow {
+    animation: arrow-bounce-right 2s ease-in-out infinite;
+}
+
+/* Badge styles */
+.feature-highlight-badge {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.95) 0%, rgba(5, 150, 105, 0.95) 100%);
+    color: white;
+    padding: 12px 18px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 
+        0 4px 20px rgba(16, 185, 129, 0.3),
+        0 0 0 2px rgba(255, 255, 255, 0.1),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    position: relative;
+    animation: badge-glow 3s ease-in-out infinite;
+    max-width: 280px;
+}
+
+.feature-highlight-new {
+    background: rgba(255, 255, 255, 0.25);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.05em;
+    animation: new-pulse 2s ease-in-out infinite;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.feature-highlight-message {
+    flex: 1;
+    line-height: 1.4;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.feature-highlight-dismiss {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    margin-left: 8px;
+}
+
+.feature-highlight-dismiss:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(1.1);
+}
+
+/* Layout adjustments for different positions */
+.feature-highlight-top,
+.feature-highlight-bottom {
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+.feature-highlight-left,
+.feature-highlight-right {
+    flex-direction: row;
+    align-items: center;
+    gap: 5px;
+}
+
+.feature-highlight-top .feature-highlight-arrow,
+.feature-highlight-left .feature-highlight-arrow {
+    order: 2;
+}
+
+/* Fine-tune arrow positioning for bottom layout */
+.feature-highlight-bottom .feature-highlight-arrow {
+    margin-bottom: -5px; /* Bring arrow closer to badge */
+}
+
+.feature-highlight-top .feature-highlight-arrow {
+    margin-top: -5px;
+}
+
+/* Animations */
+@keyframes arrow-bounce-down {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(8px);
+    }
+}
+
+@keyframes arrow-bounce-up {
+    0%, 100% {
+        transform: translateY(0);
+    }
+    50% {
+        transform: translateY(-8px);
+    }
+}
+
+@keyframes arrow-bounce-left {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(-8px);
+    }
+}
+
+@keyframes arrow-bounce-right {
+    0%, 100% {
+        transform: translateX(0);
+    }
+    50% {
+        transform: translateX(8px);
+    }
+}
+
+@keyframes badge-glow {
+    0%, 100% {
+        box-shadow: 
+            0 4px 20px rgba(16, 185, 129, 0.3),
+            0 0 0 2px rgba(255, 255, 255, 0.1),
+            inset 0 1px 0 rgba(255, 255, 255, 0.2);
+    }
+    50% {
+        box-shadow: 
+            0 4px 30px rgba(16, 185, 129, 0.5),
+            0 0 0 3px rgba(255, 255, 255, 0.15),
+            inset 0 1px 0 rgba(255, 255, 255, 0.3);
+    }
+}
+
+@keyframes new-pulse {
+    0%, 100% {
+        transform: scale(1);
+        background: rgba(255, 255, 255, 0.25);
+    }
+    50% {
+        transform: scale(1.05);
+        background: rgba(255, 255, 255, 0.35);
+    }
+}
+
+/* Dark theme compatibility */
+@media (prefers-color-scheme: dark) {
+    .feature-highlight-badge {
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .feature-highlight-badge {
+        max-width: 200px;
+        font-size: 13px;
+        padding: 10px 14px;
+    }
+    
+    .feature-highlight-new {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+}

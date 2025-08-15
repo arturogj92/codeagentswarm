@@ -3,6 +3,7 @@ const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
 const LogViewer = require('./log-viewer');
+const FeatureHighlight = require('./feature-highlight');
 
 console.log('🔧 [RENDERER] renderer.js loaded');
 
@@ -163,6 +164,21 @@ class TerminalManager {
             console.log(`📨 Received scroll-to-bottom event for terminal ${quadrant}`);
             this.scrollTerminalToBottom(quadrant);
         });
+        
+        // Listen for focus terminal tab events (when notification is clicked in tabbed mode)
+        ipcRenderer.on('focus-terminal-tab', (event, quadrant) => {
+            console.log(`📨 Received focus-terminal-tab event for terminal ${quadrant}`);
+            if (this.layoutMode === 'tabbed' && this.terminals.has(quadrant)) {
+                // Switch to the tab when notification is clicked
+                this.switchToTab(quadrant);
+                // Also scroll to bottom for good measure
+                this.scrollTerminalToBottom(quadrant);
+            } else if (this.layoutMode === 'grid') {
+                // In grid mode, just scroll to bottom and highlight the terminal
+                this.scrollTerminalToBottom(quadrant);
+                this.highlightTerminal(quadrant);
+            }
+        });
     }
 
     setupEventListeners() {
@@ -253,7 +269,22 @@ class TerminalManager {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
-                const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
+                // Get quadrant from data-terminal attribute first, then fallback to parent quadrant
+                let quadrant;
+                const btn = e.target.closest('.terminal-control-btn');
+                if (btn && btn.dataset.terminal) {
+                    quadrant = parseInt(btn.dataset.terminal);
+                } else {
+                    const quadrantEl = e.target.closest('.terminal-quadrant');
+                    if (quadrantEl) {
+                        quadrant = parseInt(quadrantEl.dataset.quadrant);
+                    }
+                }
+                
+                if (!quadrant && quadrant !== 0) {
+                    console.error('Could not determine quadrant for action:', action);
+                    return;
+                }
                 
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
@@ -280,6 +311,12 @@ class TerminalManager {
                     if (dropdown) dropdown.style.display = 'none';
                 } else if (action === 'open-folder') {
                     this.handleOpenFolder(quadrant);
+                    // Close the dropdown
+                    const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
+                    if (dropdown) dropdown.style.display = 'none';
+                } else if (action === 'open-in-ide') {
+                    const ideKey = dropdownItem.dataset.ide;
+                    this.openInIDE(quadrant, ideKey);
                     // Close the dropdown
                     const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
                     if (dropdown) dropdown.style.display = 'none';
@@ -1180,8 +1217,8 @@ class TerminalManager {
             console.log(`Terminal creation result:`, result);
             
             // Update only the terminal header to show the "More Options" button
-            setTimeout(() => {
-                this.updateTerminalHeader(quadrant);
+            setTimeout(async () => {
+                await this.updateTerminalHeader(quadrant);
             }, 100);
         } catch (error) {
             console.error('Failed to create terminal:', error);
@@ -1458,7 +1495,7 @@ class TerminalManager {
                 // Just show notification, don't auto-switch
                 const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"]`);
                 if (tab) {
-                    tab.classList.add('notification');
+                    tab.classList.add('tab-has-notification');
                 }
             }
         } else {
@@ -1810,6 +1847,21 @@ class TerminalManager {
         
         console.log(`Updating header color for terminal ${quadrant} in ${this.layoutMode} mode`);
         
+        // Get the project name and color for this terminal (moved outside to be available for tabs)
+        const projectName = this.getTerminalProjectName(quadrant);
+        let projectColor = null;
+        
+        if (projectName) {
+            // Check for custom color first
+            if (this.customProjectColors[projectName]) {
+                projectColor = this.customProjectColors[projectName];
+            } else {
+                // Generate color if not custom
+                const colors = this.generateProjectColor(projectName);
+                projectColor = colors ? colors.primary : null;
+            }
+        }
+        
         if (terminalHeader) {
             // Only apply colors if terminal is actually running
             if (!this.terminals.has(quadrant)) {
@@ -1832,9 +1884,6 @@ class TerminalManager {
                 }
                 return;
             }
-        
-        // Get the project name for this terminal
-        const projectName = this.getTerminalProjectName(quadrant);
         
         if (projectName) {
             const colors = this.generateProjectColor(projectName);
@@ -2150,7 +2199,7 @@ class TerminalManager {
         }
     }
 
-    updateTerminalHeader(quadrant) {
+    async updateTerminalHeader(quadrant) {
         const quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
         if (!quadrantElement) return;
         
@@ -2173,6 +2222,9 @@ class TerminalManager {
                 // Create the More Options container
                 const moreOptionsContainer = document.createElement('div');
                 moreOptionsContainer.className = 'terminal-more-options-container';
+                // Get detected IDEs and build menu HTML
+                const ideMenuItems = await this.buildIDEMenuItems(quadrant);
+                
                 moreOptionsContainer.innerHTML = `
                     <button class="terminal-control-btn terminal-more-btn" data-action="more-options" data-terminal="${quadrant}" title="More Options">⋯</button>
                     <div class="terminal-dropdown-menu" data-terminal="${quadrant}" style="display: none;">
@@ -2184,6 +2236,7 @@ class TerminalManager {
                             <i data-lucide="folder-open"></i>
                             <span>Open Folder</span>
                         </button>
+                        ${ideMenuItems}
                     </div>
                 `;
                 
@@ -2214,6 +2267,9 @@ class TerminalManager {
                             this.handleOpenTerminalInPath(quadrant);
                         } else if (action === 'open-folder') {
                             this.handleOpenFolder(quadrant);
+                        } else if (action === 'open-in-ide') {
+                            const ideKey = item.dataset.ide;
+                            this.openInIDE(quadrant, ideKey);
                         }
                         
                         // Close the dropdown
@@ -2236,6 +2292,120 @@ class TerminalManager {
         }
     }
 
+    // Build IDE menu items dynamically based on detected IDEs
+    async buildIDEMenuItems(terminalId) {
+        try {
+            // Check for installed IDEs
+            const result = await ipcRenderer.invoke('check-installed-ides');
+            if (!result.success || result.ides.length === 0) {
+                return ''; // No IDEs detected, return empty string
+            }
+            
+            // Add separator if IDEs found
+            let html = '<div class="dropdown-separator"></div>';
+            
+            // Add menu item for each detected IDE
+            for (const ide of result.ides) {
+                // Use custom icons for specific IDEs
+                let iconHtml;
+                if (ide.key === 'cursor') {
+                    iconHtml = '<img src="assets/cursor-icon.png" class="ide-icon" alt="Cursor">';
+                } else if (ide.key === 'vscode') {
+                    iconHtml = '<img src="assets/vscode-icon.png" class="ide-icon" alt="VSCode">';
+                } else if (ide.key === 'intellij') {
+                    iconHtml = '<img src="assets/intellij-icon.png" class="ide-icon" alt="IntelliJ">';
+                } else {
+                    // Fallback to Lucide icon
+                    iconHtml = `<i data-lucide="${ide.icon}"></i>`;
+                }
+                
+                html += `
+                    <button class="terminal-dropdown-item" data-action="open-in-ide" data-ide="${ide.key}" data-terminal="${terminalId}">
+                        ${iconHtml}
+                        <span>Open in ${ide.name}</span>
+                    </button>
+                `;
+            }
+            
+            return html;
+        } catch (error) {
+            console.error('Error building IDE menu items:', error);
+            return '';
+        }
+    }
+
+    attachTerminalControlListeners() {
+        // Remove existing listeners to avoid duplicates
+        document.querySelectorAll('.terminal-control-btn').forEach(btn => {
+            btn.replaceWith(btn.cloneNode(true));
+        });
+        
+        // Re-attach control button listeners
+        document.querySelectorAll('.terminal-control-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
+                
+                // Get quadrant from data-terminal attribute first, then fallback to parent quadrant
+                let quadrant;
+                const btnEl = e.target.closest('.terminal-control-btn');
+                if (btnEl && btnEl.dataset.terminal) {
+                    quadrant = parseInt(btnEl.dataset.terminal);
+                } else {
+                    const quadrantEl = e.target.closest('.terminal-quadrant');
+                    if (quadrantEl) {
+                        quadrant = parseInt(quadrantEl.dataset.quadrant);
+                    }
+                }
+                
+                if (!quadrant && quadrant !== 0) {
+                    console.error('Could not determine quadrant for action:', action);
+                    return;
+                }
+                
+                console.log('Terminal control action:', action, 'for quadrant:', quadrant);
+                
+                if (action === 'fullscreen') {
+                    this.toggleFullscreen(quadrant);
+                } else if (action === 'close') {
+                    this.closeTerminal(quadrant);
+                } else if (action === 'more-options') {
+                    this.toggleDropdownMenu(quadrant);
+                }
+            });
+        });
+        
+        // Re-attach dropdown item listeners
+        document.querySelectorAll('.terminal-dropdown-item').forEach(item => {
+            item.replaceWith(item.cloneNode(true));
+        });
+        
+        document.querySelectorAll('.terminal-dropdown-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = item.dataset.action;
+                const terminal = parseInt(item.dataset.terminal);
+                
+                console.log('Dropdown item action:', action, 'for terminal:', terminal);
+                
+                // Close the dropdown
+                const dropdown = item.closest('.terminal-dropdown-menu');
+                if (dropdown) {
+                    dropdown.style.display = 'none';
+                }
+                
+                if (action === 'open-terminal-here') {
+                    this.openTerminalInProjectPath(terminal);
+                } else if (action === 'open-folder') {
+                    this.openProjectFolder(terminal);
+                } else if (action === 'open-in-ide') {
+                    const ideKey = item.dataset.ide;
+                    this.openInIDE(terminal, ideKey);
+                }
+            });
+        });
+    }
+
     toggleDropdownMenu(quadrant) {
         console.log('toggleDropdownMenu called for quadrant:', quadrant);
         const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
@@ -2252,14 +2422,19 @@ class TerminalManager {
             }
         });
         
-        // Toggle this dropdown
-        const currentDisplay = dropdown.style.display;
-        console.log('Current display:', currentDisplay);
-        dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+        // Toggle this dropdown - check both inline style and computed style
+        const currentDisplay = window.getComputedStyle(dropdown).display;
+        const isCurrentlyHidden = currentDisplay === 'none' || dropdown.style.display === 'none' || dropdown.style.display === '';
+        console.log('Current display:', currentDisplay, 'Inline style:', dropdown.style.display, 'Is hidden:', isCurrentlyHidden);
+        
+        dropdown.style.display = isCurrentlyHidden ? 'block' : 'none';
         console.log('New display:', dropdown.style.display);
         
-        // Close dropdown when clicking outside
+        // Ensure dropdown has proper z-index
         if (dropdown.style.display === 'block') {
+            dropdown.style.zIndex = '99999';
+            
+            // Close dropdown when clicking outside
             const closeDropdown = (e) => {
                 if (!e.target.closest('.terminal-more-options-container')) {
                     dropdown.style.display = 'none';
@@ -2293,6 +2468,18 @@ class TerminalManager {
         } catch (error) {
             console.error('Error opening folder:', error);
             this.showNotification('Failed to open folder', 'error');
+        }
+    }
+
+    async openInIDE(terminalId, ideKey) {
+        try {
+            const result = await ipcRenderer.invoke('open-in-ide', terminalId, ideKey);
+            if (!result.success) {
+                this.showNotification(`Failed to open IDE: ${result.error}`, 'error');
+            }
+        } catch (error) {
+            console.error('Error opening IDE:', error);
+            this.showNotification('Failed to open IDE', 'error');
         }
     }
 
@@ -2608,8 +2795,15 @@ class TerminalManager {
     }
 
     addScrollToBottomButton(terminalDiv, terminal, quadrant) {
+        // Check if button already exists
+        let scrollBtn = terminalDiv.querySelector('.scroll-to-bottom-btn');
+        if (scrollBtn) {
+            console.log(`Scroll button already exists for terminal ${quadrant}, skipping creation`);
+            return; // Button already exists, don't create duplicate
+        }
+        
         // Create scroll to bottom button
-        const scrollBtn = document.createElement('button');
+        scrollBtn = document.createElement('button');
         scrollBtn.className = 'scroll-to-bottom-btn';
         scrollBtn.title = 'Scroll to bottom';
         scrollBtn.innerHTML = '⬇';
@@ -5088,7 +5282,7 @@ class TerminalManager {
 
             // If in tabbed mode, render tabbed layout instead
             if (this.layoutMode === 'tabbed') {
-                this.renderTabbedLayout(activeTerminals);
+                await this.renderTabbedLayout(activeTerminals);
                 return;
             }
 
@@ -5158,7 +5352,7 @@ class TerminalManager {
 
             console.log('🏗️ Creating terminal elements with resizers...');
             // Create terminal elements with resizers
-            this.createTerminalLayoutWithResizers(container, activeTerminals);
+            await this.createTerminalLayoutWithResizers(container, activeTerminals);
 
             // Restore preserved terminal information and colors
             console.log('🔄 Restoring terminal information and colors...');
@@ -5202,7 +5396,7 @@ class TerminalManager {
         }
     }
 
-    createTerminalElement(terminalId) {
+    async createTerminalElement(terminalId) {
         const element = document.createElement('div');
         element.className = 'terminal-quadrant';
         element.dataset.quadrant = terminalId;
@@ -5262,6 +5456,7 @@ class TerminalManager {
                                 <i data-lucide="folder-open"></i>
                                 <span>Open Folder</span>
                             </button>
+                            ${await this.buildIDEMenuItems(terminalId)}
                         </div>
                     </div>
                     ` : ''}
@@ -5363,7 +5558,23 @@ class TerminalManager {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const action = e.target.dataset.action || e.target.closest('[data-action]')?.dataset.action;
-                const quadrant = parseInt(e.target.closest('.terminal-quadrant').dataset.quadrant);
+                
+                // Get quadrant from data-terminal attribute first, then fallback to parent quadrant
+                let quadrant;
+                const btnEl = e.target.closest('.terminal-control-btn');
+                if (btnEl && btnEl.dataset.terminal) {
+                    quadrant = parseInt(btnEl.dataset.terminal);
+                } else {
+                    const quadrantEl = e.target.closest('.terminal-quadrant');
+                    if (quadrantEl) {
+                        quadrant = parseInt(quadrantEl.dataset.quadrant);
+                    }
+                }
+                
+                if (!quadrant && quadrant !== 0) {
+                    console.error('Could not determine quadrant for action:', action);
+                    return;
+                }
                 
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
@@ -5472,7 +5683,7 @@ class TerminalManager {
         }
     }
 
-    setLayout(layout) {
+    async setLayout(layout) {
         console.log('setLayout called with:', layout);
         
         const validLayouts = ['horizontal', 'vertical', '3-top1', '3-top2-horiz', '3-left2', '3-right2'];
@@ -5507,7 +5718,7 @@ class TerminalManager {
         this.updateLayoutButtons();
         
         // Re-render terminals with new layout
-        this.renderTerminals();
+        await this.renderTerminals();
         
         // Reparar controles después de cambiar layout
         setTimeout(() => {
@@ -5531,6 +5742,11 @@ class TerminalManager {
         console.log('Switching from grid to tabbed mode...');
         this.layoutMode = 'tabbed';
         
+        // Close all dropdowns before switching
+        document.querySelectorAll('.terminal-dropdown-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
+        
         // Hide grid container and show tabbed container
         const gridContainer = document.getElementById('terminals-container');
         const tabbedContainer = document.getElementById('tabbed-layout-container');
@@ -5544,12 +5760,12 @@ class TerminalManager {
         document.body.classList.add('tabbed-layout-active');
         
         // Get first terminal as active if none selected
-        const activeResult = ipcRenderer.invoke('get-active-terminals').then(result => {
+        const activeResult = ipcRenderer.invoke('get-active-terminals').then(async result => {
             if (result.success && result.terminals.length > 0) {
                 if (!this.activeTabTerminal && result.terminals.length > 0) {
                     this.activeTabTerminal = result.terminals[0];
                 }
-                this.renderTabbedLayout(result.terminals);
+                await this.renderTabbedLayout(result.terminals);
                 
                 // Restore all terminal states after rendering with a slight delay
                 setTimeout(() => {
@@ -5566,6 +5782,11 @@ class TerminalManager {
     switchToGridMode() {
         console.log('Switching from tabbed to grid mode...');
         this.layoutMode = 'grid';
+        
+        // Close all dropdowns before switching
+        document.querySelectorAll('.terminal-dropdown-menu').forEach(menu => {
+            menu.style.display = 'none';
+        });
         
         // Show grid container and hide tabbed container
         const gridContainer = document.getElementById('terminals-container');
@@ -5593,7 +5814,9 @@ class TerminalManager {
             
             // Re-attach event listeners after rendering new DOM
             this.attachTerminalEventListeners();
-            console.log('Grid mode switch complete, event listeners re-attached');
+            // Also re-attach control button listeners specifically
+            this.attachTerminalControlListeners();
+            console.log('Grid mode switch complete, all event listeners re-attached');
         });
     }
 
@@ -5641,7 +5864,7 @@ class TerminalManager {
         });
     }
 
-    renderTabbedLayout(activeTerminals) {
+    async renderTabbedLayout(activeTerminals) {
         console.log('Rendering tabbed layout with terminals:', activeTerminals);
         
         const tabsContainer = document.getElementById('terminal-tabs');
@@ -5657,13 +5880,13 @@ class TerminalManager {
         }
         
         // Create tabs and terminal elements
-        activeTerminals.forEach(terminalId => {
+        for (const terminalId of activeTerminals) {
             // Create tab
             const tab = this.createTerminalTab(terminalId);
             tabsContainer.appendChild(tab);
             
             // Create terminal element
-            const terminalElement = this.createTerminalElement(terminalId);
+            const terminalElement = await this.createTerminalElement(terminalId);
             if (terminalId === this.activeTabTerminal) {
                 terminalElement.classList.add('active');
             }
@@ -5680,16 +5903,31 @@ class TerminalManager {
                         if (existingTerminal.fitAddon) {
                             existingTerminal.fitAddon.fit();
                         }
+                        // Add scroll to bottom button for tabbed mode
+                        console.log(`Adding scroll button for terminal ${terminalId} in tabbed mode`);
+                        this.addScrollToBottomButton(terminalDiv, existingTerminal.terminal, terminalId);
+                        
+                        // Debug: check if button was added and viewport exists
+                        setTimeout(() => {
+                            const btn = terminalDiv.querySelector('.scroll-to-bottom-btn');
+                            const viewport = terminalDiv.querySelector('.xterm-viewport');
+                            console.log(`Terminal ${terminalId} - Button exists: ${!!btn}, Viewport exists: ${!!viewport}`);
+                            if (viewport) {
+                                console.log(`Terminal ${terminalId} - Viewport scroll height: ${viewport.scrollHeight}, client height: ${viewport.clientHeight}`);
+                            }
+                        }, 500);
                     }
                 }, 0);
             }
-        });
+        }
         
         // Attach tab event listeners
         this.attachTabEventListeners();
         
-        // Event delegation is already set up in init(), no need to re-attach
-        console.log('Tabbed layout rendered, event delegation active');
+        // Re-attach terminal control button event listeners
+        this.attachTerminalControlListeners();
+        
+        console.log('Tabbed layout rendered, event listeners attached');
         
         // Re-initialize icons
         if (typeof lucide !== 'undefined') {
@@ -5731,7 +5969,7 @@ class TerminalManager {
             tab.classList.add('working');
         }
         if (this.terminalsNeedingAttention.has(terminalId)) {
-            tab.classList.add('notification');
+            tab.classList.add('tab-has-notification');
         }
         
         // Get terminal title and apply project color
@@ -5852,7 +6090,7 @@ class TerminalManager {
             this.terminalsNeedingAttention.delete(terminalId);
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
             if (tab) {
-                tab.classList.remove('notification');
+                tab.classList.remove('tab-has-notification');
             }
         }
         
@@ -5885,7 +6123,7 @@ class TerminalManager {
         if (this.layoutMode === 'tabbed') {
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
             if (tab && terminalId !== this.activeTabTerminal) {
-                tab.classList.add('notification');
+                tab.classList.add('tab-has-notification');
             }
         }
     }
@@ -6264,31 +6502,31 @@ class TerminalManager {
         }
     }
 
-    create3TerminalLayout(container, activeTerminals) {
+    async create3TerminalLayout(container, activeTerminals) {
         const layout = this.currentLayout;
         console.log('Creating 3-terminal layout:', layout);
         
         switch (layout) {
             case '3-top1':
-                this.create3TerminalTop1Layout(container, activeTerminals);
+                await this.create3TerminalTop1Layout(container, activeTerminals);
                 break;
             case '3-top2-horiz':
-                this.create3TerminalTop2HorizLayout(container, activeTerminals);
+                await this.create3TerminalTop2HorizLayout(container, activeTerminals);
                 break;
             case '3-left2':
-                this.create3TerminalLeft2Layout(container, activeTerminals);
+                await this.create3TerminalLeft2Layout(container, activeTerminals);
                 break;
             case '3-right2':
-                this.create3TerminalRight2Layout(container, activeTerminals);
+                await this.create3TerminalRight2Layout(container, activeTerminals);
                 break;
             default:
                 // Default to top1 layout
-                this.create3TerminalTop1Layout(container, activeTerminals);
+                await this.create3TerminalTop1Layout(container, activeTerminals);
                 break;
         }
     }
 
-    create3TerminalTop1Layout(container, activeTerminals) {
+    async create3TerminalTop1Layout(container, activeTerminals) {
         // Reset CSS variables to ensure 50-50 split for bottom terminals
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.setProperty('--left-width', '50%');
@@ -6302,12 +6540,12 @@ class TerminalManager {
         rowBottom.className = 'terminal-row-bottom';
         
         // Add first terminal to top row (full width)
-        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        const terminal1 = await this.createTerminalElement(activeTerminals[0]);
         rowTop.appendChild(terminal1);
         
         // Add remaining two terminals to bottom row
-        const terminal2 = this.createTerminalElement(activeTerminals[1]);
-        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
+        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         rowBottom.appendChild(terminal2);
         rowBottom.appendChild(terminal3);
         
@@ -6324,7 +6562,7 @@ class TerminalManager {
         container.appendChild(hResizer);
     }
 
-    create3TerminalTop2HorizLayout(container, activeTerminals) {
+    async create3TerminalTop2HorizLayout(container, activeTerminals) {
         // Reset CSS variables to ensure 50-50 split for top terminals
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.setProperty('--left-width', '50%');
@@ -6338,8 +6576,8 @@ class TerminalManager {
         rowBottom.className = 'terminal-row-bottom';
         
         // Add first two terminals to top row
-        const terminal1 = this.createTerminalElement(activeTerminals[0]);
-        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        const terminal1 = await this.createTerminalElement(activeTerminals[0]);
+        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
         rowTop.appendChild(terminal1);
         rowTop.appendChild(terminal2);
         
@@ -6348,7 +6586,7 @@ class TerminalManager {
         rowTop.appendChild(vResizerTop);
         
         // Add third terminal to bottom row (full width)
-        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         rowBottom.appendChild(terminal3);
         
         // Append rows to container
@@ -6360,7 +6598,7 @@ class TerminalManager {
         container.appendChild(hResizer);
     }
 
-    create3TerminalLeft2Layout(container, activeTerminals) {
+    async create3TerminalLeft2Layout(container, activeTerminals) {
         // Reset all CSS variables first
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.removeProperty('--left-width');
@@ -6383,8 +6621,8 @@ class TerminalManager {
         columnRight.className = 'terminal-column-right';
         
         // Add first two terminals to left column
-        const terminal1 = this.createTerminalElement(activeTerminals[0]);
-        const terminal2 = this.createTerminalElement(activeTerminals[1]);
+        const terminal1 = await this.createTerminalElement(activeTerminals[0]);
+        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
         columnLeft.appendChild(terminal1);
         columnLeft.appendChild(terminal2);
         
@@ -6393,7 +6631,7 @@ class TerminalManager {
         columnLeft.appendChild(hResizerLeft);
         
         // Add third terminal to right column
-        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         columnRight.appendChild(terminal3);
         
         // Append columns to container
@@ -6405,7 +6643,7 @@ class TerminalManager {
         container.appendChild(vResizer);
     }
 
-    create3TerminalRight2Layout(container, activeTerminals) {
+    async create3TerminalRight2Layout(container, activeTerminals) {
         // Reset all CSS variables first
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.removeProperty('--left-width');
@@ -6428,12 +6666,12 @@ class TerminalManager {
         columnRight.className = 'terminal-column-right';
         
         // Add first terminal to left column
-        const terminal1 = this.createTerminalElement(activeTerminals[0]);
+        const terminal1 = await this.createTerminalElement(activeTerminals[0]);
         columnLeft.appendChild(terminal1);
         
         // Add remaining two terminals to right column
-        const terminal2 = this.createTerminalElement(activeTerminals[1]);
-        const terminal3 = this.createTerminalElement(activeTerminals[2]);
+        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
+        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         columnRight.appendChild(terminal2);
         columnRight.appendChild(terminal3);
         
@@ -6450,11 +6688,11 @@ class TerminalManager {
         container.appendChild(vResizer);
     }
 
-    createTerminalLayoutWithResizers(container, activeTerminals) {
+    async createTerminalLayoutWithResizers(container, activeTerminals) {
         const terminalCount = activeTerminals.length;
         
         if (terminalCount === 3) {
-            this.create3TerminalLayout(container, activeTerminals);
+            await this.create3TerminalLayout(container, activeTerminals);
         } else if (terminalCount === 4) {
             // Create independent row structure for 4 terminals
             const row1 = document.createElement('div');
@@ -6464,14 +6702,14 @@ class TerminalManager {
             row2.className = 'terminal-row-2';
             
             // Add first two terminals to row 1
-            const terminal1 = this.createTerminalElement(activeTerminals[0]);
-            const terminal2 = this.createTerminalElement(activeTerminals[1]);
+            const terminal1 = await this.createTerminalElement(activeTerminals[0]);
+            const terminal2 = await this.createTerminalElement(activeTerminals[1]);
             row1.appendChild(terminal1);
             row1.appendChild(terminal2);
             
             // Add last two terminals to row 2
-            const terminal3 = this.createTerminalElement(activeTerminals[2]);
-            const terminal4 = this.createTerminalElement(activeTerminals[3]);
+            const terminal3 = await this.createTerminalElement(activeTerminals[2]);
+            const terminal4 = await this.createTerminalElement(activeTerminals[3]);
             row2.appendChild(terminal3);
             row2.appendChild(terminal4);
             
@@ -6491,10 +6729,10 @@ class TerminalManager {
             
         } else {
             // Original logic for other terminal counts
-            activeTerminals.forEach(terminalId => {
-                const terminalElement = this.createTerminalElement(terminalId);
+            for (const terminalId of activeTerminals) {
+                const terminalElement = await this.createTerminalElement(terminalId);
                 container.appendChild(terminalElement);
-            });
+            }
             
             // Add resizers as absolutely positioned elements
             if (terminalCount === 2) {
@@ -6897,9 +7135,22 @@ class TerminalManager {
                         logger.disable();
                     }
                     
-                    // Update LogViewer visibility
-                    if (window.logViewer) {
-                        window.logViewer.setDebugMode(debugModeEnabled);
+                    // Update LogViewer - create or destroy based on debug mode
+                    if (debugModeEnabled) {
+                        // Create LogViewer if it doesn't exist
+                        if (!window.logViewer) {
+                            const LogViewer = require('./log-viewer');
+                            window.logViewer = new LogViewer();
+                        }
+                        window.logViewer.setDebugMode(true);
+                    } else {
+                        // Destroy LogViewer when debug mode is disabled
+                        if (window.logViewer) {
+                            window.logViewer.setDebugMode(false);
+                            // Also destroy the instance to fully clean up
+                            window.logViewer.destroy();
+                            window.logViewer = null;
+                        }
                     }
                 } else {
                     // Revert checkbox on error
@@ -7555,17 +7806,88 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
         logger.enable();
         
         // Initialize LogViewer if not already initialized
-        if (window.logViewer && !window.logViewer.container) {
-            window.logViewer.init();
-        } else if (!window.logViewer) {
+        if (window.logViewer) {
+            // LogViewer already exists, just enable debug mode
+            window.logViewer.setDebugMode(true);
+        } else {
             // Create LogViewer if it doesn't exist
             const LogViewer = require('./log-viewer');
             window.logViewer = new LogViewer();
+            window.logViewer.setDebugMode(true);
         }
     }
 });
 
 // Initialize the terminal manager when the DOM is loaded
+// Feature highlights configuration
+const FEATURE_HIGHLIGHTS_CONFIG = [
+    {
+        featureName: 'tabbedMode',
+        targetSelector: '#tabbed-mode-btn',
+        message: 'Toggle between grid and tabbed layouts',
+        position: 'bottom',
+        duration: 30000, // 30 seconds
+        showInVersions: ['0.0.38'], // Only show in these versions
+        delay: 500 // Delay before showing
+    },
+    // Add more features here in the future:
+    // {
+    //     featureName: 'someNewFeature',
+    //     targetSelector: '#some-button',
+    //     message: 'Check out this new feature!',
+    //     position: 'left',
+    //     duration: 20000,
+    //     showInVersions: ['0.0.39', '0.0.40'], // Can show in multiple versions
+    //     delay: 1000
+    // }
+];
+
+// Initialize feature highlights
+async function initializeFeatureHighlights() {
+    // Get app version from main process
+    try {
+        const appVersion = await ipcRenderer.invoke('get-app-version');
+        window.appVersion = appVersion; // Make it available globally
+        console.log('App version:', appVersion);
+    } catch (error) {
+        console.warn('Could not get app version:', error);
+    }
+    
+    // Create global instance for development testing
+    window.featureHighlight = new FeatureHighlight();
+    
+    // Process all configured highlights
+    FEATURE_HIGHLIGHTS_CONFIG.forEach(config => {
+        // Check if this feature should be shown in current version
+        // DEV MODE: Uncomment next line to always show highlights in dev
+        // if (true) {  // TEMPORARY: Always show in dev
+        if (config.showInVersions.includes(window.appVersion)) {
+            setTimeout(() => {
+                window.featureHighlight.show({
+                    targetSelector: config.targetSelector,
+                    featureName: config.featureName,
+                    message: config.message,
+                    position: config.position,
+                    duration: config.duration
+                });
+                console.log(`Showing feature highlight: ${config.featureName} for version ${window.appVersion}`);
+            }, config.delay || 500);
+        } else {
+            console.log(`Feature ${config.featureName} skipped - version ${window.appVersion} not in [${config.showInVersions.join(', ')}]`);
+        }
+    });
+    
+    // For development: expose test functions in console
+    if (window.location.href.includes('--dev') || process.env.ENABLE_DEBUG_LOGS) {
+        console.log('🎯 Feature Highlight Dev Mode Enabled!');
+        console.log('Test commands:');
+        console.log('  featureHighlight.testHighlight("tabbedMode") - Test tabbed mode highlight');
+        console.log('  featureHighlight.reset("tabbedMode") - Reset tabbed mode highlight');
+        console.log('  featureHighlight.resetAll() - Reset all highlights');
+        console.log('  featureHighlight.forceShow({...}) - Force show any highlight');
+    }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
     // Get loading screen element
     const loadingScreen = document.getElementById('loading-screen');
@@ -7595,6 +7917,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                     loadingScreen.style.display = 'none';
                 }, 300);
             }
+            
+            // Initialize feature highlights after UI is ready
+            initializeFeatureHighlights();
         }, 100);
     } catch (error) {
         console.error('Error during initialization:', error);
@@ -7605,11 +7930,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
     
     // Sync debug mode state from settings FIRST
+    let debugEnabled = false;
     try {
         const debugModeResult = await ipcRenderer.invoke('get-debug-mode');
         if (debugModeResult.success) {
+            debugEnabled = debugModeResult.enabled;
             const logger = require('./logger');
-            if (debugModeResult.enabled) {
+            if (debugEnabled) {
                 logger.enable();
             } else {
                 logger.disable();
@@ -7619,9 +7946,24 @@ document.addEventListener('DOMContentLoaded', async () => {
         console.error('Error syncing debug mode:', error);
     }
     
-    // Initialize LogViewer AFTER syncing debug mode (only if not already created)
-    if (!window.logViewer) {
+    // Clean up any orphan log viewer elements from previous sessions
+    if (!debugEnabled) {
+        const orphanButton = document.querySelector('.log-viewer-button');
+        if (orphanButton) {
+            console.log('Removing orphan log viewer button');
+            orphanButton.remove();
+        }
+        const orphanContainer = document.querySelector('.log-viewer-container');
+        if (orphanContainer) {
+            console.log('Removing orphan log viewer container');
+            orphanContainer.remove();
+        }
+    }
+    
+    // Initialize LogViewer ONLY if debug mode is enabled
+    if (debugEnabled && !window.logViewer) {
         window.logViewer = new LogViewer();
+        window.logViewer.setDebugMode(true);
     }
     
     // Start performance monitoring in dev mode

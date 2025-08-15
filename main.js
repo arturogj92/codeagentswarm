@@ -470,7 +470,7 @@ function createWindow() {
         closeSplashWindow();
         mainWindow.show();
         mainWindow.focus();
-        console.log(`[Startup] Window shown after ${Date.now() - startTime}ms`);
+        // console.log(`[Startup] Window shown after ${Date.now() - startTime}ms`); // startTime not in scope here
       }, 300);
     }, 200); // 200ms delay to ensure everything is loaded
   });
@@ -3646,6 +3646,11 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
       if (mainWindow) {
         if (mainWindow.isMinimized()) mainWindow.restore();
         mainWindow.focus();
+        
+        // If in tabbed mode, switch to the corresponding tab
+        const terminalNumber = parseInt(terminalMatch[1]);
+        const quadrant = terminalNumber - 1; // Convert 1-based to 0-based
+        mainWindow.webContents.send('focus-terminal-tab', quadrant);
       }
     });
   } else {
@@ -4944,6 +4949,245 @@ ipcMain.handle('open-folder', async (event, terminalId) => {
     return { success: true };
   } catch (error) {
     console.error('Error opening folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// ============================================================================
+// IDE Integration - Generic system for detecting and opening IDEs
+// ============================================================================
+
+// Configuration for supported IDEs - Easy to add more!
+const IDE_CONFIGS = {
+  intellij: {
+    name: 'IntelliJ IDEA',
+    icon: 'code-2', // Lucide icon name
+    platforms: {
+      darwin: { // macOS
+        paths: [
+          '~/Applications/IntelliJ IDEA Ultimate.app',
+          '~/Applications/IntelliJ IDEA.app',
+          '/Applications/IntelliJ IDEA.app',
+          '/Applications/IntelliJ IDEA Ultimate.app',
+          '/Applications/IntelliJ IDEA Community Edition.app',
+          '~/Library/Application Support/JetBrains/Toolbox/apps/IDEA-U',
+          '~/Library/Application Support/JetBrains/Toolbox/apps/IDEA-C'
+        ],
+        openCommand: (idePath, projectPath) => `open -na "${idePath}" --args "${projectPath}"`,
+        searchCommand: 'mdfind -name "IntelliJ IDEA.app"'
+      },
+      win32: { // Windows
+        paths: [
+          'C:\\Program Files\\JetBrains\\IntelliJ IDEA',
+          'C:\\Program Files\\JetBrains\\IntelliJ IDEA Community Edition',
+          'C:\\Program Files (x86)\\JetBrains\\IntelliJ IDEA'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}\\bin\\idea64.exe" "${projectPath}"`,
+        searchCommand: null
+      },
+      linux: {
+        paths: [
+          '/usr/local/bin/idea',
+          '/opt/idea/bin/idea.sh',
+          '/snap/bin/intellij-idea-ultimate',
+          '/snap/bin/intellij-idea-community'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}" "${projectPath}"`,
+        searchCommand: 'which idea'
+      }
+    }
+  },
+  vscode: {
+    name: 'Visual Studio Code',
+    icon: 'file-code',
+    platforms: {
+      darwin: {
+        paths: [
+          '/Applications/Visual Studio Code.app',
+          '/usr/local/bin/code'
+        ],
+        openCommand: (idePath, projectPath) => `open -na "${idePath}" --args "${projectPath}"`,
+        searchCommand: 'mdfind -name "Visual Studio Code.app"'
+      },
+      win32: {
+        paths: [
+          'C:\\Program Files\\Microsoft VS Code',
+          'C:\\Program Files (x86)\\Microsoft VS Code',
+          process.env.LOCALAPPDATA + '\\Programs\\Microsoft VS Code'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}\\Code.exe" "${projectPath}"`,
+        searchCommand: null
+      },
+      linux: {
+        paths: [
+          '/usr/bin/code',
+          '/usr/local/bin/code',
+          '/snap/bin/code'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}" "${projectPath}"`,
+        searchCommand: 'which code'
+      }
+    }
+  },
+  cursor: {
+    name: 'Cursor',
+    icon: 'edit-3',
+    platforms: {
+      darwin: {
+        paths: [
+          '/Applications/Cursor.app',
+          '/usr/local/bin/cursor'
+        ],
+        openCommand: (idePath, projectPath) => `open -na "${idePath}" --args "${projectPath}"`,
+        searchCommand: 'mdfind -name "Cursor.app"'
+      },
+      win32: {
+        paths: [
+          process.env.LOCALAPPDATA + '\\Programs\\cursor\\Cursor.exe'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}" "${projectPath}"`,
+        searchCommand: null
+      },
+      linux: {
+        paths: [
+          '/usr/bin/cursor',
+          '/usr/local/bin/cursor'
+        ],
+        openCommand: (idePath, projectPath) => `"${idePath}" "${projectPath}"`,
+        searchCommand: 'which cursor'
+      }
+    }
+  }
+  // Add more IDEs here in the future:
+  // webstorm: { ... },
+  // sublime: { ... },
+  // atom: { ... },
+};
+
+// Generic function to detect if an IDE is installed
+async function detectIDE(ideKey) {
+  const fs = require('fs');
+  const path = require('path');
+  const os = require('os');
+  const { exec } = require('child_process');
+  const util = require('util');
+  const execPromise = util.promisify(exec);
+  
+  const ideConfig = IDE_CONFIGS[ideKey];
+  if (!ideConfig) return { installed: false };
+  
+  const platform = process.platform;
+  const platformConfig = ideConfig.platforms[platform];
+  if (!platformConfig) return { installed: false };
+  
+  // Check standard paths
+  for (let idePath of platformConfig.paths) {
+    // Expand home directory
+    if (idePath.startsWith('~')) {
+      idePath = path.join(os.homedir(), idePath.slice(1));
+    }
+    
+    if (fs.existsSync(idePath)) {
+      return { 
+        installed: true, 
+        path: idePath,
+        name: ideConfig.name,
+        icon: ideConfig.icon,
+        key: ideKey
+      };
+    }
+  }
+  
+  // Try search command if available
+  if (platformConfig.searchCommand) {
+    try {
+      const { stdout } = await execPromise(platformConfig.searchCommand);
+      if (stdout && stdout.trim()) {
+        const foundPath = stdout.trim().split('\n')[0]; // Take first result
+        return { 
+          installed: true, 
+          path: foundPath,
+          name: ideConfig.name,
+          icon: ideConfig.icon,
+          key: ideKey
+        };
+      }
+    } catch (e) {
+      // Search command failed, IDE not found
+    }
+  }
+  
+  return { installed: false };
+}
+
+// Detect all installed IDEs
+async function detectAllIDEs() {
+  const detectedIDEs = [];
+  
+  for (const ideKey of Object.keys(IDE_CONFIGS)) {
+    const result = await detectIDE(ideKey);
+    if (result.installed) {
+      detectedIDEs.push(result);
+    }
+  }
+  
+  return detectedIDEs;
+}
+
+// Handler to check which IDEs are installed
+ipcMain.handle('check-installed-ides', async () => {
+  try {
+    const ides = await detectAllIDEs();
+    return { success: true, ides };
+  } catch (error) {
+    console.error('Error detecting IDEs:', error);
+    return { success: false, ides: [] };
+  }
+});
+
+// Handler to open project in specific IDE
+ipcMain.handle('open-in-ide', async (event, terminalId, ideKey) => {
+  try {
+    const { exec } = require('child_process');
+    
+    // Get the IDE configuration
+    const ideResult = await detectIDE(ideKey);
+    if (!ideResult.installed) {
+      return { success: false, error: `${IDE_CONFIGS[ideKey]?.name || ideKey} not found` };
+    }
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    // Get the open command for this platform
+    const platform = process.platform;
+    const openCommand = IDE_CONFIGS[ideKey].platforms[platform].openCommand;
+    const command = openCommand(ideResult.path, cwd);
+    
+    console.log(`Opening ${ideResult.name} with command:`, command);
+    
+    // Execute the command and return a promise
+    return new Promise((resolve) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error(`Error opening ${ideResult.name}:`, error);
+          console.error('stderr:', stderr);
+          resolve({ success: false, error: error.message });
+        } else {
+          console.log(`Successfully opened ${ideResult.name}`);
+          if (stdout) console.log('stdout:', stdout);
+          resolve({ success: true });
+        }
+      });
+    });
+  } catch (error) {
+    console.error('Error opening IDE:', error);
     return { success: false, error: error.message };
   }
 });

@@ -369,5 +369,21 @@ NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
+## 🚨 IMPORTANT: Application Execution Rules 🚨
+
+**NEVER run the application automatically. This includes:**
+- `npm start`
+- `npm run dev`
+- `electron .`
+- Any command that launches the Electron app
+
+**ONLY run these commands when the user EXPLICITLY requests it with phrases like:**
+- "run the app"
+- "start the application"
+- "launch the app"
+- "ejecuta la app" / "abre la app" (Spanish)
+
+**The user will run the application themselves when needed. Do not launch it proactively.**
+
 <!-- CODEAGENTSWARM CONFIG END -->
 

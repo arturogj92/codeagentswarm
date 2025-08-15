@@ -70,7 +70,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "logo_prod_512.png",
+      "icon": "logomac.png",
       "target": [
         {
           "target": "dmg"

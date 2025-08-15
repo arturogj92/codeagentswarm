@@ -20,7 +20,7 @@ fi
 
 # Convert PNG icon to ICNS (if png2icns is available)
 if command -v png2icns &> /dev/null; then
-    png2icns dmg-icon.icns logo_prod_512.png
+    png2icns dmg-icon.icns logomac.png
     echo "✅ Created dmg-icon.icns"
 else
     echo "⚠️  png2icns not found. Install with: brew install libicns"
@@ -30,16 +30,16 @@ else
     mkdir -p dmg-icon.iconset
     
     # Generate different sizes from the 512px icon
-    sips -z 16 16     logo_prod_512.png --out dmg-icon.iconset/icon_16x16.png
-    sips -z 32 32     logo_prod_512.png --out dmg-icon.iconset/icon_16x16@2x.png
-    sips -z 32 32     logo_prod_512.png --out dmg-icon.iconset/icon_32x32.png
-    sips -z 64 64     logo_prod_512.png --out dmg-icon.iconset/icon_32x32@2x.png
-    sips -z 128 128   logo_prod_512.png --out dmg-icon.iconset/icon_128x128.png
-    sips -z 256 256   logo_prod_512.png --out dmg-icon.iconset/icon_128x128@2x.png
-    sips -z 256 256   logo_prod_512.png --out dmg-icon.iconset/icon_256x256.png
-    sips -z 512 512   logo_prod_512.png --out dmg-icon.iconset/icon_256x256@2x.png
-    sips -z 512 512   logo_prod_512.png --out dmg-icon.iconset/icon_512x512.png
-    cp logo_prod_512.png dmg-icon.iconset/icon_512x512@2x.png
+    sips -z 16 16     logomac.png --out dmg-icon.iconset/icon_16x16.png
+    sips -z 32 32     logomac.png --out dmg-icon.iconset/icon_16x16@2x.png
+    sips -z 32 32     logomac.png --out dmg-icon.iconset/icon_32x32.png
+    sips -z 64 64     logomac.png --out dmg-icon.iconset/icon_32x32@2x.png
+    sips -z 128 128   logomac.png --out dmg-icon.iconset/icon_128x128.png
+    sips -z 256 256   logomac.png --out dmg-icon.iconset/icon_128x128@2x.png
+    sips -z 256 256   logomac.png --out dmg-icon.iconset/icon_256x256.png
+    sips -z 512 512   logomac.png --out dmg-icon.iconset/icon_256x256@2x.png
+    sips -z 512 512   logomac.png --out dmg-icon.iconset/icon_512x512.png
+    cp logomac.png dmg-icon.iconset/icon_512x512@2x.png
     
     # Convert to icns
     iconutil -c icns dmg-icon.iconset
