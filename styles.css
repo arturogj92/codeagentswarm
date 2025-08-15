@@ -1494,14 +1494,15 @@ body::before {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: var(--text-muted);
-  background: var(--surface);
-  border: 2px dashed var(--border);
-  border-radius: 8px;
+  color: var(--text-secondary);
+  background: linear-gradient(135deg, rgba(127, 90, 240, 0.05) 0%, rgba(127, 90, 240, 0.02) 100%);
+  border: 2px solid rgba(127, 90, 240, 0.2);
+  border-radius: 12px;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  backdrop-filter: blur(10px);
 }
 
 .terminal-placeholder::before {
@@ -1511,27 +1512,87 @@ body::before {
   left: -50%;
   width: 200%;
   height: 200%;
-  background: radial-gradient(circle, rgba(127, 90, 240, 0.1) 0%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(127, 90, 240, 0.15) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+  animation: rotate 20s linear infinite;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.terminal-placeholder::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 12px;
+  padding: 2px;
+  background: linear-gradient(45deg, transparent, rgba(127, 90, 240, 0.3), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
   opacity: 0;
   transition: opacity 0.3s ease;
-  pointer-events: none;
 }
 
 .terminal-placeholder:hover {
-  border-color: var(--primary);
-  background: var(--surface-hover);
+  border-color: rgba(127, 90, 240, 0.5);
+  background: linear-gradient(135deg, rgba(127, 90, 240, 0.1) 0%, rgba(127, 90, 240, 0.05) 100%);
   color: var(--text-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px -10px rgba(127, 90, 240, 0.3);
 }
 
 .terminal-placeholder:hover::before {
   opacity: 1;
 }
 
+.terminal-placeholder:hover::after {
+  opacity: 1;
+}
+
+.terminal-placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  position: relative;
+}
+
 .terminal-placeholder-icon {
-  font-size: 2.5rem;
-  margin-bottom: 12px;
-  filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.5));
-  /* animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; */
+  width: 64px;
+  height: 64px;
+  margin-bottom: 16px;
+  filter: drop-shadow(0 4px 20px rgba(127, 90, 240, 0.3));
+  transition: all 0.3s ease;
+}
+
+.terminal-placeholder:hover .terminal-placeholder-icon {
+  transform: scale(1.1);
+  filter: drop-shadow(0 6px 30px rgba(127, 90, 240, 0.5));
+}
+
+.terminal-placeholder-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.terminal-placeholder-text {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  letter-spacing: 0.3px;
+}
+
+.terminal-placeholder-subtext {
+  font-size: 13px;
+  color: var(--text-secondary);
+  opacity: 0.8;
 }
 
 @keyframes pulse {

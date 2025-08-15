@@ -91,6 +91,9 @@ class TerminalManager {
         this.checkHooksStatus(); // Check hooks status on startup
         this.startHooksStatusUpdates(); // Periodically check hooks status
         
+        // Setup delegated event listeners for placeholders early
+        this.attachTerminalEventListeners();
+        
         // Listen for clear waiting states message
         ipcRenderer.on('clear-waiting-states', () => {
             this.terminalsNeedingAttention.clear();
@@ -244,12 +247,7 @@ class TerminalManager {
             this.showSettingsModal();
         });
 
-        document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
-            placeholder.addEventListener('click', (e) => {
-                const quadrant = parseInt(e.currentTarget.dataset.quadrant);
-                this.showDirectorySelector(quadrant);
-            });
-        });
+        // Placeholder clicks are now handled by event delegation in attachTerminalEventListeners()
 
         document.querySelectorAll('.terminal-control-btn').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -570,7 +568,55 @@ class TerminalManager {
     }
 
     async showDirectorySelector(quadrant) {
-        const wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
+        console.log(`showDirectorySelector called for quadrant ${quadrant}, mode: ${this.layoutMode}`);
+        
+        // Debug: log all terminal-quadrant elements (not placeholders)
+        const allQuadrants = document.querySelectorAll('.terminal-quadrant');
+        console.log(`Found ${allQuadrants.length} terminal-quadrant elements in DOM`);
+        allQuadrants.forEach(el => {
+            console.log(`  Quadrant ${el.dataset.quadrant}: parent=${el.parentElement?.id || el.parentElement?.className}, hasWrapper=${!!el.querySelector('.terminal-wrapper')}`);
+        });
+        
+        // Find wrapper with more robust search
+        let wrapper;
+        let quadrantElement;
+        
+        if (this.layoutMode === 'tabbed') {
+            // In tabbed mode, look in the tabbed content container
+            const tabbedContent = document.getElementById('tabbed-terminal-content');
+            if (tabbedContent) {
+                quadrantElement = tabbedContent.querySelector(`[data-quadrant="${quadrant}"]`);
+            }
+        } else {
+            // In grid mode, look in the terminals-container (could be nested in rows/columns)
+            const gridContainer = document.getElementById('terminals-container');
+            if (gridContainer) {
+                quadrantElement = gridContainer.querySelector(`[data-quadrant="${quadrant}"]`);
+                console.log(`Grid mode: found quadrantElement=${!!quadrantElement} in terminals-container`);
+            }
+        }
+        
+        // Fallback to document-wide search
+        if (!quadrantElement) {
+            quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+            console.log(`Fallback: found quadrantElement=${!!quadrantElement} in document`);
+        }
+        
+        if (quadrantElement) {
+            wrapper = quadrantElement.querySelector('.terminal-wrapper');
+            console.log(`Found wrapper=${!!wrapper} in quadrantElement`);
+        }
+        
+        if (!wrapper) {
+            console.error(`Terminal wrapper not found for quadrant ${quadrant} in ${this.layoutMode} mode`);
+            console.error(`QuadrantElement found: ${!!quadrantElement}`);
+            if (quadrantElement) {
+                console.error(`QuadrantElement HTML:`, quadrantElement.outerHTML.substring(0, 500));
+            }
+            return;
+        }
+        
+        console.log(`Wrapper found for quadrant ${quadrant}`);
         
         // Remove placeholder if it exists
         const placeholder = wrapper.querySelector('.terminal-placeholder');
@@ -649,14 +695,16 @@ class TerminalManager {
             if (!wrapper.querySelector('.terminal-placeholder') && !wrapper.querySelector('.terminal')) {
                 wrapper.innerHTML = `
                     <div class="terminal-placeholder" data-quadrant="${quadrant}">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
+                        <div class="terminal-placeholder-content">
+                            <div class="terminal-placeholder-icon">
+                                <img src="assets/claude-icon.png" alt="Claude">
+                            </div>
+                            <div class="terminal-placeholder-text">Start Claude Code</div>
+                            <div class="terminal-placeholder-subtext">Click to launch terminal</div>
+                        </div>
                     </div>
                 `;
-                wrapper.querySelector('.terminal-placeholder').addEventListener('click', (e) => {
-                    const quadrant = parseInt(e.currentTarget.dataset.quadrant);
-                    this.showDirectorySelector(quadrant);
-                });
+                // Event delegation handles the click, no need to add listener here
             }
         };
 
@@ -815,7 +863,18 @@ class TerminalManager {
     }
 
     showSessionSelector(quadrant, selectedDirectory) {
-        const wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
+        // In tabbed mode, we need to look in the tabbed content container
+        let wrapper;
+        if (this.layoutMode === 'tabbed') {
+            wrapper = document.querySelector(`.tabbed-terminal-content [data-quadrant="${quadrant}"] .terminal-wrapper`);
+        } else {
+            wrapper = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-wrapper`);
+        }
+        
+        if (!wrapper) {
+            console.error(`Terminal wrapper not found for quadrant ${quadrant} in session selector`);
+            return;
+        }
         
         // Create session selector modal
         const selectorDiv = document.createElement('div');
@@ -881,26 +940,68 @@ class TerminalManager {
     }
 
     async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
-        // In tabbed mode, we need to handle this differently
+        console.log(`Starting terminal ${quadrant} in ${this.layoutMode} mode, directory: ${selectedDirectory}`);
+        
+        // Find the terminal element based on current layout mode with more robust search
         let quadrantElement;
+        
+        // Try mode-specific search first
         if (this.layoutMode === 'tabbed') {
-            quadrantElement = document.querySelector(`.tabbed-terminal-content [data-quadrant="${quadrant}"]`);
+            // In tabbed mode, look in the tabbed content container
+            const tabbedContent = document.getElementById('tabbed-terminal-content');
+            if (tabbedContent) {
+                quadrantElement = tabbedContent.querySelector(`[data-quadrant="${quadrant}"]`);
+                console.log(`Looking for terminal in tabbed mode, found:`, quadrantElement);
+            }
         } else {
+            // In grid mode, look in the terminals container
+            const gridContainer = document.getElementById('terminals-container');
+            if (gridContainer) {
+                // Try to find in any nested structure (could be in rows/columns)
+                quadrantElement = gridContainer.querySelector(`[data-quadrant="${quadrant}"]`);
+                console.log(`Looking for terminal in grid mode, found:`, quadrantElement);
+            }
+        }
+        
+        // Fallback to document-wide search if not found
+        if (!quadrantElement) {
             quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
+            console.log(`Using fallback search, found:`, quadrantElement);
         }
         
         if (!quadrantElement) {
-            console.error(`Terminal element not found for quadrant ${quadrant}`);
+            console.error(`Terminal element not found for quadrant ${quadrant} in ${this.layoutMode} mode`);
+            console.error(`Available quadrants:`, document.querySelectorAll('[data-quadrant]'));
             return;
         }
         
+        // Find wrapper with verification
         const wrapper = quadrantElement.querySelector('.terminal-wrapper');
+        if (!wrapper) {
+            console.error(`Terminal wrapper not found for quadrant ${quadrant}`);
+            console.error(`QuadrantElement structure:`, quadrantElement.innerHTML.substring(0, 500));
+            return;
+        }
+        
+        // Verify wrapper is actually in the DOM
+        if (!document.body.contains(wrapper)) {
+            console.error(`Wrapper found but not in DOM for quadrant ${quadrant}`);
+            return;
+        }
+        
+        console.log(`Wrapper found and verified in DOM for quadrant ${quadrant}`);
+        
         const placeholder = wrapper.querySelector('.terminal-placeholder');
         
         if (placeholder) {
+            console.log(`Removing placeholder for terminal ${quadrant}`);
             placeholder.remove();
         }
 
+        // Clean wrapper content before adding new elements
+        console.log(`Cleaning wrapper content for quadrant ${quadrant}, current content length: ${wrapper.innerHTML.length}`);
+        wrapper.innerHTML = '';
+        
         // Create loader
         const loader = document.createElement('div');
         loader.className = 'terminal-loader';
@@ -911,6 +1012,7 @@ class TerminalManager {
             <div class="loader-status">Initializing terminal</div>
         `;
         wrapper.appendChild(loader);
+        console.log(`Loader added for terminal ${quadrant}`);
 
         // Track Claude Code readiness
         if (!this.claudeCodeReady) {
@@ -943,6 +1045,15 @@ class TerminalManager {
         terminalDiv.id = `terminal-${quadrant}`;
         terminalDiv.style.display = 'none';
         wrapper.appendChild(terminalDiv);
+        
+        // Verify the terminalDiv was added correctly
+        const addedTerminal = wrapper.querySelector(`#terminal-${quadrant}`);
+        if (!addedTerminal) {
+            console.error(`Failed to add terminalDiv to wrapper for quadrant ${quadrant}`);
+            console.error(`Wrapper content after append:`, wrapper.innerHTML.substring(0, 500));
+            return;
+        }
+        console.log(`TerminalDiv successfully added to wrapper for quadrant ${quadrant}`);
 
         // Initialize xterm.js terminal with better config
         const terminal = new Terminal({
@@ -1026,7 +1137,30 @@ class TerminalManager {
         terminal.loadAddon(fitAddon);
         terminal.loadAddon(webLinksAddon);
         
-        terminal.open(terminalDiv);
+        // Verify terminalDiv is still in DOM before opening terminal
+        if (!document.body.contains(terminalDiv)) {
+            console.error(`TerminalDiv not in DOM before opening for quadrant ${quadrant}`);
+            // Try to re-add it
+            const currentWrapper = quadrantElement.querySelector('.terminal-wrapper');
+            if (currentWrapper) {
+                console.log(`Re-adding terminalDiv to wrapper for quadrant ${quadrant}`);
+                currentWrapper.appendChild(terminalDiv);
+            } else {
+                console.error(`Cannot find wrapper to re-add terminalDiv for quadrant ${quadrant}`);
+                return;
+            }
+        }
+        
+        try {
+            terminal.open(terminalDiv);
+            console.log(`Terminal opened successfully for quadrant ${quadrant}`);
+        } catch (error) {
+            console.error(`Failed to open terminal for quadrant ${quadrant}:`, error);
+            console.error(`TerminalDiv state:`, terminalDiv);
+            console.error(`TerminalDiv parent:`, terminalDiv.parentElement);
+            return;
+        }
+        
         fitAddon.fit();
         
         // Add visibility observer to ensure proper fitting when terminal becomes visible
@@ -1041,7 +1175,9 @@ class TerminalManager {
 
         // Create PTY terminal process with selected directory
         try {
-            await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
+            console.log(`Creating terminal process for quadrant ${quadrant}, directory: ${selectedDirectory}, session: ${sessionType}`);
+            const result = await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
+            console.log(`Terminal creation result:`, result);
             
             // Update only the terminal header to show the "More Options" button
             setTimeout(() => {
@@ -1049,7 +1185,7 @@ class TerminalManager {
             }, 100);
         } catch (error) {
             console.error('Failed to create terminal:', error);
-            this.showNotification('Failed to create terminal', 'error');
+            this.showNotification(`Failed to create terminal: ${error.message || error}`, 'error');
             return;
         }
         
@@ -1308,15 +1444,7 @@ class TerminalManager {
             this.updateBranchDisplay(quadrant);
         }, 2000);
         
-        // If in tabbed mode, refresh the tabs to show the new terminal is active
-        if (this.layoutMode === 'tabbed') {
-            setTimeout(async () => {
-                const activeResult = await ipcRenderer.invoke('get-active-terminals');
-                if (activeResult.success) {
-                    this.renderTabbedLayout(activeResult.terminals);
-                }
-            }, 500);
-        }
+        // No need to refresh tabs here - already handled in addTerminal
 
     }
 
@@ -1572,27 +1700,28 @@ class TerminalManager {
     }
 
     updateTerminalTitle(quadrant, title) {
-        // Update grid mode terminal title
-        const titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
-        if (titleElement) {
-            // Add terminal number before the title
-            const terminalNumber = quadrant + 1;
-            titleElement.textContent = `${terminalNumber} · ${title}`;
-        }
-        
-        // Update tabbed mode tab title and refresh to apply colors
+        // Find the terminal title element based on current layout mode
+        let titleElement;
         if (this.layoutMode === 'tabbed') {
+            // Update both the tab title and the terminal header title in tabbed mode
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"] .tab-title`);
             if (tab) {
                 tab.textContent = title;
             }
-            // Refresh tabs to update colors
-            setTimeout(async () => {
-                const activeResult = await ipcRenderer.invoke('get-active-terminals');
-                if (activeResult.success) {
-                    this.renderTabbedLayout(activeResult.terminals);
-                }
-            }, 100);
+            titleElement = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] .terminal-title`);
+        } else {
+            titleElement = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] .terminal-title`);
+        }
+        
+        if (!titleElement) {
+            // Fallback to general search
+            titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
+        }
+        
+        if (titleElement) {
+            // Add terminal number before the title
+            const terminalNumber = quadrant + 1;
+            titleElement.textContent = `${terminalNumber} · ${title}`;
         }
         
         // Update terminal header color based on project
@@ -1662,8 +1791,25 @@ class TerminalManager {
 
     // Update terminal header color based on project
     updateTerminalHeaderColor(quadrant) {
-        // Update grid mode header
-        const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
+        // Find the terminal header based on current layout mode
+        let terminalHeader;
+        if (this.layoutMode === 'tabbed') {
+            terminalHeader = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] .terminal-header`);
+        } else {
+            terminalHeader = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] .terminal-header`);
+        }
+        
+        if (!terminalHeader) {
+            // Fallback to general search
+            terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
+            if (!terminalHeader) {
+                console.warn(`Terminal header not found for quadrant ${quadrant} in mode ${this.layoutMode}`);
+                return;
+            }
+        }
+        
+        console.log(`Updating header color for terminal ${quadrant} in ${this.layoutMode} mode`);
+        
         if (terminalHeader) {
             // Only apply colors if terminal is actually running
             if (!this.terminals.has(quadrant)) {
@@ -1682,10 +1828,10 @@ class TerminalManager {
                     titleElement.style.color = 'var(--text-secondary)';
                     titleElement.style.fontWeight = '600';
                     titleElement.style.textShadow = '';
-                titleElement.style.filter = '';
+                    titleElement.style.filter = '';
+                }
+                return;
             }
-            return;
-        }
         
         // Get the project name for this terminal
         const projectName = this.getTerminalProjectName(quadrant);
@@ -1765,15 +1911,13 @@ class TerminalManager {
         }
         }
         
-        // Update tab color if in tabbed mode
+        // Update tab color if in tabbed mode (directly without re-rendering)
         if (this.layoutMode === 'tabbed') {
-            // Simply re-render tabs to apply the new colors
-            setTimeout(async () => {
-                const activeResult = await ipcRenderer.invoke('get-active-terminals');
-                if (activeResult.success) {
-                    this.renderTabbedLayout(activeResult.terminals);
-                }
-            }, 100);
+            // Apply color directly to the tab without re-rendering everything
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"]`);
+            if (tab && projectColor) {
+                tab.style.setProperty('--project-color', projectColor);
+            }
         }
     }
 
@@ -4211,7 +4355,20 @@ class TerminalManager {
             }
             
             const result = await ipcRenderer.invoke('git-get-branches', terminalId);
-            const branchDisplay = document.getElementById(`git-branch-display-${terminalId}`);
+            
+            // Find git branch display based on current layout mode
+            let branchDisplay;
+            if (this.layoutMode === 'tabbed') {
+                branchDisplay = document.querySelector(`#tabbed-terminal-content [data-quadrant="${terminalId}"] #git-branch-display-${terminalId}`);
+            } else {
+                branchDisplay = document.querySelector(`#terminals-container [data-quadrant="${terminalId}"] #git-branch-display-${terminalId}`);
+            }
+            
+            if (!branchDisplay) {
+                // Fallback to ID search
+                branchDisplay = document.getElementById(`git-branch-display-${terminalId}`);
+            }
+            
             const branchName = branchDisplay?.querySelector('.current-branch-name');
             
             if (result.success && result.currentBranch && branchDisplay && branchName) {
@@ -4508,7 +4665,19 @@ class TerminalManager {
             const result = await ipcRenderer.invoke('task-get-current', terminalId);
             // Convert terminal_id (1-4) back to quadrant (0-3) for DOM element lookup
             const quadrant = terminalId - 1;
-            const taskIndicator = document.getElementById(`current-task-${quadrant}`);
+            
+            // Find task indicator based on current layout mode
+            let taskIndicator;
+            if (this.layoutMode === 'tabbed') {
+                taskIndicator = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] #current-task-${quadrant}`);
+            } else {
+                taskIndicator = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] #current-task-${quadrant}`);
+            }
+            
+            if (!taskIndicator) {
+                // Fallback to ID search
+                taskIndicator = document.getElementById(`current-task-${quadrant}`);
+            }
             
             if (!taskIndicator) return;
 
@@ -4762,23 +4931,14 @@ class TerminalManager {
                 // Get the new terminal ID from the result
                 const newTerminalId = result.terminalId;
                 
-                // Render based on current layout mode
-                await this.renderTerminals();
-                await this.updateTerminalManagementButtons();
-                
-                // In tabbed mode, switch to the new terminal
+                // In tabbed mode, set active terminal before rendering
                 if (this.layoutMode === 'tabbed' && newTerminalId !== undefined) {
                     this.activeTabTerminal = newTerminalId;
-                    // Re-render tabbed layout to show new terminal
-                    const activeResult = await ipcRenderer.invoke('get-active-terminals');
-                    if (activeResult.success) {
-                        this.renderTabbedLayout(activeResult.terminals);
-                        // Switch to the new tab
-                        setTimeout(() => {
-                            this.switchToTab(newTerminalId);
-                        }, 100);
-                    }
                 }
+                
+                // Render terminals (this will handle both grid and tabbed mode)
+                await this.renderTerminals();
+                await this.updateTerminalManagementButtons();
                 
                 // Reparar controles de todos los terminales después de re-renderizar
                 // Esto asegura que los botones de scroll se muestren correctamente
@@ -5023,8 +5183,7 @@ class TerminalManager {
                 lucide.createIcons();
             }
 
-            console.log('🔗 Re-attaching event listeners...');
-            // Re-attach event listeners
+            console.log('🔗 Re-attaching event listeners after rendering...');
             this.attachTerminalEventListeners();
             
             // Restore task indicators and git branch displays
@@ -5049,14 +5208,27 @@ class TerminalManager {
         element.dataset.quadrant = terminalId;
         element.dataset.terminalId = terminalId;
         
-        // Check if terminal already exists
+        // Check if terminal already exists and is initialized
+        console.log(`Terminals in Map:`, Array.from(this.terminals.keys()));
         const existingTerminal = this.terminals.get(terminalId);
         const hasActiveTerminal = existingTerminal && existingTerminal.terminal;
+        
+        // Get the terminal title - use project name if available
+        let terminalTitle = `Terminal ${terminalId + 1}`;
+        // Use lastSelectedDirectories even if terminal is not in Map
+        if (this.lastSelectedDirectories[terminalId]) {
+            const projectPath = this.lastSelectedDirectories[terminalId];
+            const projectName = projectPath.split('/').pop() || projectPath;
+            terminalTitle = `${terminalId + 1} · ${projectName}`;
+        }
+        
+        // Log for debugging
+        console.log(`Creating element for terminal ${terminalId}, initialized: ${hasActiveTerminal}, title: ${terminalTitle}, existingTerminal:`, existingTerminal);
         
         element.innerHTML = `
             <div class="terminal-header">
                 <div style="display: flex; align-items: center; flex: 1;">
-                    <span class="terminal-title">Terminal ${terminalId + 1}</span>
+                    <span class="terminal-title">${terminalTitle}</span>
                     <div class="current-task" id="current-task-${terminalId}" style="display: none;">
                         <i data-lucide="play-circle"></i>
                         <span class="task-text"></span>
@@ -5101,8 +5273,13 @@ class TerminalManager {
                 ${hasActiveTerminal ? 
                     `<div class="terminal" id="terminal-${terminalId}"></div>` :
                     `<div class="terminal-placeholder" data-quadrant="${terminalId}">
-                        <div class="terminal-placeholder-icon">⚡</div>
-                        <div>Click to start Claude Code</div>
+                        <div class="terminal-placeholder-content">
+                            <div class="terminal-placeholder-icon">
+                                <img src="assets/claude-icon.png" alt="Claude">
+                            </div>
+                            <div class="terminal-placeholder-text">Start Claude Code</div>
+                            <div class="terminal-placeholder-subtext">Click to launch terminal</div>
+                        </div>
                     </div>`
                 }
             </div>
@@ -5128,12 +5305,38 @@ class TerminalManager {
     }
 
     attachTerminalEventListeners() {
-        // Re-attach placeholder listeners
-        document.querySelectorAll('.terminal-placeholder').forEach(placeholder => {
-            placeholder.addEventListener('click', (e) => {
-                const quadrant = parseInt(e.currentTarget.dataset.quadrant);
-                this.showDirectorySelector(quadrant);
-            });
+        console.log('Attaching terminal event listeners...');
+        
+        // Use event delegation for placeholders instead of attaching to each one
+        // This ensures they work even after DOM changes
+        const containers = [
+            document.getElementById('terminals-container'),
+            document.getElementById('tabbed-terminal-content')
+        ];
+        
+        containers.forEach(container => {
+            if (!container) return;
+            
+            // Remove existing delegated listener if any
+            if (container._placeholderClickHandler) {
+                container.removeEventListener('click', container._placeholderClickHandler);
+            }
+            
+            // Create new delegated click handler
+            container._placeholderClickHandler = (e) => {
+                const placeholder = e.target.closest('.terminal-placeholder');
+                if (placeholder) {
+                    e.stopPropagation();
+                    const quadrant = parseInt(placeholder.dataset.quadrant);
+                    console.log(`Placeholder clicked for terminal ${quadrant} via delegation`);
+                    // Always show directory selector - remove reconnect functionality
+                    this.showDirectorySelector(quadrant);
+                }
+            };
+            
+            // Attach the delegated listener
+            container.addEventListener('click', container._placeholderClickHandler);
+            console.log(`Added delegated click listener to ${container.id}`);
         });
 
         // Re-attach color picker event listeners to terminal headers
@@ -5325,6 +5528,7 @@ class TerminalManager {
     }
 
     switchToTabbedMode() {
+        console.log('Switching from grid to tabbed mode...');
         this.layoutMode = 'tabbed';
         
         // Hide grid container and show tabbed container
@@ -5346,17 +5550,34 @@ class TerminalManager {
                     this.activeTabTerminal = result.terminals[0];
                 }
                 this.renderTabbedLayout(result.terminals);
+                
+                // Restore all terminal states after rendering with a slight delay
+                setTimeout(() => {
+                    this.restoreAllTerminalStates();
+                    console.log('Tabbed mode switch complete, restoring states');
+                }, 100);
+                
+                // Event delegation is already set up, no need to re-attach
+                console.log('Tabbed mode rendering complete, event delegation active');
             }
         });
     }
 
     switchToGridMode() {
+        console.log('Switching from tabbed to grid mode...');
         this.layoutMode = 'grid';
         
         // Show grid container and hide tabbed container
         const gridContainer = document.getElementById('terminals-container');
         const tabbedContainer = document.getElementById('tabbed-layout-container');
         const tabbedBtn = document.getElementById('tabbed-mode-btn');
+        
+        // Clean up tabbed mode content to avoid duplicate elements
+        const tabbedContent = document.getElementById('tabbed-terminal-content');
+        if (tabbedContent) {
+            console.log('Cleaning up tabbed content to avoid duplicates');
+            tabbedContent.innerHTML = '';
+        }
         
         gridContainer.style.display = '';
         tabbedContainer.style.display = 'none';
@@ -5369,6 +5590,10 @@ class TerminalManager {
         this.renderTerminals().then(() => {
             // After rendering, restore all terminal states
             this.restoreAllTerminalStates();
+            
+            // Re-attach event listeners after rendering new DOM
+            this.attachTerminalEventListeners();
+            console.log('Grid mode switch complete, event listeners re-attached');
         });
     }
 
@@ -5378,35 +5603,40 @@ class TerminalManager {
         // Get all active terminals
         ipcRenderer.invoke('get-active-terminals').then(result => {
             if (result.success && result.terminals) {
-                result.terminals.forEach(terminalId => {
-                    // Restore terminal title if it exists
-                    const terminal = this.terminals.get(terminalId);
-                    if (terminal && terminal.terminal) {
-                        const projectPath = this.lastSelectedDirectories[terminalId];
-                        if (projectPath) {
-                            const projectName = projectPath.split('/').pop() || projectPath;
-                            this.updateTerminalTitle(terminalId, projectName);
+                // Use setTimeout to ensure DOM is fully rendered
+                setTimeout(() => {
+                    result.terminals.forEach(async terminalId => {
+                        // Restore terminal title if it exists
+                        const terminal = this.terminals.get(terminalId);
+                        if (terminal && terminal.terminal) {
+                            const projectPath = this.lastSelectedDirectories[terminalId];
+                            if (projectPath) {
+                                const projectName = projectPath.split('/').pop() || projectPath;
+                                console.log(`Restoring title for terminal ${terminalId}: ${projectName}`);
+                                this.updateTerminalTitle(terminalId, projectName);
+                            }
                         }
-                    }
-                    
-                    // Restore header color
-                    if (this.lastSelectedDirectories[terminalId]) {
-                        this.updateTerminalHeaderColor(terminalId);
-                    }
-                    
-                    // Restore current task indicator
-                    const currentTaskElement = document.getElementById(`current-task-${terminalId}`);
-                    if (currentTaskElement && this.currentTasks[terminalId]) {
-                        const taskText = currentTaskElement.querySelector('.task-text');
-                        if (taskText) {
-                            taskText.textContent = this.currentTasks[terminalId];
-                            currentTaskElement.style.display = 'flex';
+                        
+                        // Restore header color
+                        if (this.lastSelectedDirectories[terminalId]) {
+                            console.log(`Restoring color for terminal ${terminalId} with path ${this.lastSelectedDirectories[terminalId]}`);
+                            this.updateTerminalHeaderColor(terminalId);
                         }
-                    }
+                        
+                        // Update current task indicator - fetch from backend
+                        await this.updateTerminalTaskIndicator(terminalId + 1); // Convert to terminal_id (1-based)
+                        
+                        // Update git branch display
+                        await this.updateBranchDisplay(terminalId);
+                    });
                     
-                    // Restore git branch display
-                    this.updateGitBranchDisplay(terminalId);
-                });
+                    // Also re-initialize lucide icons for the new elements
+                    if (typeof lucide !== 'undefined') {
+                        setTimeout(() => {
+                            lucide.createIcons();
+                        }, 100);
+                    }
+                }, 300); // Wait 300ms for DOM to be fully rendered
             }
         });
     }
@@ -5458,8 +5688,8 @@ class TerminalManager {
         // Attach tab event listeners
         this.attachTabEventListeners();
         
-        // Attach terminal event listeners (for placeholders, etc)
-        this.attachTerminalEventListeners();
+        // Event delegation is already set up in init(), no need to re-attach
+        console.log('Tabbed layout rendered, event delegation active');
         
         // Re-initialize icons
         if (typeof lucide !== 'undefined') {
@@ -5468,6 +5698,21 @@ class TerminalManager {
         
         // Update task indicators
         this.updateCurrentTaskIndicators();
+        
+        // Apply colors and other styling after everything is rendered
+        setTimeout(() => {
+            console.log('Applying terminal styling in tabbed mode...');
+            activeTerminals.forEach(terminalId => {
+                // Apply header colors if terminal has a project
+                if (this.lastSelectedDirectories[terminalId]) {
+                    console.log(`Applying color for terminal ${terminalId} with project ${this.lastSelectedDirectories[terminalId]}`);
+                    this.updateTerminalHeaderColor(terminalId);
+                }
+                
+                // Update git branch display
+                this.updateBranchDisplay(terminalId);
+            });
+        }, 150); // Slightly longer delay to ensure DOM is ready
     }
 
     createTerminalTab(terminalId) {

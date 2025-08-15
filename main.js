@@ -1862,14 +1862,7 @@ async function configureMCPInClaudeCLI() {
       console.log('✅ MCP configured successfully in Claude CLI');
     }
     
-    // Show success notification
-    if (Notification.isSupported()) {
-      new Notification({
-        title: 'CodeAgentSwarm Ready',
-        body: 'Task management tools are now available in Claude CLI',
-        silent: true
-      }).show();
-    }
+    // Notification removed - it doesn't provide much value
   } catch (error) {
     console.error('Failed to configure MCP in Claude CLI:', error);
   }

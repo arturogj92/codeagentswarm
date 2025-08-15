@@ -686,8 +686,27 @@ class KanbanManager {
     updateColumnCounts() {
         const statuses = ['pending', 'in_progress', 'in_testing', 'completed'];
         
+        // Filter tasks by project if needed
+        let filteredTasks = this.tasks;
+        if (this.currentProjectFilter !== 'all') {
+            filteredTasks = this.tasks.filter(task => task.project === this.currentProjectFilter);
+        }
+        
+        // Apply search filter if present
+        if (this.searchQuery) {
+            const query = this.searchQuery.toLowerCase();
+            filteredTasks = filteredTasks.filter(task => {
+                if (task.title && task.title.toLowerCase().includes(query)) return true;
+                if (task.description && task.description.toLowerCase().includes(query)) return true;
+                if (task.plan && task.plan.toLowerCase().includes(query)) return true;
+                if (task.implementation && task.implementation.toLowerCase().includes(query)) return true;
+                if (task.id && task.id.toString().includes(query)) return true;
+                return false;
+            });
+        }
+        
         statuses.forEach(status => {
-            const count = this.tasks.filter(t => t.status === status).length;
+            const count = filteredTasks.filter(t => t.status === status).length;
             const countElement = document.getElementById(`${status}-count`);
             if (countElement) {
                 countElement.textContent = count;
