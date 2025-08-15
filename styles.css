@@ -1564,9 +1564,9 @@ body::before {
 }
 
 .terminal-placeholder-icon {
-  width: 64px;
-  height: 64px;
-  margin-bottom: 16px;
+  width: 120px;
+  height: 120px;
+  margin-bottom: 24px;
   filter: drop-shadow(0 4px 20px rgba(127, 90, 240, 0.3));
   transition: all 0.3s ease;
 }

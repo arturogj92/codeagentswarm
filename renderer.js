@@ -697,7 +697,7 @@ class TerminalManager {
                     <div class="terminal-placeholder" data-quadrant="${quadrant}">
                         <div class="terminal-placeholder-content">
                             <div class="terminal-placeholder-icon">
-                                <img src="assets/claude-icon.png" alt="Claude">
+                                <img src="assets/claude_terminal.png" alt="Claude">
                             </div>
                             <div class="terminal-placeholder-text">Start Claude Code</div>
                             <div class="terminal-placeholder-subtext">Click to launch terminal</div>
@@ -5275,7 +5275,7 @@ class TerminalManager {
                     `<div class="terminal-placeholder" data-quadrant="${terminalId}">
                         <div class="terminal-placeholder-content">
                             <div class="terminal-placeholder-icon">
-                                <img src="assets/claude-icon.png" alt="Claude">
+                                <img src="assets/claude_terminal.png" alt="Claude">
                             </div>
                             <div class="terminal-placeholder-text">Start Claude Code</div>
                             <div class="terminal-placeholder-subtext">Click to launch terminal</div>
