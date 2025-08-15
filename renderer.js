@@ -91,6 +91,7 @@ class TerminalManager {
         this.startTaskIndicatorUpdates(); // Initialize task indicators with periodic updates
         this.checkHooksStatus(); // Check hooks status on startup
         this.startHooksStatusUpdates(); // Periodically check hooks status
+        this.startTerminalRefreshInterval(); // Start periodic terminal refresh to fix rendering issues
         
         // Setup delegated event listeners for placeholders early
         this.attachTerminalEventListeners();
@@ -1432,6 +1433,17 @@ class TerminalManager {
         }
         this.updateTerminalTitle(quadrant, terminalTitle);
         
+        // Update all terminals with the same project to ensure color consistency
+        if (selectedDirectory) {
+            const projectName = selectedDirectory.split('/').pop() || selectedDirectory.split('\\').pop();
+            if (projectName) {
+                // Small delay to ensure DOM is ready
+                setTimeout(() => {
+                    this.updateAllTerminalsWithProject(projectName);
+                }, 100);
+            }
+        }
+        
         // Add click event to terminal header for color selection
         const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
         if (terminalHeader) {
@@ -1964,8 +1976,30 @@ class TerminalManager {
         if (this.layoutMode === 'tabbed') {
             // Apply color directly to the tab without re-rendering everything
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"]`);
-            if (tab && projectColor) {
-                tab.style.setProperty('--project-color', projectColor);
+            if (tab) {
+                const tabNumber = tab.querySelector('.tab-terminal-number');
+                
+                if (projectColor) {
+                    // Apply gradient directly to the tab button (same as in createTerminalTab)
+                    tab.style.background = `linear-gradient(135deg, ${projectColor}40 0%, ${projectColor}15 100%)`;
+                    tab.style.borderLeft = `3px solid ${projectColor}`;
+                    
+                    if (tabNumber) {
+                        tabNumber.style.background = `${projectColor}`;
+                        tabNumber.style.color = 'white';
+                        tabNumber.style.fontWeight = 'bold';
+                    }
+                } else {
+                    // Reset to default styles when no project color
+                    tab.style.background = '';
+                    tab.style.borderLeft = '';
+                    
+                    if (tabNumber) {
+                        tabNumber.style.background = '';
+                        tabNumber.style.color = '';
+                        tabNumber.style.fontWeight = '';
+                    }
+                }
             }
         }
     }
@@ -5485,13 +5519,39 @@ class TerminalManager {
             setTimeout(() => {
                 const terminalDiv = element.querySelector(`#terminal-${terminalId}`);
                 if (terminalDiv && existingTerminal.terminal) {
+                    // Clear any existing content to prevent duplication
+                    terminalDiv.innerHTML = '';
+                    
                     // Make sure the terminal div is visible
                     terminalDiv.style.display = 'block';
+                    
+                    // Force a reflow to ensure DOM is ready
+                    terminalDiv.offsetHeight;
+                    
                     // Reopen the terminal in the new element
                     existingTerminal.terminal.open(terminalDiv);
+                    
+                    // Multiple fit attempts to ensure proper sizing
                     if (existingTerminal.fitAddon) {
+                        // Immediate fit
                         existingTerminal.fitAddon.fit();
+                        
+                        // Delayed fit for after render
+                        setTimeout(() => {
+                            existingTerminal.fitAddon.fit();
+                        }, 50);
+                        
+                        // Final fit after animations
+                        setTimeout(() => {
+                            existingTerminal.fitAddon.fit();
+                        }, 300);
                     }
+                    
+                    // Trigger a resize event to force xterm to recalculate properly
+                    // This simulates the manual window resize that fixes the rendering
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 100);
                 }
             }, 0);
         }
@@ -5771,6 +5831,11 @@ class TerminalManager {
                 setTimeout(() => {
                     this.restoreAllTerminalStates();
                     console.log('Tabbed mode switch complete, restoring states');
+                    
+                    // Refresh the active terminal display to ensure scrollbar is visible
+                    if (this.activeTabTerminal !== null) {
+                        this.refreshTerminalDisplay(this.activeTabTerminal);
+                    }
                 }, 100);
                 
                 // Event delegation is already set up, no need to re-attach
@@ -5898,11 +5963,36 @@ class TerminalManager {
                 setTimeout(() => {
                     const terminalDiv = terminalElement.querySelector(`#terminal-${terminalId}`);
                     if (terminalDiv && existingTerminal.terminal) {
+                        // Clear any existing content to prevent duplication
+                        terminalDiv.innerHTML = '';
+                        
                         terminalDiv.style.display = 'block';
+                        
+                        // Force a reflow to ensure DOM is ready
+                        terminalDiv.offsetHeight;
+                        
                         existingTerminal.terminal.open(terminalDiv);
+                        
                         if (existingTerminal.fitAddon) {
+                            // Immediate fit
                             existingTerminal.fitAddon.fit();
+                            
+                            // Delayed fit for after render
+                            setTimeout(() => {
+                                existingTerminal.fitAddon.fit();
+                            }, 50);
+                            
+                            // Final fit after animations
+                            setTimeout(() => {
+                                existingTerminal.fitAddon.fit();
+                            }, 300);
                         }
+                        
+                        // Trigger a resize event to force xterm to recalculate properly
+                        setTimeout(() => {
+                            window.dispatchEvent(new Event('resize'));
+                        }, 100);
+                        
                         // Add scroll to bottom button for tabbed mode
                         console.log(`Adding scroll button for terminal ${terminalId} in tabbed mode`);
                         this.addScrollToBottomButton(terminalDiv, existingTerminal.terminal, terminalId);
@@ -5950,6 +6040,11 @@ class TerminalManager {
                 // Update git branch display
                 this.updateBranchDisplay(terminalId);
             });
+            
+            // Refresh the active terminal to ensure scrollbar is visible
+            if (this.activeTabTerminal !== null) {
+                this.refreshTerminalDisplay(this.activeTabTerminal);
+            }
         }, 150); // Slightly longer delay to ensure DOM is ready
     }
 
@@ -5976,42 +6071,43 @@ class TerminalManager {
         let title = `Terminal ${terminalId + 1}`;
         let projectColor = null;
         
-        // Only show project/task name if terminal is actually running
-        const terminal = this.terminals.get(terminalId);
-        if (terminal && terminal.terminal) {
-            // Terminal is active, check for task or directory
-            const currentTask = document.querySelector(`#current-task-${terminalId} .task-text`);
-            if (currentTask && currentTask.textContent) {
-                title = currentTask.textContent;
-                // Also try to get project color from directory
-                if (this.lastSelectedDirectories[terminalId]) {
-                    const dir = this.lastSelectedDirectories[terminalId];
-                    const projectName = dir.split('/').pop() || dir;
-                    // Get project color even when showing task
-                    if (this.customProjectColors[projectName]) {
-                        projectColor = this.customProjectColors[projectName];
-                    } else {
-                        const colors = this.generateProjectColor(projectName);
-                        projectColor = colors ? colors.primary : null;
-                    }
-                }
-            } else if (this.lastSelectedDirectories[terminalId]) {
-                const dir = this.lastSelectedDirectories[terminalId];
-                const projectName = dir.split('/').pop() || dir;
-                title = projectName;
-                
-                // Get or generate project color
-                if (this.customProjectColors[projectName]) {
-                    projectColor = this.customProjectColors[projectName];
-                } else {
-                    const colors = this.generateProjectColor(projectName);
-                    projectColor = colors ? colors.primary : null;
-                }
+        // First check if we have a directory for this terminal (might not be fully initialized yet)
+        if (this.lastSelectedDirectories[terminalId]) {
+            const dir = this.lastSelectedDirectories[terminalId];
+            const projectName = dir.split('/').pop() || dir;
+            
+            // Get or generate project color regardless of terminal state
+            if (this.customProjectColors[projectName]) {
+                projectColor = this.customProjectColors[projectName];
+            } else {
+                const colors = this.generateProjectColor(projectName);
+                projectColor = colors ? colors.primary : null;
             }
             
-            console.log(`Tab ${terminalId}: title="${title}", projectColor="${projectColor}"`);
+            // Update title if terminal is active
+            const terminal = this.terminals.get(terminalId);
+            if (terminal && terminal.terminal) {
+                // Terminal is active, check for task or use project name
+                const currentTask = document.querySelector(`#current-task-${terminalId} .task-text`);
+                if (currentTask && currentTask.textContent) {
+                    title = currentTask.textContent;
+                } else {
+                    title = projectName;
+                }
+            } else {
+                // Terminal not fully initialized yet, but we can still show project name
+                title = projectName;
+            }
+            
+            console.log(`Tab ${terminalId}: title="${title}", projectColor="${projectColor}", hasTerminal=${!!(terminal && terminal.terminal)}`);
+        } else {
+            // No directory selected yet, check if terminal is active
+            const terminal = this.terminals.get(terminalId);
+            if (terminal && terminal.terminal) {
+                // Terminal is active but no directory - shouldn't happen normally
+                console.log(`Tab ${terminalId}: Terminal active but no directory selected`);
+            }
         }
-        // If terminal is not active (placeholder), just show "Terminal X"
         
         tab.innerHTML = `
             <div class="terminal-tab-content">
@@ -6094,13 +6190,70 @@ class TerminalManager {
             }
         }
         
-        // Resize terminal
+        // Refresh and resize terminal with better cleanup
+        this.refreshTerminalDisplay(terminalId);
+    }
+    
+    // Method to refresh terminal display and fix any rendering issues
+    refreshTerminalDisplay(terminalId) {
         const terminal = this.terminals.get(terminalId);
-        if (terminal && terminal.fitAddon) {
-            setTimeout(() => {
-                terminal.fitAddon.fit();
-            }, 100);
+        if (!terminal || !terminal.fitAddon) return;
+        
+        const terminalDiv = document.querySelector(`#terminal-${terminalId}`);
+        if (!terminalDiv) return;
+        
+        // Clear selection to prevent duplication issues
+        if (terminal.terminal) {
+            terminal.terminal.clearSelection();
         }
+        
+        // Force fit to recalculate dimensions
+        terminal.fitAddon.fit();
+        
+        // Refresh the terminal to ensure proper rendering
+        if (terminal.terminal) {
+            terminal.terminal.refresh(0, terminal.terminal.rows - 1);
+        }
+        
+        // Delayed fits to handle any async rendering
+        setTimeout(() => {
+            terminal.fitAddon.fit();
+        }, 50);
+        
+        setTimeout(() => {
+            terminal.fitAddon.fit();
+            // Final refresh after all fits
+            if (terminal.terminal) {
+                terminal.terminal.refresh(0, terminal.terminal.rows - 1);
+            }
+        }, 200);
+        
+        // Trigger a resize event to force xterm to recalculate properly
+        setTimeout(() => {
+            window.dispatchEvent(new Event('resize'));
+        }, 100);
+    }
+    
+    // Start periodic refresh to fix any rendering issues automatically
+    startTerminalRefreshInterval() {
+        // Check and refresh visible terminals every 10 seconds
+        setInterval(() => {
+            if (this.layoutMode === 'tabbed' && this.activeTabTerminal !== null) {
+                // In tabbed mode, only refresh the active tab
+                this.refreshTerminalDisplay(this.activeTabTerminal);
+            } else if (this.layoutMode === 'grid') {
+                // In grid mode, refresh all visible terminals
+                this.terminals.forEach((terminal, terminalId) => {
+                    const terminalDiv = document.querySelector(`#terminal-${terminalId}`);
+                    if (terminalDiv && terminalDiv.offsetParent !== null) {
+                        // Only refresh if the terminal is actually visible
+                        if (terminal.fitAddon) {
+                            terminal.fitAddon.fit();
+                        }
+                    }
+                });
+            }
+        }, 10000); // Run every 10 seconds
     }
 
     // Update existing methods to work with tabbed mode
@@ -6434,10 +6587,33 @@ class TerminalManager {
             if (terminalData && terminalData.terminal) {
                 const terminalDiv = document.querySelector(`#terminal-${terminalId}`);
                 if (terminalDiv) {
+                    // Clear any existing content to prevent duplication
+                    terminalDiv.innerHTML = '';
+                    
+                    // Force a reflow to ensure DOM is ready
+                    terminalDiv.offsetHeight;
+                    
                     terminalData.terminal.open(terminalDiv);
+                    
                     if (terminalData.fitAddon) {
+                        // Immediate fit
                         terminalData.fitAddon.fit();
+                        
+                        // Delayed fit for after render
+                        setTimeout(() => {
+                            terminalData.fitAddon.fit();
+                        }, 50);
+                        
+                        // Final fit after animations
+                        setTimeout(() => {
+                            terminalData.fitAddon.fit();
+                        }, 300);
                     }
+                    
+                    // Trigger a resize event to force xterm to recalculate properly
+                    setTimeout(() => {
+                        window.dispatchEvent(new Event('resize'));
+                    }, 100);
                 }
             }
         });

@@ -6381,15 +6381,20 @@ textarea {
   left: 0;
   right: 0;
   bottom: 0;
-  display: none;
+  display: flex;
   flex-direction: column;
   border: none;
   border-radius: 0;
   margin: 0;
+  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .tabbed-terminal-content .terminal-quadrant.active {
-  display: flex;
+  visibility: visible;
+  opacity: 1;
+  pointer-events: auto;
 }
 
 /* Fullscreen terminal adjustments */
