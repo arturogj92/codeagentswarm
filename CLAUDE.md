@@ -121,11 +121,12 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
      - Flow: explanation of implemented functionality
    - If plan wasn't fully completed, update plan with what's missing or create new task for pending
    - **🚨 MANDATORY TESTING FLOW - NO EXCEPTIONS:**
-     - First `complete_task` call: ALWAYS moves task to `in_testing` state (NO DIRECT PATH TO COMPLETED)
-     - User must manually review and approve
-     - Second `complete_task` call: moves to `completed` (requires `implementation` documented)
-     - **CRITICAL: Tasks can NEVER go directly from `in_progress` to `completed` - this is PROHIBITED**
-     - **The ONLY way to reach `completed` is through `in_testing` state with manual approval**
+     - Call `complete_task` ONCE: moves task to `in_testing` state
+     - **STOP HERE:** Do NOT call `complete_task` again automatically
+     - Inform user: "Task is now in testing, please review the changes"
+     - **WAIT** for user to explicitly request completion
+     - ONLY when user says "mark as completed", call `complete_task` second time
+     - **CRITICAL: Agents must NEVER automatically complete tasks from testing**
    - This automatically updates interface and database state
    - Plan and implementation remain documented for future reference
 
@@ -134,25 +135,46 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 **CRITICAL: All tasks MUST go through testing phase before completion. Tasks can NEVER go directly from "in_progress" to "completed" status:**
 
 1. **🚨 Mandatory transition to testing (NO EXCEPTIONS):**
-   - When finishing task implementation, use `complete_task`
+   - When finishing task implementation, use `complete_task` ONCE
    - This ALWAYS and AUTOMATICALLY moves task to `in_testing` state
    - **PROHIBITED:** Going directly from `in_progress` to `completed`
-   - **REMEMBER:** Unless the user EXPLICITLY asks to mark as completed, tasks ALWAYS go to testing first
+   - **STOP HERE:** After calling `complete_task` once, DO NOT call it again
 
-2. **Requirements to complete from testing:**
+2. **⛔ AGENTS MUST STOP after moving to testing:**
+   - **NEVER** automatically call `complete_task` a second time
+   - **WAIT** for the user to manually test and verify
+   - **ONLY** when user EXPLICITLY says "mark as completed" or "complete the task", then call `complete_task` again
+   - The user will test for at least 30 seconds before allowing completion
+
+3. **Requirements for user to complete from testing:**
    - Task must have `implementation` field documented
-   - User must manually review and approve
-   - Only then use `complete_task` again to mark as `completed`
+   - User must manually review and approve the changes
+   - Minimum 30 seconds must pass in testing phase
+   - User must EXPLICITLY request completion
 
-3. **If needing to send directly to testing:**
+4. **If needing to send directly to testing:**
    - Use `submit_for_testing` to move directly to `in_testing`
    - Useful when another agent or person will perform tests
 
-4. **Complete flow:**
+5. **Complete flow:**
    ```
-   pending → in_progress → in_testing → completed
-                     ↑                    ↓
-                     └── (requires documentation and manual approval)
+   pending → in_progress → in_testing → [STOP & WAIT FOR USER] → completed
+                     ↑                                              ↓
+                     └── (agent calls once)      (user explicitly requests)
+   ```
+
+6. **Example correct behavior:**
+   ```
+   Agent: "I've completed the implementation and documented it. Moving task to testing..."
+   [Calls complete_task ONCE - task goes to in_testing]
+   Agent: "Task #123 is now in testing. Please review the changes and let me know if everything works correctly."
+   [AGENT STOPS HERE - Does NOT call complete_task again]
+   
+   [User tests the feature...]
+   
+   User: "Everything looks good, please mark it as completed"
+   Agent: "Great! I'll mark the task as completed now."
+   [NOW agent calls complete_task second time - task goes to completed]
    ```
 
 ### 🔄 BUG FIXES AND MODIFICATIONS - CONTINUE WITH SAME TASK

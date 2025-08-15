@@ -4964,6 +4964,16 @@ class TerminalManager {
             // Update container class for layout while preserving existing layout classes
             container.className = `terminals-container count-${activeTerminals.length}`;
             
+            // Reset any inline styles that might have been set by resizers
+            container.style.removeProperty('--left-width');
+            container.style.removeProperty('--right-width');
+            container.style.removeProperty('--top-height');
+            container.style.removeProperty('--bottom-height');
+            container.style.removeProperty('--row1-left-width');
+            container.style.removeProperty('--row1-right-width');
+            container.style.removeProperty('--row2-left-width');
+            container.style.removeProperty('--row2-right-width');
+            
             // Re-apply layout class if set
             if (activeTerminals.length === 2 && this.currentLayout === 'vertical') {
                 container.classList.add('layout-vertical');
@@ -5274,6 +5284,12 @@ class TerminalManager {
         
         // Remove all layout classes first
         container.classList.remove('layout-vertical', 'layout-3-top1', 'layout-3-top2-horiz', 'layout-3-left2', 'layout-3-right2');
+        
+        // Reset all CSS variables to defaults before applying new layout
+        container.style.removeProperty('--left-width');
+        container.style.removeProperty('--right-width');
+        container.style.removeProperty('--top-height');
+        container.style.removeProperty('--bottom-height');
         
         // Update container classes based on layout
         if (layout === 'vertical') {
@@ -6100,8 +6116,14 @@ class TerminalManager {
     }
 
     create3TerminalLeft2Layout(container, activeTerminals) {
-        // Reset CSS variables to ensure 50-50 split
+        // Reset all CSS variables first
         const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.removeProperty('--left-width');
+        mainContainer.style.removeProperty('--right-width');
+        mainContainer.style.removeProperty('--top-height');
+        mainContainer.style.removeProperty('--bottom-height');
+        
+        // Then set new values to ensure 50-50 split
         mainContainer.style.setProperty('--left-width', '50%');
         mainContainer.style.setProperty('--right-width', '50%');
         mainContainer.style.setProperty('--top-height', '50%');
@@ -6139,8 +6161,14 @@ class TerminalManager {
     }
 
     create3TerminalRight2Layout(container, activeTerminals) {
-        // Reset CSS variables to ensure 50-50 split
+        // Reset all CSS variables first
         const mainContainer = document.getElementById('terminals-container');
+        mainContainer.style.removeProperty('--left-width');
+        mainContainer.style.removeProperty('--right-width');
+        mainContainer.style.removeProperty('--top-height');
+        mainContainer.style.removeProperty('--bottom-height');
+        
+        // Then set new values to ensure 50-50 split
         mainContainer.style.setProperty('--left-width', '50%');
         mainContainer.style.setProperty('--right-width', '50%');
         mainContainer.style.setProperty('--top-height', '50%');
