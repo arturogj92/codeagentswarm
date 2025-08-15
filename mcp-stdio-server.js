@@ -104,6 +104,54 @@ class MCPStdioServer {
         // Log to stderr so it doesn't interfere with JSON-RPC communication
         console.error('[MCP Server]', message, ...args);
     }
+    
+    generateShortTitle(fullTitle) {
+        // Generate a 3-word title from a longer task title
+        if (!fullTitle) return '';
+        
+        // If already 3 words or less, return as is
+        const words = fullTitle.split(' ').filter(w => w.length > 0);
+        if (words.length <= 3) {
+            return fullTitle;
+        }
+        
+        // Common words to filter out
+        const stopWords = ['the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'been'];
+        
+        // Filter out stop words and keep important words
+        const importantWords = words.filter(word => {
+            const lowerWord = word.toLowerCase();
+            return !stopWords.includes(lowerWord) && lowerWord.length > 2;
+        });
+        
+        // If we have 3 or more important words, take the first 3
+        if (importantWords.length >= 3) {
+            return importantWords.slice(0, 3).join(' ');
+        }
+        
+        // Otherwise, take the first word and up to 2 important words
+        const result = [];
+        if (words.length > 0) {
+            result.push(words[0]); // Always include first word (usually a verb)
+        }
+        
+        // Add remaining important words
+        for (const word of importantWords.slice(0, 2)) {
+            if (!result.includes(word)) {
+                result.push(word);
+            }
+        }
+        
+        // If still not enough, add original words
+        for (const word of words) {
+            if (result.length >= 3) break;
+            if (!result.includes(word)) {
+                result.push(word);
+            }
+        }
+        
+        return result.slice(0, 3).join(' ');
+    }
 
     async handleMessage(line) {
         try {
@@ -441,6 +489,94 @@ class MCPStdioServer {
             updated: true
         };
     }
+    
+    async updateTerminalTitle(params) {
+        const { title } = params;
+        
+        if (!title) {
+            throw new Error('title is required');
+        }
+        
+        // Limit to 3 words
+        const words = title.split(' ').slice(0, 3);
+        const shortTitle = words.join(' ');
+        
+        // Get current terminal from environment
+        const terminalId = process.env.CODEAGENTSWARM_CURRENT_QUADRANT;
+        if (!terminalId) {
+            throw new Error('Cannot detect current terminal. CODEAGENTSWARM_CURRENT_QUADRANT not set');
+        }
+        
+        try {
+            // Get current task for this terminal if any
+            let taskId = null;
+            try {
+                const currentTask = this.db.getCurrentTask(parseInt(terminalId));
+                if (currentTask) {
+                    taskId = currentTask.id;
+                }
+            } catch (e) {
+                // No current task, that's ok
+            }
+            
+            // Write notification for title update
+            const os = require('os');
+            const fs = require('fs');
+            const notificationDir = path.join(os.homedir(), '.codeagentswarm');
+            const notificationFile = path.join(notificationDir, 'task_notifications.json');
+            
+            // Ensure directory exists
+            if (!fs.existsSync(notificationDir)) {
+                fs.mkdirSync(notificationDir, { recursive: true });
+            }
+            
+            // Read existing notifications
+            let notifications = [];
+            if (fs.existsSync(notificationFile)) {
+                try {
+                    const content = fs.readFileSync(notificationFile, 'utf8');
+                    notifications = JSON.parse(content);
+                } catch (e) {
+                    // Invalid JSON, start fresh
+                    notifications = [];
+                }
+            }
+            
+            // Add terminal title update notification
+            const newNotification = {
+                type: 'terminal_title_update',
+                terminal_id: parseInt(terminalId),
+                title: shortTitle,
+                task_id: taskId,
+                timestamp: new Date().toISOString(),
+                processed: false
+            };
+            
+            notifications.push(newNotification);
+            
+            this.logError(`📝 Terminal title notification created:`, JSON.stringify(newNotification, null, 2));
+            
+            // Keep only last 50 notifications
+            if (notifications.length > 50) {
+                notifications = notifications.slice(-50);
+            }
+            
+            // Write back to file
+            fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
+            
+            this.logError(`✅ Terminal title updated: "${shortTitle}" for terminal ${terminalId}`);
+            this.logError(`📁 Notification written to: ${notificationFile}`);
+            
+            return {
+                terminal_id: parseInt(terminalId),
+                title: shortTitle,
+                task_id: taskId,
+                updated: true
+            };
+        } catch (error) {
+            throw new Error(`Failed to update terminal title: ${error.message}`);
+        }
+    }
 
     // Project management methods
     async createProject(params) {
@@ -578,6 +714,17 @@ class MCPStdioServer {
                     }
                 },
                 {
+                    name: 'update_terminal_title',
+                    description: 'Update the terminal title (max 3 words) to show what the terminal is working on',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Terminal title (max 3 words, e.g., "Fix Auth Bug")' }
+                        },
+                        required: ['title']
+                    }
+                },
+                {
                     name: 'create_project',
                     description: 'Create a new project',
                     inputSchema: {
@@ -690,6 +837,21 @@ class MCPStdioServer {
                         terminal_id: parseInt(currentTerminalId).toString() 
                     });
                     this.logError(`Auto-assigned task ${args.task_id} to terminal ${currentTerminalId}`);
+                    
+                    // Generate and update terminal title based on task
+                    try {
+                        const task = await this.db.getTaskById(args.task_id);
+                        if (task && task.title) {
+                            const shortTitle = this.generateShortTitle(task.title);
+                            if (shortTitle) {
+                                await this.updateTerminalTitle({ title: shortTitle });
+                                this.logError(`Auto-generated terminal title: "${shortTitle}" for task ${args.task_id}`);
+                            }
+                        }
+                    } catch (e) {
+                        // Don't fail the task start if title update fails
+                        this.logError('Failed to auto-generate terminal title:', e.message);
+                    }
                 }
                 
                 result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_progress' });
@@ -753,6 +915,10 @@ class MCPStdioServer {
                 
             case 'update_task_terminal':
                 result = await this.updateTaskTerminal({ task_id: args.task_id, terminal_id: args.terminal_id });
+                break;
+                
+            case 'update_terminal_title':
+                result = await this.updateTerminalTitle({ title: args.title });
                 break;
                 
             case 'create_project':

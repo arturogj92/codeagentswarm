@@ -84,6 +84,13 @@ class TerminalManager {
     }
 
     init() {
+        // Notify main process that renderer is ready (clears notification tracking)
+        ipcRenderer.invoke('renderer-ready').then(() => {
+            console.log('Renderer initialized - notification tracking reset');
+        }).catch(err => {
+            console.error('Failed to notify main process:', err);
+        });
+        
         this.setupEventListeners();
         this.setupResizeHandlers();
         this.setupGlobalTerminalFocusDetection(); // Add global focus detection
@@ -1749,8 +1756,28 @@ class TerminalManager {
     }
 
     updateTerminalTitle(quadrant, title) {
+        // Get project information for initials
+        let projectInitials = '';
+        let projectColor = null;
+        
+        if (this.lastSelectedDirectories[quadrant]) {
+            const dir = this.lastSelectedDirectories[quadrant];
+            const projectName = dir.split('/').pop() || dir;
+            projectInitials = this.getProjectInitials(projectName);
+            
+            // Get project color
+            if (this.customProjectColors[projectName]) {
+                projectColor = this.customProjectColors[projectName];
+            } else {
+                const colors = this.generateProjectColor(projectName);
+                projectColor = colors ? colors.primary : null;
+            }
+        }
+        
         // Find the terminal title element based on current layout mode
         let titleElement;
+        let headerElement;
+        
         if (this.layoutMode === 'tabbed') {
             // Update both the tab title and the terminal header title in tabbed mode
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${quadrant}"] .tab-title`);
@@ -1758,25 +1785,86 @@ class TerminalManager {
                 tab.textContent = title;
             }
             titleElement = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] .terminal-title`);
+            headerElement = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] .terminal-header`);
         } else {
             titleElement = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] .terminal-title`);
+            headerElement = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] .terminal-header`);
         }
         
         if (!titleElement) {
             // Fallback to general search
             titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
+            headerElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
         }
         
         if (titleElement) {
-            // Add terminal number before the title
+            // Update the title with terminal number and project initials
             const terminalNumber = quadrant + 1;
-            titleElement.textContent = `${terminalNumber} · ${title}`;
+            
+            // Check if we need to add/update project initials badge
+            if (headerElement) {
+                let initialsElement = headerElement.querySelector('.terminal-project-initials');
+                
+                if (projectInitials) {
+                    if (!initialsElement) {
+                        // Create initials element if it doesn't exist
+                        initialsElement = document.createElement('span');
+                        initialsElement.className = 'terminal-project-initials';
+                        // Insert after terminal title
+                        titleElement.parentNode.insertBefore(initialsElement, titleElement.nextSibling);
+                    }
+                    
+                    initialsElement.textContent = projectInitials;
+                    if (projectColor) {
+                        initialsElement.style.background = projectColor;
+                        initialsElement.style.color = 'white';
+                    }
+                } else if (initialsElement) {
+                    // Remove initials element if no project
+                    initialsElement.remove();
+                }
+            }
+            
+            // Check if title already has the terminal number prefix to avoid duplication
+            const hasNumberPrefix = /^\d+\s*·\s*/.test(title);
+            if (hasNumberPrefix) {
+                // Title already has number, use as is
+                titleElement.textContent = title;
+            } else {
+                // Add terminal number prefix
+                titleElement.textContent = `${terminalNumber} · ${title}`;
+            }
         }
         
         // Update terminal header color based on project
         this.updateTerminalHeaderColor(quadrant);
     }
 
+    // Generate project initials from project name
+    getProjectInitials(projectName) {
+        if (!projectName) return '';
+        
+        // Split by camelCase, PascalCase, kebab-case, snake_case, or spaces
+        const words = projectName
+            .replace(/([A-Z])/g, ' $1') // Add space before capitals
+            .replace(/[-_]/g, ' ') // Replace dashes and underscores with spaces
+            .split(' ')
+            .filter(word => word.length > 0);
+        
+        if (words.length === 0) return '';
+        
+        // If single word, return first 2 letters
+        if (words.length === 1) {
+            return words[0].substring(0, 2).toUpperCase();
+        }
+        
+        // If multiple words, return initials (max 3)
+        return words
+            .slice(0, 3)
+            .map(word => word[0].toUpperCase())
+            .join('');
+    }
+    
     // Generate a unique color based on project name
     generateProjectColor(projectName) {
         if (!projectName) {
@@ -2575,6 +2663,12 @@ class TerminalManager {
         if (this.claudeCodeReady) {
             this.claudeCodeReady[quadrant] = false;
         }
+        
+        // Clean up localStorage for this terminal (convert quadrant 0-based to terminal_id 1-based)
+        const terminalId = quadrant + 1;
+        localStorage.removeItem(`terminal_title_${terminalId}`);
+        localStorage.removeItem(`terminal_task_${terminalId}`);
+        console.log(`🧹 Cleaned up localStorage for terminal ${terminalId}`);
         
         // Just send kill signal - the terminal-closed event handler will do the cleanup
         console.log(`🗑️ Sending kill signal for terminal ${quadrant}`);
@@ -4894,42 +4988,42 @@ class TerminalManager {
             // Convert terminal_id (1-4) back to quadrant (0-3) for DOM element lookup
             const quadrant = terminalId - 1;
             
-            // Find task indicator based on current layout mode
-            let taskIndicator;
+            // Find task badge based on current layout mode
+            let taskBadge;
             if (this.layoutMode === 'tabbed') {
-                taskIndicator = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] #current-task-${quadrant}`);
+                taskBadge = document.querySelector(`#tabbed-terminal-content [data-quadrant="${quadrant}"] #task-badge-${quadrant}`);
             } else {
-                taskIndicator = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] #current-task-${quadrant}`);
+                taskBadge = document.querySelector(`#terminals-container [data-quadrant="${quadrant}"] #task-badge-${quadrant}`);
             }
             
-            if (!taskIndicator) {
+            if (!taskBadge) {
                 // Fallback to ID search
-                taskIndicator = document.getElementById(`current-task-${quadrant}`);
+                taskBadge = document.getElementById(`task-badge-${quadrant}`);
             }
             
-            if (!taskIndicator) return;
+            if (!taskBadge) return;
 
             if (result.success && result.task) {
                 const task = result.task;
-                const taskText = taskIndicator.querySelector('.task-text');
+                const taskIdElement = taskBadge.querySelector('.task-id');
                 
-                if (taskText) {
-                    taskText.textContent = `#${task.id} ${task.title}`;
-                    taskIndicator.style.display = 'flex';
-                    taskIndicator.title = `Click to open Task #${task.id}: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                if (taskIdElement) {
+                    taskIdElement.textContent = task.id;
+                    taskBadge.style.display = 'inline-flex';
+                    taskBadge.title = `Task #${task.id}: ${task.title}${task.description ? '\n' + task.description : ''}`;
                     
                     // Remove any existing click listener and add new one
-                    const newTaskIndicator = taskIndicator.cloneNode(true);
-                    taskIndicator.parentNode.replaceChild(newTaskIndicator, taskIndicator);
+                    const newTaskBadge = taskBadge.cloneNode(true);
+                    taskBadge.parentNode.replaceChild(newTaskBadge, taskBadge);
                     
                     // Add click event to open task manager with this task
-                    newTaskIndicator.addEventListener('click', (e) => {
+                    newTaskBadge.addEventListener('click', (e) => {
                         e.stopPropagation();
                         this.openTaskInKanban(task.id);
                     });
                 }
             } else {
-                taskIndicator.style.display = 'none';
+                taskBadge.style.display = 'none';
             }
         } catch (error) {
             console.error(`Error updating task indicator for terminal ${terminalId}:`, error);
@@ -5134,16 +5228,68 @@ class TerminalManager {
     }
 
     async checkForTaskCompletionNotifications() {
+        console.log('🔍 Checking for task notifications...');
         try {
             const result = await ipcRenderer.invoke('check-task-notifications');
+            
+            // Debug logging
+            if (result.notifications && result.notifications.length > 0) {
+                console.log(`📬 Found ${result.notifications.length} unprocessed notifications`);
+                console.log('Notification types:', result.notifications.map(n => n.type));
+                // Log terminal title notifications specifically
+                const titleNotifications = result.notifications.filter(n => n.type === 'terminal_title_update');
+                if (titleNotifications.length > 0) {
+                    console.log('🏷️ Terminal title notifications found:', titleNotifications);
+                }
+            }
+            
             if (result.success && result.notifications && result.notifications.length > 0) {
                 result.notifications.forEach(notification => {
                     if (notification.type === 'task_completed') {
                         // Desktop notification removed - only update indicators
                         // Immediately update task indicators to reflect the change
                         this.updateCurrentTaskIndicators();
+                    } else if (notification.type === 'terminal_title_update') {
+                        // Process terminal title update
+                        const { terminal_id, title, task_id } = notification;
+                        
+                        console.log(`🏷️ Processing terminal title update:`, {
+                            terminal_id,
+                            title,
+                            task_id,
+                            timestamp: notification.timestamp
+                        });
+                        
+                        // Save to localStorage
+                        localStorage.setItem(`terminal_title_${terminal_id}`, title);
+                        if (task_id) {
+                            localStorage.setItem(`terminal_task_${terminal_id}`, task_id);
+                        }
+                        
+                        // Verify localStorage was updated
+                        const storedTitle = localStorage.getItem(`terminal_title_${terminal_id}`);
+                        console.log(`✅ localStorage verification - stored title: "${storedTitle}"`);
+                        
+                        // Update UI immediately - convert terminal_id (1-based) to quadrant (0-based)
+                        const quadrant = terminal_id - 1;
+                        this.updateTerminalTitle(quadrant, title);
+                        
+                        // Also update the task badge if we have a task
+                        if (task_id) {
+                            this.updateTerminalTaskIndicator(terminal_id);
+                        }
+                        
+                        console.log(`✨ Terminal ${terminal_id} title updated to: "${title}"`);
                     }
                 });
+                
+                // After processing all terminal title updates, mark them as processed
+                const hasTerminalTitleUpdates = result.notifications.some(n => n.type === 'terminal_title_update');
+                if (hasTerminalTitleUpdates) {
+                    // Mark terminal title notifications as processed in the file
+                    await ipcRenderer.invoke('mark-terminal-titles-processed');
+                    console.log('✅ Terminal title notifications marked as processed');
+                }
             }
         } catch (error) {
             // Silently fail - this is just for notifications
@@ -5441,13 +5587,18 @@ class TerminalManager {
         const existingTerminal = this.terminals.get(terminalId);
         const hasActiveTerminal = existingTerminal && existingTerminal.terminal;
         
-        // Get the terminal title - use project name if available
-        let terminalTitle = `Terminal ${terminalId + 1}`;
-        // Use lastSelectedDirectories even if terminal is not in Map
-        if (this.lastSelectedDirectories[terminalId]) {
-            const projectPath = this.lastSelectedDirectories[terminalId];
-            const projectName = projectPath.split('/').pop() || projectPath;
-            terminalTitle = `${terminalId + 1} · ${projectName}`;
+        // Get the terminal title - check localStorage first, then use project name if available
+        let terminalTitle = localStorage.getItem(`terminal_title_${terminalId + 1}`);
+        
+        if (!terminalTitle) {
+            // No custom title in localStorage, use default
+            terminalTitle = `Terminal ${terminalId + 1}`;
+            // Use lastSelectedDirectories even if terminal is not in Map
+            if (this.lastSelectedDirectories[terminalId]) {
+                const projectPath = this.lastSelectedDirectories[terminalId];
+                const projectName = projectPath.split('/').pop() || projectPath;
+                terminalTitle = `${terminalId + 1} · ${projectName}`;
+            }
         }
         
         // Log for debugging
@@ -5457,10 +5608,9 @@ class TerminalManager {
             <div class="terminal-header">
                 <div style="display: flex; align-items: center; flex: 1;">
                     <span class="terminal-title">${terminalTitle}</span>
-                    <div class="current-task" id="current-task-${terminalId}" style="display: none;">
-                        <i data-lucide="play-circle"></i>
-                        <span class="task-text"></span>
-                    </div>
+                    <button class="task-id-badge" id="task-badge-${terminalId}" style="display: none;" title="View task in Kanban">
+                        #<span class="task-id"></span>
+                    </button>
                     <div class="git-branch-display" id="git-branch-display-${terminalId}" style="display: none;">
                         <i data-lucide="git-branch"></i>
                         <span class="current-branch-name">main</span>
@@ -5802,6 +5952,19 @@ class TerminalManager {
         console.log('Switching from grid to tabbed mode...');
         this.layoutMode = 'tabbed';
         
+        // Save current terminal titles before switching (without terminal number prefix)
+        const savedTitles = new Map();
+        this.terminals.forEach((terminal, quadrant) => {
+            const titleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
+            if (titleElement && titleElement.textContent) {
+                // Remove terminal number prefix if present (e.g., "1 · Title" -> "Title")
+                const titleText = titleElement.textContent;
+                const match = titleText.match(/^\d+\s*·\s*(.+)$/);
+                const cleanTitle = match ? match[1] : titleText;
+                savedTitles.set(quadrant, cleanTitle);
+            }
+        });
+        
         // Close all dropdowns before switching
         document.querySelectorAll('.terminal-dropdown-menu').forEach(menu => {
             menu.style.display = 'none';
@@ -5829,8 +5992,29 @@ class TerminalManager {
                 
                 // Restore all terminal states after rendering with a slight delay
                 setTimeout(() => {
+                    // First restore general terminal states (colors, etc)
                     this.restoreAllTerminalStates();
                     console.log('Tabbed mode switch complete, restoring states');
+                    
+                    // Then restore custom titles (with higher priority) after a small delay
+                    setTimeout(() => {
+                        // Restore saved titles from before the switch
+                        savedTitles.forEach((title, quadrant) => {
+                            console.log(`Restoring saved title for terminal ${quadrant}: "${title}"`);
+                            this.updateTerminalTitle(quadrant, title);
+                        });
+                        
+                        // Also check localStorage for any custom titles not in savedTitles
+                        for (let i = 0; i < 6; i++) {
+                            if (!savedTitles.has(i)) {
+                                const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
+                                if (storedTitle) {
+                                    console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+                                    this.updateTerminalTitle(i, storedTitle);
+                                }
+                            }
+                        }
+                    }, 50); // Small delay to ensure restoreAllTerminalStates doesn't override
                     
                     // Refresh the active terminal display to ensure scrollbar is visible
                     if (this.activeTabTerminal !== null) {
@@ -5846,6 +6030,21 @@ class TerminalManager {
 
     switchToGridMode() {
         console.log('Switching from tabbed to grid mode...');
+        
+        // Save current terminal titles before switching (clean titles without numbers)
+        const savedTitles = new Map();
+        document.querySelectorAll('.terminal-tab').forEach(tab => {
+            const terminalId = parseInt(tab.dataset.terminalId);
+            const titleElement = tab.querySelector('.tab-title');
+            if (titleElement && titleElement.textContent) {
+                // Tab titles shouldn't have numbers, but clean just in case
+                const titleText = titleElement.textContent;
+                const match = titleText.match(/^\d+\s*·\s*(.+)$/);
+                const cleanTitle = match ? match[1] : titleText;
+                savedTitles.set(terminalId, cleanTitle);
+            }
+        });
+        
         this.layoutMode = 'grid';
         
         // Close all dropdowns before switching
@@ -5874,8 +6073,28 @@ class TerminalManager {
         
         // Re-render grid layout
         this.renderTerminals().then(() => {
-            // After rendering, restore all terminal states
+            // First restore general terminal states (colors, etc)
             this.restoreAllTerminalStates();
+            
+            // Then restore custom titles with higher priority after a delay
+            setTimeout(() => {
+                // Restore saved titles from tabs
+                savedTitles.forEach((title, terminalId) => {
+                    console.log(`Restoring saved title for terminal ${terminalId}: "${title}"`);
+                    this.updateTerminalTitle(terminalId, title);
+                });
+                
+                // Also check localStorage for any custom titles not in savedTitles
+                for (let i = 0; i < 6; i++) {
+                    if (!savedTitles.has(i)) {
+                        const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
+                        if (storedTitle) {
+                            console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+                            this.updateTerminalTitle(i, storedTitle);
+                        }
+                    }
+                }
+            }, 200); // Slightly longer delay for grid mode to ensure DOM is ready
             
             // Re-attach event listeners after rendering new DOM
             this.attachTerminalEventListeners();
@@ -5894,7 +6113,9 @@ class TerminalManager {
                 // Use setTimeout to ensure DOM is fully rendered
                 setTimeout(() => {
                     result.terminals.forEach(async terminalId => {
-                        // Restore terminal title if it exists
+                        // Don't restore project name as title - we want to keep custom titles
+                        // Custom titles are already restored from localStorage in switchToTabbedMode/switchToGridMode
+                        /* Commented out to preserve custom titles
                         const terminal = this.terminals.get(terminalId);
                         if (terminal && terminal.terminal) {
                             const projectPath = this.lastSelectedDirectories[terminalId];
@@ -5904,6 +6125,7 @@ class TerminalManager {
                                 this.updateTerminalTitle(terminalId, projectName);
                             }
                         }
+                        */
                         
                         // Restore header color
                         if (this.lastSelectedDirectories[terminalId]) {
@@ -6070,11 +6292,21 @@ class TerminalManager {
         // Get terminal title and apply project color
         let title = `Terminal ${terminalId + 1}`;
         let projectColor = null;
+        let projectInitials = '';
+        
+        // First check localStorage for custom terminal title
+        const customTitle = localStorage.getItem(`terminal_title_${terminalId + 1}`);
+        if (customTitle) {
+            title = customTitle;
+        }
         
         // First check if we have a directory for this terminal (might not be fully initialized yet)
         if (this.lastSelectedDirectories[terminalId]) {
             const dir = this.lastSelectedDirectories[terminalId];
             const projectName = dir.split('/').pop() || dir;
+            
+            // Generate project initials
+            projectInitials = this.getProjectInitials(projectName);
             
             // Get or generate project color regardless of terminal state
             if (this.customProjectColors[projectName]) {
@@ -6084,22 +6316,24 @@ class TerminalManager {
                 projectColor = colors ? colors.primary : null;
             }
             
-            // Update title if terminal is active
-            const terminal = this.terminals.get(terminalId);
-            if (terminal && terminal.terminal) {
-                // Terminal is active, check for task or use project name
-                const currentTask = document.querySelector(`#current-task-${terminalId} .task-text`);
-                if (currentTask && currentTask.textContent) {
-                    title = currentTask.textContent;
+            // If no custom title from localStorage, try to get from task or project
+            if (!customTitle) {
+                const terminal = this.terminals.get(terminalId);
+                if (terminal && terminal.terminal) {
+                    // Terminal is active, check for task or use project name
+                    const currentTask = document.querySelector(`#current-task-${terminalId} .task-text`);
+                    if (currentTask && currentTask.textContent) {
+                        title = currentTask.textContent;
+                    } else {
+                        title = projectName;
+                    }
                 } else {
+                    // Terminal not fully initialized yet, but we can still show project name
                     title = projectName;
                 }
-            } else {
-                // Terminal not fully initialized yet, but we can still show project name
-                title = projectName;
             }
             
-            console.log(`Tab ${terminalId}: title="${title}", projectColor="${projectColor}", hasTerminal=${!!(terminal && terminal.terminal)}`);
+            console.log(`Tab ${terminalId}: title="${title}", projectInitials="${projectInitials}", projectColor="${projectColor}`);
         } else {
             // No directory selected yet, check if terminal is active
             const terminal = this.terminals.get(terminalId);
@@ -6112,6 +6346,7 @@ class TerminalManager {
         tab.innerHTML = `
             <div class="terminal-tab-content">
                 <span class="tab-terminal-number">${terminalId + 1}</span>
+                ${projectInitials ? `<span class="tab-project-initials" style="background: ${projectColor}; color: white;">${projectInitials}</span>` : ''}
                 <span class="tab-title">${title}</span>
                 <div class="tab-activity-spinner"></div>
             </div>
@@ -8003,7 +8238,9 @@ const FEATURE_HIGHLIGHTS_CONFIG = [
         message: 'Toggle between grid and tabbed layouts',
         position: 'bottom',
         duration: 30000, // 30 seconds
-        showInVersions: ['0.0.38'], // Only show in these versions
+        showInVersions: ['0.0.38', '0.0.39', '0.0.40', '0.0.41'], // Available in these versions
+        // NOTE: tabbedMode uses cross-version tracking - shows only ONCE across all versions
+        // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.41
         delay: 500 // Delay before showing
     },
     // Add more features here in the future:
@@ -8067,6 +8304,22 @@ async function initializeFeatureHighlights() {
 document.addEventListener('DOMContentLoaded', async () => {
     // Get loading screen element
     const loadingScreen = document.getElementById('loading-screen');
+    
+    // Clear terminal titles from localStorage on fresh app start
+    // This ensures we don't keep old titles when the app restarts
+    console.log('🧹 Clearing terminal titles from previous session...');
+    for (let i = 1; i <= 6; i++) {
+        const titleKey = `terminal_title_${i}`;
+        const taskKey = `terminal_task_${i}`;
+        if (localStorage.getItem(titleKey)) {
+            console.log(`  Cleared title for terminal ${i}: "${localStorage.getItem(titleKey)}"`);
+            localStorage.removeItem(titleKey);
+        }
+        if (localStorage.getItem(taskKey)) {
+            localStorage.removeItem(taskKey);
+        }
+    }
+    console.log('✅ Terminal titles cleared for fresh session');
     
     try {
         window.terminalManager = new TerminalManager();
@@ -8186,4 +8439,105 @@ document.addEventListener('DOMContentLoaded', async () => {
             gitStatusBtn.click();
         }
     });
+    
+    // Debug functions for terminal titles
+    window.checkTerminalTitles = () => {
+        console.log('🔍 Checking terminal titles in localStorage:');
+        for (let i = 1; i <= 6; i++) {
+            const title = localStorage.getItem(`terminal_title_${i}`);
+            const taskId = localStorage.getItem(`terminal_task_${i}`);
+            console.log(`Terminal ${i}:`, {
+                title: title || '(not set)',
+                taskId: taskId || '(not set)'
+            });
+        }
+        return 'Check complete';
+    };
+    
+    window.clearTerminalTitles = () => {
+        console.log('🗑️ Clearing all terminal titles from localStorage...');
+        for (let i = 1; i <= 6; i++) {
+            localStorage.removeItem(`terminal_title_${i}`);
+            localStorage.removeItem(`terminal_task_${i}`);
+        }
+        console.log('✅ All terminal titles cleared');
+        return 'Cleared';
+    };
+    
+    window.testTerminalTitle = (terminalId = 1, title = 'Test Title') => {
+        console.log(`🧪 Testing terminal ${terminalId} with title: "${title}"`);
+        localStorage.setItem(`terminal_title_${terminalId}`, title);
+        localStorage.setItem(`terminal_task_${terminalId}`, '999');
+        
+        // Update UI - tm is the TerminalManager instance
+        const quadrant = terminalId - 1;
+        if (window.terminalManager) {
+            window.terminalManager.updateTerminalTitle(quadrant, title);
+            window.terminalManager.updateTerminalTaskIndicator(terminalId);
+        } else {
+            console.warn('TerminalManager not available yet. Title saved to localStorage only.');
+        }
+        
+        console.log('✅ Test complete - check the terminal header');
+        return 'Test applied';
+    };
+    
+    // Function to manually reload terminal title notifications
+    window.reloadTerminalTitles = async () => {
+        console.log('🔄 Manually reloading terminal title notifications...');
+        try {
+            const fs = require('fs');
+            const path = require('path');
+            const os = require('os');
+            
+            const notificationFile = path.join(os.homedir(), '.codeagentswarm', 'task_notifications.json');
+            
+            if (fs.existsSync(notificationFile)) {
+                const content = fs.readFileSync(notificationFile, 'utf8');
+                const notifications = JSON.parse(content);
+                
+                // Find terminal_title_update notifications
+                const titleNotifications = notifications.filter(n => n.type === 'terminal_title_update');
+                
+                console.log(`Found ${titleNotifications.length} terminal title notifications`);
+                
+                // Process each notification
+                titleNotifications.forEach(notification => {
+                    const { terminal_id, title, task_id } = notification;
+                    
+                    console.log(`Processing: Terminal ${terminal_id} -> "${title}"`);
+                    
+                    // Save to localStorage
+                    localStorage.setItem(`terminal_title_${terminal_id}`, title);
+                    if (task_id) {
+                        localStorage.setItem(`terminal_task_${terminal_id}`, task_id);
+                    }
+                    
+                    // Update UI
+                    const quadrant = terminal_id - 1;
+                    if (window.terminalManager) {
+                        window.terminalManager.updateTerminalTitle(quadrant, title);
+                        if (task_id) {
+                            window.terminalManager.updateTerminalTaskIndicator(terminal_id);
+                        }
+                    }
+                });
+                
+                console.log('✅ Terminal titles reloaded successfully');
+                return 'Reloaded';
+            } else {
+                console.log('❌ Notification file not found');
+                return 'File not found';
+            }
+        } catch (error) {
+            console.error('Error reloading terminal titles:', error);
+            return 'Error';
+        }
+    };
+    
+    console.log('🛠️ Terminal title debug functions available:');
+    console.log('  - checkTerminalTitles() : View all terminal titles in localStorage');
+    console.log('  - clearTerminalTitles() : Clear all terminal titles');
+    console.log('  - testTerminalTitle(terminalId, title) : Test a title on a specific terminal');
+    console.log('  - reloadTerminalTitles() : Manually reload terminal titles from notification file');
 });

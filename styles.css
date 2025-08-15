@@ -1298,6 +1298,50 @@ body::before {
   transform: translateY(-1px);
 }
 
+/* Project initials badge in terminal header */
+.terminal-project-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  margin: 0 6px;
+  border-radius: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.9;
+}
+
+/* Task ID Badge - New compact design */
+.task-id-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  margin-left: 8px;
+  transition: all 0.2s ease;
+  height: 18px;
+  line-height: 1;
+}
+
+.task-id-badge:hover {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+}
+
+.task-id-badge .task-id {
+  font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', monospace;
+}
+
 .terminal-controls {
   display: flex;
   gap: 8px;
@@ -6240,6 +6284,22 @@ textarea {
 .terminal-tab.active .tab-terminal-number {
   background: var(--primary);
   color: white;
+}
+
+/* Project initials badge in tab */
+.tab-project-initials {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 5px;
+  margin: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  opacity: 0.9;
+  min-width: 20px;
 }
 
 /* Tab title */

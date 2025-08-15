@@ -275,11 +275,24 @@ class FeatureHighlight {
     }
 
     hasBeenShown(featureName) {
+        // For cross-version features (like tabbedMode), check without version
+        if (featureName === 'tabbedMode') {
+            const crossVersionKey = `featureHighlight_${featureName}_shown`;
+            return localStorage.getItem(crossVersionKey) === 'true';
+        }
+        // For version-specific features, use version in key
         const key = this.getStorageKey(featureName);
         return localStorage.getItem(key) === 'true';
     }
 
     markAsShown(featureName) {
+        // For cross-version features (like tabbedMode), mark without version
+        if (featureName === 'tabbedMode') {
+            const crossVersionKey = `featureHighlight_${featureName}_shown`;
+            localStorage.setItem(crossVersionKey, 'true');
+            return;
+        }
+        // For version-specific features, use version in key
         const key = this.getStorageKey(featureName);
         localStorage.setItem(key, 'true');
     }
@@ -289,6 +302,13 @@ class FeatureHighlight {
     }
 
     reset(featureName) {
+        // For cross-version features (like tabbedMode), reset the cross-version key
+        if (featureName === 'tabbedMode') {
+            const crossVersionKey = `featureHighlight_${featureName}_shown`;
+            localStorage.removeItem(crossVersionKey);
+            return;
+        }
+        // For version-specific features, use version in key
         const key = this.getStorageKey(featureName);
         localStorage.removeItem(key);
     }

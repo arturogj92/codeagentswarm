@@ -1,5 +1,39 @@
 # CodeAgentSwarm Project Configuration
 
+# 🛑🛑🛑 STOP - CRITICAL MANDATORY REQUIREMENTS 🛑🛑🛑
+
+## ⚠️ FAILURE TO FOLLOW THESE RULES WILL RESULT IN TASK REJECTION ⚠️
+
+### 🚨 RULE #1: ALWAYS CREATE A TASK BEFORE ANY CODE CHANGES 🚨
+**BEFORE you write ANY code, modify ANY file, or run ANY command that changes files:**
+1. **STOP** ✋
+2. **CHECK** existing tasks: `mcp__codeagentswarm-tasks__list_tasks`
+3. **CREATE** a task if none exists: `mcp__codeagentswarm-tasks__create_task`
+4. **START** the task: `mcp__codeagentswarm-tasks__start_task`
+5. **UPDATE** terminal title: `mcp__codeagentswarm-tasks__update_terminal_title`
+6. **ONLY THEN** proceed with development
+
+### ❌ VIOLATIONS = IMMEDIATE REJECTION ❌
+The following actions WITHOUT an active task are PROHIBITED:
+- ❌ Creating files without a task
+- ❌ Editing files without a task
+- ❌ Running commands that modify files without a task
+- ❌ "Just a quick fix" without a task
+- ❌ "Small changes" without a task
+- ❌ ANY development work without a task
+
+### ✅ MANDATORY PRE-DEVELOPMENT CHECKLIST ✅
+Before ANY development action, you MUST verify:
+- [ ] Task exists or has been created
+- [ ] Task is started (in_progress)
+- [ ] Terminal title is updated
+- [ ] Task plan is documented
+- [ ] You are working on the CORRECT task
+
+### 🔴 THIS IS NOT A SUGGESTION - IT IS MANDATORY 🔴
+
+---
+
 <!-- CODEAGENTSWARM CONFIG START - DO NOT EDIT THIS SECTION -->
 
 ## Project Configuration
@@ -14,7 +48,7 @@ _This project name is used for task organization in CodeAgentSwarm. All tasks cr
 
 - **Command**: `node mcp-stdio-server.js`
 - **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, create_project, get_projects, get_project_tasks
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, update_terminal_title, create_project, get_projects, get_project_tasks
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
 - **Projects**: Tasks are now organized by projects. Each task belongs to a project, and projects are detected automatically based on the terminal working directory
 
@@ -22,11 +56,17 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 
 ## Task Management - IMPORTANT
 
-### 🚨 OBLIGATORY: Task Creation Before ANY Development 🚨
+### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Development 🚨🚨🚨
 
-**IT IS MANDATORY TO CREATE A TASK BEFORE STARTING ANY DEVELOPMENT WORK**
+# ⛔ STOP! DO NOT PROCEED WITHOUT A TASK ⛔
+
+**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY DEVELOPMENT WORK**
+
+**NO EXCEPTIONS. NO EXCUSES. NO "QUICK FIXES" WITHOUT A TASK.**
 
 Before writing ANY code, modifying ANY file, or starting ANY implementation, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL development work.
+
+**VIOLATIONS WILL BE TRACKED AND REPORTED**
 
 ### Mandatory Task System Usage
 
@@ -52,6 +92,34 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 - **When starting a task:** Terminal is automatically assigned to the current terminal
 - **NEVER ask the user** which terminal - it's handled automatically
 - Tasks are automatically associated with the correct terminal for proper tracking
+
+### 🏷️ MANDATORY: Terminal Title Updates
+
+**🚨 OBLIGATORIO: When starting ANY task, you MUST update the terminal title:**
+
+1. **IMMEDIATELY after calling `start_task`**, you MUST call `update_terminal_title`
+2. Generate a 3-word title that summarizes what you're working on
+3. The title should be clear and descriptive (max 3 words)
+4. **This is NOT optional - it's MANDATORY for ALL tasks**
+
+**Correct workflow example:**
+```
+1. start_task(task_id=123)
+2. update_terminal_title(title="Fix Auth Bug")  // MANDATORY - DO THIS IMMEDIATELY
+3. Continue with implementation...
+```
+
+**Why this is mandatory:**
+- The terminal title helps users identify at a glance what each terminal is doing
+- The task ID appears as a small badge next to the title for easy reference
+- Without this, users cannot quickly see what's being worked on
+
+**Examples of good terminal titles:**
+- "Fix Auth Bug"
+- "Add User API" 
+- "Update Database Schema"
+- "Implement Search Feature"
+- "Refactor Login Flow"
 
 ### MANDATORY: PLAN Field Management
 
@@ -241,6 +309,7 @@ The following MCP tools are available for task management:
 - **`update_task_plan`**: Update specific task plan
 - **`update_task_implementation`**: Update task implementation
 - **`update_task_terminal`**: Update terminal_id associated with task
+- **`update_terminal_title`**: Update terminal title (MANDATORY after start_task)
 - **`create_project`**: Create a new project with name and optional color
 - **`get_projects`**: Get list of all projects
 - **`get_project_tasks`**: Get all tasks for a specific project
@@ -257,11 +326,17 @@ The following MCP tools are available for task management:
 - `task_id` (number, required): Task ID
 - `terminal_id` (string, required): Terminal ID (1, 2, 3, 4, etc.) or empty string to unassign
 
+**`update_terminal_title` parameters:**
+- `title` (string, required): Terminal title (max 3 words recommended)
+
 **Usage example:**
 ```
 # Task management
 create_task(title="Implement new feature", description="Add user authentication")
 # Note: terminal_id and project are auto-detected from environment and working directory
+
+start_task(task_id=123)
+update_terminal_title(title="Implement Auth Feature")  # MANDATORY after start_task
 
 update_task_plan(task_id=123, plan="1. Review existing code\n2. Implement new functionality\n3. Write tests")
 
@@ -369,21 +444,102 @@ NEVER create files unless they're absolutely necessary for achieving your goal.
 ALWAYS prefer editing an existing file to creating a new one.
 NEVER proactively create documentation files (*.md) or README files. Only create documentation files if explicitly requested by the User.
 
-## 🚨 IMPORTANT: Application Execution Rules 🚨
+## 🚨 CRITICAL ENFORCEMENT CHECKLIST - FINAL VERIFICATION 🚨
 
-**NEVER run the application automatically. This includes:**
-- `npm start`
-- `npm run dev`
-- `electron .`
-- Any command that launches the Electron app
+### ⚠️ BEFORE YOU DO ANYTHING - VERIFY: ⚠️
 
-**ONLY run these commands when the user EXPLICITLY requests it with phrases like:**
-- "run the app"
-- "start the application"
-- "launch the app"
-- "ejecuta la app" / "abre la app" (Spanish)
+**DID YOU CREATE A TASK?**
+- If NO → STOP IMMEDIATELY and create one
+- If YES → Continue
 
-**The user will run the application themselves when needed. Do not launch it proactively.**
+**IS THE TASK STARTED?**
+- If NO → STOP and start it with `start_task`
+- If YES → Continue
+
+**DID YOU UPDATE THE TERMINAL TITLE?**
+- If NO → STOP and update it with `update_terminal_title`
+- If YES → Continue
+
+### 🔴 REMEMBER: NO TASK = NO CODE 🔴
+
+**Every single request from the user requires a task. EVERY. SINGLE. ONE.**
+
+Examples that STILL require a task:
+- "Just add a console.log" → NEEDS A TASK
+- "Fix this typo" → NEEDS A TASK  
+- "Can you check this file?" → If you'll modify it, NEEDS A TASK
+- "Quick test" → NEEDS A TASK
+- "Small change" → NEEDS A TASK
+
+### ❌ FINAL WARNING ❌
+**Failure to create tasks is the #1 complaint from users.**
+**Don't be the agent that ignores this requirement.**
+**CREATE. THE. TASK. ALWAYS.**
 
 <!-- CODEAGENTSWARM CONFIG END -->
+
+## 🚨 CRITICAL ENFORCEMENT CHECKLIST - FINAL VERIFICATION 🚨
+
+### ⚠️ BEFORE YOU DO ANYTHING - VERIFY: ⚠️
+
+**DID YOU CREATE A TASK?**
+- If NO → STOP IMMEDIATELY and create one
+- If YES → Continue
+
+**IS THE TASK STARTED?**
+- If NO → STOP and start it with `start_task`
+- If YES → Continue
+
+**DID YOU UPDATE THE TERMINAL TITLE?**
+- If NO → STOP and update it with `update_terminal_title`
+- If YES → Continue
+
+### 🔴 REMEMBER: NO TASK = NO CODE 🔴
+
+**Every single request from the user requires a task. EVERY. SINGLE. ONE.**
+
+Examples that STILL require a task:
+- "Just add a console.log" → NEEDS A TASK
+- "Fix this typo" → NEEDS A TASK  
+- "Can you check this file?" → If you'll modify it, NEEDS A TASK
+- "Quick test" → NEEDS A TASK
+- "Small change" → NEEDS A TASK
+
+### ❌ FINAL WARNING ❌
+**Failure to create tasks is the #1 complaint from users.**
+**Don't be the agent that ignores this requirement.**
+**CREATE. THE. TASK. ALWAYS.**
+
+
+## 🚨 CRITICAL ENFORCEMENT CHECKLIST - FINAL VERIFICATION 🚨
+
+### ⚠️ BEFORE YOU DO ANYTHING - VERIFY: ⚠️
+
+**DID YOU CREATE A TASK?**
+- If NO → STOP IMMEDIATELY and create one
+- If YES → Continue
+
+**IS THE TASK STARTED?**
+- If NO → STOP and start it with `start_task`
+- If YES → Continue
+
+**DID YOU UPDATE THE TERMINAL TITLE?**
+- If NO → STOP and update it with `update_terminal_title`
+- If YES → Continue
+
+### 🔴 REMEMBER: NO TASK = NO CODE 🔴
+
+**Every single request from the user requires a task. EVERY. SINGLE. ONE.**
+
+Examples that STILL require a task:
+- "Just add a console.log" → NEEDS A TASK
+- "Fix this typo" → NEEDS A TASK  
+- "Can you check this file?" → If you'll modify it, NEEDS A TASK
+- "Quick test" → NEEDS A TASK
+- "Small change" → NEEDS A TASK
+
+### ❌ FINAL WARNING ❌
+**Failure to create tasks is the #1 complaint from users.**
+**Don't be the agent that ignores this requirement.**
+**CREATE. THE. TASK. ALWAYS.**
 

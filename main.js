@@ -3676,6 +3676,10 @@ ipcMain.on('open-system-notifications', (event) => {
   }
 });
 
+// Store IDs of terminal title notifications that have been sent to renderer
+// This gets cleared when renderer reloads to ensure notifications are re-sent
+let sentTerminalTitleNotifications = new Set();
+
 // Task notification file checker
 ipcMain.handle('check-task-notifications', async () => {
   try {
@@ -3691,22 +3695,112 @@ ipcMain.handle('check-task-notifications', async () => {
     const content = fs.readFileSync(notificationFile, 'utf8');
     let notifications = JSON.parse(content);
     
-    // Filter unprocessed notifications
-    const unprocessed = notifications.filter(n => !n.processed);
+    // Debug: Log what we're reading
+    // IMPORTANT: We process ALL terminal_title_update notifications, not just unprocessed ones
+    // This ensures titles always update when MCP is called
+    const terminalTitleNotifications = notifications.filter(n => n.type === 'terminal_title_update');
+    if (terminalTitleNotifications.length > 0) {
+      console.log(`[Main] Found ${terminalTitleNotifications.length} terminal title notifications (processing all)`);
+    }
     
-    if (unprocessed.length > 0) {
-      // Mark all notifications as processed
-      notifications = notifications.map(n => ({ ...n, processed: true }));
+    // Create unique IDs for notifications
+    notifications = notifications.map((n, index) => ({
+      ...n,
+      _id: `${n.type}_${n.timestamp}_${index}`
+    }));
+    
+    // Filter unprocessed notifications
+    let unprocessedToSend = [];
+    
+    // Group terminal title notifications by terminal_id and get the most recent one for each
+    const latestTitlesByTerminal = {};
+    notifications.forEach(n => {
+      if (n.type === 'terminal_title_update') {
+        const existing = latestTitlesByTerminal[n.terminal_id];
+        if (!existing || new Date(n.timestamp) > new Date(existing.timestamp)) {
+          latestTitlesByTerminal[n.terminal_id] = n;
+        }
+      }
+    });
+    
+    notifications.forEach(n => {
+      if (n.type === 'terminal_title_update') {
+        // For terminal titles: ALWAYS send the latest one per terminal
+        // This ensures MCP updates always work, regardless of processed state
+        if (latestTitlesByTerminal[n.terminal_id] === n && !sentTerminalTitleNotifications.has(n._id)) {
+          unprocessedToSend.push(n);
+          sentTerminalTitleNotifications.add(n._id);
+          console.log(`[Main] Sending latest terminal title notification: Terminal ${n.terminal_id} -> "${n.title}"`);
+        }
+      } else if (!n.processed) {
+        // For other types, send if unprocessed
+        unprocessedToSend.push(n);
+      }
+    });
+    
+    // Mark non-terminal_title_update notifications as processed
+    if (unprocessedToSend.length > 0) {
+      notifications = notifications.map(n => {
+        // Remove the temporary _id before saving
+        const { _id, ...notificationWithoutId } = n;
+        
+        if (n.type !== 'terminal_title_update' && !n.processed) {
+          return { ...notificationWithoutId, processed: true };
+        }
+        return notificationWithoutId;
+      });
       
       // Write back to file
       fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
-      
-      return { success: true, notifications: unprocessed };
     }
     
-    return { success: true, notifications: [] };
+    return { success: true, notifications: unprocessedToSend };
   } catch (error) {
     console.error('Error checking task notifications:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Clear the sent notifications tracking when renderer reloads
+ipcMain.handle('renderer-ready', async () => {
+  // Clear the Set so notifications are re-sent after reload
+  const previousSize = sentTerminalTitleNotifications.size;
+  sentTerminalTitleNotifications.clear();
+  console.log(`[Main] Renderer ready - cleared ${previousSize} sent notifications from tracking`);
+  return { success: true };
+});
+
+// Mark terminal title notifications as processed
+ipcMain.handle('mark-terminal-titles-processed', async () => {
+  try {
+    const notificationDir = path.join(os.homedir(), '.codeagentswarm');
+    const notificationFile = path.join(notificationDir, 'task_notifications.json');
+    
+    if (!fs.existsSync(notificationFile)) {
+      return { success: true };
+    }
+    
+    // Read and parse notifications
+    const content = fs.readFileSync(notificationFile, 'utf8');
+    let notifications = JSON.parse(content);
+    
+    // Mark all terminal_title_update notifications as processed
+    notifications = notifications.map(n => {
+      if (n.type === 'terminal_title_update') {
+        return { ...n, processed: true };
+      }
+      return n;
+    });
+    
+    // Write back to file
+    fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
+    
+    // Clear the sent notifications set since they're now processed
+    // But we don't need to clear it because processed notifications won't be sent again anyway
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error marking terminal titles as processed:', error);
     return { success: false, error: error.message };
   }
 });
