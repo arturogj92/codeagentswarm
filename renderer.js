@@ -207,6 +207,19 @@ class TerminalManager {
                     this.terminals.delete(i);
                 }
                 
+                // In tabbed mode, if we closed the active tab, switch to another available one
+                if (this.layoutMode === 'tabbed' && this.activeTabTerminal === i) {
+                    const activeResult = await ipcRenderer.invoke('get-active-terminals');
+                    if (activeResult.success && activeResult.terminals.length > 0) {
+                        // Switch to the first available terminal
+                        this.activeTabTerminal = activeResult.terminals[0];
+                        console.log(`🔄 Switched active tab to terminal ${this.activeTabTerminal} after closing terminal ${i}`);
+                    } else {
+                        this.activeTabTerminal = null;
+                        console.log(`🔄 No terminals left, clearing active tab`);
+                    }
+                }
+                
                 // Update the UI - just render and update buttons since terminal is already removed
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
@@ -5005,22 +5018,38 @@ class TerminalManager {
 
             if (result.success && result.task) {
                 const task = result.task;
-                const taskIdElement = taskBadge.querySelector('.task-id');
                 
-                if (taskIdElement) {
-                    taskIdElement.textContent = task.id;
-                    taskBadge.style.display = 'inline-flex';
-                    taskBadge.title = `Task #${task.id}: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                // Get the current terminal's project name
+                const terminalProjectName = this.getTerminalProjectName(quadrant);
+                
+                // Only show badge if task project matches terminal project
+                // If task has no project (NULL), always show it (backward compatibility)
+                // If terminal has no project, show all tasks
+                const shouldShowBadge = !task.project || 
+                                       !terminalProjectName || 
+                                       task.project === terminalProjectName;
+                
+                if (shouldShowBadge) {
+                    const taskIdElement = taskBadge.querySelector('.task-id');
                     
-                    // Remove any existing click listener and add new one
-                    const newTaskBadge = taskBadge.cloneNode(true);
-                    taskBadge.parentNode.replaceChild(newTaskBadge, taskBadge);
-                    
-                    // Add click event to open task manager with this task
-                    newTaskBadge.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        this.openTaskInKanban(task.id);
-                    });
+                    if (taskIdElement) {
+                        taskIdElement.textContent = task.id;
+                        taskBadge.style.display = 'inline-flex';
+                        taskBadge.title = `Task #${task.id}: ${task.title}${task.description ? '\n' + task.description : ''}`;
+                        
+                        // Remove any existing click listener and add new one
+                        const newTaskBadge = taskBadge.cloneNode(true);
+                        taskBadge.parentNode.replaceChild(newTaskBadge, taskBadge);
+                        
+                        // Add click event to open task manager with this task
+                        newTaskBadge.addEventListener('click', (e) => {
+                            e.stopPropagation();
+                            this.openTaskInKanban(task.id);
+                        });
+                    }
+                } else {
+                    // Hide badge if project doesn't match
+                    taskBadge.style.display = 'none';
                 }
             } else {
                 taskBadge.style.display = 'none';
@@ -6004,15 +6033,19 @@ class TerminalManager {
                             this.updateTerminalTitle(quadrant, title);
                         });
                         
-                        // Also check localStorage for any custom titles not in savedTitles
-                        for (let i = 0; i < 6; i++) {
-                            if (!savedTitles.has(i)) {
-                                const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
-                                if (storedTitle) {
-                                    console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
-                                    this.updateTerminalTitle(i, storedTitle);
+                        // Check if we should restore from localStorage (not on fresh app start)
+                        if (!window.isAppFreshStart) {
+                            for (let i = 0; i < 6; i++) {
+                                if (!savedTitles.has(i)) {
+                                    const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
+                                    if (storedTitle) {
+                                        console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+                                        this.updateTerminalTitle(i, storedTitle);
+                                    }
                                 }
                             }
+                        } else {
+                            console.log('Fresh app start - skipping localStorage title restoration');
                         }
                     }, 50); // Small delay to ensure restoreAllTerminalStates doesn't override
                     
@@ -6084,15 +6117,19 @@ class TerminalManager {
                     this.updateTerminalTitle(terminalId, title);
                 });
                 
-                // Also check localStorage for any custom titles not in savedTitles
-                for (let i = 0; i < 6; i++) {
-                    if (!savedTitles.has(i)) {
-                        const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
-                        if (storedTitle) {
-                            console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
-                            this.updateTerminalTitle(i, storedTitle);
+                // Check if we should restore from localStorage (not on fresh app start)
+                if (!window.isAppFreshStart) {
+                    for (let i = 0; i < 6; i++) {
+                        if (!savedTitles.has(i)) {
+                            const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
+                            if (storedTitle) {
+                                console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+                                this.updateTerminalTitle(i, storedTitle);
+                            }
                         }
                     }
+                } else {
+                    console.log('Fresh app start - skipping localStorage title restoration');
                 }
             }, 200); // Slightly longer delay for grid mode to ensure DOM is ready
             
@@ -6161,9 +6198,16 @@ class TerminalManager {
         tabsContainer.innerHTML = '';
         contentContainer.innerHTML = '';
         
-        // Ensure we have an active tab
+        // Ensure we have a valid active tab
+        // Check if activeTabTerminal is still valid (exists in active terminals)
+        if (!activeTerminals.includes(this.activeTabTerminal)) {
+            this.activeTabTerminal = null;
+        }
+        
+        // If no active tab or invalid, set to first available
         if (!this.activeTabTerminal && activeTerminals.length > 0) {
             this.activeTabTerminal = activeTerminals[0];
+            console.log(`🔄 Set active tab to terminal ${this.activeTabTerminal}`);
         }
         
         // Create tabs and terminal elements
@@ -6396,10 +6440,58 @@ class TerminalManager {
                 this.closeTerminal(terminalId);
             });
         });
+        
+        // Terminal content click to clear notifications
+        const tabbedContent = document.getElementById('tabbed-terminal-content');
+        if (tabbedContent) {
+            tabbedContent.querySelectorAll('[data-quadrant]').forEach(terminalDiv => {
+                terminalDiv.addEventListener('click', (e) => {
+                    // Get the terminal ID from the data-quadrant attribute
+                    const terminalId = parseInt(terminalDiv.dataset.quadrant);
+                    
+                    // Clear notification if this terminal has one
+                    if (this.terminalsNeedingAttention.has(terminalId)) {
+                        console.log(`Clearing notification for terminal ${terminalId} via content click`);
+                        this.terminalsNeedingAttention.delete(terminalId);
+                        
+                        // Remove notification class from the tab
+                        const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+                        if (tab) {
+                            tab.classList.remove('tab-has-notification');
+                        }
+                        
+                        // Update the notification badge count
+                        this.updateNotificationBadge();
+                    }
+                });
+            });
+        }
     }
 
     switchToTab(terminalId) {
-        if (this.activeTabTerminal === terminalId) return;
+        console.log(`switchToTab called for terminal ${terminalId}, active terminal is ${this.activeTabTerminal}`);
+        
+        // Always clear notification state for this terminal, even if already active
+        if (this.terminalsNeedingAttention.has(terminalId)) {
+            console.log(`Clearing notification for terminal ${terminalId}`);
+            this.terminalsNeedingAttention.delete(terminalId);
+            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+            console.log(`Found tab for terminal ${terminalId}:`, tab);
+            if (tab) {
+                tab.classList.remove('tab-has-notification');
+                console.log(`Removed notification class from terminal ${terminalId}`);
+            }
+            // Update the notification badge count
+            this.updateNotificationBadge();
+        }
+        
+        // If already on this tab, we need to still show the terminal (in case of notification clear)
+        if (this.activeTabTerminal === terminalId) {
+            console.log(`Already on terminal ${terminalId}, but ensuring it's visible`);
+            // Make sure the terminal is visible
+            this.showTerminal(terminalId);
+            return;
+        }
         
         console.log('Switching to tab:', terminalId);
         this.activeTabTerminal = terminalId;
@@ -6415,15 +6507,6 @@ class TerminalManager {
             const tId = parseInt(terminal.dataset.quadrant);
             terminal.classList.toggle('active', tId === terminalId);
         });
-        
-        // Clear notification state for this terminal
-        if (this.terminalsNeedingAttention.has(terminalId)) {
-            this.terminalsNeedingAttention.delete(terminalId);
-            const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
-            if (tab) {
-                tab.classList.remove('tab-has-notification');
-            }
-        }
         
         // Refresh and resize terminal with better cleanup
         this.refreshTerminalDisplay(terminalId);
@@ -8238,9 +8321,9 @@ const FEATURE_HIGHLIGHTS_CONFIG = [
         message: 'Toggle between grid and tabbed layouts',
         position: 'bottom',
         duration: 30000, // 30 seconds
-        showInVersions: ['0.0.38', '0.0.39', '0.0.40', '0.0.41'], // Available in these versions
+        showInVersions: ['0.0.38', '0.0.39', '0.0.40', '0.0.41', '0.0.42', '0.0.43'], // Available in these versions
         // NOTE: tabbedMode uses cross-version tracking - shows only ONCE across all versions
-        // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.41
+        // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.43
         delay: 500 // Delay before showing
     },
     // Add more features here in the future:
@@ -8305,6 +8388,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Get loading screen element
     const loadingScreen = document.getElementById('loading-screen');
     
+    // Set flag to indicate fresh app start
+    window.isAppFreshStart = true;
+    
     // Clear terminal titles from localStorage on fresh app start
     // This ensures we don't keep old titles when the app restarts
     console.log('🧹 Clearing terminal titles from previous session...');
@@ -8320,6 +8406,21 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     }
     console.log('✅ Terminal titles cleared for fresh session');
+    
+    // Also clear old terminal title notifications from the file
+    // This prevents them from being re-processed and put back into localStorage
+    try {
+        await ipcRenderer.invoke('clear-old-terminal-title-notifications');
+        console.log('🧹 Cleared old terminal title notifications from file');
+    } catch (error) {
+        console.error('Error clearing old terminal title notifications:', error);
+    }
+    
+    // Clear the flag after a delay to allow mode switches later
+    setTimeout(() => {
+        window.isAppFreshStart = false;
+        console.log('App initialization complete - localStorage title restoration enabled for mode switches');
+    }, 5000); // 5 seconds should be enough for initial setup
     
     try {
         window.terminalManager = new TerminalManager();

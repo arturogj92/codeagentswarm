@@ -17,12 +17,36 @@ class MockTerminalManager {
         this.scrollToBottomCalledWith = null;
         this.highlightTerminalCalled = false;
         this.highlightTerminalCalledWith = null;
+        this.terminalsNeedingAttention = new Set();
+        this.updateNotificationBadgeCalled = false;
+        this.tabElements = new Map(); // Mock DOM elements for tabs
     }
 
     switchToTab(terminalId) {
+        // Always clear notification state for this terminal, even if already active
+        if (this.terminalsNeedingAttention.has(terminalId)) {
+            this.terminalsNeedingAttention.delete(terminalId);
+            const tab = this.tabElements.get(terminalId);
+            if (tab) {
+                tab.classList.remove('tab-has-notification');
+            }
+            this.updateNotificationBadge();
+        }
+        
+        // If already on this tab, we need to still show the terminal (in case of notification clear)
+        if (this.activeTabTerminal === terminalId) {
+            this.showTerminal(terminalId);
+            return;
+        }
+        
         this.switchToTabCalled = true;
         this.switchToTabCalledWith = terminalId;
         this.activeTabTerminal = terminalId;
+    }
+    
+    showTerminal(terminalId) {
+        this.showTerminalCalled = true;
+        this.showTerminalCalledWith = terminalId;
     }
 
     scrollTerminalToBottom(terminalId) {
@@ -34,6 +58,18 @@ class MockTerminalManager {
         this.highlightTerminalCalled = true;
         this.highlightTerminalCalledWith = terminalId;
     }
+    
+    updateNotificationBadge() {
+        this.updateNotificationBadgeCalled = true;
+    }
+    
+    addNotificationToTab(terminalId) {
+        this.terminalsNeedingAttention.add(terminalId);
+        const tab = this.tabElements.get(terminalId);
+        if (tab) {
+            tab.classList.add('tab-has-notification');
+        }
+    }
 
     reset() {
         this.switchToTabCalled = false;
@@ -42,6 +78,9 @@ class MockTerminalManager {
         this.scrollToBottomCalledWith = null;
         this.highlightTerminalCalled = false;
         this.highlightTerminalCalledWith = null;
+        this.terminalsNeedingAttention.clear();
+        this.updateNotificationBadgeCalled = false;
+        this.tabElements.clear();
     }
 }
 
@@ -265,6 +304,146 @@ describe('Notification Tab Focus Tests', () => {
             expect(mockMainWindow.restore).toHaveBeenCalled();
             expect(mockMainWindow.focus).toHaveBeenCalled();
             expect(mockMainWindow.webContents.send).toHaveBeenCalledWith('focus-terminal-tab', 2);
+        });
+    });
+
+    describe('Notification Badge Clearing', () => {
+        beforeEach(() => {
+            terminalManager.layoutMode = 'tabbed';
+            terminalManager.activeTabTerminal = 0;
+            
+            // Create mock tab elements
+            for (let i = 0; i < 3; i++) {
+                const mockTab = {
+                    classList: {
+                        add: jest.fn(),
+                        remove: jest.fn(),
+                        contains: jest.fn()
+                    }
+                };
+                terminalManager.tabElements.set(i, mockTab);
+            }
+        });
+
+        test('should clear notification badge when clicking on active tab with notification', () => {
+            // Add notification to the currently active tab
+            terminalManager.addNotificationToTab(0);
+            expect(terminalManager.terminalsNeedingAttention.has(0)).toBe(true);
+            
+            // Click on the same tab (already active)
+            terminalManager.switchToTab(0);
+            
+            // Verify notification was cleared even though tab didn't switch
+            expect(terminalManager.terminalsNeedingAttention.has(0)).toBe(false);
+            expect(terminalManager.updateNotificationBadgeCalled).toBe(true);
+            expect(terminalManager.switchToTabCalled).toBe(false); // Should not switch
+            
+            // Verify DOM element had class removed
+            const tab = terminalManager.tabElements.get(0);
+            expect(tab.classList.remove).toHaveBeenCalledWith('tab-has-notification');
+        });
+
+        test('should clear notification badge when switching to tab with notification', () => {
+            // Add notification to terminal 2
+            terminalManager.addNotificationToTab(2);
+            expect(terminalManager.terminalsNeedingAttention.has(2)).toBe(true);
+            
+            // Switch to terminal 2
+            terminalManager.switchToTab(2);
+            
+            // Verify notification was cleared
+            expect(terminalManager.terminalsNeedingAttention.has(2)).toBe(false);
+            expect(terminalManager.updateNotificationBadgeCalled).toBe(true);
+            expect(terminalManager.switchToTabCalled).toBe(true);
+            expect(terminalManager.activeTabTerminal).toBe(2);
+            
+            // Verify DOM element had class removed
+            const tab = terminalManager.tabElements.get(2);
+            expect(tab.classList.remove).toHaveBeenCalledWith('tab-has-notification');
+        });
+
+        test('should not update badge if tab has no notification', () => {
+            // Switch to a tab without notification
+            terminalManager.switchToTab(1);
+            
+            // Verify badge update was not called unnecessarily
+            expect(terminalManager.updateNotificationBadgeCalled).toBe(false);
+            expect(terminalManager.switchToTabCalled).toBe(true);
+        });
+
+        test('should handle multiple notifications correctly', () => {
+            // Add notifications to multiple tabs
+            terminalManager.addNotificationToTab(1);
+            terminalManager.addNotificationToTab(2);
+            
+            expect(terminalManager.terminalsNeedingAttention.size).toBe(2);
+            
+            // Click on tab 1 to clear its notification
+            terminalManager.switchToTab(1);
+            
+            // Verify only tab 1's notification was cleared
+            expect(terminalManager.terminalsNeedingAttention.has(1)).toBe(false);
+            expect(terminalManager.terminalsNeedingAttention.has(2)).toBe(true);
+            expect(terminalManager.terminalsNeedingAttention.size).toBe(1);
+            
+            // Click on tab 2 to clear its notification
+            terminalManager.switchToTab(2);
+            
+            // Verify all notifications are cleared
+            expect(terminalManager.terminalsNeedingAttention.size).toBe(0);
+        });
+
+        test('should clear notification even when rapidly clicking the same tab', () => {
+            // Add notification to active tab
+            terminalManager.addNotificationToTab(0);
+            
+            // Rapidly click the same tab multiple times
+            terminalManager.switchToTab(0);
+            terminalManager.switchToTab(0);
+            terminalManager.switchToTab(0);
+            
+            // Verify notification was cleared on first click and stays cleared
+            expect(terminalManager.terminalsNeedingAttention.has(0)).toBe(false);
+            // updateNotificationBadge should only be called once (on first click when notification existed)
+            expect(terminalManager.updateNotificationBadgeCalled).toBe(true);
+        });
+
+        test('should call showTerminal when clicking on active tab with notification', () => {
+            // Set terminal 1 as active
+            terminalManager.activeTabTerminal = 1;
+            
+            // Add notification to the active tab
+            terminalManager.addNotificationToTab(1);
+            
+            // Click on the active tab (which has a notification)
+            terminalManager.switchToTab(1);
+            
+            // Verify showTerminal was called to ensure visibility
+            expect(terminalManager.showTerminalCalled).toBe(true);
+            expect(terminalManager.showTerminalCalledWith).toBe(1);
+            
+            // Verify notification was cleared
+            expect(terminalManager.terminalsNeedingAttention.has(1)).toBe(false);
+            
+            // Verify we didn't actually switch tabs (stayed on same tab)
+            expect(terminalManager.switchToTabCalled).toBe(false);
+            expect(terminalManager.activeTabTerminal).toBe(1);
+        });
+
+        test('should call showTerminal when clicking on active tab without notification', () => {
+            // Set terminal 2 as active
+            terminalManager.activeTabTerminal = 2;
+            
+            // Click on the active tab (no notification)
+            terminalManager.switchToTab(2);
+            
+            // Verify showTerminal was called even without notification
+            expect(terminalManager.showTerminalCalled).toBe(true);
+            expect(terminalManager.showTerminalCalledWith).toBe(2);
+            
+            // Verify we didn't actually switch tabs
+            expect(terminalManager.switchToTabCalled).toBe(false);
+            expect(terminalManager.activeTabTerminal).toBe(2);
         });
     });
 

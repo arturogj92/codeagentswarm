@@ -24,15 +24,23 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 
 ## Task Management - IMPORTANT
 
-### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Development 🚨🚨🚨
+### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Work 🚨🚨🚨
 
 # ⛔ STOP! DO NOT PROCEED WITHOUT A TASK ⛔
 
-**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY DEVELOPMENT WORK**
+**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY WORK**
+
+**THIS INCLUDES:**
+- ✅ **RESEARCH TASKS**: "Investigate", "Analyze", "Search", "Find", "Look into", "Check", "Explain"
+- ✅ **CODE CHANGES**: Any modification, no matter how small
+- ✅ **FILE READING**: Even just looking at files  
+- ✅ **QUESTIONS**: "How does X work?", "What is Y?", "Where is Z?"
+- ✅ **ANALYSIS**: Architecture review, code analysis, performance checks
+- ✅ **LITERALLY EVERYTHING**: If the user asks for ANYTHING, create a task FIRST
 
 **NO EXCEPTIONS. NO EXCUSES. NO "QUICK FIXES" WITHOUT A TASK.**
 
-Before writing ANY code, modifying ANY file, or starting ANY implementation, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL development work.
+Before doing ANY work, including research, investigation, or code changes, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL work.
 
 **VIOLATIONS WILL BE TRACKED AND REPORTED**
 
@@ -428,21 +436,52 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 - If NO → STOP and update it with \`update_terminal_title\`
 - If YES → Continue
 
-### 🔴 REMEMBER: NO TASK = NO CODE 🔴
+### 🔴 REMEMBER: NO TASK = NO WORK 🔴
 
 **Every single request from the user requires a task. EVERY. SINGLE. ONE.**
 
-Examples that STILL require a task:
+**INCLUDING RESEARCH AND INVESTIGATION TASKS:**
+- "Investigate how X works" → NEEDS A TASK
+- "Search for Y in the codebase" → NEEDS A TASK
+- "Analyze this feature" → NEEDS A TASK
+- "Find all occurrences of Z" → NEEDS A TASK
+- "Explain how this works" → NEEDS A TASK
+- "Look into this issue" → NEEDS A TASK
+- "Research best practices for..." → NEEDS A TASK
+- "Check what's in this file" → NEEDS A TASK (even if just reading!)
+- "Tell me about..." → NEEDS A TASK
+
+**AND ALSO CODE CHANGES:**
 - "Just add a console.log" → NEEDS A TASK
 - "Fix this typo" → NEEDS A TASK  
-- "Can you check this file?" → If you'll modify it, NEEDS A TASK
 - "Quick test" → NEEDS A TASK
 - "Small change" → NEEDS A TASK
 
-### ❌ FINAL WARNING ❌
+**🚨 ABSOLUTELY NO EXCEPTIONS - EVEN FOR:**
+- Reading files → NEEDS A TASK
+- Searching code → NEEDS A TASK  
+- Analyzing architecture → NEEDS A TASK
+- Answering questions about code → NEEDS A TASK
+- ANY request that involves looking at project files → NEEDS A TASK
+
+### ❌ FINAL WARNING - THIS MEANS YOU ❌
+
+**🚨 COMMON MISTAKES THAT STILL REQUIRE TASKS:**
+- "Just tell me what's in this file" → CREATE A TASK
+- "Search for function X" → CREATE A TASK
+- "How does this feature work?" → CREATE A TASK
+- "Investigate this bug" → CREATE A TASK
+- "Analyze the architecture" → CREATE A TASK
+- "What does this code do?" → CREATE A TASK
+- "Find all uses of..." → CREATE A TASK
+
 **Failure to create tasks is the #1 complaint from users.**
 **Don't be the agent that ignores this requirement.**
+
 **CREATE. THE. TASK. ALWAYS.**
+**FOR. EVERY. SINGLE. REQUEST.**
+**NO. MATTER. HOW. SIMPLE.**
+**RESEARCH. NEEDS. TASKS. TOO.**
 
 ${SECTION_END}`;
 

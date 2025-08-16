@@ -3770,6 +3770,40 @@ ipcMain.handle('renderer-ready', async () => {
   return { success: true };
 });
 
+// Clear old terminal title notifications on app start
+ipcMain.handle('clear-old-terminal-title-notifications', async () => {
+  try {
+    const notificationDir = path.join(os.homedir(), '.codeagentswarm');
+    const notificationFile = path.join(notificationDir, 'task_notifications.json');
+    
+    if (!fs.existsSync(notificationFile)) {
+      return { success: true };
+    }
+    
+    // Read and parse notifications
+    const content = fs.readFileSync(notificationFile, 'utf8');
+    let notifications = JSON.parse(content);
+    
+    // Remove all terminal_title_update notifications
+    const beforeCount = notifications.length;
+    notifications = notifications.filter(n => n.type !== 'terminal_title_update');
+    const removedCount = beforeCount - notifications.length;
+    
+    // Write back to file
+    fs.writeFileSync(notificationFile, JSON.stringify(notifications, null, 2));
+    
+    console.log(`[Main] Cleared ${removedCount} old terminal title notifications from file`);
+    
+    // Also clear the sent notifications tracking to ensure clean state
+    sentTerminalTitleNotifications.clear();
+    
+    return { success: true, removed: removedCount };
+  } catch (error) {
+    console.error('Error clearing old terminal title notifications:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Mark terminal title notifications as processed
 ipcMain.handle('mark-terminal-titles-processed', async () => {
   try {

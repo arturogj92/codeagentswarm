@@ -56,15 +56,23 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 
 ## Task Management - IMPORTANT
 
-### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Development 🚨🚨🚨
+### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Work 🚨🚨🚨
 
 # ⛔ STOP! DO NOT PROCEED WITHOUT A TASK ⛔
 
-**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY DEVELOPMENT WORK**
+**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY WORK**
+
+**THIS INCLUDES:**
+- ✅ **RESEARCH TASKS**: "Investigate", "Analyze", "Search", "Find", "Look into", "Check", "Explain"
+- ✅ **CODE CHANGES**: Any modification, no matter how small
+- ✅ **FILE READING**: Even just looking at files  
+- ✅ **QUESTIONS**: "How does X work?", "What is Y?", "Where is Z?"
+- ✅ **ANALYSIS**: Architecture review, code analysis, performance checks
+- ✅ **LITERALLY EVERYTHING**: If the user asks for ANYTHING, create a task FIRST
 
 **NO EXCEPTIONS. NO EXCUSES. NO "QUICK FIXES" WITHOUT A TASK.**
 
-Before writing ANY code, modifying ANY file, or starting ANY implementation, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL development work.
+Before doing ANY work, including research, investigation, or code changes, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL work.
 
 **VIOLATIONS WILL BE TRACKED AND REPORTED**
 
@@ -249,15 +257,21 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
 
 **CRITICAL: When bugs are found or modifications are requested AFTER a task is in testing or completed:**
 
-1. **🚨 DO NOT CREATE A NEW TASK for bug fixes or minor modifications:**
-   - If the user reports a bug or requests changes related to the current/recent task
-   - **ASK THE USER:** "Should I continue with the current task [ID: X] or create a new one?"
-   - Default to continuing with the same task unless:
-     - The change is a completely different feature
-     - The user explicitly asks for a new task
-     - More than 24 hours have passed since the task was completed
+1. **🚨 MANDATORY SEARCH BEFORE NEW TASK - When user reports "still not working" or "doesn't work":**
+   - **FIRST:** Use `search_tasks` to find related tasks with keywords from the problem
+   - **SECOND:** Check tasks in `in_testing` and recent `completed` status
+   - **THIRD:** If related task found, ASK: "Should I continue with task [ID: X - Title] or create a new one?"
+   - **ONLY create new task if:** No related task exists OR user explicitly requests new task
 
-2. **How to handle bug fixes in existing tasks:**
+2. **🔍 How to search for related tasks when issues are reported:**
+   ```
+   # When user says "X still doesn't work" or "X is broken":
+   1. search_tasks(query="X", recent_only=true)  # Search for X in recent tasks
+   2. search_tasks(query="feature keywords", status="in_testing")  # Check testing tasks
+   3. list_tasks(status="in_testing")  # Check all tasks currently in testing
+   ```
+
+3. **How to handle bug fixes in existing tasks:**
    - If task is `in_testing`: Move back to `in_progress` using `start_task`
    - If task is `completed` and user reports bug immediately: 
      - Ask: "I found task [ID: X - Title] that was just completed. Should I reopen it for these fixes?"
@@ -265,19 +279,22 @@ Before writing ANY code, modifying ANY file, or starting ANY implementation, you
    - Update the plan to include the bug fix steps using `update_task_plan`
    - Continue working on the same task ID
 
-3. **When to create a new task:**
+4. **When to create a new task:**
    - The modification is a NEW feature (not a fix)
    - The original task has been completed for more than 24 hours
    - The user explicitly requests a new task
    - The scope significantly changes (e.g., from "fix button color" to "redesign entire UI")
+   - No related task exists after thorough search
 
-4. **Example dialogue for bug fixes:**
+5. **Example dialogue for bug fixes:**
    ```
-   User: "The feature we just implemented has a bug when clicking the button"
-   Agent: "I see you found a bug in the task we just completed (Task #123: Add button feature). 
-           Should I reopen this task to fix the bug, or would you prefer a new task?"
+   User: "The authentication still doesn't work"
+   Agent: [Searches for related tasks using search_tasks(query="authentication")]
+   Agent: "I found task #123: 'Fix authentication bug' that's currently in testing. 
+           This seems related to your issue. Should I continue with this task to fix 
+           the problem, or would you prefer a new task?"
    User: "Continue with the same task"
-   Agent: [Moves task back to in_progress and fixes the bug]
+   Agent: [Moves task back to in_progress and investigates the issue]
    ```
 
 ### Handling Multiple Pending Tasks
@@ -306,6 +323,7 @@ The following MCP tools are available for task management:
 - **`complete_task`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **`submit_for_testing`**: Mark task as "in_testing"
 - **`list_tasks`**: List all tasks (optional: filter by status)
+- **`search_tasks`**: Search for tasks by keywords in title, description, plan, or implementation
 - **`update_task_plan`**: Update specific task plan
 - **`update_task_implementation`**: Update task implementation
 - **`update_task_terminal`**: Update terminal_id associated with task
@@ -313,6 +331,12 @@ The following MCP tools are available for task management:
 - **`create_project`**: Create a new project with name and optional color
 - **`get_projects`**: Get list of all projects
 - **`get_project_tasks`**: Get all tasks for a specific project
+
+**`search_tasks` parameters:**
+- `query` (string, required): Search keywords to find in task fields
+- `status` (string, optional): Filter by status (pending, in_progress, in_testing, completed)
+- `recent_only` (boolean, optional): Only search tasks updated in last 48 hours (default: true)
+- `limit` (number, optional): Maximum number of results (default: 20)
 
 **`update_task_plan` parameters:**
 - `task_id` (number, required): Task ID
@@ -337,6 +361,11 @@ create_task(title="Implement new feature", description="Add user authentication"
 
 start_task(task_id=123)
 update_terminal_title(title="Implement Auth Feature")  # MANDATORY after start_task
+
+# Search for related tasks before creating new ones
+search_tasks(query="authentication")  # Search all recent tasks
+search_tasks(query="login bug", status="in_testing")  # Search only testing tasks
+search_tasks(query="database", recent_only=false, limit=10)  # Search all time, limit 10
 
 update_task_plan(task_id=123, plan="1. Review existing code\n2. Implement new functionality\n3. Write tests")
 
@@ -460,21 +489,52 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 - If NO → STOP and update it with `update_terminal_title`
 - If YES → Continue
 
-### 🔴 REMEMBER: NO TASK = NO CODE 🔴
+### 🔴 REMEMBER: NO TASK = NO WORK 🔴
 
 **Every single request from the user requires a task. EVERY. SINGLE. ONE.**
 
-Examples that STILL require a task:
+**INCLUDING RESEARCH AND INVESTIGATION TASKS:**
+- "Investigate how X works" → NEEDS A TASK
+- "Search for Y in the codebase" → NEEDS A TASK
+- "Analyze this feature" → NEEDS A TASK
+- "Find all occurrences of Z" → NEEDS A TASK
+- "Explain how this works" → NEEDS A TASK
+- "Look into this issue" → NEEDS A TASK
+- "Research best practices for..." → NEEDS A TASK
+- "Check what's in this file" → NEEDS A TASK (even if just reading!)
+- "Tell me about..." → NEEDS A TASK
+
+**AND ALSO CODE CHANGES:**
 - "Just add a console.log" → NEEDS A TASK
 - "Fix this typo" → NEEDS A TASK  
-- "Can you check this file?" → If you'll modify it, NEEDS A TASK
 - "Quick test" → NEEDS A TASK
 - "Small change" → NEEDS A TASK
 
-### ❌ FINAL WARNING ❌
+**🚨 ABSOLUTELY NO EXCEPTIONS - EVEN FOR:**
+- Reading files → NEEDS A TASK
+- Searching code → NEEDS A TASK  
+- Analyzing architecture → NEEDS A TASK
+- Answering questions about code → NEEDS A TASK
+- ANY request that involves looking at project files → NEEDS A TASK
+
+### ❌ FINAL WARNING - THIS MEANS YOU ❌
+
+**🚨 COMMON MISTAKES THAT STILL REQUIRE TASKS:**
+- "Just tell me what's in this file" → CREATE A TASK
+- "Search for function X" → CREATE A TASK
+- "How does this feature work?" → CREATE A TASK
+- "Investigate this bug" → CREATE A TASK
+- "Analyze the architecture" → CREATE A TASK
+- "What does this code do?" → CREATE A TASK
+- "Find all uses of..." → CREATE A TASK
+
 **Failure to create tasks is the #1 complaint from users.**
 **Don't be the agent that ignores this requirement.**
+
 **CREATE. THE. TASK. ALWAYS.**
+**FOR. EVERY. SINGLE. REQUEST.**
+**NO. MATTER. HOW. SIMPLE.**
+**RESEARCH. NEEDS. TASKS. TOO.**
 
 <!-- CODEAGENTSWARM CONFIG END -->
 

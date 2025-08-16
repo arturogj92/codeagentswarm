@@ -23,6 +23,23 @@ class HooksManager {
                 }]
             }]
         };
+        
+        // Define MCP permissions to auto-approve all CodeAgentSwarm task tools
+        this.codeAgentSwarmPermissions = [
+            "mcp__codeagentswarm-tasks__*",  // Auto-approve ALL tools from this MCP server
+            "mcp__codeagentswarm-tasks__create_task",
+            "mcp__codeagentswarm-tasks__start_task",
+            "mcp__codeagentswarm-tasks__complete_task",
+            "mcp__codeagentswarm-tasks__submit_for_testing",
+            "mcp__codeagentswarm-tasks__list_tasks",
+            "mcp__codeagentswarm-tasks__update_task_plan",
+            "mcp__codeagentswarm-tasks__update_task_implementation",
+            "mcp__codeagentswarm-tasks__update_task_terminal",
+            "mcp__codeagentswarm-tasks__update_terminal_title",
+            "mcp__codeagentswarm-tasks__create_project",
+            "mcp__codeagentswarm-tasks__get_projects",
+            "mcp__codeagentswarm-tasks__get_project_tasks"
+        ];
     }
 
     buildHookCommand(eventType, tool = '') {
@@ -77,12 +94,26 @@ class HooksManager {
         try {
             const settings = await this.readSettings();
             
-            // Merge hooks with existing settings
+            // Get existing permissions or create empty structure
+            const existingPermissions = settings.permissions || {};
+            const existingAllowList = existingPermissions.allow || [];
+            
+            // Merge new permissions with existing ones (avoiding duplicates)
+            const mergedPermissions = [...new Set([
+                ...existingAllowList,
+                ...this.codeAgentSwarmPermissions
+            ])];
+            
+            // Merge hooks and permissions with existing settings
             const updatedSettings = {
                 ...settings,
                 hooks: {
                     ...(settings.hooks || {}),
                     ...this.codeAgentSwarmHooks
+                },
+                permissions: {
+                    ...existingPermissions,
+                    allow: mergedPermissions
                 }
             };
             
@@ -102,21 +133,34 @@ class HooksManager {
         try {
             const settings = await this.readSettings();
             
-            if (!settings.hooks) {
-                return { success: true };
-            }
-            
             // Remove CodeAgentSwarm hooks
-            if (settings.hooks.Notification) {
-                delete settings.hooks.Notification;
-            }
-            if (settings.hooks.Stop) {
-                delete settings.hooks.Stop;
+            if (settings.hooks) {
+                if (settings.hooks.Notification) {
+                    delete settings.hooks.Notification;
+                }
+                if (settings.hooks.Stop) {
+                    delete settings.hooks.Stop;
+                }
+                
+                // Clean up empty hooks object
+                if (Object.keys(settings.hooks).length === 0) {
+                    delete settings.hooks;
+                }
             }
             
-            // Clean up empty hooks object
-            if (Object.keys(settings.hooks).length === 0) {
-                delete settings.hooks;
+            // Remove CodeAgentSwarm permissions from allow list
+            if (settings.permissions && settings.permissions.allow) {
+                settings.permissions.allow = settings.permissions.allow.filter(
+                    permission => !this.codeAgentSwarmPermissions.includes(permission)
+                );
+                
+                // Clean up empty permissions
+                if (settings.permissions.allow.length === 0) {
+                    delete settings.permissions.allow;
+                }
+                if (Object.keys(settings.permissions).length === 0) {
+                    delete settings.permissions;
+                }
             }
             
             const success = await this.writeSettings(settings);
@@ -147,12 +191,19 @@ class HooksManager {
                 )
             );
             
+            // Check if our permissions are installed
+            const hasMCPPermissions = settings.permissions?.allow?.includes('mcp__codeagentswarm-tasks__*') ||
+                (settings.permissions?.allow?.includes('mcp__codeagentswarm-tasks__create_task') &&
+                 settings.permissions?.allow?.includes('mcp__codeagentswarm-tasks__start_task'));
+            
             return {
-                installed: hasNotificationHook && hasStopHook,
+                installed: hasNotificationHook && hasStopHook && hasMCPPermissions,
                 notificationHook: hasNotificationHook,
                 stopHook: hasStopHook,
+                permissionsInstalled: hasMCPPermissions,
                 settingsPath: this.settingsPath,
-                hooks: settings.hooks || {}
+                hooks: settings.hooks || {},
+                permissions: settings.permissions || {}
             };
         } catch (error) {
             return {

@@ -138,13 +138,31 @@ class DatabaseManagerMCP {
   // Task management methods
   async createTask(title, description, terminalId, project = null) {
     try {
-      const sql = `INSERT INTO tasks (title, description, terminal_id, project) VALUES (?, ?, ?, ?)`;
-      this.execSQL(sql, [title, description || '', terminalId || 0, project || null]);
+      // Combine INSERT and SELECT in a single SQLite session to get the correct ID
+      // Using a temporary file to avoid command line escaping issues
+      const tempFile = path.join(os.tmpdir(), `mcp_task_${Date.now()}.sql`);
+      const sqlCommands = `
+        INSERT INTO tasks (title, description, terminal_id, project) 
+        VALUES ('${(title || '').replace(/'/g, "''")}', 
+                '${(description || '').replace(/'/g, "''")}', 
+                ${terminalId || 0}, 
+                ${project ? `'${project.replace(/'/g, "''")}'` : 'NULL'});
+        SELECT last_insert_rowid();
+      `;
       
-      // Get the last inserted ID in a separate command
-      const lastId = execSync(`sqlite3 "${this.dbPath}" "SELECT seq FROM sqlite_sequence WHERE name='tasks';"`, {
+      fs.writeFileSync(tempFile, sqlCommands);
+      const result = execSync(`sqlite3 "${this.dbPath}" < "${tempFile}"`, {
         encoding: 'utf8'
       }).trim();
+      
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      const lastId = result.split('\n').pop(); // Get the last line which should be the ID
       
       return {
         success: true,
@@ -219,6 +237,70 @@ class DatabaseManagerMCP {
       }));
     } catch (error) {
       console.error('[MCP Database] Error getting tasks by status:', error.message);
+      return [];
+    }
+  }
+
+  async searchTasks(searchQuery, options = {}) {
+    try {
+      // Sanitize search query for SQL LIKE
+      const sanitizedQuery = searchQuery.replace(/'/g, "''").toLowerCase();
+      
+      // Build WHERE clause for searching in multiple fields
+      const searchConditions = [
+        `LOWER(title) LIKE '%${sanitizedQuery}%'`,
+        `LOWER(description) LIKE '%${sanitizedQuery}%'`,
+        `LOWER(plan) LIKE '%${sanitizedQuery}%'`,
+        `LOWER(implementation) LIKE '%${sanitizedQuery}%'`
+      ];
+      
+      let whereClause = `(${searchConditions.join(' OR ')})`;
+      
+      // Add status filter if provided
+      if (options.status) {
+        const escapedStatus = options.status.replace(/'/g, "''");
+        whereClause += ` AND status = '${escapedStatus}'`;
+      }
+      
+      // Add time filter for recent tasks (last 48 hours by default)
+      if (options.recentOnly !== false) {
+        whereClause += ` AND datetime(updated_at) > datetime('now', '-2 days')`;
+      }
+      
+      // Limit results to prevent token overflow
+      const limit = options.limit || 20;
+      
+      const query = `
+        SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at 
+        FROM tasks 
+        WHERE ${whereClause}
+        ORDER BY 
+          CASE 
+            WHEN status = 'in_testing' THEN 1
+            WHEN status = 'in_progress' THEN 2
+            WHEN status = 'pending' THEN 3
+            WHEN status = 'completed' THEN 4
+          END,
+          updated_at DESC
+        LIMIT ${limit}
+      `;
+      
+      const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
+      
+      if (!result || result.trim() === '') {
+        return [];
+      }
+      
+      const tasks = JSON.parse(result);
+      
+      return tasks.map(task => ({
+        ...task,
+        id: parseInt(task.id),
+        terminal_id: task.terminal_id ? parseInt(task.terminal_id) : null,
+        sort_order: parseInt(task.sort_order) || 0
+      }));
+    } catch (error) {
+      console.error('[MCP Database] Error searching tasks:', error.message);
       return [];
     }
   }
@@ -353,13 +435,29 @@ class DatabaseManagerMCP {
         color = colors.find(c => !usedColors.includes(c)) || colors[0];
       }
       
-      const sql = `INSERT INTO projects (name, display_name, color) VALUES (?, ?, ?)`;
-      this.execSQL(sql, [name, name, color]);
+      // Combine INSERT and SELECT in a single SQLite session to get the correct ID
+      const tempFile = path.join(os.tmpdir(), `mcp_project_${Date.now()}.sql`);
+      const sqlCommands = `
+        INSERT INTO projects (name, display_name, color) 
+        VALUES ('${name.replace(/'/g, "''")}', 
+                '${name.replace(/'/g, "''")}', 
+                '${color.replace(/'/g, "''")}');
+        SELECT last_insert_rowid();
+      `;
       
-      // Get the last inserted ID from sqlite_sequence
-      const lastId = execSync(`sqlite3 "${this.dbPath}" "SELECT seq FROM sqlite_sequence WHERE name='projects';"`, {
+      fs.writeFileSync(tempFile, sqlCommands);
+      const result = execSync(`sqlite3 "${this.dbPath}" < "${tempFile}"`, {
         encoding: 'utf8'
       }).trim();
+      
+      // Clean up temp file
+      try {
+        fs.unlinkSync(tempFile);
+      } catch (e) {
+        // Ignore cleanup errors
+      }
+      
+      const lastId = result.split('\n').pop(); // Get the last line which should be the ID
       
       return {
         success: true,

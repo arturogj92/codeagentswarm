@@ -678,6 +678,20 @@ class MCPStdioServer {
                     }
                 },
                 {
+                    name: 'search_tasks',
+                    description: 'Search for tasks by keywords in title, description, plan, or implementation',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            query: { type: 'string', description: 'Search query to find in task fields' },
+                            status: { type: 'string', enum: ['pending', 'in_progress', 'in_testing', 'completed'], description: 'Optional: filter by status' },
+                            recent_only: { type: 'boolean', description: 'Optional: only search tasks updated in last 48 hours (default: true)' },
+                            limit: { type: 'number', description: 'Optional: maximum number of results (default: 20)' }
+                        },
+                        required: ['query']
+                    }
+                },
+                {
                     name: 'update_task_plan',
                     description: 'Update the plan for a task',
                     inputSchema: {
@@ -903,6 +917,20 @@ class MCPStdioServer {
                     const tasks = await this.db.getAllTasks();
                     result = { tasks };
                 }
+                break;
+                
+            case 'search_tasks':
+                const searchOptions = {
+                    status: args.status,
+                    recentOnly: args.recent_only !== false, // Default to true
+                    limit: args.limit || 20
+                };
+                const searchResults = await this.db.searchTasks(args.query, searchOptions);
+                result = { 
+                    tasks: searchResults,
+                    query: args.query,
+                    count: searchResults.length
+                };
                 break;
                 
             case 'update_task_plan':
