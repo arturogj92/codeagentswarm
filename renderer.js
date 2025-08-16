@@ -8641,4 +8641,63 @@ document.addEventListener('DOMContentLoaded', async () => {
     console.log('  - clearTerminalTitles() : Clear all terminal titles');
     console.log('  - testTerminalTitle(terminalId, title) : Test a title on a specific terminal');
     console.log('  - reloadTerminalTitles() : Manually reload terminal titles from notification file');
+    
+    // Initialize MCP Settings Manager
+    initializeMCPSettings();
 });
+
+// ================== MCP Settings Initialization ==================
+function initializeMCPSettings() {
+    try {
+        // Load the MCP modules
+        const MCPValidator = require('./modules/mcp/MCPValidator');
+        const MCPManager = require('./modules/mcp/MCPManager');
+        const MCPRenderer = require('./modules/mcp/MCPRenderer');
+        
+        // Create instances
+        const validator = new MCPValidator();
+        const manager = new MCPManager(ipcRenderer, validator);
+        const renderer = new MCPRenderer(manager);
+        
+        // Store globally for debugging
+        window.mcpManager = manager;
+        window.mcpRenderer = renderer;
+        
+        // Initialize when settings modal is opened
+        const settingsBtn = document.getElementById('settings-btn');
+        const mcpTab = document.querySelector('[data-tab="mcp-servers"]');
+        
+        let mcpInitialized = false;
+        
+        const initMCP = async () => {
+            if (!mcpInitialized) {
+                console.log('Initializing MCP Settings...');
+                await renderer.initialize();
+                mcpInitialized = true;
+                console.log('MCP Settings initialized successfully');
+            }
+        };
+        
+        // Initialize when MCP tab is clicked
+        if (mcpTab) {
+            mcpTab.addEventListener('click', initMCP);
+        }
+        
+        // Also initialize if settings is opened directly to MCP tab
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                // Check if MCP tab is active after a short delay
+                setTimeout(() => {
+                    const activeMCPTab = document.querySelector('.tab-btn[data-tab="mcp-servers"].active');
+                    if (activeMCPTab) {
+                        initMCP();
+                    }
+                }, 100);
+            });
+        }
+        
+        console.log('MCP Settings module loaded and ready');
+    } catch (error) {
+        console.error('Failed to initialize MCP Settings:', error);
+    }
+}

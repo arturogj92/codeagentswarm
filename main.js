@@ -2135,7 +2135,7 @@ function startMCPHealthCheck() {
 
 function updateClaudeConfigFile() {
   try {
-    const configPath = path.join(os.homedir(), '.claude', 'claude_desktop_config.json');
+    const configPath = getClaudeConfigPath();
     let config = {};
     
     // Read existing config if it exists
@@ -2149,7 +2149,8 @@ function updateClaudeConfigFile() {
       config.mcpServers = {};
     }
     
-    // Update codeagentswarm-tasks configuration
+    // IMPORTANT: Don't modify disabled servers or other servers
+    // Only update codeagentswarm-tasks configuration
     const serverPath = app.isPackaged 
       ? path.join(app.getPath('userData'), 'mcp', 'mcp-stdio-server.js')
       : path.join(__dirname, 'mcp-stdio-server.js');
@@ -2163,9 +2164,10 @@ function updateClaudeConfigFile() {
       }
     };
     
-    // Write updated config
+    // Write updated config - this preserves all other servers including disabled ones
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     console.log('✅ Updated Claude Code config file at:', configPath);
+    console.log('[MCP Debug] Preserved servers:', Object.keys(config.mcpServers));
     
     return true;
   } catch (error) {
@@ -2173,6 +2175,313 @@ function updateClaudeConfigFile() {
     return false;
   }
 }
+
+// ================== MCP Settings IPC Handlers ==================
+
+// Helper function to get the correct Claude config path
+function getClaudeConfigPath() {
+  // Claude Code uses ~/.claude.json (NOT ~/.config/claude/claude_cli_config.json)
+  const claudeJsonPath = path.join(os.homedir(), '.claude.json');
+  
+  // Check if Claude Code config exists
+  if (fs.existsSync(claudeJsonPath)) {
+    console.log('[MCP] Using Claude Code config path:', claudeJsonPath);
+    return claudeJsonPath;
+  }
+  
+  // Fallback to the old path if needed
+  const claudeCodePath = path.join(os.homedir(), '.config', 'claude', 'claude_cli_config.json');
+  if (fs.existsSync(claudeCodePath)) {
+    console.log('[MCP] Using old Claude Code config path:', claudeCodePath);
+    return claudeCodePath;
+  }
+  
+  // Fallback paths for other Claude apps
+  const libraryPath = path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+  const dotClaudePath = path.join(os.homedir(), '.claude', 'claude_desktop_config.json');
+  
+  // Check Library path (macOS Claude Desktop)
+  if (process.platform === 'darwin' && fs.existsSync(libraryPath)) {
+    console.log('[MCP] Using Claude Desktop config path:', libraryPath);
+    return libraryPath;
+  }
+  
+  // Final fallback
+  console.log('[MCP] Using fallback config path:', dotClaudePath);
+  return dotClaudePath;
+}
+
+// Load MCP configuration
+ipcMain.on('mcp:load-config', (event) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    let config = {};
+    
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(configContent);
+      console.log('[MCP Debug] Loaded config with servers:', Object.keys(config.mcpServers || {}));
+    }
+    
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Load disabled servers from backup to show them as disabled in UI
+    const backupPath = path.join(path.dirname(configPath), '.mcp_disabled_servers.json');
+    if (fs.existsSync(backupPath)) {
+      try {
+        const disabledServers = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+        console.log('[MCP Debug] Found disabled servers:', Object.keys(disabledServers));
+        
+        // Add disabled servers with a special marker so UI knows they're disabled
+        // We'll add them with _disabled_ prefix for UI compatibility
+        for (const [name, serverConfig] of Object.entries(disabledServers)) {
+          config.mcpServers[`_disabled_${name}`] = serverConfig;
+        }
+      } catch (e) {
+        console.log('[MCP Debug] Could not read disabled servers backup:', e.message);
+      }
+    }
+    
+    event.reply('mcp:load-config-response', config);
+  } catch (error) {
+    console.error('Error loading MCP config:', error);
+    event.reply('mcp:load-config-response', { error: error.message });
+  }
+});
+
+// Add MCP servers
+ipcMain.on('mcp:add-servers', (event, servers) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    let config = {};
+    
+    // Create backup
+    if (fs.existsSync(configPath)) {
+      const backupPath = configPath + '.backup';
+      fs.copyFileSync(configPath, backupPath);
+      
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(configContent);
+    }
+    
+    // Ensure mcpServers exists
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Add new servers
+    Object.assign(config.mcpServers, servers);
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    event.reply('mcp:add-servers-response', { success: true });
+  } catch (error) {
+    console.error('Error adding MCP servers:', error);
+    event.reply('mcp:add-servers-response', { 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Update MCP server
+ipcMain.on('mcp:update-server', (event, { name, config: serverConfig }) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error('Configuration file not found');
+    }
+    
+    // Create backup
+    const backupPath = configPath + '.backup';
+    fs.copyFileSync(configPath, backupPath);
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    if (!config.mcpServers || !config.mcpServers[name]) {
+      throw new Error(`Server "${name}" not found`);
+    }
+    
+    // Update server configuration
+    config.mcpServers[name] = serverConfig;
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    event.reply('mcp:update-server-response', { success: true });
+  } catch (error) {
+    console.error('Error updating MCP server:', error);
+    event.reply('mcp:update-server-response', { 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Remove MCP server
+ipcMain.on('mcp:remove-server', (event, name) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error('Configuration file not found');
+    }
+    
+    // Create backup
+    const backupPath = configPath + '.backup';
+    fs.copyFileSync(configPath, backupPath);
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    if (!config.mcpServers || !config.mcpServers[name]) {
+      throw new Error(`Server "${name}" not found`);
+    }
+    
+    // Don't allow removing protected servers
+    const protectedServers = ['codeagentswarm-tasks', 'codeagentswarm'];
+    if (protectedServers.includes(name.toLowerCase())) {
+      throw new Error(`Cannot remove protected server "${name}"`);
+    }
+    
+    // Remove server
+    delete config.mcpServers[name];
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    event.reply('mcp:remove-server-response', { success: true });
+  } catch (error) {
+    console.error('Error removing MCP server:', error);
+    event.reply('mcp:remove-server-response', { 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// Toggle MCP server enabled state
+ipcMain.on('mcp:toggle-server', (event, { name, enabled }) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    console.log(`[MCP Debug] Toggle request: ${name} -> ${enabled ? 'ENABLE' : 'DISABLE'}`);
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error('Configuration file not found');
+    }
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    console.log('[MCP Debug] Current servers before toggle:', Object.keys(config.mcpServers || {}));
+    
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Get backup file path for disabled servers
+    const backupPath = path.join(path.dirname(configPath), '.mcp_disabled_servers.json');
+    let disabledServers = {};
+    
+    // Load existing disabled servers backup
+    if (fs.existsSync(backupPath)) {
+      try {
+        disabledServers = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+      } catch (e) {
+        console.log('[MCP Debug] Could not read disabled servers backup, starting fresh');
+        disabledServers = {};
+      }
+    }
+    
+    // NEW APPROACH: Delete servers completely when disabled, restore from backup when enabled
+    if (!enabled) {
+      // Disable: Remove server completely and save to backup
+      if (config.mcpServers[name]) {
+        console.log(`[MCP Debug] Disabling: removing ${name} from config and saving to backup`);
+        
+        // Save the server config to backup
+        disabledServers[name] = config.mcpServers[name];
+        
+        // Remove from main config
+        delete config.mcpServers[name];
+        
+        // Also check for _disabled_ prefixed version and remove it
+        const disabledName = `_disabled_${name}`;
+        if (config.mcpServers[disabledName]) {
+          console.log(`[MCP Debug] Also removing old disabled version: ${disabledName}`);
+          delete config.mcpServers[disabledName];
+        }
+        
+        // Save backup file
+        fs.writeFileSync(backupPath, JSON.stringify(disabledServers, null, 2));
+      } else {
+        // Check if it's already disabled (in backup)
+        if (disabledServers[name]) {
+          console.log(`[MCP Debug] Server "${name}" is already disabled`);
+        } else {
+          console.log(`[MCP Debug] Server "${name}" not found to disable`);
+          throw new Error(`Server "${name}" not found`);
+        }
+      }
+    } else {
+      // Enable: Restore from backup
+      if (disabledServers[name]) {
+        console.log(`[MCP Debug] Enabling: restoring ${name} from backup`);
+        
+        // Restore the server config
+        config.mcpServers[name] = disabledServers[name];
+        
+        // Remove from disabled backup
+        delete disabledServers[name];
+        
+        // Update backup file
+        if (Object.keys(disabledServers).length > 0) {
+          fs.writeFileSync(backupPath, JSON.stringify(disabledServers, null, 2));
+        } else {
+          // Remove backup file if empty
+          if (fs.existsSync(backupPath)) {
+            fs.unlinkSync(backupPath);
+          }
+        }
+      } else if (config.mcpServers[name]) {
+        console.log(`[MCP Debug] Server "${name}" is already enabled`);
+      } else {
+        // Check for old _disabled_ version
+        const disabledName = `_disabled_${name}`;
+        if (config.mcpServers[disabledName]) {
+          console.log(`[MCP Debug] Enabling from old format: ${disabledName} -> ${name}`);
+          config.mcpServers[name] = config.mcpServers[disabledName];
+          delete config.mcpServers[disabledName];
+        } else {
+          console.log(`[MCP Debug] Server "${name}" not found in disabled state`);
+          throw new Error(`Server "${name}" not found in disabled state`);
+        }
+      }
+    }
+    
+    console.log('[MCP Debug] Servers after toggle:', Object.keys(config.mcpServers));
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    console.log('[MCP Debug] Config file updated successfully');
+    
+    event.reply('mcp:toggle-server-response', { success: true });
+  } catch (error) {
+    console.error('[MCP Debug] Error toggling MCP server:', error);
+    event.reply('mcp:toggle-server-response', { 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
+// ================== End MCP Settings IPC Handlers ==================
 
 // New function to just check Claude installation without auto-installing
 function checkClaudeInstallation() {
