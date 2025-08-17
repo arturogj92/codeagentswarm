@@ -118,8 +118,6 @@ class WebhookServer {
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                 this.mainWindow.show();
                 this.mainWindow.focus();
-                // Send event to switch to the correct terminal tab
-                this.mainWindow.webContents.send('focus-terminal-tab', terminalIndex);
             }
         });
         
@@ -152,8 +150,6 @@ class WebhookServer {
             if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                 this.mainWindow.show();
                 this.mainWindow.focus();
-                // Send event to switch to the correct terminal tab
-                this.mainWindow.webContents.send('focus-terminal-tab', terminalIndex);
             }
         });
         
