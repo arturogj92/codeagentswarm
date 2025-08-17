@@ -1,0 +1,374 @@
+{
+  "servers": [
+    {
+      "id": "notion",
+      "name": "Notion",
+      "description": "Connect to your Notion workspace to create pages, query databases, and manage content directly from Claude",
+      "category": "Productivity",
+      "icon": "./assets/mcp-icons/notion.png",
+      "popularity": 5,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "NOTION_API_KEY",
+          "label": "Notion API Key",
+          "type": "password",
+          "placeholder": "ntn_...",
+          "required": true,
+          "helpText": "Get your API key from Notion Settings → Connections → Develop or manage integrations"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@makenotion/notion-mcp-server@latest"
+        ]
+      },
+      "features": [
+        "Create and update pages",
+        "Query databases",
+        "Manage blocks and content",
+        "Search across workspace"
+      ],
+      "setupGuide": "https://github.com/makenotion/notion-mcp-server",
+      "documentation": "https://developers.notion.com/docs/mcp"
+    },
+    {
+      "id": "supabase",
+      "name": "Supabase",
+      "description": "Manage your Supabase projects, databases, and edge functions directly from Claude",
+      "category": "Database",
+      "icon": "./assets/mcp-icons/supabase.png",
+      "popularity": 5,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "SUPABASE_ACCESS_TOKEN",
+          "label": "Supabase Access Token",
+          "type": "password",
+          "placeholder": "sbp_...",
+          "required": true,
+          "helpText": "Generate a token from your Supabase dashboard → Account → Access Tokens"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@supabase-community/supabase-mcp@latest"
+        ]
+      },
+      "features": [
+        "Execute SQL queries",
+        "Manage database schemas",
+        "Deploy edge functions",
+        "Configure authentication"
+      ],
+      "setupGuide": "https://github.com/supabase-community/supabase-mcp",
+      "documentation": "https://supabase.com/blog/mcp-server"
+    },
+    {
+      "id": "playwright",
+      "name": "Playwright",
+      "description": "Automate web browser interactions, take screenshots, and perform E2E testing",
+      "category": "Automation",
+      "icon": "./assets/mcp-icons/playwright.png",
+      "popularity": 4,
+      "requiresAuth": false,
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@executeautomation/mcp-playwright@latest"
+        ]
+      },
+      "features": [
+        "Browser automation",
+        "Screenshot capture",
+        "Web scraping",
+        "E2E testing",
+        "Multi-browser support"
+      ],
+      "setupGuide": "https://github.com/executeautomation/mcp-playwright",
+      "documentation": "https://executeautomation.github.io/mcp-playwright/"
+    },
+    {
+      "id": "puppeteer",
+      "name": "Puppeteer",
+      "description": "Control headless Chrome for web scraping, screenshot generation, and automation",
+      "category": "Automation",
+      "icon": "./assets/mcp-icons/puppeteer.png",
+      "popularity": 4,
+      "requiresAuth": false,
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-puppeteer@latest"
+        ]
+      },
+      "features": [
+        "Headless Chrome control",
+        "PDF generation",
+        "Screenshot capture",
+        "Web scraping",
+        "Form automation"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/puppeteer",
+      "documentation": "https://pptr.dev/"
+    },
+    {
+      "id": "filesystem",
+      "name": "Filesystem Enhanced",
+      "description": "Advanced file system operations with search, directory management, and file manipulation",
+      "category": "System",
+      "icon": "./assets/mcp-icons/filesystem.png",
+      "popularity": 5,
+      "requiresAuth": false,
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-filesystem@latest"
+        ]
+      },
+      "features": [
+        "Read/write files",
+        "Directory operations",
+        "File search",
+        "Path manipulation",
+        "File metadata"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
+      "documentation": "https://modelcontextprotocol.io/docs"
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "description": "Interact with GitHub repositories, issues, pull requests, and actions",
+      "category": "Development",
+      "icon": "./assets/mcp-icons/github.png",
+      "popularity": 5,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "GITHUB_TOKEN",
+          "label": "GitHub Personal Access Token",
+          "type": "password",
+          "placeholder": "ghp_...",
+          "required": true,
+          "helpText": "Create a token at GitHub Settings → Developer settings → Personal access tokens"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-github@latest"
+        ]
+      },
+      "features": [
+        "Repository management",
+        "Issue tracking",
+        "Pull request operations",
+        "GitHub Actions",
+        "Code search"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/github",
+      "documentation": "https://docs.github.com/en/rest"
+    },
+    {
+      "id": "slack",
+      "name": "Slack",
+      "description": "Send messages, manage channels, and interact with your Slack workspace",
+      "category": "Communication",
+      "icon": "./assets/mcp-icons/slack.png",
+      "popularity": 4,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "SLACK_BOT_TOKEN",
+          "label": "Slack Bot Token",
+          "type": "password",
+          "placeholder": "xoxb-...",
+          "required": true,
+          "helpText": "Create a Slack app and get the bot token from OAuth & Permissions"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-slack@latest"
+        ]
+      },
+      "features": [
+        "Send messages",
+        "Read channels",
+        "Manage users",
+        "File uploads",
+        "Thread replies"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/slack",
+      "documentation": "https://api.slack.com/docs"
+    },
+    {
+      "id": "google-drive",
+      "name": "Google Drive",
+      "description": "Access, search, and manage files in your Google Drive",
+      "category": "Storage",
+      "icon": "./assets/mcp-icons/google-drive.png",
+      "popularity": 4,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "GOOGLE_CREDENTIALS",
+          "label": "Google Service Account JSON",
+          "type": "textarea",
+          "placeholder": "Paste your service account JSON here",
+          "required": true,
+          "helpText": "Create a service account in Google Cloud Console"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-gdrive@latest"
+        ]
+      },
+      "features": [
+        "File search",
+        "Upload/download",
+        "Folder management",
+        "Share permissions",
+        "File metadata"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive",
+      "documentation": "https://developers.google.com/drive/api/v3/about-sdk"
+    },
+    {
+      "id": "postgres",
+      "name": "PostgreSQL",
+      "description": "Connect to PostgreSQL databases for querying and management",
+      "category": "Database",
+      "icon": "./assets/mcp-icons/postgres.png",
+      "popularity": 4,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "DATABASE_URL",
+          "label": "Database Connection URL",
+          "type": "password",
+          "placeholder": "postgresql://user:password@host:port/database",
+          "required": true,
+          "helpText": "Your PostgreSQL connection string"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-postgres@latest"
+        ]
+      },
+      "features": [
+        "SQL queries",
+        "Schema management",
+        "Table operations",
+        "Data import/export",
+        "Transaction support"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/postgres",
+      "documentation": "https://www.postgresql.org/docs/"
+    },
+    {
+      "id": "brave-search",
+      "name": "Brave Search",
+      "description": "Web search using Brave Search API for real-time information",
+      "category": "Search",
+      "icon": "./assets/mcp-icons/brave-search.png",
+      "popularity": 3,
+      "requiresAuth": true,
+      "authFields": [
+        {
+          "key": "BRAVE_API_KEY",
+          "label": "Brave Search API Key",
+          "type": "password",
+          "placeholder": "Your Brave API key",
+          "required": true,
+          "helpText": "Get your API key from https://brave.com/search/api/"
+        }
+      ],
+      "config": {
+        "type": "stdio",
+        "command": "npx",
+        "args": [
+          "-y",
+          "@modelcontextprotocol/server-brave-search@latest"
+        ]
+      },
+      "features": [
+        "Web search",
+        "News search",
+        "Image search",
+        "Real-time results",
+        "SafeSearch filtering"
+      ],
+      "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search",
+      "documentation": "https://brave.com/search/api/"
+    }
+  ],
+  "categories": [
+    {
+      "id": "productivity",
+      "name": "Productivity",
+      "icon": "📊"
+    },
+    {
+      "id": "database",
+      "name": "Database",
+      "icon": "🗄️"
+    },
+    {
+      "id": "automation",
+      "name": "Automation",
+      "icon": "🤖"
+    },
+    {
+      "id": "development",
+      "name": "Development",
+      "icon": "💻"
+    },
+    {
+      "id": "communication",
+      "name": "Communication",
+      "icon": "💬"
+    },
+    {
+      "id": "storage",
+      "name": "Storage",
+      "icon": "☁️"
+    },
+    {
+      "id": "system",
+      "name": "System",
+      "icon": "⚙️"
+    },
+    {
+      "id": "search",
+      "name": "Search",
+      "icon": "🔍"
+    }
+  ]
+}

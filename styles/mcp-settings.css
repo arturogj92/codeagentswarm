@@ -16,13 +16,127 @@
   gap: var(--spacing-sm, 8px);
 }
 
+.mcp-header-buttons {
+  display: flex;
+  gap: var(--spacing-sm, 8px);
+  align-items: center;
+}
+
+/* MCP Header Button Styles */
+.mcp-header-buttons .btn-secondary.btn-small,
+#open-marketplace-btn {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  vertical-align: middle;
+}
+
+.mcp-header-buttons .btn-secondary.btn-small i {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.mcp-header-buttons .btn-secondary.btn-small:hover {
+  /* Reduced movement for better UX */
+  transform: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  background: rgba(127, 90, 240, 0.1);
+  border-color: var(--primary, #7f5af0);
+}
+
+.mcp-header-buttons .btn-primary.btn-small,
+#add-mcp-btn {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  line-height: 1;
+  vertical-align: middle;
+  transition: all 0.2s ease;
+}
+
+.mcp-header-buttons .btn-primary.btn-small i {
+  width: 14px;
+  height: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.mcp-header-buttons .btn-primary.btn-small:hover {
+  /* Subtle hover without movement */
+  transform: none;
+  box-shadow: 0 1px 4px rgba(127, 90, 240, 0.3);
+  background: #6b4ed4;
+}
+
+/* Marketplace Section */
+.mcp-marketplace-section {
+  margin-top: var(--spacing-xl, 30px);
+  animation: slideDown 0.3s ease-out;
+}
+
+.marketplace-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+  margin: var(--spacing-lg, 20px) 0;
+}
+
+.marketplace-title {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm, 8px);
+  margin-bottom: var(--spacing-md, 12px);
+  font-size: 1.1em;
+  color: var(--color-text-primary, #e0e0e0);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Marketplace Toggle Button Active State */
+#marketplace-toggle-btn.active {
+  background: rgba(127, 90, 240, 0.2);
+  border-color: var(--primary, #7f5af0);
+  color: var(--primary, #7f5af0);
+}
+
+#marketplace-toggle-btn {
+  transition: all 0.3s ease;
+}
+
+#marketplace-toggle-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
 /* Server List Container */
 .mcp-servers-list {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md, 12px);
-  max-height: 400px;
-  overflow-y: auto;
   padding: 4px;
 }
 
@@ -324,4 +438,14 @@
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes highlight {
+  0% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0.7); }
+  50% { box-shadow: 0 0 20px 10px rgba(102, 126, 234, 0.3); }
+  100% { box-shadow: 0 0 0 0 rgba(102, 126, 234, 0); }
+}
+
+.mcp-server-card.highlight {
+  animation: highlight 2s ease-in-out;
 }

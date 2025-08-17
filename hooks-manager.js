@@ -32,7 +32,7 @@ class HooksManager {
             "mcp__codeagentswarm-tasks__complete_task",
             "mcp__codeagentswarm-tasks__submit_for_testing",
             "mcp__codeagentswarm-tasks__list_tasks",
-            "mcp__codeagentswarm-tasks__search_tasks",
+            "mcp__codeagentswarm-tasks__search_tasks",  // Explicitly allow search_tasks
             "mcp__codeagentswarm-tasks__update_task_plan",
             "mcp__codeagentswarm-tasks__update_task_implementation",
             "mcp__codeagentswarm-tasks__update_task_terminal",

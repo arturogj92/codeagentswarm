@@ -54,6 +54,7 @@
     <link rel="stylesheet" href="diff-viewer.css">
     <link rel="stylesheet" href="feature-highlight.css">
     <link rel="stylesheet" href="styles/mcp-settings.css">
+    <link rel="stylesheet" href="styles/mcp-marketplace.css">
     <!-- Load Lucide asynchronously -->
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
@@ -248,10 +249,16 @@
                             <div class="settings-section">
                                 <div class="mcp-header">
                                     <h3><i data-lucide="server"></i> MCP Servers</h3>
-                                    <button class="btn btn-primary btn-small" id="add-mcp-btn">
-                                        <i data-lucide="plus"></i>
-                                        Add MCP Server
-                                    </button>
+                                    <div class="mcp-header-buttons">
+                                        <button class="btn btn-secondary btn-small" id="open-marketplace-btn">
+                                            <i data-lucide="shopping-bag"></i>
+                                            Marketplace
+                                        </button>
+                                        <button class="btn btn-primary btn-small" id="add-mcp-btn">
+                                            <i data-lucide="plus"></i>
+                                            Add MCP Server
+                                        </button>
+                                    </div>
                                 </div>
                                 <p class="settings-note">Manage Model Context Protocol servers for Claude Code. These servers provide additional tools and capabilities.</p>
                                 
@@ -264,6 +271,7 @@
                                 </div>
                             </div>
                         </div>
+                        
                         
                         <!-- Updates Tab -->
                         <div class="tab-panel" data-panel="updates">
@@ -570,5 +578,24 @@
         });
     </script>
     <script src="renderer.js"></script>
+    
+    <!-- MCP Marketplace Modal (separate from settings) -->
+    <div id="marketplace-modal" class="modal" style="display: none;">
+        <div class="modal-content marketplace-modal-content">
+            <div class="modal-header">
+                <h2><i data-lucide="shopping-bag"></i> MCP Marketplace</h2>
+                <button class="close-modal" id="close-marketplace">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body marketplace-modal-body">
+                <div id="mcp-marketplace-container">
+                    <!-- Marketplace will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

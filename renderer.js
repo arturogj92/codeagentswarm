@@ -8653,21 +8653,28 @@ function initializeMCPSettings() {
         const MCPValidator = require('./modules/mcp/MCPValidator');
         const MCPManager = require('./modules/mcp/MCPManager');
         const MCPRenderer = require('./modules/mcp/MCPRenderer');
+        const MCPMarketplace = require('./modules/mcp/MCPMarketplace');
         
         // Create instances
         const validator = new MCPValidator();
         const manager = new MCPManager(ipcRenderer, validator);
         const renderer = new MCPRenderer(manager);
+        const marketplace = new MCPMarketplace(manager);
         
         // Store globally for debugging
         window.mcpManager = manager;
         window.mcpRenderer = renderer;
+        window.mcpMarketplace = marketplace;
+        
+        // Get containers
+        const marketplaceContainer = document.getElementById('mcp-marketplace-container');
         
         // Initialize when settings modal is opened
         const settingsBtn = document.getElementById('settings-btn');
         const mcpTab = document.querySelector('[data-tab="mcp-servers"]');
         
         let mcpInitialized = false;
+        let marketplaceInitialized = false;
         
         const initMCP = async () => {
             if (!mcpInitialized) {
@@ -8678,25 +8685,106 @@ function initializeMCPSettings() {
             }
         };
         
-        // Initialize when MCP tab is clicked
+        const initMarketplace = async () => {
+            if (!marketplaceInitialized && marketplaceContainer) {
+                console.log('Initializing MCP Marketplace...');
+                await marketplace.render(marketplaceContainer);
+                marketplaceInitialized = true;
+                console.log('MCP Marketplace initialized successfully');
+            }
+        };
+        
+        // Initialize MCP when MCP tab is clicked
         if (mcpTab) {
-            mcpTab.addEventListener('click', initMCP);
+            mcpTab.addEventListener('click', async () => {
+                await initMCP();
+            });
+        }
+        
+        // Add marketplace modal functionality
+        const openMarketplaceBtn = document.getElementById('open-marketplace-btn');
+        const marketplaceModal = document.getElementById('marketplace-modal');
+        const closeMarketplaceBtn = document.getElementById('close-marketplace');
+        const newMarketplaceContainer = document.getElementById('mcp-marketplace-container');
+        
+        if (openMarketplaceBtn && marketplaceModal) {
+            openMarketplaceBtn.addEventListener('click', async () => {
+                // Show modal
+                marketplaceModal.style.display = 'flex';
+                document.body.classList.add('modal-open');
+                
+                // Initialize marketplace if needed
+                if (!marketplaceInitialized && newMarketplaceContainer) {
+                    await marketplace.render(newMarketplaceContainer);
+                    marketplaceInitialized = true;
+                }
+            });
+        }
+        
+        if (closeMarketplaceBtn && marketplaceModal) {
+            closeMarketplaceBtn.addEventListener('click', () => {
+                marketplaceModal.style.display = 'none';
+                document.body.classList.remove('modal-open');
+            });
+        }
+        
+        // Close modal on background click
+        if (marketplaceModal) {
+            marketplaceModal.addEventListener('click', (e) => {
+                if (e.target === marketplaceModal) {
+                    marketplaceModal.style.display = 'none';
+                    document.body.classList.remove('modal-open');
+                }
+            });
         }
         
         // Also initialize if settings is opened directly to MCP tab
         if (settingsBtn) {
             settingsBtn.addEventListener('click', () => {
                 // Check if MCP tab is active after a short delay
-                setTimeout(() => {
+                setTimeout(async () => {
                     const activeMCPTab = document.querySelector('.tab-btn[data-tab="mcp-servers"].active');
+                    
                     if (activeMCPTab) {
-                        initMCP();
+                        await initMCP();
                     }
                 }, 100);
             });
         }
         
-        console.log('MCP Settings module loaded and ready');
+        // Listen for manage server events from marketplace
+        window.addEventListener('mcp-manage-server', async (event) => {
+            const { serverId } = event.detail;
+            
+            // Switch to MCP Settings tab
+            const mcpTab = document.querySelector('[data-tab="mcp-servers"]');
+            const mcpPanel = document.querySelector('[data-panel="mcp-servers"]');
+            
+            if (mcpTab && mcpPanel) {
+                // Remove active from all tabs and panels
+                document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(panel => panel.classList.remove('active'));
+                
+                // Activate MCP tab
+                mcpTab.classList.add('active');
+                mcpPanel.classList.add('active');
+                
+                // Initialize MCP if needed
+                await initMCP();
+                
+                // Highlight the server (optional)
+                setTimeout(() => {
+                    const serverCard = document.querySelector(`[data-server="${serverId}"]`);
+                    if (serverCard) {
+                        serverCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        serverCard.classList.add('highlight');
+                        setTimeout(() => serverCard.classList.remove('highlight'), 2000);
+                    }
+                }, 100);
+            }
+        });
+        
+        console.log('MCP Settings and Marketplace modules loaded and ready');
     } catch (error) {
         console.error('Failed to initialize MCP Settings:', error);
     }
