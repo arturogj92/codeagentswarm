@@ -2339,18 +2339,52 @@ ipcMain.on('mcp:remove-server', (event, name) => {
     const configContent = fs.readFileSync(configPath, 'utf8');
     const config = JSON.parse(configContent);
     
-    if (!config.mcpServers || !config.mcpServers[name]) {
-      throw new Error(`Server "${name}" not found`);
-    }
-    
     // Don't allow removing protected servers
     const protectedServers = ['codeagentswarm-tasks', 'codeagentswarm'];
     if (protectedServers.includes(name.toLowerCase())) {
       throw new Error(`Cannot remove protected server "${name}"`);
     }
     
-    // Remove server
-    delete config.mcpServers[name];
+    // Check if server exists in main config
+    let serverFound = false;
+    if (config.mcpServers && config.mcpServers[name]) {
+      // Remove from main config
+      delete config.mcpServers[name];
+      serverFound = true;
+    }
+    
+    // Check if server exists in disabled backup
+    const disabledBackupPath = path.join(path.dirname(configPath), '.mcp_disabled_servers.json');
+    if (fs.existsSync(disabledBackupPath)) {
+      try {
+        const disabledServers = JSON.parse(fs.readFileSync(disabledBackupPath, 'utf8'));
+        if (disabledServers[name]) {
+          // Remove from disabled backup
+          delete disabledServers[name];
+          serverFound = true;
+          
+          // Update or remove backup file
+          if (Object.keys(disabledServers).length > 0) {
+            fs.writeFileSync(disabledBackupPath, JSON.stringify(disabledServers, null, 2));
+          } else {
+            // Remove backup file if empty
+            fs.unlinkSync(disabledBackupPath);
+          }
+        }
+      } catch (e) {
+        console.error('Error handling disabled servers backup:', e);
+      }
+    }
+    
+    // Also check for old _disabled_ format and remove it
+    if (config.mcpServers && config.mcpServers[`_disabled_${name}`]) {
+      delete config.mcpServers[`_disabled_${name}`];
+      serverFound = true;
+    }
+    
+    if (!serverFound) {
+      throw new Error(`Server "${name}" not found`);
+    }
     
     // Write updated config
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));

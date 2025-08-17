@@ -459,12 +459,25 @@ class MCPMarketplace {
         this.updateGrid(container);
         
         try {
+            // Prepare the configuration
+            let configToUse = { ...server.config };
+            
+            // Special handling for PostgreSQL and other servers that need URL in args
+            if (serverId === 'postgres' && server.config.env && server.config.env.DATABASE_URL) {
+                // Replace ${DATABASE_URL} placeholder in args with actual value
+                configToUse.args = configToUse.args.map(arg => 
+                    arg === '${DATABASE_URL}' ? server.config.env.DATABASE_URL : arg
+                );
+                // Remove DATABASE_URL from env since it's now in args
+                delete configToUse.env.DATABASE_URL;
+            }
+            
             // Prepare the configuration with mcpServers wrapper
             const config = {
                 mcpServers: {
                     [server.id]: {
-                        ...server.config,
-                        env: server.config.env || {}
+                        ...configToUse,
+                        env: configToUse.env || {}
                     }
                 }
             };
@@ -503,6 +516,91 @@ class MCPMarketplace {
      */
     async showAuthModal(server) {
         return new Promise((resolve) => {
+            // Special handling for PostgreSQL - show separate fields
+            let bodyContent = '';
+            if (server.id === 'postgres') {
+                bodyContent = `
+                    <p>Configure your PostgreSQL connection details:</p>
+                    
+                    <div class="auth-field">
+                        <label for="pg_host">Host</label>
+                        <input type="text" 
+                               id="pg_host"
+                               placeholder="localhost"
+                               value="localhost"
+                               required>
+                        <small class="auth-help">Database server hostname or IP</small>
+                    </div>
+                    
+                    <div class="auth-field">
+                        <label for="pg_port">Port</label>
+                        <input type="number" 
+                               id="pg_port"
+                               placeholder="5432"
+                               value="5432"
+                               required>
+                        <small class="auth-help">PostgreSQL port (default: 5432)</small>
+                    </div>
+                    
+                    <div class="auth-field">
+                        <label for="pg_database">Database Name</label>
+                        <input type="text" 
+                               id="pg_database"
+                               placeholder="mydb"
+                               required>
+                        <small class="auth-help">Name of the database to connect to</small>
+                    </div>
+                    
+                    <div class="auth-field">
+                        <label for="pg_user">Username</label>
+                        <input type="text" 
+                               id="pg_user"
+                               placeholder="postgres"
+                               required>
+                        <small class="auth-help">Database username</small>
+                    </div>
+                    
+                    <div class="auth-field">
+                        <label for="pg_password">Password</label>
+                        <input type="password" 
+                               id="pg_password"
+                               placeholder="••••••••">
+                        <small class="auth-help">Database password (leave empty if not required)</small>
+                    </div>
+                    
+                    <div class="auth-field">
+                        <label>Connection String Preview:</label>
+                        <code id="pg_preview" style="background: #2a2a2a; color: #e0e0e0; padding: 10px; border: 1px solid #3a3a3a; border-radius: 6px; display: block; word-break: break-all; font-family: 'SF Mono', Monaco, monospace; font-size: 13px;">
+                            postgresql://localhost:5432/mydb
+                        </code>
+                    </div>
+                `;
+            } else {
+                // Default auth fields for other servers
+                bodyContent = `
+                    <p>This server requires authentication to work properly.</p>
+                    
+                    ${server.authFields.map(field => `
+                        <div class="auth-field">
+                            <label for="${field.key}">${field.label}</label>
+                            ${field.type === 'textarea' ? `
+                                <textarea id="${field.key}" 
+                                          placeholder="${field.placeholder}"
+                                          ${field.required ? 'required' : ''}></textarea>
+                            ` : `
+                                <input type="${field.type}" 
+                                       id="${field.key}"
+                                       placeholder="${field.placeholder}"
+                                       ${field.required ? 'required' : ''}>
+                            `}
+                            ${field.helpText ? `
+                                <small class="auth-help">${field.helpText}</small>
+                            ` : ''}
+                        </div>
+                    `).join('')}
+                `;
+            }
+            
             const modalHtml = `
                 <div class="mcp-auth-modal" id="auth-modal">
                     <div class="auth-modal-content">
@@ -514,26 +612,7 @@ class MCPMarketplace {
                         </div>
                         
                         <div class="auth-modal-body">
-                            <p>This server requires authentication to work properly.</p>
-                            
-                            ${server.authFields.map(field => `
-                                <div class="auth-field">
-                                    <label for="${field.key}">${field.label}</label>
-                                    ${field.type === 'textarea' ? `
-                                        <textarea id="${field.key}" 
-                                                  placeholder="${field.placeholder}"
-                                                  ${field.required ? 'required' : ''}></textarea>
-                                    ` : `
-                                        <input type="${field.type}" 
-                                               id="${field.key}"
-                                               placeholder="${field.placeholder}"
-                                               ${field.required ? 'required' : ''}>
-                                    `}
-                                    ${field.helpText ? `
-                                        <small class="auth-help">${field.helpText}</small>
-                                    ` : ''}
-                                </div>
-                            `).join('')}
+                            ${bodyContent}
                         </div>
                         
                         <div class="auth-modal-footer">
@@ -553,20 +632,83 @@ class MCPMarketplace {
                 window.lucide.createIcons();
             }
             
+            // Special handling for PostgreSQL
+            if (server.id === 'postgres') {
+                // Function to update the connection string preview
+                const updatePreview = () => {
+                    const host = document.getElementById('pg_host').value || 'localhost';
+                    const port = document.getElementById('pg_port').value || '5432';
+                    const database = document.getElementById('pg_database').value || 'mydb';
+                    const user = document.getElementById('pg_user').value || 'postgres';
+                    const password = document.getElementById('pg_password').value;
+                    
+                    let connectionString = `postgresql://`;
+                    if (user) {
+                        connectionString += user;
+                        if (password) {
+                            connectionString += `:${password}`;
+                        }
+                        connectionString += '@';
+                    }
+                    connectionString += `${host}:${port}/${database}`;
+                    
+                    document.getElementById('pg_preview').textContent = connectionString;
+                };
+                
+                // Add event listeners to update preview
+                ['pg_host', 'pg_port', 'pg_database', 'pg_user', 'pg_password'].forEach(id => {
+                    const elem = document.getElementById(id);
+                    if (elem) {
+                        elem.addEventListener('input', updatePreview);
+                    }
+                });
+                
+                // Initial preview update
+                updatePreview();
+            }
+            
             // Handle submit
             document.getElementById('auth-submit').addEventListener('click', () => {
                 const authData = {};
                 let valid = true;
                 
-                server.authFields.forEach(field => {
-                    const input = document.getElementById(field.key);
-                    if (field.required && !input.value) {
+                if (server.id === 'postgres') {
+                    // Build connection string for PostgreSQL
+                    const host = document.getElementById('pg_host').value || 'localhost';
+                    const port = document.getElementById('pg_port').value || '5432';
+                    const database = document.getElementById('pg_database').value;
+                    const user = document.getElementById('pg_user').value;
+                    const password = document.getElementById('pg_password').value;
+                    
+                    if (!database || !user) {
                         valid = false;
-                        input.classList.add('error');
+                        if (!database) document.getElementById('pg_database').classList.add('error');
+                        if (!user) document.getElementById('pg_user').classList.add('error');
                     } else {
-                        authData[field.key] = input.value;
+                        let connectionString = `postgresql://`;
+                        if (user) {
+                            connectionString += user;
+                            if (password) {
+                                connectionString += `:${password}`;
+                            }
+                            connectionString += '@';
+                        }
+                        connectionString += `${host}:${port}/${database}`;
+                        
+                        authData.DATABASE_URL = connectionString;
                     }
-                });
+                } else {
+                    // Default handling for other servers
+                    server.authFields.forEach(field => {
+                        const input = document.getElementById(field.key);
+                        if (field.required && !input.value) {
+                            valid = false;
+                            input.classList.add('error');
+                        } else {
+                            authData[field.key] = input.value;
+                        }
+                    });
+                }
                 
                 if (valid) {
                     modal.remove();

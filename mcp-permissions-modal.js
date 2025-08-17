@@ -185,6 +185,11 @@ class MCPPermissionsModal {
                 displayName: 'Brave Search',
                 logo: 'assets/mcp-icons/brave-search.png',
                 tools: ['brave_web_search', 'brave_local_search']
+            },
+            'postgres': {
+                displayName: 'PostgreSQL',
+                logo: 'assets/mcp-icons/postgres.png',
+                tools: ['query']
             }
         };
         

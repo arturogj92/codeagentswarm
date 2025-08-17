@@ -155,14 +155,9 @@ class MCPManager {
      */
     async removeServer(name) {
         try {
-            // Check if server exists
-            if (!this.servers[name]) {
-                return {
-                    success: false,
-                    error: `Server "${name}" not found`
-                };
-            }
-
+            // Note: Server might exist in disabled state (in backup file)
+            // but not in this.servers. We'll let the backend handle the check.
+            
             // Check if protected
             if (this.validator.isProtectedServer(name)) {
                 return {
@@ -171,13 +166,18 @@ class MCPManager {
                 };
             }
 
-            // Remove via IPC
+            // Remove via IPC - backend will check both enabled and disabled states
             const result = await this.ipcCall('mcp:remove-server', name);
             
             if (result.success) {
-                // Update local cache
-                delete this.servers[name];
+                // Update local cache if server was in our list
+                if (this.servers[name]) {
+                    delete this.servers[name];
+                }
                 this.emit('server-removed', { name });
+                
+                // Reload servers to ensure we have the latest state
+                await this.loadServers();
                 
                 return { success: true };
             }

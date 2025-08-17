@@ -279,7 +279,8 @@
         "command": "npx",
         "args": [
           "-y",
-          "@modelcontextprotocol/server-postgres@latest"
+          "@modelcontextprotocol/server-postgres@latest",
+          "${DATABASE_URL}"
         ]
       },
       "features": [

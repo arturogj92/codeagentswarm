@@ -32,7 +32,10 @@ class MCPInstructionsManager {
 **Best practices:**
 - Be specific in search queries
 - Include year/date when searching for recent info
-- Use multiple searches to verify important information`
+- Use multiple searches to verify important information
+
+**Repository:**
+- Official MCP Server: https://github.com/modelcontextprotocol/servers/tree/main/src/brave-search`
       },
       
       'notion': {

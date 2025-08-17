@@ -234,8 +234,16 @@ describe('MCPManager', () => {
 
         test('should remove existing server', async () => {
             mockValidator.isProtectedServer.mockReturnValue(false);
+            let loadCallCount = 0;
             mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: true });
+                loadCallCount++;
+                if (loadCallCount === 1) {
+                    // First call is the remove request
+                    callback(null, { success: true });
+                } else {
+                    // Second call is the loadServers after removal
+                    callback(null, { mcpServers: {} });
+                }
             });
 
             const removeListener = jest.fn();
@@ -248,7 +256,42 @@ describe('MCPManager', () => {
             expect(removeListener).toHaveBeenCalledWith({ name: 'removable' });
         });
 
-        test('should reject non-existent server', async () => {
+        test('should remove disabled server not in local cache', async () => {
+            // Server is disabled, so not in local cache
+            delete manager.servers['removable'];
+            
+            mockValidator.isProtectedServer.mockReturnValue(false);
+            let loadCallCount = 0;
+            mockIpcRenderer.once.mockImplementation((channel, callback) => {
+                loadCallCount++;
+                if (loadCallCount === 1) {
+                    // First call is the remove request - backend handles it
+                    callback(null, { success: true });
+                } else {
+                    // Second call is the loadServers after removal
+                    callback(null, { mcpServers: {} });
+                }
+            });
+
+            const removeListener = jest.fn();
+            manager.on('server-removed', removeListener);
+
+            const result = await manager.removeServer('removable');
+
+            expect(result.success).toBe(true);
+            expect(removeListener).toHaveBeenCalledWith({ name: 'removable' });
+            expect(mockIpcRenderer.send).toHaveBeenCalledWith('mcp:remove-server', 'removable');
+        });
+
+        test('should handle backend rejection for non-existent server', async () => {
+            // Server not in cache, backend will check
+            delete manager.servers['non-existent'];
+            
+            mockValidator.isProtectedServer.mockReturnValue(false);
+            mockIpcRenderer.once.mockImplementation((channel, callback) => {
+                callback(null, { success: false, error: 'Server "non-existent" not found' });
+            });
+
             const result = await manager.removeServer('non-existent');
 
             expect(result.success).toBe(false);
@@ -262,6 +305,33 @@ describe('MCPManager', () => {
 
             expect(result.success).toBe(false);
             expect(result.error).toContain('Cannot remove protected server');
+        });
+
+        test('should reload servers after successful removal', async () => {
+            mockValidator.isProtectedServer.mockReturnValue(false);
+            
+            let callCount = 0;
+            mockIpcRenderer.once.mockImplementation((channel, callback) => {
+                callCount++;
+                if (callCount === 1) {
+                    // Remove request
+                    callback(null, { success: true });
+                } else if (callCount === 2) {
+                    // loadServers call after removal
+                    callback(null, { 
+                        mcpServers: {
+                            'other-server': { command: 'npx' }
+                        }
+                    });
+                }
+            });
+
+            await manager.removeServer('removable');
+
+            // Check that loadServers was called (2 IPC calls total)
+            expect(mockIpcRenderer.send).toHaveBeenCalledTimes(2);
+            expect(mockIpcRenderer.send).toHaveBeenNthCalledWith(1, 'mcp:remove-server', 'removable');
+            expect(mockIpcRenderer.send).toHaveBeenNthCalledWith(2, 'mcp:load-config', undefined);
         });
     });
 
