@@ -801,13 +801,14 @@ body::before {
 .terminals-container.count-3.layout-3-left2 .terminal-column-left {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: var(--top-height) var(--bottom-height);
+  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
   gap: 20px;
   height: 100%;
   min-height: 0; /* Allow shrinking */
   max-height: 100%; /* Constrain to parent height */
   position: relative;
   overflow: hidden; /* Prevent content overflow */
+  box-sizing: border-box;
 }
 
 .terminals-container.count-3.layout-3-left2 .terminal-column-right {
@@ -843,13 +844,14 @@ body::before {
 .terminals-container.count-3.layout-3-right2 .terminal-column-right {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: var(--top-height) var(--bottom-height);
+  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
   gap: 20px;
   height: 100%;
   min-height: 0; /* Allow shrinking */
   max-height: 100%; /* Constrain to parent height */
   position: relative;
   overflow: hidden; /* Prevent content overflow */
+  box-sizing: border-box;
 }
 
 /* Ensure terminal quadrants in column layouts fill their grid cells */
