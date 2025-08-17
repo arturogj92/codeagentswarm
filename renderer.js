@@ -7422,6 +7422,9 @@ class TerminalManager {
                 lucide.createIcons();
             }
             
+            // Show MCP settings highlight for versions 0.0.41-0.0.44
+            this.showMCPHighlightIfNeeded();
+            this.addMCPTabBadgeIfNeeded();
         }, 10);
         
         if (shellPref.success) {
@@ -7493,7 +7496,252 @@ class TerminalManager {
             if (tabButton) {
                 tabButton.click();
             }
+            
+            // Show MCP highlight if opening MCP tab directly
+            if (initialTab === 'mcp-servers') {
+                setTimeout(() => {
+                    this.showMCPHighlightIfNeeded();
+                }, 200);
+            }
         }
+    }
+
+    addMCPTabBadgeIfNeeded() {
+        // Check if we're in the right version range (0.0.41-0.0.48)
+        const targetVersions = ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'];
+        
+        if (!window.appVersion || !targetVersions.includes(window.appVersion)) {
+            return;
+        }
+        
+        // Check if badge has been shown before
+        const storageKey = `mcpTabBadge_${window.appVersion}_shown`;
+        if (localStorage.getItem(storageKey) === 'true') {
+            return;
+        }
+        
+        // Find the MCP Servers tab button
+        const mcpTabButton = document.querySelector('.tab-btn[data-tab="mcp-servers"]');
+        if (!mcpTabButton) {
+            return;
+        }
+        
+        // Check if badge already exists
+        if (mcpTabButton.querySelector('.mcp-tab-badge')) {
+            return;
+        }
+        
+        // Create and add the badge
+        const badge = document.createElement('span');
+        badge.className = 'mcp-tab-badge';
+        badge.textContent = 'NEW!';
+        
+        // Add styles for the badge if not already added
+        if (!document.getElementById('mcp-tab-badge-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'mcp-tab-badge-styles';
+            styles.textContent = `
+                .tab-btn {
+                    position: relative;
+                }
+                
+                .mcp-tab-badge {
+                    position: absolute;
+                    top: -8px;
+                    right: -8px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    font-size: 9px;
+                    font-weight: bold;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    animation: pulse 2s infinite;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    z-index: 10;
+                }
+                
+                @keyframes pulse {
+                    0% {
+                        transform: scale(1);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    }
+                    50% {
+                        transform: scale(1.05);
+                        box-shadow: 0 3px 6px rgba(102, 126, 234, 0.4);
+                    }
+                    100% {
+                        transform: scale(1);
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    }
+                }
+                
+                .tab-btn[data-tab="mcp-servers"].active .mcp-tab-badge {
+                    display: none;
+                }
+                
+                @keyframes fadeOut {
+                    from {
+                        opacity: 1;
+                    }
+                    to {
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        mcpTabButton.appendChild(badge);
+        
+        // Remove badge when tab is clicked
+        mcpTabButton.addEventListener('click', () => {
+            setTimeout(() => {
+                const badge = mcpTabButton.querySelector('.mcp-tab-badge');
+                if (badge) {
+                    badge.style.animation = 'fadeOut 0.3s ease-out';
+                    setTimeout(() => badge.remove(), 300);
+                }
+                localStorage.setItem(storageKey, 'true');
+            }, 100);
+        }, { once: true });
+        
+        console.log('MCP tab badge added for version', window.appVersion);
+    }
+
+    showMCPHighlightIfNeeded() {
+        // Check if we're in the right version range (0.0.41-0.0.48)
+        const targetVersions = ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'];
+        
+        if (!window.appVersion || !targetVersions.includes(window.appVersion)) {
+            console.log(`MCP highlight skipped - version ${window.appVersion} not in target range`);
+            return;
+        }
+        
+        // Check if highlight has been shown before for MCP settings
+        const storageKey = `mcpSettingsHighlight_${window.appVersion}_shown`;
+        if (localStorage.getItem(storageKey) === 'true') {
+            console.log('MCP settings highlight already shown for this version');
+            return;
+        }
+        
+        // Show highlight inside the modal for MCP features
+        const mcpPanel = document.querySelector('.tab-panel[data-panel="mcp-servers"].active');
+        if (!mcpPanel) {
+            console.log('MCP panel not active, skipping highlight');
+            return;
+        }
+        
+        // Create an in-modal highlight
+        const existingHighlight = document.getElementById('mcp-modal-highlight');
+        if (existingHighlight) {
+            existingHighlight.remove();
+        }
+        
+        const highlight = document.createElement('div');
+        highlight.id = 'mcp-modal-highlight';
+        highlight.className = 'mcp-modal-highlight';
+        highlight.innerHTML = `
+            <div class="mcp-highlight-content">
+                <span class="mcp-highlight-badge">NEW!</span>
+                <span class="mcp-highlight-text">MCP Servers now available! Add powerful integrations like filesystem access, database connections, and more.</span>
+                <button class="mcp-highlight-dismiss" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+        `;
+        
+        // Add styles for the highlight
+        if (!document.getElementById('mcp-highlight-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'mcp-highlight-styles';
+            styles.textContent = `
+                .mcp-modal-highlight {
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    border-radius: 8px;
+                    padding: 12px 16px;
+                    margin: 0 0 16px 0;
+                    animation: slideDown 0.3s ease-out;
+                    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+                }
+                
+                .mcp-highlight-content {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    color: white;
+                }
+                
+                .mcp-highlight-badge {
+                    background: rgba(255, 255, 255, 0.2);
+                    color: white;
+                    padding: 4px 8px;
+                    border-radius: 4px;
+                    font-size: 11px;
+                    font-weight: bold;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                }
+                
+                .mcp-highlight-text {
+                    flex: 1;
+                    font-size: 14px;
+                    line-height: 1.4;
+                }
+                
+                .mcp-highlight-dismiss {
+                    background: none;
+                    border: none;
+                    color: white;
+                    font-size: 20px;
+                    cursor: pointer;
+                    opacity: 0.8;
+                    transition: opacity 0.2s;
+                    padding: 0;
+                    width: 24px;
+                    height: 24px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                }
+                
+                .mcp-highlight-dismiss:hover {
+                    opacity: 1;
+                }
+                
+                @keyframes slideDown {
+                    from {
+                        opacity: 0;
+                        transform: translateY(-10px);
+                    }
+                    to {
+                        opacity: 1;
+                        transform: translateY(0);
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+        
+        // Insert at the top of the MCP panel
+        const mcpHeader = mcpPanel.querySelector('.mcp-header');
+        if (mcpHeader && mcpHeader.nextSibling) {
+            mcpHeader.parentNode.insertBefore(highlight, mcpHeader.nextSibling);
+        } else {
+            mcpPanel.insertBefore(highlight, mcpPanel.firstChild);
+        }
+        
+        // Mark as shown
+        localStorage.setItem(storageKey, 'true');
+        console.log(`MCP settings highlight shown for version ${window.appVersion}`);
+        
+        // Auto-dismiss after 30 seconds
+        setTimeout(() => {
+            const element = document.getElementById('mcp-modal-highlight');
+            if (element) {
+                element.style.animation = 'slideDown 0.3s ease-out reverse';
+                setTimeout(() => element.remove(), 300);
+            }
+        }, 30000);
     }
 
     initializeSettingsHandlers() {
@@ -7649,6 +7897,16 @@ class TerminalManager {
                 const targetPanel = modal.querySelector(`.tab-panel[data-panel="${targetTab}"]`);
                 if (targetPanel) {
                     targetPanel.classList.add('active');
+                }
+                
+                // Show MCP highlight when MCP tab is opened (versions 0.0.41-0.0.44)
+                if (targetTab === 'mcp-servers') {
+                    setTimeout(() => {
+                        // Call the method directly on terminalManager instance
+                        if (window.terminalManager && window.terminalManager.showMCPHighlightIfNeeded) {
+                            window.terminalManager.showMCPHighlightIfNeeded();
+                        }
+                    }, 100);
                 }
             });
         });
@@ -8366,7 +8624,7 @@ const FEATURE_HIGHLIGHTS_CONFIG = [
         message: 'Toggle between grid and tabbed layouts',
         position: 'bottom',
         duration: 30000, // 30 seconds
-        showInVersions: ['0.0.38', '0.0.39', '0.0.40', '0.0.41', '0.0.42', '0.0.43'], // Available in these versions
+        showInVersions: ['0.0.38', '0.0.39', '0.0.40'], // Available in these versions
         // NOTE: tabbedMode uses cross-version tracking - shows only ONCE across all versions
         // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.43
         delay: 500 // Delay before showing
