@@ -294,6 +294,11 @@ class MCPManager {
             const disabledKey = `_disabled_${serverName}`;
             const isProtected = this.validator.isProtectedServer(serverName);
             
+            // Skip protected servers (they should not be included in the filtered list)
+            if (isProtected) {
+                continue;
+            }
+            
             if (servers[disabledKey]) {
                 // Server is disabled
                 filtered[serverName] = {
@@ -301,7 +306,7 @@ class MCPManager {
                     metadata: { 
                         ...servers[disabledKey].metadata, 
                         enabled: false,
-                        protected: isProtected
+                        protected: false
                     }
                 };
             } else if (servers[enabledKey]) {
@@ -311,7 +316,7 @@ class MCPManager {
                     metadata: { 
                         ...servers[enabledKey].metadata, 
                         enabled: true,
-                        protected: isProtected
+                        protected: false
                     }
                 };
             }

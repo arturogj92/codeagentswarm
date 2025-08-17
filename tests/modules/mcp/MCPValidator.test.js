@@ -242,10 +242,14 @@ describe('MCPValidator', () => {
             
             const sanitized = validator.sanitizeEnvVars(env);
             
+            // The implementation shows first 4 chars + asterisks (max 8)
+            // For 'supersecretkey123' (17 chars): 'supe' + 8 asterisks (max)
+            // For 'bearer-token-xyz' (16 chars): 'bear' + 8 asterisks (max) 
+            // For 'mypassword' (10 chars): 'mypa' + 6 asterisks (10-4=6)
             expect(sanitized.API_KEY).toBe('supe********');
             expect(sanitized.TOKEN).toBe('bear********');
             expect(sanitized.NORMAL_VAR).toBe('visible');
-            expect(sanitized.PASSWORD).toBe('mypa********');
+            expect(sanitized.PASSWORD).toBe('mypa******');
         });
 
         test('should not sanitize short values', () => {

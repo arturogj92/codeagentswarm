@@ -273,8 +273,20 @@ describe('MCPManager', () => {
         });
 
         test('should toggle server state', async () => {
+            let callCount = 0;
             mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: true });
+                callCount++;
+                if (callCount === 1) {
+                    // First call is the toggle request
+                    callback(null, { success: true });
+                } else {
+                    // Second call is the loadServers after toggle
+                    callback(null, { 
+                        mcpServers: {
+                            '_disabled_toggleable': { command: 'node' }
+                        }
+                    });
+                }
             });
 
             const toggleListener = jest.fn();
@@ -283,6 +295,7 @@ describe('MCPManager', () => {
             const result = await manager.toggleServer('toggleable', false);
 
             expect(result.success).toBe(true);
+            expect(manager.servers.toggleable).toBeDefined();
             expect(manager.servers.toggleable.metadata.enabled).toBe(false);
             expect(toggleListener).toHaveBeenCalledWith({
                 name: 'toggleable',
