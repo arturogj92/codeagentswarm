@@ -3,13 +3,13 @@ module.exports = {
     {
       displayName: 'node',
       testEnvironment: 'node',
-      testMatch: ['<rootDir>/tests/**/*(?<!modal).test.js'],
+      testMatch: ['<rootDir>/tests/**/*(?<!modal)(?<!layout).test.js'],
       roots: ['<rootDir>/tests']
     },
     {
       displayName: 'jsdom',
       testEnvironment: 'jsdom',
-      testMatch: ['<rootDir>/tests/**/*modal.test.js'],
+      testMatch: ['<rootDir>/tests/**/*@(modal|layout).test.js'],
       roots: ['<rootDir>/tests'],
       setupFilesAfterEnv: ['<rootDir>/tests/setup-dom.js']
     }

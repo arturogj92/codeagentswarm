@@ -8640,7 +8640,7 @@ const FEATURE_HIGHLIGHTS_CONFIG = [
         message: 'Toggle between grid and tabbed layouts',
         position: 'bottom',
         duration: 30000, // 30 seconds
-        showInVersions: ['0.0.38', '0.0.39', '0.0.40'], // Available in these versions
+        showInVersions: ['0.0.38', '0.0.39', '0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48', '0.0.49'], // Available in these versions
         // NOTE: tabbedMode uses cross-version tracking - shows only ONCE across all versions
         // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.43
         delay: 500 // Delay before showing
