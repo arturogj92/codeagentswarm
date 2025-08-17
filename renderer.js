@@ -7070,6 +7070,8 @@ class TerminalManager {
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.setProperty('--left-width', '50%');
         mainContainer.style.setProperty('--right-width', '50%');
+        mainContainer.style.setProperty('--top-height', '50%');
+        mainContainer.style.setProperty('--bottom-height', '50%');
         
         // Create 1+2 grid with separate rows
         const rowTop = document.createElement('div');
@@ -7092,13 +7094,15 @@ class TerminalManager {
         const vResizer = this.createResizer('vertical', 'bottom-row');
         rowBottom.appendChild(vResizer);
         
-        // Append rows to container
+        // Append top row first
         container.appendChild(rowTop);
-        container.appendChild(rowBottom);
         
         // Add horizontal resizer between rows
         const hResizer = this.createResizer('horizontal');
         container.appendChild(hResizer);
+        
+        // Then append bottom row
+        container.appendChild(rowBottom);
     }
 
     async create3TerminalTop2HorizLayout(container, activeTerminals) {
@@ -7106,6 +7110,8 @@ class TerminalManager {
         const mainContainer = document.getElementById('terminals-container');
         mainContainer.style.setProperty('--left-width', '50%');
         mainContainer.style.setProperty('--right-width', '50%');
+        mainContainer.style.setProperty('--top-height', '50%');
+        mainContainer.style.setProperty('--bottom-height', '50%');
         
         // Create 2+1 grid with separate rows
         const rowTop = document.createElement('div');
@@ -7128,13 +7134,15 @@ class TerminalManager {
         const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         rowBottom.appendChild(terminal3);
         
-        // Append rows to container
+        // Append top row first
         container.appendChild(rowTop);
-        container.appendChild(rowBottom);
         
         // Add horizontal resizer between rows
         const hResizer = this.createResizer('horizontal');
         container.appendChild(hResizer);
+        
+        // Then append bottom row
+        container.appendChild(rowBottom);
     }
 
     async create3TerminalLeft2Layout(container, activeTerminals) {
@@ -7159,27 +7167,31 @@ class TerminalManager {
         const columnRight = document.createElement('div');
         columnRight.className = 'terminal-column-right';
         
-        // Add first two terminals to left column
+        // Add first terminal to left column
         const terminal1 = await this.createTerminalElement(activeTerminals[0]);
-        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
         columnLeft.appendChild(terminal1);
-        columnLeft.appendChild(terminal2);
         
-        // Add horizontal resizer between left terminals
+        // Add horizontal resizer BETWEEN left terminals
         const hResizerLeft = this.createResizer('horizontal', 'left-column');
         columnLeft.appendChild(hResizerLeft);
+        
+        // Add second terminal to left column
+        const terminal2 = await this.createTerminalElement(activeTerminals[1]);
+        columnLeft.appendChild(terminal2);
         
         // Add third terminal to right column
         const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         columnRight.appendChild(terminal3);
         
-        // Append columns to container
+        // Append left column first
         container.appendChild(columnLeft);
-        container.appendChild(columnRight);
         
         // Add vertical resizer between columns
         const vResizer = this.createResizer('vertical', 'main-columns');
         container.appendChild(vResizer);
+        
+        // Then append right column
+        container.appendChild(columnRight);
     }
 
     async create3TerminalRight2Layout(container, activeTerminals) {
@@ -7208,23 +7220,27 @@ class TerminalManager {
         const terminal1 = await this.createTerminalElement(activeTerminals[0]);
         columnLeft.appendChild(terminal1);
         
-        // Add remaining two terminals to right column
+        // Add first terminal to right column
         const terminal2 = await this.createTerminalElement(activeTerminals[1]);
-        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
         columnRight.appendChild(terminal2);
-        columnRight.appendChild(terminal3);
         
-        // Add horizontal resizer between right terminals
+        // Add horizontal resizer BETWEEN right terminals
         const hResizerRight = this.createResizer('horizontal', 'right-column');
         columnRight.appendChild(hResizerRight);
         
-        // Append columns to container
+        // Add second terminal to right column
+        const terminal3 = await this.createTerminalElement(activeTerminals[2]);
+        columnRight.appendChild(terminal3);
+        
+        // Append left column first
         container.appendChild(columnLeft);
-        container.appendChild(columnRight);
         
         // Add vertical resizer between columns
         const vResizer = this.createResizer('vertical', 'main-columns');
         container.appendChild(vResizer);
+        
+        // Then append right column
+        container.appendChild(columnRight);
     }
 
     async createTerminalLayoutWithResizers(container, activeTerminals) {

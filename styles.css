@@ -713,7 +713,7 @@ body::before {
   background: transparent;
   padding: 20px;
   position: relative;
-  overflow: hidden;
+  overflow: hidden; /* Changed from visible to prevent overflow */
   height: calc(100vh - 60px);
   max-height: calc(100vh - 60px);
   box-sizing: border-box;
@@ -757,7 +757,7 @@ body::before {
 }
 
 /* Base 3 terminals layout - Default: 1 top + 2 bottom horizontal */
-.terminals-container.count-3 {
+.terminals-container.count-3:not(.layout-3-left2):not(.layout-3-right2) {
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -795,15 +795,19 @@ body::before {
   grid-template-rows: 1fr;
   gap: 20px;
   height: 100%;
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .terminals-container.count-3.layout-3-left2 .terminal-column-left {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
+  grid-template-rows: var(--top-height) var(--bottom-height);
   gap: 20px;
   height: 100%;
+  min-height: 0; /* Allow shrinking */
+  max-height: 100%; /* Constrain to parent height */
   position: relative;
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .terminals-container.count-3.layout-3-left2 .terminal-column-right {
@@ -811,6 +815,9 @@ body::before {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
   height: 100%;
+  min-height: 0; /* Allow shrinking */
+  max-height: 100%; /* Constrain to parent height */
+  overflow: hidden; /* Prevent content overflow */
 }
 
 /* Layout: 1 left + 2 right vertical */
@@ -820,6 +827,7 @@ body::before {
   grid-template-rows: 1fr;
   gap: 20px;
   height: 100%;
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .terminals-container.count-3.layout-3-right2 .terminal-column-left {
@@ -827,21 +835,29 @@ body::before {
   grid-template-columns: 1fr;
   grid-template-rows: 1fr;
   height: 100%;
+  min-height: 0; /* Allow shrinking */
+  max-height: 100%; /* Constrain to parent height */
+  overflow: hidden; /* Prevent content overflow */
 }
 
 .terminals-container.count-3.layout-3-right2 .terminal-column-right {
   display: grid;
   grid-template-columns: 1fr;
-  grid-template-rows: calc(var(--top-height) - 10px) calc(var(--bottom-height) - 10px);
+  grid-template-rows: var(--top-height) var(--bottom-height);
   gap: 20px;
   height: 100%;
+  min-height: 0; /* Allow shrinking */
+  max-height: 100%; /* Constrain to parent height */
   position: relative;
+  overflow: hidden; /* Prevent content overflow */
 }
 
 /* Ensure terminal quadrants in column layouts fill their grid cells */
 .terminals-container.count-3.layout-3-left2 .terminal-quadrant,
 .terminals-container.count-3.layout-3-right2 .terminal-quadrant {
   min-height: 0; /* Allows proper shrinking in grid */
+  max-height: 100%; /* Prevent growing beyond cell */
+  overflow: hidden; /* Ensure content doesn't overflow */
 }
 
 .terminals-container.count-4 {
@@ -1213,12 +1229,13 @@ body::before {
   border: 1px solid var(--border);
   border-radius: 16px;
   position: relative;
-  overflow: visible;
+  overflow: hidden;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--shadow-card);
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
 }
 
 /* Terminal positioning now handled by CSS Grid auto-placement */
@@ -1446,7 +1463,7 @@ body::before {
   height: calc(100% - 32px);
   display: flex;
   flex-direction: column;
-  overflow: visible;
+  overflow: hidden;
   border-radius: 0 0 16px 16px;
   position: relative;
 }
