@@ -116,13 +116,18 @@ class TerminalManager {
         
         // Listen for webhook events
         ipcRenderer.on('confirmation-needed', (event, data) => {
-            console.log('Confirmation needed via webhook:', data);
+            console.log('🔔 NOTIFICATION RECEIVED - Confirmation needed via webhook:', data);
             const { terminalId, tool } = data;
+            console.log(`🔔 Terminal ID: ${terminalId}, Type: ${typeof terminalId}`);
             if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
+                console.log(`🔔 Adding terminal ${terminalId} to attention set`);
                 this.terminalsNeedingAttention.add(terminalId);
+                console.log(`🔔 Current attention set:`, Array.from(this.terminalsNeedingAttention));
                 this.updateNotificationBadge();
                 this.highlightTerminalForConfirmation(terminalId);
                 this.scrollTerminalToBottom(terminalId);
+            } else {
+                console.log(`🔔 Invalid terminal ID ${terminalId}, ignoring notification`);
             }
         });
         
@@ -1148,8 +1153,8 @@ class TerminalManager {
             cols: 100,
             rows: 30,
             // Terminal behavior settings
-            macOptionIsMeta: true,
-            macOptionClickForcesSelection: true,
+            macOptionIsMeta: false,
+            macOptionClickForcesSelection: false,
             rightClickSelectsWord: false,
             // Ensure proper handling of special keys
             convertEol: true,
@@ -6428,6 +6433,27 @@ class TerminalManager {
                 }
                 
                 const terminalId = parseInt(tab.dataset.terminalId);
+                console.log(`🖱️ TAB CLICKED - Terminal ${terminalId}`);
+                console.log(`🖱️ Tab dataset.terminalId: ${tab.dataset.terminalId}, parsed: ${terminalId}`);
+                console.log(`🖱️ Current attention set:`, Array.from(this.terminalsNeedingAttention));
+                console.log(`🖱️ Tab has notification class:`, tab.classList.contains('tab-has-notification'));
+                
+                // Always clear notification when clicking a tab, even if it's already active
+                if (this.terminalsNeedingAttention.has(terminalId)) {
+                    console.log(`🖱️ ✅ Terminal ${terminalId} IS in attention set, clearing notification`);
+                    this.terminalsNeedingAttention.delete(terminalId);
+                    tab.classList.remove('tab-has-notification');
+                    console.log(`🖱️ Removed notification class, new classes:`, tab.className);
+                    this.updateNotificationBadge();
+                } else {
+                    console.log(`🖱️ ❌ Terminal ${terminalId} NOT in attention set`);
+                    // Still try to remove the class if it exists
+                    if (tab.classList.contains('tab-has-notification')) {
+                        console.log(`🖱️ But tab HAS notification class, removing it anyway`);
+                        tab.classList.remove('tab-has-notification');
+                    }
+                }
+                
                 this.switchToTab(terminalId);
             });
         });
@@ -6471,9 +6497,9 @@ class TerminalManager {
     switchToTab(terminalId) {
         console.log(`switchToTab called for terminal ${terminalId}, active terminal is ${this.activeTabTerminal}`);
         
-        // Always clear notification state for this terminal, even if already active
+        // Always clear notification state for this terminal, regardless of whether it's active
         if (this.terminalsNeedingAttention.has(terminalId)) {
-            console.log(`Clearing notification for terminal ${terminalId}`);
+            console.log(`Clearing notification for terminal ${terminalId} in switchToTab`);
             this.terminalsNeedingAttention.delete(terminalId);
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
             console.log(`Found tab for terminal ${terminalId}:`, tab);
@@ -6483,6 +6509,13 @@ class TerminalManager {
             }
             // Update the notification badge count
             this.updateNotificationBadge();
+        }
+        
+        // Also check and clear notification class even if not in attention set (defensive programming)
+        const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+        if (tab && tab.classList.contains('tab-has-notification')) {
+            console.log(`Found orphaned notification class on terminal ${terminalId}, removing it`);
+            tab.classList.remove('tab-has-notification');
         }
         
         // If already on this tab, we need to still show the terminal (in case of notification clear)
@@ -6588,13 +6621,25 @@ class TerminalManager {
     }
 
     showTerminalNotification(terminalId) {
+        console.log(`📍 showTerminalNotification called for terminal ${terminalId}`);
+        console.log(`📍 Current layout mode: ${this.layoutMode}`);
+        console.log(`📍 Active tab terminal: ${this.activeTabTerminal}`);
+        
         this.terminalsNeedingAttention.add(terminalId);
+        console.log(`📍 Added to attention set. Current set:`, Array.from(this.terminalsNeedingAttention));
         
         // Update tab if in tabbed mode
         if (this.layoutMode === 'tabbed') {
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
+            console.log(`📍 Found tab element:`, tab);
+            console.log(`📍 Tab data-terminal-id:`, tab ? tab.dataset.terminalId : 'null');
+            
             if (tab && terminalId !== this.activeTabTerminal) {
+                console.log(`📍 Adding notification class to tab for terminal ${terminalId}`);
                 tab.classList.add('tab-has-notification');
+                console.log(`📍 Tab classes after adding:`, tab.className);
+            } else if (terminalId === this.activeTabTerminal) {
+                console.log(`📍 Terminal ${terminalId} is already active, not adding notification badge`);
             }
         }
     }
@@ -8701,6 +8746,16 @@ function initializeMCPSettings() {
             });
         }
         
+        // Add permissions button functionality
+        const editPermissionsBtn = document.getElementById('edit-permissions-btn');
+        if (editPermissionsBtn) {
+            editPermissionsBtn.addEventListener('click', async () => {
+                // Open permissions modal
+                const permissionsModal = new MCPPermissionsModal();
+                await permissionsModal.show();
+            });
+        }
+        
         // Add marketplace modal functionality
         const openMarketplaceBtn = document.getElementById('open-marketplace-btn');
         const marketplaceModal = document.getElementById('marketplace-modal');
@@ -8736,6 +8791,16 @@ function initializeMCPSettings() {
                     document.body.classList.remove('modal-open');
                 }
             });
+            
+            // Close modal on Escape key press
+            const handleEscapeKey = (e) => {
+                if (e.key === 'Escape' && marketplaceModal.style.display === 'flex') {
+                    marketplaceModal.style.display = 'none';
+                    document.body.classList.remove('modal-open');
+                }
+            };
+            
+            document.addEventListener('keydown', handleEscapeKey);
         }
         
         // Also initialize if settings is opened directly to MCP tab

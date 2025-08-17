@@ -33,7 +33,7 @@
         "Search across workspace"
       ],
       "setupGuide": "https://github.com/makenotion/notion-mcp-server",
-      "documentation": "https://developers.notion.com/docs/mcp"
+      "documentation": "https://developers.notion.com/docs/get-started-with-mcp"
     },
     {
       "id": "supabase",
@@ -68,7 +68,7 @@
         "Configure authentication"
       ],
       "setupGuide": "https://github.com/supabase-community/supabase-mcp",
-      "documentation": "https://supabase.com/blog/mcp-server"
+      "documentation": "https://supabase.com/docs/guides/getting-started/mcp"
     },
     {
       "id": "playwright",
@@ -146,7 +146,7 @@
         "File metadata"
       ],
       "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/filesystem",
-      "documentation": "https://modelcontextprotocol.io/docs"
+      "documentation": "https://modelcontextprotocol.io/quickstart/user"
     },
     {
       "id": "github",
@@ -218,7 +218,7 @@
         "Thread replies"
       ],
       "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/slack",
-      "documentation": "https://api.slack.com/docs"
+      "documentation": "https://api.slack.com/"
     },
     {
       "id": "google-drive",
@@ -254,7 +254,7 @@
         "File metadata"
       ],
       "setupGuide": "https://github.com/modelcontextprotocol/servers/tree/main/src/gdrive",
-      "documentation": "https://developers.google.com/drive/api/v3/about-sdk"
+      "documentation": "https://developers.google.com/workspace/drive/api/guides/about-sdk"
     },
     {
       "id": "postgres",

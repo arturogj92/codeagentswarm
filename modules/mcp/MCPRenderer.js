@@ -313,6 +313,11 @@ class MCPRenderer {
             this.hideValidation();
             this.hidePreview();
             this.elements.saveBtn.disabled = true;
+            
+            // Initialize Lucide icons for the modal
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
     }
 
@@ -346,6 +351,11 @@ class MCPRenderer {
             
             this.elements.editJsonInput.value = JSON.stringify(config, null, 2);
             this.elements.editJsonInput.focus();
+            
+            // Initialize Lucide icons for the modal
+            if (typeof lucide !== 'undefined') {
+                lucide.createIcons();
+            }
         }
     }
 

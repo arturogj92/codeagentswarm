@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { getCodeAgentSwarmSection, SECTION_START, SECTION_END } = require('./claude-md-config');
+const MCPInstructionsManager = require('./mcp-instructions-manager');
 
 // Define the paths to update
 const claudeMdPaths = [
@@ -61,25 +62,51 @@ function updateClaudeMd(filePath, projectName) {
 }
 
 // Main execution
-console.log('🔄 Regenerating CLAUDE.md files with updated instructions...\n');
+async function main() {
+    console.log('🔄 Regenerating CLAUDE.md files with updated instructions...\n');
 
-let updated = 0;
-let failed = 0;
+    let updated = 0;
+    let failed = 0;
 
-for (const filePath of claudeMdPaths) {
-    const projectName = projectNames[filePath];
-    if (updateClaudeMd(filePath, projectName)) {
-        updated++;
+    // Step 1: Update CodeAgentSwarm sections
+    for (const filePath of claudeMdPaths) {
+        const projectName = projectNames[filePath];
+        if (updateClaudeMd(filePath, projectName)) {
+            updated++;
+        } else {
+            failed++;
+        }
+    }
+
+    // Step 2: Update MCP instructions in GLOBAL CLAUDE.md only
+    console.log('\n📦 Updating MCP instructions in global CLAUDE.md...');
+    const mcpManager = new MCPInstructionsManager();
+    
+    // Only update the global CLAUDE.md with MCP instructions
+    const globalUpdated = await mcpManager.updateClaudeMd(true);
+    if (globalUpdated) {
+        console.log('   ✅ Global CLAUDE.md updated at ~/.claude/CLAUDE.md');
     } else {
-        failed++;
+        console.log('   ℹ️  No changes needed in global CLAUDE.md');
+    }
+
+    console.log('\n📊 Summary:');
+    console.log(`   ✅ Updated: ${updated} project files with CodeAgentSwarm instructions`);
+    console.log(`   ⚠️  Failed: ${failed} files`);
+    if (globalUpdated) {
+        console.log(`   ✅ Updated: Global CLAUDE.md with MCP instructions`);
+    }
+
+    if (updated > 0 || globalUpdated) {
+        console.log('\n🎉 Configuration updated:');
+        console.log('   • Project files: Latest CodeAgentSwarm task management instructions');
+        console.log('   • Global (~/.claude/CLAUDE.md): MCP usage instructions');
+        console.log('   Agents will now know when and how to use all installed MCPs globally!');
     }
 }
 
-console.log('\n📊 Summary:');
-console.log(`   ✅ Updated: ${updated} files`);
-console.log(`   ⚠️  Failed: ${failed} files`);
-
-if (updated > 0) {
-    console.log('\n🎉 CLAUDE.md files have been updated with the new terminal title instructions!');
-    console.log('   Agents will now be required to call update_terminal_title after starting tasks.');
-}
+// Run the main function
+main().catch(error => {
+    console.error('❌ Error:', error);
+    process.exit(1);
+});

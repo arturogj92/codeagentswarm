@@ -2481,6 +2481,39 @@ ipcMain.on('mcp:toggle-server', (event, { name, enabled }) => {
   }
 });
 
+// Update CLAUDE.md with MCP instructions
+ipcMain.on('mcp:update-claude-instructions', async (event, { serverId }) => {
+  try {
+    console.log(`[MCP] Updating global CLAUDE.md instructions for: ${serverId}`);
+    
+    // Import the instructions manager
+    const MCPInstructionsManager = require('./mcp-instructions-manager');
+    const manager = new MCPInstructionsManager();
+    
+    // Update the global CLAUDE.md
+    const result = await manager.updateClaudeMd(true); // true = use global
+    
+    if (result) {
+      console.log(`[MCP] Successfully updated global CLAUDE.md at ~/.claude/CLAUDE.md`);
+      event.reply('mcp:update-claude-instructions-response', { 
+        success: true,
+        message: `Updated global CLAUDE.md with ${serverId} instructions`
+      });
+    } else {
+      event.reply('mcp:update-claude-instructions-response', { 
+        success: false,
+        error: 'Failed to update global CLAUDE.md'
+      });
+    }
+  } catch (error) {
+    console.error('[MCP] Error updating CLAUDE.md instructions:', error);
+    event.reply('mcp:update-claude-instructions-response', { 
+      success: false, 
+      error: error.message 
+    });
+  }
+});
+
 // ================== End MCP Settings IPC Handlers ==================
 
 // New function to just check Claude installation without auto-installing
@@ -5289,6 +5322,42 @@ ipcMain.handle('get-log-path', () => {
 ipcMain.handle('open-log-directory', () => {
   const { shell } = require('electron');
   shell.openPath(logDir);
+  return { success: true };
+});
+
+// IPC handler for MCP Permissions Window
+ipcMain.handle('open-permissions-window', async () => {
+  const permissionsWindow = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    minWidth: 900,
+    minHeight: 600,
+    parent: mainWindow,
+    modal: false,
+    show: false,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      webSecurity: false
+    },
+    backgroundColor: '#1a1a1a',
+    titleBarStyle: 'hiddenInset',
+    title: 'MCP Permissions Manager'
+  });
+  
+  permissionsWindow.loadFile('mcp-permissions-manager.html');
+  
+  permissionsWindow.once('ready-to-show', () => {
+    permissionsWindow.show();
+  });
+  
+  permissionsWindow.on('closed', () => {
+    // Refresh main window permissions if needed
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('permissions-updated');
+    }
+  });
+  
   return { success: true };
 });
 

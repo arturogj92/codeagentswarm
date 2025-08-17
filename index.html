@@ -250,6 +250,10 @@
                                 <div class="mcp-header">
                                     <h3><i data-lucide="server"></i> MCP Servers</h3>
                                     <div class="mcp-header-buttons">
+                                        <button class="btn btn-secondary btn-small" id="edit-permissions-btn">
+                                            <i data-lucide="shield"></i>
+                                            Edit Permissions
+                                        </button>
                                         <button class="btn btn-secondary btn-small" id="open-marketplace-btn">
                                             <i data-lucide="shopping-bag"></i>
                                             Marketplace
@@ -577,6 +581,7 @@
             }, true);
         });
     </script>
+    <script src="mcp-permissions-modal.js"></script>
     <script src="renderer.js"></script>
     
     <!-- MCP Marketplace Modal (separate from settings) -->
@@ -593,6 +598,40 @@
             <div class="modal-body marketplace-modal-body">
                 <div id="mcp-marketplace-container">
                     <!-- Marketplace will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- MCP Permissions Modal -->
+    <div id="permissions-modal" class="modal" style="display: none;">
+        <div class="modal-content permissions-modal-content">
+            <div class="modal-header">
+                <h2><i data-lucide="shield"></i> MCP Permissions</h2>
+                <button class="close-modal" id="close-permissions">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M15 5L5 15M5 5L15 15" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                </button>
+            </div>
+            <div class="modal-body permissions-modal-body">
+                <div class="permissions-info">
+                    <p>Configure permissions for MCP tools. Choose how Claude should handle each tool:</p>
+                    <div class="permission-legend">
+                        <span class="legend-item"><span class="legend-dot deny"></span> Deny - Block this tool</span>
+                        <span class="legend-item"><span class="legend-dot ask"></span> Ask - Request confirmation</span>
+                        <span class="legend-item"><span class="legend-dot allow"></span> Allow - Auto-approve</span>
+                    </div>
+                </div>
+                <div class="permissions-search">
+                    <input type="text" id="permissions-search" placeholder="Search MCP tools...">
+                </div>
+                <div id="mcp-permissions-list" class="mcp-permissions-list">
+                    <!-- MCP permissions will be loaded here -->
+                </div>
+                <div class="permissions-footer">
+                    <button class="btn btn-secondary" id="reset-permissions">Reset to Defaults</button>
+                    <button class="btn btn-primary" id="save-permissions">Save Changes</button>
                 </div>
             </div>
         </div>

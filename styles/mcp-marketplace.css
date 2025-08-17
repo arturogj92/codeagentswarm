@@ -62,7 +62,7 @@
 }
 
 .mcp-marketplace {
-  padding: 20px;
+  padding: 15px;
   max-width: 1400px;
   margin: 0 auto;
   /* Performance optimizations */
@@ -76,12 +76,14 @@
 }
 
 .marketplace-header h2 {
-  font-size: 28px;
+  font-size: 32px;
   margin-bottom: 8px;
   background: linear-gradient(135deg, #7F5AF0 0%, #9D4EDD 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 .marketplace-header p {
@@ -177,65 +179,85 @@
 /* Grid */
 .marketplace-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
   /* Remove containment for better performance */
   contain: none !important;
   will-change: auto !important;
   transform: none !important;
+  padding: 0 4px;
 }
 
 
 /* Card */
 .marketplace-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   padding: 20px;
-  /* Disable transitions for better scroll performance */
-  transition: none;
+  /* Subtle transition for hover effect */
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
+  min-height: 280px;
+  position: relative;
+  overflow: hidden;
 }
 
 .marketplace-card:hover {
-  /* Remove transform for better performance */
-  box-shadow: 0 10px 30px rgba(127, 90, 240, 0.1);
-  border-color: rgba(127, 90, 240, 0.3);
-  background: rgba(255, 255, 255, 0.05);
+  /* Enhanced hover effect */
+  box-shadow: 0 12px 40px rgba(127, 90, 240, 0.15),
+              0 0 60px rgba(127, 90, 240, 0.05);
+  border-color: rgba(127, 90, 240, 0.4);
+  background: linear-gradient(135deg, rgba(127, 90, 240, 0.08) 0%, rgba(255, 255, 255, 0.04) 100%);
+  transform: translateY(-2px);
 }
 
 .marketplace-card.installed {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.1) 100%);
-  border-color: rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(5, 150, 105, 0.08) 100%);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+.marketplace-card.installed::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2) 0%, transparent 50%);
+  border-radius: 0 16px 0 100%;
 }
 
 /* Card Header */
 .card-header {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 15px;
-  gap: 12px;
+  margin-bottom: 12px;
+  gap: 10px;
 }
 
 .card-icon {
-  font-size: 32px;
+  font-size: 28px;
   width: 48px;
   height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, rgba(127, 90, 240, 0.15) 0%, rgba(157, 78, 221, 0.15) 100%);
+  /* White background for all icons for better contrast */
+  background: linear-gradient(135deg, #ffffff 0%, #f5f5f5 100%);
   border-radius: 12px;
   overflow: hidden;
   padding: 8px;
+  flex-shrink: 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 
 .card-icon img {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  /* Removed filter for cleaner appearance on white background */
 }
 
 .card-info {
@@ -244,9 +266,10 @@
 
 .card-info h3 {
   margin: 0 0 4px 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: #fff;
+  line-height: 1.2;
 }
 
 .card-category {
@@ -259,38 +282,41 @@
 /* Popularity */
 .card-popularity {
   display: flex;
-  gap: 2px;
+  gap: 3px;
+  margin-left: auto;
 }
 
 .card-popularity i {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 .star-filled {
   color: #fbbf24;
   fill: #fbbf24;
+  filter: drop-shadow(0 1px 2px rgba(251, 191, 36, 0.3));
 }
 
 .star-empty {
-  color: #e5e7eb;
+  color: rgba(255, 255, 255, 0.1);
 }
 
 /* Description */
 .card-description {
-  color: rgba(255, 255, 255, 0.6);
+  color: rgba(255, 255, 255, 0.65);
   font-size: 13px;
   line-height: 1.6;
-  margin-bottom: 15px;
+  margin-bottom: 14px;
   flex: 1;
+  min-height: 40px;
 }
 
 /* Features */
 .card-features {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: 6px;
+  margin-bottom: 15px;
 }
 
 .feature-tag {
@@ -298,10 +324,12 @@
   align-items: center;
   gap: 4px;
   padding: 4px 10px;
-  background: rgba(127, 90, 240, 0.1);
+  background: linear-gradient(135deg, rgba(127, 90, 240, 0.15) 0%, rgba(127, 90, 240, 0.1) 100%);
+  border: 1px solid rgba(127, 90, 240, 0.2);
   border-radius: 12px;
   font-size: 11px;
-  color: rgba(255, 255, 255, 0.7);
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 500;
 }
 
 .feature-tag i {
@@ -324,16 +352,18 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 15px;
+  padding-top: 12px;
+  margin-top: auto;
   border-top: 1px solid rgba(255, 255, 255, 0.1);
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn-install,
-.btn-manage,
 .btn-installed,
 .btn-installing {
-  padding: 8px 16px;
-  border-radius: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -342,35 +372,26 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  white-space: nowrap;
 }
 
 .btn-install {
-  background: var(--primary, #7F5AF0);
+  background: linear-gradient(135deg, #7F5AF0 0%, #9D4EDD 100%);
   color: white;
+  box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2);
 }
 
 .btn-install:hover {
-  background: #6b4ed4;
-  /* Remove transform */
-}
-
-.btn-manage {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  margin-left: 8px;
-}
-
-.btn-manage:hover {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: var(--primary, #7F5AF0);
-  color: var(--primary, #7F5AF0);
+  background: linear-gradient(135deg, #6b4ed4 0%, #8b3dc5 100%);
+  box-shadow: 0 6px 16px rgba(127, 90, 240, 0.3);
+  transform: translateY(-1px);
 }
 
 .btn-installed {
-  background: #10b98115;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.1) 100%);
   color: #10b981;
   cursor: default;
+  border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 .btn-installing {
@@ -383,19 +404,56 @@
   animation: spin 1s linear infinite;
 }
 
+/* Installed actions container */
+.installed-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* Uninstall button */
+.btn-uninstall {
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.btn-uninstall:hover {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(239, 68, 68, 0.5);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  transform: translateY(-1px);
+}
+
+.btn-uninstall i {
+  width: 16px;
+  height: 16px;
+}
+
 /* Card Links */
 .card-links {
   display: flex;
-  gap: 12px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .card-link {
   color: rgba(255, 255, 255, 0.5);
   text-decoration: none;
-  font-size: 12px;
+  font-size: 11px;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   transition: color 0.2s;
 }
 
@@ -583,6 +641,97 @@
   background: #6b4ed4;
 }
 
+/* Confirmation Modal */
+.mcp-confirm-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.confirm-modal-content {
+  background: #1a1a1a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  width: 90%;
+  max-width: 450px;
+  overflow: hidden;
+}
+
+.confirm-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.confirm-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #fff;
+}
+
+.confirm-modal-close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.confirm-modal-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.confirm-modal-body {
+  padding: 20px;
+}
+
+.confirm-modal-body p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.confirm-modal-footer {
+  padding: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.btn-danger {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-danger:hover {
+  background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
 /* Toast Messages */
 .mcp-toast {
   position: fixed;
@@ -686,15 +835,40 @@
 */
 
 /* Responsive */
+@media (max-width: 1200px) {
+  .marketplace-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 14px;
+  }
+}
+
+@media (max-width: 900px) {
+  .marketplace-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 12px;
+  }
+  
+  .marketplace-card {
+    padding: 14px;
+    min-height: 260px;
+  }
+}
+
 @media (max-width: 768px) {
   .marketplace-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+    padding: 0;
   }
   
   .marketplace-categories {
     overflow-x: auto;
     justify-content: flex-start;
     padding-bottom: 10px;
+  }
+  
+  .marketplace-card {
+    min-height: auto;
   }
   
   .auth-modal-content {

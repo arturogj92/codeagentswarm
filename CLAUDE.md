@@ -257,21 +257,15 @@ Before doing ANY work, including research, investigation, or code changes, you M
 
 **CRITICAL: When bugs are found or modifications are requested AFTER a task is in testing or completed:**
 
-1. **🚨 MANDATORY SEARCH BEFORE NEW TASK - When user reports "still not working" or "doesn't work":**
-   - **FIRST:** Use `search_tasks` to find related tasks with keywords from the problem
-   - **SECOND:** Check tasks in `in_testing` and recent `completed` status
-   - **THIRD:** If related task found, ASK: "Should I continue with task [ID: X - Title] or create a new one?"
-   - **ONLY create new task if:** No related task exists OR user explicitly requests new task
+1. **🚨 DO NOT CREATE A NEW TASK for bug fixes or minor modifications:**
+   - If the user reports a bug or requests changes related to the current/recent task
+   - **ASK THE USER:** "Should I continue with the current task [ID: X] or create a new one?"
+   - Default to continuing with the same task unless:
+     - The change is a completely different feature
+     - The user explicitly asks for a new task
+     - More than 24 hours have passed since the task was completed
 
-2. **🔍 How to search for related tasks when issues are reported:**
-   ```
-   # When user says "X still doesn't work" or "X is broken":
-   1. search_tasks(query="X", recent_only=true)  # Search for X in recent tasks
-   2. search_tasks(query="feature keywords", status="in_testing")  # Check testing tasks
-   3. list_tasks(status="in_testing")  # Check all tasks currently in testing
-   ```
-
-3. **How to handle bug fixes in existing tasks:**
+2. **How to handle bug fixes in existing tasks:**
    - If task is `in_testing`: Move back to `in_progress` using `start_task`
    - If task is `completed` and user reports bug immediately: 
      - Ask: "I found task [ID: X - Title] that was just completed. Should I reopen it for these fixes?"
@@ -279,22 +273,19 @@ Before doing ANY work, including research, investigation, or code changes, you M
    - Update the plan to include the bug fix steps using `update_task_plan`
    - Continue working on the same task ID
 
-4. **When to create a new task:**
+3. **When to create a new task:**
    - The modification is a NEW feature (not a fix)
    - The original task has been completed for more than 24 hours
    - The user explicitly requests a new task
    - The scope significantly changes (e.g., from "fix button color" to "redesign entire UI")
-   - No related task exists after thorough search
 
-5. **Example dialogue for bug fixes:**
+4. **Example dialogue for bug fixes:**
    ```
-   User: "The authentication still doesn't work"
-   Agent: [Searches for related tasks using search_tasks(query="authentication")]
-   Agent: "I found task #123: 'Fix authentication bug' that's currently in testing. 
-           This seems related to your issue. Should I continue with this task to fix 
-           the problem, or would you prefer a new task?"
+   User: "The feature we just implemented has a bug when clicking the button"
+   Agent: "I see you found a bug in the task we just completed (Task #123: Add button feature). 
+           Should I reopen this task to fix the bug, or would you prefer a new task?"
    User: "Continue with the same task"
-   Agent: [Moves task back to in_progress and investigates the issue]
+   Agent: [Moves task back to in_progress and fixes the bug]
    ```
 
 ### Handling Multiple Pending Tasks
@@ -323,7 +314,6 @@ The following MCP tools are available for task management:
 - **`complete_task`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **`submit_for_testing`**: Mark task as "in_testing"
 - **`list_tasks`**: List all tasks (optional: filter by status)
-- **`search_tasks`**: Search for tasks by keywords in title, description, plan, or implementation
 - **`update_task_plan`**: Update specific task plan
 - **`update_task_implementation`**: Update task implementation
 - **`update_task_terminal`**: Update terminal_id associated with task
@@ -331,12 +321,6 @@ The following MCP tools are available for task management:
 - **`create_project`**: Create a new project with name and optional color
 - **`get_projects`**: Get list of all projects
 - **`get_project_tasks`**: Get all tasks for a specific project
-
-**`search_tasks` parameters:**
-- `query` (string, required): Search keywords to find in task fields
-- `status` (string, optional): Filter by status (pending, in_progress, in_testing, completed)
-- `recent_only` (boolean, optional): Only search tasks updated in last 48 hours (default: true)
-- `limit` (number, optional): Maximum number of results (default: 20)
 
 **`update_task_plan` parameters:**
 - `task_id` (number, required): Task ID
@@ -361,11 +345,6 @@ create_task(title="Implement new feature", description="Add user authentication"
 
 start_task(task_id=123)
 update_terminal_title(title="Implement Auth Feature")  # MANDATORY after start_task
-
-# Search for related tasks before creating new ones
-search_tasks(query="authentication")  # Search all recent tasks
-search_tasks(query="login bug", status="in_testing")  # Search only testing tasks
-search_tasks(query="database", recent_only=false, limit=10)  # Search all time, limit 10
 
 update_task_plan(task_id=123, plan="1. Review existing code\n2. Implement new functionality\n3. Write tests")
 
@@ -537,6 +516,74 @@ NEVER proactively create documentation files (*.md) or README files. Only create
 **RESEARCH. NEEDS. TASKS. TOO.**
 
 <!-- CODEAGENTSWARM CONFIG END -->
+
+<!-- MCP INSTRUCTIONS START - AUTO-GENERATED -->
+## MCP Usage Instructions
+
+
+### 🗄️ Supabase MCP
+**When to use:**
+- Managing Supabase databases and projects
+- Creating/modifying schemas and migrations
+- Executing SQL queries
+- Managing Edge Functions
+- Checking logs and debugging issues
+
+**Important rules:**
+- ALWAYS use `mcp__supabase__search_docs` before implementing
+- Use `mcp__supabase__apply_migration` for DDL changes, NOT `execute_sql`
+- Document all migrations in Notion
+- Check `mcp__supabase__get_advisors` after schema changes
+
+**Common workflow:**
+1. List projects with `mcp__supabase__list_projects`
+2. Search docs for best practices
+3. Apply migrations for schema changes
+4. Check advisors for security/performance issues
+
+
+### 📝 Notion MCP  
+**When to use:**
+- **MANDATORY:** After completing EVERY task → Document in Notion
+- When user says "document" (ALWAYS means Notion, NOT local files)
+- To search existing project documentation
+- To maintain knowledge base updated
+
+**Mandatory workflow:**
+1. Complete task → Search relevant Notion page
+2. If no page exists → Create new page
+3. Document: changes, decisions, architecture, problems solved
+4. Include: date, task ID, modified files
+
+**Key tools:**
+- `mcp__notion__query-database`: Search existing documentation
+- `mcp__notion__append-block-children`: Add to existing pages
+- `mcp__notion__create-page`: Only if no relevant page exists
+
+**REMEMBER:** "Document this" = Notion, NOT local files
+
+### 🎯 General MCP Rules
+
+1. **Tool Priority:**
+   - If an MCP exists for the task → Use it
+   - MCPs are often more efficient than native tools
+   - Check MCP capabilities before using native alternatives
+
+2. **Documentation:**
+   - ALWAYS document MCP usage in Notion
+   - Record any issues and solutions found
+   - Share learnings with the team
+
+3. **Error Handling:**
+   - If an MCP fails, document the error
+   - Try alternative approaches
+   - Report persistent issues to the team
+
+4. **Best Practices:**
+   - Use MCPs for their intended purpose
+   - Don't force MCP usage when native tools are better
+   - Combine multiple MCPs when needed for complex tasks
+<!-- MCP INSTRUCTIONS END -->
 
 ## 🚨 CRITICAL ENFORCEMENT CHECKLIST - FINAL VERIFICATION 🚨
 

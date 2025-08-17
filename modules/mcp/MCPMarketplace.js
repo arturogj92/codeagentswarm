@@ -166,12 +166,14 @@ class MCPMarketplace {
                 
                 <div class="card-actions">
                     ${isInstalled ? `
-                        <button class="btn-installed" disabled>
-                            <i data-lucide="check-circle"></i> Installed
-                        </button>
-                        <button class="btn-manage" data-action="manage" data-server="${server.id}">
-                            <i data-lucide="settings"></i> Manage
-                        </button>
+                        <div class="installed-actions">
+                            <button class="btn-installed" disabled>
+                                <i data-lucide="check-circle"></i> Installed
+                            </button>
+                            <button class="btn-uninstall" data-action="uninstall" data-server="${server.id}">
+                                <i data-lucide="trash-2"></i> Uninstall
+                            </button>
+                        </div>
                     ` : isInstalling ? `
                         <button class="btn-installing" disabled>
                             <i data-lucide="loader-2" class="spinning"></i> Installing...
@@ -224,7 +226,7 @@ class MCPMarketplace {
         // Filter by category
         if (this.selectedCategory !== 'all') {
             servers = servers.filter(s => 
-                s.category.toLowerCase() === this.selectedCategory
+                s.category.toLowerCase() === this.selectedCategory.toLowerCase()
             );
         }
         
@@ -407,8 +409,8 @@ class MCPMarketplace {
                     
                     if (action === 'install') {
                         await this.installServer(btnServerId, grid.closest('.mcp-marketplace'));
-                    } else if (action === 'manage') {
-                        this.manageServer(btnServerId);
+                    } else if (action === 'uninstall') {
+                        await this.uninstallServer(btnServerId, grid.closest('.mcp-marketplace'));
                     }
                 });
             });
@@ -426,7 +428,13 @@ class MCPMarketplace {
         const grid = container.querySelector('#marketplace-grid');
         if (grid) {
             grid.innerHTML = '';
-            this.loadMoreItems();
+            // Load initial items
+            this.loadMoreItems().then(() => {
+                // Load all remaining items after initial load
+                setTimeout(() => {
+                    this.loadAllRemainingItems();
+                }, 100);
+            });
         }
     }
 
@@ -469,6 +477,15 @@ class MCPMarketplace {
                 
                 // Reload servers to update UI
                 await this.manager.loadServers();
+                
+                // Update CLAUDE.md with MCP instructions
+                try {
+                    await this.updateClaudeMdInstructions(serverId);
+                    console.log(`[MCPMarketplace] Updated CLAUDE.md with ${server.name} instructions`);
+                } catch (error) {
+                    console.warn('[MCPMarketplace] Failed to update CLAUDE.md:', error);
+                    // Don't fail the installation if CLAUDE.md update fails
+                }
             } else {
                 this.showError(`Failed to install ${server.name}: ${result.error}`);
             }
@@ -558,7 +575,7 @@ class MCPMarketplace {
             });
             
             // Handle cancel
-            const closeModal = () => {
+            let closeModal = () => {
                 modal.remove();
                 resolve(null);
             };
@@ -572,6 +589,21 @@ class MCPMarketplace {
                     closeModal();
                 }
             });
+            
+            // Close on Escape key press
+            const handleEscapeKey = (e) => {
+                if (e.key === 'Escape') {
+                    closeModal();
+                }
+            };
+            document.addEventListener('keydown', handleEscapeKey);
+            
+            // Clean up event listener when modal is closed
+            const originalCloseModal = closeModal;
+            closeModal = () => {
+                document.removeEventListener('keydown', handleEscapeKey);
+                originalCloseModal();
+            };
         });
     }
 
@@ -584,6 +616,113 @@ class MCPMarketplace {
             detail: { serverId } 
         });
         window.dispatchEvent(event);
+    }
+
+    /**
+     * Uninstall a server from marketplace
+     */
+    async uninstallServer(serverId, container) {
+        const server = this.marketplace.servers.find(s => s.id === serverId);
+        if (!server) return;
+        
+        // Show confirmation dialog
+        const confirmed = await this.showConfirmDialog(
+            `Uninstall ${server.name}?`,
+            `Are you sure you want to uninstall ${server.name}? This will remove the server configuration from your system.`,
+            'Uninstall',
+            'Cancel'
+        );
+        
+        if (!confirmed) return;
+        
+        try {
+            // Remove server via manager
+            const result = await this.manager.removeServer(serverId);
+            
+            if (result.success) {
+                this.showSuccess(`${server.name} uninstalled successfully!`);
+                
+                // Reload servers to update UI
+                await this.manager.loadServers();
+                
+                // Update the grid to reflect the change
+                this.updateGrid(container);
+            } else {
+                this.showError(`Failed to uninstall ${server.name}: ${result.error}`);
+            }
+        } catch (error) {
+            console.error('[MCPMarketplace] Uninstall error:', error);
+            this.showError(`Failed to uninstall ${server.name}: ${error.message}`);
+        }
+    }
+
+    /**
+     * Show confirmation dialog
+     */
+    async showConfirmDialog(title, message, confirmText = 'Confirm', cancelText = 'Cancel') {
+        return new Promise((resolve) => {
+            const modalHtml = `
+                <div class="mcp-confirm-modal" id="confirm-modal">
+                    <div class="confirm-modal-content">
+                        <div class="confirm-modal-header">
+                            <h3>${title}</h3>
+                            <button class="confirm-modal-close" id="confirm-close">
+                                <i data-lucide="x"></i>
+                            </button>
+                        </div>
+                        
+                        <div class="confirm-modal-body">
+                            <p>${message}</p>
+                        </div>
+                        
+                        <div class="confirm-modal-footer">
+                            <button class="btn-cancel" id="confirm-cancel">${cancelText}</button>
+                            <button class="btn-danger" id="confirm-confirm">${confirmText}</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add modal to body
+            document.body.insertAdjacentHTML('beforeend', modalHtml);
+            const modal = document.getElementById('confirm-modal');
+            
+            // Initialize Lucide icons
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+            
+            // Handle confirm
+            document.getElementById('confirm-confirm').addEventListener('click', () => {
+                modal.remove();
+                resolve(true);
+            });
+            
+            // Handle cancel
+            const closeModal = () => {
+                modal.remove();
+                resolve(false);
+            };
+            
+            document.getElementById('confirm-cancel').addEventListener('click', closeModal);
+            document.getElementById('confirm-close').addEventListener('click', closeModal);
+            
+            // Close on backdrop click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+            
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    closeModal();
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
     }
 
     /**
@@ -636,6 +775,32 @@ class MCPMarketplace {
             toast.classList.remove('show');
             setTimeout(() => toast.remove(), 300);
         }, 5000);
+    }
+
+    /**
+     * Update CLAUDE.md with MCP instructions after installation
+     */
+    async updateClaudeMdInstructions(serverId) {
+        try {
+            // Use IPC to trigger the update in the main process
+            if (this.manager && this.manager.ipcCall) {
+                const result = await this.manager.ipcCall('mcp:update-claude-instructions', { serverId });
+                
+                if (result && result.success) {
+                    console.log(`[MCPMarketplace] Successfully updated CLAUDE.md instructions for ${serverId}`);
+                    return true;
+                } else {
+                    console.warn('[MCPMarketplace] Failed to update CLAUDE.md:', result?.error);
+                    return false;
+                }
+            } else {
+                console.warn('[MCPMarketplace] No IPC call method available to update CLAUDE.md');
+                return false;
+            }
+        } catch (error) {
+            console.error('[MCPMarketplace] Error updating CLAUDE.md instructions:', error);
+            return false;
+        }
     }
 }
 
