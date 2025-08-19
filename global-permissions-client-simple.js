@@ -77,6 +77,24 @@ class GlobalPermissionsFileManager {
             { name: 'Bash(brew:*)', category: 'command-package', description: 'Homebrew commands' },
             { name: 'Bash(apt:*)', category: 'command-package', description: 'APT package manager' },
             
+            // Build tools and dev commands
+            { name: 'Bash(mvn:*)', category: 'command-package', description: 'Maven build tool' },
+            { name: 'Bash(mvn clean:*)', category: 'command-package', description: 'Maven clean' },
+            { name: 'Bash(mvn test:*)', category: 'command-package', description: 'Maven test' },
+            { name: 'Bash(mvn install:*)', category: 'command-package', description: 'Maven install' },
+            { name: 'Bash(gradle:*)', category: 'command-package', description: 'Gradle build tool' },
+            { name: 'Bash(gradlew:*)', category: 'command-package', description: 'Gradle wrapper' },
+            { name: 'Bash(./gradlew:*)', category: 'command-package', description: 'Gradle wrapper script' },
+            { name: 'Bash(cargo:*)', category: 'command-package', description: 'Rust cargo' },
+            { name: 'Bash(go:*)', category: 'command-package', description: 'Go commands' },
+            { name: 'Bash(dotnet:*)', category: 'command-package', description: '.NET CLI' },
+            { name: 'Bash(composer:*)', category: 'command-package', description: 'PHP Composer' },
+            { name: 'Bash(bundle:*)', category: 'command-package', description: 'Ruby Bundler' },
+            { name: 'Bash(gem:*)', category: 'command-package', description: 'Ruby gems' },
+            { name: 'Bash(pod:*)', category: 'command-package', description: 'CocoaPods for iOS' },
+            { name: 'Bash(flutter:*)', category: 'command-package', description: 'Flutter SDK' },
+            { name: 'Bash(pub:*)', category: 'command-package', description: 'Dart package manager' },
+            
             // File system commands
             { name: 'Bash(ls:*)', category: 'command-file', description: 'List files with ls' },
             { name: 'Bash(cd:*)', category: 'command-file', description: 'Change directory' },
@@ -1250,7 +1268,7 @@ class GlobalPermissionsFileManager {
         if (commandPart) {
             const cmd = commandPart[1].toLowerCase();
             if (cmd.startsWith('git')) category = 'command-git';
-            else if (['npm', 'yarn', 'pnpm', 'pip', 'brew', 'apt'].includes(cmd)) category = 'command-package';
+            else if (['npm', 'yarn', 'pnpm', 'pip', 'brew', 'apt', 'mvn', 'gradle', 'gradlew', './gradlew', 'cargo', 'go', 'dotnet', 'composer', 'bundle', 'gem', 'pod', 'flutter', 'pub'].includes(cmd)) category = 'command-package';
             else if (['ls', 'cd', 'mkdir', 'cp', 'mv', 'rm', 'cat', 'echo', 'grep', 'find'].includes(cmd)) category = 'command-file';
             else if (['sudo', 'chmod', 'chown', 'ps', 'kill'].includes(cmd)) category = 'command-system';
             else if (['curl', 'wget', 'ssh', 'scp'].includes(cmd)) category = 'command-network';
