@@ -342,6 +342,7 @@ body::before {
   display: flex;
   gap: 8px;
   align-items: center;
+  overflow: visible; /* Ensure badges are not clipped */
 }
 
 .git-button {
@@ -655,6 +656,7 @@ body::before {
   border-radius: 6px;
   transition: all 0.2s ease;
   cursor: pointer;
+  overflow: visible; /* Allow badges to show outside button bounds */
 }
 
 /* Icon rotation classes for creating left/right panel effects */
@@ -5813,11 +5815,13 @@ h3 i {
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
-/* Ensure buttons have relative positioning for tooltips */
+/* Ensure buttons have relative positioning for tooltips and badges */
 .btn-layout,
 .btn,
-.git-button {
+.git-button,
+#permissions-btn {
   position: relative;
+  overflow: visible; /* Allow badges to extend outside button boundaries */
 }
 
 @keyframes tooltipFadeIn {

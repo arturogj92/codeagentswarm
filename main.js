@@ -3406,6 +3406,57 @@ function registerDatabaseHandlers() {
       return { success: false, enabled: false, error: error.message };
     }
   });
+  
+  // Handle Claude settings for global permissions
+  ipcMain.handle('get-claude-settings', async () => {
+    try {
+      const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const content = fs.readFileSync(settingsPath, 'utf8');
+        return JSON.parse(content);
+      }
+      return null;
+    } catch (error) {
+      console.error('Error reading Claude settings:', error);
+      return null;
+    }
+  });
+  
+  ipcMain.handle('save-claude-settings', async (event, settings) => {
+    try {
+      const settingsPath = path.join(os.homedir(), '.claude', 'settings.json');
+      const dir = path.dirname(settingsPath);
+      
+      console.log('[IPC] Saving Claude settings:', JSON.stringify(settings.permissions, null, 2));
+      
+      // Ensure directory exists
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      
+      // Read existing settings to preserve other fields
+      let existingSettings = {};
+      if (fs.existsSync(settingsPath)) {
+        const content = fs.readFileSync(settingsPath, 'utf8');
+        existingSettings = JSON.parse(content);
+      }
+      
+      // Merge permissions while preserving other settings
+      const mergedSettings = {
+        ...existingSettings,
+        permissions: settings.permissions
+      };
+      
+      // Write settings with pretty formatting
+      fs.writeFileSync(settingsPath, JSON.stringify(mergedSettings, null, 2), 'utf8');
+      
+      console.log('[IPC] Settings saved successfully');
+      return { success: true };
+    } catch (error) {
+      console.error('[IPC] Error saving Claude settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
 
   ipcMain.handle('set-debug-mode', async (event, enabled) => {
     try {

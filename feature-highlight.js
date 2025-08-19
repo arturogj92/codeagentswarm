@@ -3,11 +3,13 @@
  * Shows a "New!" badge with arrow pointing to features, only once per release
  */
 class FeatureHighlight {
-    constructor() {
+    constructor(storage = null) {
         this.currentHighlight = null;
         this.dismissTimeout = null;
         this.container = null;
         this.appVersion = this.getAppVersion();
+        // Allow dependency injection for testing
+        this.storage = storage || (typeof localStorage !== 'undefined' ? localStorage : null);
         this.init();
     }
 
@@ -42,6 +44,8 @@ class FeatureHighlight {
      * @param {string} options.position - Arrow position: 'top', 'bottom', 'left', 'right'
      * @param {number} options.duration - Auto-dismiss time in ms (default: 7000)
      * @param {boolean} options.showOnce - Only show once per release (default: true)
+     * @param {string} options.type - 'badge' for simple badge, 'highlight' for full highlight (default: 'highlight')
+     * @param {Array} options.versions - Array of versions to show the highlight/badge in
      */
     show(options) {
         const {
@@ -50,12 +54,20 @@ class FeatureHighlight {
             message = 'New!',
             position = 'bottom',
             duration = 7000,
-            showOnce = true
+            showOnce = true,
+            type = 'highlight',
+            versions = []
         } = options;
 
         // Don't show if version is not available
         if (!this.appVersion) {
             console.warn('Cannot show feature highlight - app version not available');
+            return;
+        }
+
+        // Check if we're in the right version range (if versions array is provided)
+        if (versions.length > 0 && !versions.includes(this.appVersion)) {
+            console.log(`Feature '${featureName}' not shown - version ${this.appVersion} not in target versions`);
             return;
         }
 
@@ -69,9 +81,20 @@ class FeatureHighlight {
         const targetElement = document.querySelector(targetSelector);
         if (!targetElement) {
             console.warn(`Target element not found: ${targetSelector}`);
+            // Try again in a moment if element not found yet (for badges)
+            if (type === 'badge') {
+                setTimeout(() => this.show(options), 100);
+            }
             return;
         }
 
+        // For badge type, create and attach directly to element
+        if (type === 'badge') {
+            this.showBadge(targetElement, featureName, position, showOnce);
+            return;
+        }
+
+        // For highlight type, use existing highlight system
         // Dismiss any existing highlight
         this.dismiss();
 
@@ -109,6 +132,105 @@ class FeatureHighlight {
 
         // Setup click handlers
         this.setupEventHandlers(targetElement);
+    }
+
+    showBadge(targetElement, featureName, position, showOnce) {
+        // Check if badge already exists
+        if (targetElement.querySelector('.feature-badge')) {
+            return;
+        }
+
+        // Make target element position relative if not already
+        const computedStyle = window.getComputedStyle(targetElement);
+        if (computedStyle.position === 'static') {
+            targetElement.style.position = 'relative';
+        }
+
+        // Create badge element
+        const badge = document.createElement('span');
+        badge.className = 'feature-badge';
+        badge.textContent = 'NEW!';
+        
+        // Set position based on parameter
+        if (position === 'bottom') {
+            badge.style.bottom = '-8px';
+            badge.style.left = '50%';
+            badge.style.transform = 'translateX(-50%)';
+        } else if (position === 'top') {
+            badge.style.top = '-8px';
+            badge.style.right = '-8px';
+        }
+
+        // Add styles if not already added
+        if (!document.getElementById('feature-badge-styles')) {
+            const styles = document.createElement('style');
+            styles.id = 'feature-badge-styles';
+            styles.textContent = `
+                .feature-badge {
+                    position: absolute;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    font-size: 9px;
+                    font-weight: bold;
+                    padding: 2px 6px;
+                    border-radius: 10px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    animation: feature-badge-pulse 2s infinite;
+                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    z-index: 9999;
+                }
+                
+                @keyframes feature-badge-pulse {
+                    0% {
+                        transform: ${position === 'bottom' ? 'translateX(-50%) scale(1)' : 'scale(1)'};
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    }
+                    50% {
+                        transform: ${position === 'bottom' ? 'translateX(-50%) scale(1.05)' : 'scale(1.05)'};
+                        box-shadow: 0 3px 6px rgba(102, 126, 234, 0.4);
+                    }
+                    100% {
+                        transform: ${position === 'bottom' ? 'translateX(-50%) scale(1)' : 'scale(1)'};
+                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+                    }
+                }
+                
+                @keyframes feature-badge-fadeout {
+                    from {
+                        opacity: 1;
+                    }
+                    to {
+                        opacity: 0;
+                    }
+                }
+            `;
+            document.head.appendChild(styles);
+        }
+
+        // Add badge to target element
+        targetElement.appendChild(badge);
+
+        // Setup click handler to remove badge
+        const clickHandler = () => {
+            badge.style.animation = 'feature-badge-fadeout 0.3s ease-out';
+            setTimeout(() => {
+                if (badge.parentNode) {
+                    badge.remove();
+                }
+            }, 300);
+            
+            // Mark as shown
+            if (showOnce) {
+                this.markAsShown(featureName);
+            }
+            
+            targetElement.removeEventListener('click', clickHandler);
+        };
+        
+        targetElement.addEventListener('click', clickHandler, { once: true });
+        
+        console.log(`Badge added for feature '${featureName}' on version ${this.appVersion}`);
     }
 
     createHighlightElement(message, position) {
@@ -275,42 +397,30 @@ class FeatureHighlight {
     }
 
     hasBeenShown(featureName) {
-        // For cross-version features (like tabbedMode), check without version
-        if (featureName === 'tabbedMode') {
-            const crossVersionKey = `featureHighlight_${featureName}_shown`;
-            return localStorage.getItem(crossVersionKey) === 'true';
-        }
-        // For version-specific features, use version in key
+        // Always use simple key without version
+        // Badges apply to multiple versions, so version in key doesn't make sense
+        if (!this.storage) return false;
         const key = this.getStorageKey(featureName);
-        return localStorage.getItem(key) === 'true';
+        return this.storage.getItem(key) === 'true';
     }
 
     markAsShown(featureName) {
-        // For cross-version features (like tabbedMode), mark without version
-        if (featureName === 'tabbedMode') {
-            const crossVersionKey = `featureHighlight_${featureName}_shown`;
-            localStorage.setItem(crossVersionKey, 'true');
-            return;
-        }
-        // For version-specific features, use version in key
+        // Always use simple key without version
+        if (!this.storage) return;
         const key = this.getStorageKey(featureName);
-        localStorage.setItem(key, 'true');
+        this.storage.setItem(key, 'true');
     }
 
     getStorageKey(featureName) {
-        return `featureHighlight_${featureName}_${this.appVersion}`;
+        // Standardized format: featureHighlight_[featureName]
+        // No version number since badges apply to multiple versions
+        return `featureHighlight_${featureName}`;
     }
 
     reset(featureName) {
-        // For cross-version features (like tabbedMode), reset the cross-version key
-        if (featureName === 'tabbedMode') {
-            const crossVersionKey = `featureHighlight_${featureName}_shown`;
-            localStorage.removeItem(crossVersionKey);
-            return;
-        }
-        // For version-specific features, use version in key
+        // Remove the standardized key
         const key = this.getStorageKey(featureName);
-        localStorage.removeItem(key);
+        if (this.storage) this.storage.removeItem(key);
     }
 
     resetAll() {
@@ -318,7 +428,7 @@ class FeatureHighlight {
         const keys = Object.keys(localStorage);
         keys.forEach(key => {
             if (key.startsWith('featureHighlight_')) {
-                localStorage.removeItem(key);
+                if (this.storage) this.storage.removeItem(key);
             }
         });
     }

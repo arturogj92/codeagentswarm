@@ -5,6 +5,9 @@ const { WebLinksAddon } = require('xterm-addon-web-links');
 const LogViewer = require('./log-viewer');
 const FeatureHighlight = require('./feature-highlight');
 
+// Expose ipcRenderer globally for other modules
+window.ipcRenderer = ipcRenderer;
+
 console.log('🔧 [RENDERER] renderer.js loaded');
 
 // Performance monitor function - lazy loaded
@@ -288,6 +291,14 @@ class TerminalManager {
         document.getElementById('settings-btn').addEventListener('click', () => {
             this.showSettingsModal();
         });
+        
+        // Add permissions button handler to open settings in permissions tab
+        const permissionsBtn = document.getElementById('permissions-btn');
+        if (permissionsBtn) {
+            permissionsBtn.addEventListener('click', () => {
+                this.showSettingsModal('permissions');
+            });
+        }
 
         // Placeholder clicks are now handled by event delegation in attachTerminalEventListeners()
 
@@ -7440,7 +7451,8 @@ class TerminalManager {
             
             // Show MCP settings highlight for versions 0.0.41-0.0.44
             this.showMCPHighlightIfNeeded();
-            this.addMCPTabBadgeIfNeeded();
+            // Show MCP badge (still needed for settings tab)
+            this.showMCPServersBadge();
         }, 10);
         
         if (shellPref.success) {
@@ -7522,110 +7534,23 @@ class TerminalManager {
         }
     }
 
-    addMCPTabBadgeIfNeeded() {
-        // Check if we're in the right version range (0.0.41-0.0.48)
-        const targetVersions = ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'];
-        
-        if (!window.appVersion || !targetVersions.includes(window.appVersion)) {
-            return;
+    showMCPServersBadge() {
+        // Show MCP Servers badge for versions 0.0.41-0.0.48 (only in settings modal)
+        if (window.featureHighlight) {
+            window.featureHighlight.show({
+                targetSelector: '.tab-btn[data-tab="mcp-servers"]',
+                featureName: 'mcpServersTab',
+                type: 'badge',
+                position: 'top',
+                versions: ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'],
+                showOnce: true
+            });
         }
-        
-        // Check if badge has been shown before
-        const storageKey = `mcpTabBadge_${window.appVersion}_shown`;
-        if (localStorage.getItem(storageKey) === 'true') {
-            return;
-        }
-        
-        // Find the MCP Servers tab button
-        const mcpTabButton = document.querySelector('.tab-btn[data-tab="mcp-servers"]');
-        if (!mcpTabButton) {
-            return;
-        }
-        
-        // Check if badge already exists
-        if (mcpTabButton.querySelector('.mcp-tab-badge')) {
-            return;
-        }
-        
-        // Create and add the badge
-        const badge = document.createElement('span');
-        badge.className = 'mcp-tab-badge';
-        badge.textContent = 'NEW!';
-        
-        // Add styles for the badge if not already added
-        if (!document.getElementById('mcp-tab-badge-styles')) {
-            const styles = document.createElement('style');
-            styles.id = 'mcp-tab-badge-styles';
-            styles.textContent = `
-                .tab-btn {
-                    position: relative;
-                }
-                
-                .mcp-tab-badge {
-                    position: absolute;
-                    top: -8px;
-                    right: -8px;
-                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                    color: white;
-                    font-size: 9px;
-                    font-weight: bold;
-                    padding: 2px 6px;
-                    border-radius: 10px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    animation: pulse 2s infinite;
-                    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                    z-index: 10;
-                }
-                
-                @keyframes pulse {
-                    0% {
-                        transform: scale(1);
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                    }
-                    50% {
-                        transform: scale(1.05);
-                        box-shadow: 0 3px 6px rgba(102, 126, 234, 0.4);
-                    }
-                    100% {
-                        transform: scale(1);
-                        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-                    }
-                }
-                
-                .tab-btn[data-tab="mcp-servers"].active .mcp-tab-badge {
-                    display: none;
-                }
-                
-                @keyframes fadeOut {
-                    from {
-                        opacity: 1;
-                    }
-                    to {
-                        opacity: 0;
-                    }
-                }
-            `;
-            document.head.appendChild(styles);
-        }
-        
-        mcpTabButton.appendChild(badge);
-        
-        // Remove badge when tab is clicked
-        mcpTabButton.addEventListener('click', () => {
-            setTimeout(() => {
-                const badge = mcpTabButton.querySelector('.mcp-tab-badge');
-                if (badge) {
-                    badge.style.animation = 'fadeOut 0.3s ease-out';
-                    setTimeout(() => badge.remove(), 300);
-                }
-                localStorage.setItem(storageKey, 'true');
-            }, 100);
-        }, { once: true });
-        
-        console.log('MCP tab badge added for version', window.appVersion);
     }
 
+    // Badge functions removed - now using unified FeatureHighlight system
+    // The FeatureHighlight class handles all badges with standardized localStorage keys:
+    // Format: featureHighlight_[featureName] (no version numbers)
     showMCPHighlightIfNeeded() {
         // Check if we're in the right version range (0.0.41-0.0.48)
         const targetVersions = ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'];
@@ -7636,9 +7561,10 @@ class TerminalManager {
         }
         
         // Check if highlight has been shown before for MCP settings
-        const storageKey = `mcpSettingsHighlight_${window.appVersion}_shown`;
+        // Using standardized format: featureHighlight_[featureName]
+        const storageKey = `featureHighlight_mcpSettingsHighlight`;
         if (localStorage.getItem(storageKey) === 'true') {
-            console.log('MCP settings highlight already shown for this version');
+            console.log('MCP settings highlight already shown');
             return;
         }
         
@@ -7748,7 +7674,7 @@ class TerminalManager {
         
         // Mark as shown
         localStorage.setItem(storageKey, 'true');
-        console.log(`MCP settings highlight shown for version ${window.appVersion}`);
+        console.log('MCP settings highlight marked as shown');
         
         // Auto-dismiss after 30 seconds
         setTimeout(() => {
@@ -7923,6 +7849,16 @@ class TerminalManager {
                             window.terminalManager.showMCPHighlightIfNeeded();
                         }
                     }, 100);
+                }
+                
+                // Initialize Global Permissions Manager when permissions tab is opened
+                if (targetTab === 'permissions') {
+                    if (!window.globalPermissionsManager) {
+                        window.globalPermissionsManager = new GlobalPermissionsFileManager();
+                    } else {
+                        // Refresh the permissions view
+                        window.globalPermissionsManager.render();
+                    }
                 }
             });
         });
@@ -8637,13 +8573,22 @@ const FEATURE_HIGHLIGHTS_CONFIG = [
     {
         featureName: 'tabbedMode',
         targetSelector: '#tabbed-mode-btn',
-        message: 'Toggle between grid and tabbed layouts',
-        position: 'bottom',
-        duration: 30000, // 30 seconds
-        showInVersions: ['0.0.38', '0.0.39', '0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48', '0.0.49'], // Available in these versions
+        type: 'badge',  // Changed to badge type
+        position: 'bottom',  // Changed to bottom so it's visible
+        versions: ['0.0.38', '0.0.39', '0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48', '0.0.49'],
+        showOnce: true,
         // NOTE: tabbedMode uses cross-version tracking - shows only ONCE across all versions
-        // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.43
+        // If user sees it in 0.0.38, won't show again in 0.0.39-0.0.49
         delay: 500 // Delay before showing
+    },
+    {
+        featureName: 'permissionsButton',
+        targetSelector: '#permissions-btn',
+        type: 'badge',
+        position: 'bottom',
+        versions: ['0.0.45', '0.0.46', '0.0.47', '0.0.48', '0.0.49'],
+        showOnce: true,
+        delay: 600 // Slight delay to ensure button is rendered
     },
     // Add more features here in the future:
     // {
@@ -8664,6 +8609,8 @@ async function initializeFeatureHighlights() {
         const appVersion = await ipcRenderer.invoke('get-app-version');
         window.appVersion = appVersion; // Make it available globally
         console.log('App version:', appVersion);
+        
+        // Badges are now configured in FEATURE_HIGHLIGHTS_CONFIG
     } catch (error) {
         console.warn('Could not get app version:', error);
     }
@@ -8676,19 +8623,23 @@ async function initializeFeatureHighlights() {
         // Check if this feature should be shown in current version
         // DEV MODE: Uncomment next line to always show highlights in dev
         // if (true) {  // TEMPORARY: Always show in dev
-        if (config.showInVersions.includes(window.appVersion)) {
+        const showInVersions = config.versions || config.showInVersions || [];
+        if (showInVersions.includes(window.appVersion)) {
             setTimeout(() => {
                 window.featureHighlight.show({
                     targetSelector: config.targetSelector,
                     featureName: config.featureName,
+                    type: config.type || 'highlight',
                     message: config.message,
                     position: config.position,
-                    duration: config.duration
+                    duration: config.duration,
+                    versions: showInVersions,
+                    showOnce: config.showOnce !== undefined ? config.showOnce : true
                 });
-                console.log(`Showing feature highlight: ${config.featureName} for version ${window.appVersion}`);
+                console.log(`Showing feature ${config.type || 'highlight'}: ${config.featureName} for version ${window.appVersion}`);
             }, config.delay || 500);
         } else {
-            console.log(`Feature ${config.featureName} skipped - version ${window.appVersion} not in [${config.showInVersions.join(', ')}]`);
+            console.log(`Feature ${config.featureName} skipped - version ${window.appVersion} not in [${showInVersions.join(', ')}]`);
         }
     });
     

@@ -55,6 +55,7 @@
     <link rel="stylesheet" href="feature-highlight.css">
     <link rel="stylesheet" href="styles/mcp-settings.css">
     <link rel="stylesheet" href="styles/mcp-marketplace.css">
+    <link rel="stylesheet" href="styles/global-permissions.css">
     <!-- Load Lucide asynchronously -->
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
@@ -131,6 +132,9 @@
                         <i data-lucide="plus" class="add-icon"></i>
                     </button>
                 </div>
+                <button class="btn-layout" id="permissions-btn" title="Tool Permissions">
+                    <i data-lucide="shield"></i>
+                </button>
                 <button class="btn-layout" id="settings-btn" title="Settings">
                     <i data-lucide="settings"></i>
                 </button>
@@ -173,6 +177,7 @@
                     <div class="tab-buttons">
                         <button class="tab-btn active" data-tab="general"><i data-lucide="settings-2"></i> General</button>
                         <button class="tab-btn" data-tab="shell"><i data-lucide="terminal"></i> Shell</button>
+                        <button class="tab-btn" data-tab="permissions"><i data-lucide="shield"></i> Permissions</button>
                         <button class="tab-btn" data-tab="mcp-servers"><i data-lucide="server"></i> MCP Servers</button>
                         <button class="tab-btn" data-tab="updates"><i data-lucide="download"></i> Updates</button>
                         <button class="tab-btn" data-tab="mcp-tips"><i data-lucide="info"></i> MCP Tips</button>
@@ -241,6 +246,19 @@
                                     </div>
                                 </div>
                                 <p class="settings-note">Note: Changes will apply to new terminal sessions only.</p>
+                            </div>
+                        </div>
+                        
+                        <!-- Permissions Tab -->
+                        <div class="tab-panel" data-panel="permissions">
+                            <div class="settings-section">
+                                <div id="global-permissions-content">
+                                    <!-- Global permissions manager will render here -->
+                                    <div class="loading-permissions">
+                                        <div class="loading-spinner"></div>
+                                        <p>Loading permissions...</p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                         
@@ -582,6 +600,7 @@
         });
     </script>
     <script src="mcp-permissions-modal.js"></script>
+    <script src="global-permissions-client-simple.js"></script>
     <script src="renderer.js"></script>
     
     <!-- MCP Marketplace Modal (separate from settings) -->
