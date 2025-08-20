@@ -852,6 +852,69 @@ body::before {
     margin-right: 0.2rem;
 }
 
+/* Parent task search wrapper */
+.parent-task-search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.parent-task-dropdown {
+    max-height: 250px;
+    overflow-y: auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-top: 4px;
+    z-index: 100000;
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+}
+
+.parent-task-option {
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.parent-task-option:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.parent-task-option.selected {
+    background: rgba(127, 90, 240, 0.1);
+}
+
+.parent-task-option .task-id {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.parent-task-option .task-title {
+    flex: 1;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+
+.parent-task-option .task-status {
+    font-size: 0.75rem;
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}
+
+.parent-task-option.no-parent {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 /* Send to terminal icon button */
 .send-to-terminal-icon {
     display: inline-flex;
@@ -1250,6 +1313,13 @@ body::before {
     flex-direction: column;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
     animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Make task creation modal much wider */
+#task-modal .modal-content {
+    max-width: 900px;  /* Much wider than default 500px */
+    width: 95%;        /* Take up most of the screen width */
+    max-height: 90vh;  /* Taller for better visibility */
 }
 
 @keyframes slideUp {

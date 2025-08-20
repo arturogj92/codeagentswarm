@@ -427,10 +427,20 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="task-parent">Parent Task (optional)</label>
-                        <select id="task-parent">
-                            <option value="">No parent (standalone task)</option>
-                        </select>
+                        <label for="task-parent-search">Parent Task (optional)</label>
+                        <div class="parent-task-search-wrapper">
+                            <input 
+                                type="text" 
+                                id="task-parent-search" 
+                                class="form-control" 
+                                placeholder="Search by task ID or title..."
+                                autocomplete="off"
+                            />
+                            <input type="hidden" id="task-parent" value="" />
+                            <div id="parent-task-dropdown" class="parent-task-dropdown" style="display: none;">
+                                <!-- Dropdown items will be populated dynamically -->
+                            </div>
+                        </div>
                         <small class="form-help">Make this task a subtask of another task</small>
                     </div>
                     <div class="form-group">

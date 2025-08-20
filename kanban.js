@@ -895,18 +895,24 @@ class KanbanManager {
         });
     }
 
-    populateParentTaskSelect(excludeTaskId = null) {
-        const parentSelect = document.getElementById('task-parent');
-        parentSelect.innerHTML = '<option value="">No parent (standalone task)</option>';
+    initializeParentTaskSearch(excludeTaskId = null, currentParentId = null) {
+        const searchInput = document.getElementById('task-parent-search');
+        const hiddenInput = document.getElementById('task-parent');
+        const dropdown = document.getElementById('parent-task-dropdown');
         
-        // Get all tasks that could be potential parents
-        // Sort by status and then by title for better organization
-        const sortedTasks = [...this.tasks].sort((a, b) => {
-            const statusOrder = { 'in_progress': 0, 'in_testing': 1, 'pending': 2, 'completed': 3 };
-            const statusCompare = statusOrder[a.status] - statusOrder[b.status];
-            if (statusCompare !== 0) return statusCompare;
-            return a.title.localeCompare(b.title);
-        });
+        if (!searchInput || !hiddenInput || !dropdown) return;
+        
+        // Set current parent if provided
+        if (currentParentId) {
+            const parentTask = this.tasks.find(t => t.id === currentParentId);
+            if (parentTask) {
+                searchInput.value = `#${parentTask.id} - ${parentTask.title}`;
+                hiddenInput.value = currentParentId;
+            }
+        } else {
+            searchInput.value = '';
+            hiddenInput.value = '';
+        }
         
         // Helper function to check if taskId is a descendant of excludeTaskId
         const isDescendant = (taskId, ancestorId) => {
@@ -917,37 +923,109 @@ class KanbanManager {
             return isDescendant(task.parent_task_id, ancestorId);
         };
         
-        sortedTasks.forEach(task => {
-            // Skip the task itself and its descendants when editing
-            if (excludeTaskId) {
-                if (task.id === excludeTaskId || isDescendant(task.id, excludeTaskId)) {
-                    return;
+        // Function to filter and display tasks
+        const filterTasks = (query) => {
+            dropdown.innerHTML = '';
+            
+            // Add "No parent" option
+            const noParentDiv = document.createElement('div');
+            noParentDiv.className = 'parent-task-option';
+            noParentDiv.innerHTML = `<strong>No parent (standalone task)</strong>`;
+            noParentDiv.addEventListener('click', () => {
+                searchInput.value = '';
+                hiddenInput.value = '';
+                dropdown.style.display = 'none';
+            });
+            dropdown.appendChild(noParentDiv);
+            
+            // Filter tasks based on query
+            const queryLower = query.toLowerCase();
+            const filteredTasks = this.tasks.filter(task => {
+                // Skip the task itself and its descendants when editing
+                if (excludeTaskId && (task.id === excludeTaskId || isDescendant(task.id, excludeTaskId))) {
+                    return false;
                 }
+                
+                // Match by ID or title
+                const idMatch = task.id.toString().includes(query);
+                const titleMatch = task.title.toLowerCase().includes(queryLower);
+                return idMatch || titleMatch || query === '';
+            });
+            
+            // Sort by status and title
+            const sortedTasks = filteredTasks.sort((a, b) => {
+                const statusOrder = { 'in_progress': 0, 'in_testing': 1, 'pending': 2, 'completed': 3 };
+                const statusCompare = statusOrder[a.status] - statusOrder[b.status];
+                if (statusCompare !== 0) return statusCompare;
+                return a.title.localeCompare(b.title);
+            });
+            
+            // Limit results for performance
+            const maxResults = 20;
+            const tasksToShow = sortedTasks.slice(0, maxResults);
+            
+            tasksToShow.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'parent-task-option';
+                
+                const statusEmoji = {
+                    'pending': '⏳',
+                    'in_progress': '▶️',
+                    'in_testing': '🧪',
+                    'completed': '✅'
+                }[task.status] || '📝';
+                
+                const projectInfo = task.project ? ` <span class="task-project-badge">${task.project}</span>` : '';
+                taskDiv.innerHTML = `${statusEmoji} <strong>#${task.id}</strong> - ${task.title}${projectInfo}`;
+                
+                if (task.status === 'completed') {
+                    taskDiv.style.opacity = '0.7';
+                }
+                
+                taskDiv.addEventListener('click', () => {
+                    searchInput.value = `#${task.id} - ${task.title}`;
+                    hiddenInput.value = task.id;
+                    dropdown.style.display = 'none';
+                });
+                
+                dropdown.appendChild(taskDiv);
+            });
+            
+            if (filteredTasks.length > maxResults) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'parent-task-option';
+                moreDiv.style.textAlign = 'center';
+                moreDiv.style.fontStyle = 'italic';
+                moreDiv.innerHTML = `...and ${filteredTasks.length - maxResults} more results`;
+                dropdown.appendChild(moreDiv);
             }
             
-            const option = document.createElement('option');
-            option.value = task.id;
-            
-            // Format the option text with status and title
-            const statusEmoji = {
-                'pending': '⏳',
-                'in_progress': '▶️',
-                'in_testing': '🧪',
-                'completed': '✅'
-            };
-            
-            const emoji = statusEmoji[task.status] || '📝';
-            const projectInfo = task.project ? ` [${task.project}]` : '';
-            option.textContent = `${emoji} #${task.id} - ${task.title}${projectInfo}`;
-            
-            // Add visual indication of task status through color
-            if (task.status === 'completed') {
-                option.style.color = '#888';
-            } else if (task.status === 'in_progress') {
-                option.style.fontWeight = 'bold';
+            dropdown.style.display = dropdown.children.length > 0 ? 'block' : 'none';
+        };
+        
+        // Event listeners
+        searchInput.addEventListener('focus', () => {
+            filterTasks(searchInput.value);
+        });
+        
+        searchInput.addEventListener('input', (e) => {
+            filterTasks(e.target.value);
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
             }
-            
-            parentSelect.appendChild(option);
+        });
+        
+        // Handle clearing the input
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                searchInput.value = '';
+                hiddenInput.value = '';
+                dropdown.style.display = 'none';
+            }
         });
     }
 
@@ -1365,7 +1443,7 @@ class KanbanManager {
         }
         
         // Populate parent task dropdown
-        this.populateParentTaskSelect();
+        this.initializeParentTaskSearch();
         document.getElementById('task-parent').value = '';
         
         document.getElementById('task-terminal').value = '';
