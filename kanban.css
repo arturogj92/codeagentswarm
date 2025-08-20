@@ -587,14 +587,18 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 0.75rem 1rem 0;
-    gap: 0.5rem;
+    padding: 0.4rem 0.6rem 0;
+    gap: 0.15rem;
+    flex-wrap: nowrap;
+    min-height: 20px;
 }
 
 .task-header-right {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.15rem;
+    flex-shrink: 0;
+    margin-left: auto;
 }
 
 .task-date {
@@ -685,16 +689,18 @@ body::before {
 }
 
 .task-id {
-    background: rgba(255, 255, 255, 0.05);
+    background: transparent;
     color: var(--text-muted);
     font-weight: 600;
-    font-size: 0.65rem;
-    padding: 0.15rem 0.4rem;
-    border-radius: 6px;
-    letter-spacing: 0.3px;
+    font-size: 0.5rem;
+    padding: 0;
+    border-radius: 0;
+    letter-spacing: 0.2px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.6;
     min-width: 28px;
     border: 1px solid rgba(255, 255, 255, 0.06);
     white-space: nowrap;
@@ -825,6 +831,27 @@ body::before {
     gap: 4px;
 }
 
+/* Task action delete button in terminal wrapper */
+.task-terminal-wrapper .task-action-delete {
+    width: 20px;
+    height: 20px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.task-terminal-wrapper .task-action-delete svg {
+    width: 12px;
+    height: 12px;
+}
+
+/* Parent indicator in actions area */
+.task-hierarchy-indicator.in-actions {
+    margin-left: 0;
+    margin-right: 0.2rem;
+}
+
 /* Send to terminal icon button */
 .send-to-terminal-icon {
     display: inline-flex;
@@ -850,6 +877,7 @@ body::before {
 .send-to-terminal-icon svg {
     width: 12px;
     height: 12px;
+    display: block;
 }
 
 /* Terminal dropdown menu - simple */
@@ -1428,23 +1456,39 @@ body::before {
 .task-project-tag {
     display: inline-flex;
     align-items: center;
-    gap: 0.25rem;
-    padding: 0.2rem 0.45rem;
-    border-radius: 10px;
-    font-size: 0.65rem;
+    gap: 0.15rem;
+    padding: 0.1rem 0.3rem;
+    border-radius: 6px;
+    font-size: 0.52rem;
     font-weight: 600;
     color: white;
     position: relative;
     z-index: 1;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    box-shadow: 0 0.5px 2px rgba(0, 0, 0, 0.1);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
     text-transform: lowercase;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex-shrink: 1;
 }
 
 .task-project-tag:hover {
     transform: scale(1.05);
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.task-project-tag.no-project {
+    font-style: italic;
+    border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.task-project-tag.no-project:hover {
+    transform: none;
+    box-shadow: none;
+    opacity: 0.7 !important;
 }
 
 .project-name {
@@ -1455,24 +1499,25 @@ body::before {
 .task-hierarchy-indicator {
     display: inline-flex;
     align-items: center;
-    gap: 0.2rem;
-    padding: 0.15rem 0.35rem;
-    border-radius: 8px;
-    font-size: 0.65rem;
+    gap: 0.1rem;
+    padding: 0.05rem 0.2rem;
+    border-radius: 4px;
+    font-size: 0.55rem;
     font-weight: 500;
-    margin-left: 0.25rem;
+    margin-left: 0.15rem;
     transition: transform 0.2s ease, background 0.2s ease;
+    line-height: 1.2;
 }
 
 .parent-indicator {
-    background: rgba(138, 180, 248, 0.15);
+    background: rgba(138, 180, 248, 0.1);
     color: #8ab4f8;
-    border: 1px solid rgba(138, 180, 248, 0.3);
+    border: 1px solid rgba(138, 180, 248, 0.2);
 }
 
 .parent-indicator:hover {
-    background: rgba(138, 180, 248, 0.25);
-    transform: scale(1.05);
+    background: rgba(138, 180, 248, 0.2);
+    transform: scale(1.02);
 }
 
 .parent-indicator.clickable {
@@ -1480,31 +1525,38 @@ body::before {
 }
 
 .parent-indicator.clickable:hover {
-    background: rgba(138, 180, 248, 0.35);
-    transform: scale(1.1);
-    box-shadow: 0 2px 8px rgba(138, 180, 248, 0.3);
+    background: rgba(138, 180, 248, 0.3);
+    transform: scale(1.05);
+    box-shadow: 0 1px 4px rgba(138, 180, 248, 0.2);
 }
 
 .subtask-indicator {
-    background: rgba(129, 201, 149, 0.15);
+    background: rgba(129, 201, 149, 0.1);
     color: #81c995;
-    border: 1px solid rgba(129, 201, 149, 0.3);
+    border: 1px solid rgba(129, 201, 149, 0.2);
 }
 
 .subtask-indicator:hover {
-    background: rgba(129, 201, 149, 0.25);
-    transform: scale(1.05);
+    background: rgba(129, 201, 149, 0.2);
+    transform: scale(1.02);
 }
 
 .task-hierarchy-indicator i {
-    width: 12px;
-    height: 12px;
+    width: 8px;
+    height: 8px;
+}
+
+.task-hierarchy-indicator svg {
+    width: 9px;
+    height: 9px;
+    stroke-width: 2.5;
 }
 
 .parent-ref,
 .subtask-count {
     font-weight: 600;
-    font-size: 0.65rem;
+    font-size: 0.55rem;
+    line-height: 1;
 }
 
 /* Project Filter with modern design */

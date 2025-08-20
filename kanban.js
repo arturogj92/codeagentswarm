@@ -1130,11 +1130,36 @@ class KanbanManager {
         taskCard.draggable = true;
         taskCard.dataset.taskId = task.id;
 
+        // Add parent indicator to terminal wrapper if task has parent
+        let parentIndicatorInActions = '';
+        if (task.parent_task_id) {
+            const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
+            if (parentTask) {
+                parentIndicatorInActions = `
+                    <span class="task-hierarchy-indicator parent-indicator clickable in-actions" 
+                          onclick="kanban.showTaskDetails(${parentTask.id}); event.stopPropagation();" 
+                          title="Subtask of: ${this.escapeHtml(parentTask.title)} (Click to view)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="6" x2="6" y1="3" y2="15"></line>
+                            <circle cx="18" cy="6" r="3"></circle>
+                            <circle cx="6" cy="18" r="3"></circle>
+                            <path d="M18 9a9 9 0 0 1-9 9"></path>
+                        </svg>
+                        <span class="parent-ref">#${parentTask.id}</span>
+                    </span>
+                `;
+            }
+        }
+
         // Create terminal icon with dropdown and send button
         const terminalIcon = `
             <div class="task-terminal-wrapper">
+                ${parentIndicatorInActions}
+                <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="trash-2" class="lucide lucide-trash-2"><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
                 <div class="send-to-terminal-icon" onclick="kanban.toggleSendToTerminalDropdown(event, ${task.id}); return false;" title="Send task to terminal">
-                    <i data-lucide="send"></i>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="send" class="lucide lucide-send"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>
                 </div>
                 <div class="task-terminal-badge ${task.terminal_id ? '' : 'unassigned'}" 
                      onclick="kanban.toggleTerminalDropdown(event, ${task.id}); return false;" 
@@ -1172,7 +1197,7 @@ class KanbanManager {
 
         const createdDate = new Date(task.created_at).toLocaleDateString();
         
-        // Get project info
+        // Get project info - always show a badge
         let projectTag = '';
         if (task.project) {
             const project = this.projects.find(p => p.name === task.project) || 
@@ -1182,32 +1207,28 @@ class KanbanManager {
             projectTag = `<span class="task-project-tag" style="background: ${gradient}">
                 <span class="project-name">${this.escapeHtml(displayName)}</span>
             </span>`;
+        } else {
+            // Show "no project" badge when task has no project
+            const gradient = 'linear-gradient(135deg, #666666 0%, #4a4a4a 100%)';
+            projectTag = `<span class="task-project-tag no-project" style="background: ${gradient}; opacity: 0.7;">
+                <span class="project-name">no project</span>
+            </span>`;
         }
 
         // Create parent/subtask indicators
         let hierarchyIndicators = '';
         
-        // Check if this task has a parent
-        if (task.parent_task_id) {
-            const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
-            if (parentTask) {
-                hierarchyIndicators += `
-                    <span class="task-hierarchy-indicator parent-indicator clickable" 
-                          onclick="kanban.showTaskDetails(${parentTask.id}); event.stopPropagation();" 
-                          title="Subtask of: ${this.escapeHtml(parentTask.title)} (Click to view)">
-                        <i data-lucide="git-branch"></i>
-                        <span class="parent-ref">#${parentTask.id}</span>
-                    </span>
-                `;
-            }
-        }
-        
+        // Only add subtask indicator to header (parent moved to actions)
         // Check if this task has subtasks
         const subtasks = this.tasks.filter(t => t.parent_task_id === task.id);
         if (subtasks.length > 0) {
             hierarchyIndicators += `
                 <span class="task-hierarchy-indicator subtask-indicator" title="${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}">
-                    <i data-lucide="git-merge"></i>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="18" cy="18" r="3"></circle>
+                        <circle cx="6" cy="6" r="3"></circle>
+                        <path d="M6 21V9a9 9 0 0 0 9 9"></path>
+                    </svg>
                     <span class="subtask-count">${subtasks.length}</span>
                 </span>
             `;
@@ -1219,11 +1240,6 @@ class KanbanManager {
                 ${hierarchyIndicators}
                 <div class="task-header-right">
                     <span class="task-id">#${task.id}</span>
-                    <div class="task-actions">
-                        <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
-                            <i data-lucide="trash-2"></i>
-                        </button>
-                    </div>
                 </div>
             </div>
             <div class="task-title">
