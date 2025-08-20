@@ -28,6 +28,7 @@ class MCPPermissionsManager {
             { name: 'Grep', icon: 'filter', description: 'Search file contents' },
             { name: 'Glob', icon: 'folder-search', description: 'Find files by pattern' },
             { name: 'LS', icon: 'list', description: 'List directory contents' },
+            { name: 'Search', icon: 'search', description: 'Search files and directories' },
             { name: 'BashOutput', icon: 'output', description: 'Get background shell output' },
             { name: 'KillBash', icon: 'x-circle', description: 'Kill background shell' }
         ];

@@ -40,6 +40,9 @@ class TerminalManager {
         this.isChangingLayout = false; // Flag to prevent re-parsing during layout changes
         this.hooksStatus = { installed: false, webhookRunning: false }; // Track hooks status
         this.terminalActivity = new Map(); // Track activity state for each terminal
+        this.userScrolling = new Map(); // Track if user is manually scrolling
+        this.scrollTimeouts = new Map(); // Track scroll timeout timers
+        this.claudeOutputting = new Map(); // Track if Claude is actively outputting to a terminal
         
         this.init();
         // Load directories asynchronously with error handling
@@ -726,6 +729,10 @@ class TerminalManager {
                             </div>
                         `).join('')}
                     </div>
+                    <button id="create-new-project-btn" class="btn-primary" style="margin-top: 12px; width: 100%;">
+                        <i data-lucide="plus"></i>
+                        Create New Project
+                    </button>
                 </div>
             `;
         }
@@ -888,6 +895,15 @@ class TerminalManager {
             });
         });
         
+        // Handle Create New Project button
+        const createProjectBtn = selectorDiv.querySelector('#create-new-project-btn');
+        if (createProjectBtn) {
+            createProjectBtn.addEventListener('click', async () => {
+                // Show project creation modal
+                this.showCreateProjectModal(quadrant, wrapper, selectorDiv);
+            });
+        }
+        
         // Handle Escape key
         const handleEscape = (e) => {
             if (e.key === 'Escape' && wrapper.contains(selectorDiv)) {
@@ -1011,6 +1027,182 @@ class TerminalManager {
             }
         };
         document.addEventListener('keydown', handleEscape);
+    }
+
+    async showCreateProjectModal(quadrant, parentWrapper, directorySelectorDiv) {
+        // Create modal overlay
+        const modal = document.createElement('div');
+        modal.className = 'modal-overlay';
+        modal.style.zIndex = '10000';
+        
+        // Project colors for selection
+        const projectColors = [
+            '#007ACC', '#FF6B6B', '#4ECDC4', '#FFA07A', 
+            '#98D8C8', '#FDCB6E', '#6C5CE7', '#A29BFE',
+            '#00B894', '#E17055', '#74B9FF', '#A29BFE'
+        ];
+        
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 500px; background: #0a0a0a;">
+                <div class="modal-header">
+                    <h2>Create New Project</h2>
+                    <button class="modal-close" id="close-modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="project-name">Project Name</label>
+                        <input type="text" id="project-name" class="form-input" placeholder="Enter project name" autofocus>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="project-path">Base Directory <small style="color: var(--text-secondary); font-weight: normal;">(project folder will be created inside)</small></label>
+                        <div class="path-input-group" style="display: flex; gap: 8px;">
+                            <input type="text" id="project-path" class="form-input" placeholder="Select base directory where project will be created" style="flex: 1;">
+                            <button id="browse-path" class="btn">Browse...</button>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Project Color</label>
+                        <div class="color-picker-grid" style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 8px;">
+                            ${projectColors.map((color, index) => `
+                                <button class="color-option" data-color="${color}" style="
+                                    width: 40px; 
+                                    height: 40px; 
+                                    background: ${color}; 
+                                    border: 2px solid transparent; 
+                                    border-radius: 4px; 
+                                    cursor: pointer;
+                                    ${index === 0 ? 'border-color: #fff;' : ''}
+                                "></button>
+                            `).join('')}
+                        </div>
+                    </div>
+                    
+                    <div class="form-group" style="margin-top: 16px;">
+                        <label style="display: flex; align-items: center; gap: 8px;">
+                            <input type="checkbox" id="init-git" checked>
+                            Initialize as Git repository
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" id="cancel-create">Cancel</button>
+                    <button class="btn btn-primary" id="confirm-create">Create Project</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        // Initialize with first color selected
+        let selectedColor = projectColors[0];
+        
+        // Handle color selection
+        modal.querySelectorAll('.color-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Remove previous selection
+                modal.querySelectorAll('.color-option').forEach(b => {
+                    b.style.borderColor = 'transparent';
+                });
+                // Add selection to clicked button
+                btn.style.borderColor = '#fff';
+                selectedColor = btn.dataset.color;
+            });
+        });
+        
+        // Handle browse button
+        modal.querySelector('#browse-path').addEventListener('click', async () => {
+            const result = await ipcRenderer.invoke('select-directory');
+            if (result) {
+                modal.querySelector('#project-path').value = result;
+                // Don't auto-fill project name since this is now a base directory
+            }
+        });
+        
+        // Handle create button
+        modal.querySelector('#confirm-create').addEventListener('click', async () => {
+            const projectName = modal.querySelector('#project-name').value.trim();
+            const basePath = modal.querySelector('#project-path').value.trim();
+            const initGit = modal.querySelector('#init-git').checked;
+            
+            if (!projectName) {
+                this.showNotification('Please enter a project name', 'error');
+                return;
+            }
+            
+            if (!basePath) {
+                this.showNotification('Please select a base directory', 'error');
+                return;
+            }
+            
+            try {
+                // Construct the full project path by combining base path with project name
+                const path = require('path');
+                const fullProjectPath = path.join(basePath, projectName);
+                
+                // Create the project directory
+                const createDirResult = await ipcRenderer.invoke('create-project-directory', fullProjectPath);
+                if (!createDirResult.success) {
+                    this.showNotification(createDirResult.error || 'Failed to create directory', 'error');
+                    return;
+                }
+                
+                // Initialize git if requested
+                if (initGit) {
+                    const gitResult = await ipcRenderer.invoke('init-git-repo', fullProjectPath);
+                    if (!gitResult.success) {
+                        console.warn('Failed to initialize git repo:', gitResult.error);
+                        // Continue anyway, git init is optional
+                    }
+                }
+                
+                // Create project in database with the full path
+                const result = await ipcRenderer.invoke('project-create', projectName, selectedColor, fullProjectPath);
+                
+                if (result.success) {
+                    // Close modal
+                    document.body.removeChild(modal);
+                    
+                    // Update last selected directory with the full project path
+                    this.lastSelectedDirectories[quadrant] = fullProjectPath;
+                    this.saveDirectoryToStorage(quadrant, fullProjectPath);
+                    
+                    // Remove directory selector and show session selector
+                    parentWrapper.removeChild(directorySelectorDiv);
+                    this.showSessionSelector(quadrant, fullProjectPath);
+                    
+                    this.showNotification(`Project "${projectName}" created successfully`, 'success');
+                } else {
+                    this.showNotification(result.error || 'Failed to create project', 'error');
+                }
+            } catch (error) {
+                console.error('Error creating project:', error);
+                this.showNotification('Failed to create project: ' + error.message, 'error');
+            }
+        });
+        
+        // Handle cancel button
+        modal.querySelector('#cancel-create').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        // Handle close button
+        modal.querySelector('#close-modal').addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+        
+        // Handle Escape key
+        const handleEscape = (e) => {
+            if (e.key === 'Escape' && document.body.contains(modal)) {
+                document.body.removeChild(modal);
+                document.removeEventListener('keydown', handleEscape);
+            }
+        };
+        document.addEventListener('keydown', handleEscape);
+        
+        // Focus on project name input
+        modal.querySelector('#project-name').focus();
     }
 
     async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
@@ -1378,6 +1570,18 @@ class TerminalManager {
             // Write filtered data to terminal
             terminal.write(filteredData);
             
+            // Track that output is happening (likely Claude)
+            this.claudeOutputting.set(quadrant, true);
+            
+            // Clear the outputting flag after a short delay if no more output
+            if (this.claudeOutputting.timeout) {
+                clearTimeout(this.claudeOutputting.timeout);
+            }
+            this.claudeOutputting.timeout = setTimeout(() => {
+                this.claudeOutputting.set(quadrant, false);
+                console.log(`📜 Claude stopped outputting to terminal ${quadrant}`);
+            }, 1000);
+            
             // Set terminal activity for spinner in tabbed mode
             this.setTerminalActivity(quadrant, true);
             
@@ -1393,43 +1597,49 @@ class TerminalManager {
             }, 500);
             this.activityTimers.set(quadrant, timer);
             
-            // Auto-scroll on certain patterns
+            // Auto-scroll on certain patterns - but NOT if user is manually scrolling
             const dataStr = data.toString();
             
-            // Patterns that indicate important output requiring attention
-            const scrollPatterns = [
-                'Welcome to Claude Code',
-                'Do you want to',
-                'Would you like to',
-                'Continue?',
-                'Press Enter',
-                'Process exited',
-                'Finished',
-                'Complete',
-                'Error:',
-                'Failed',
-                'Success',
-                '✓',
-                '✗',
-                '⚠',
-                '❌',
-                '✅',
-                '🎉',
-                '🚀',
-                'task completed',
-                'task finished'
-            ];
-            
-            // Check if any pattern matches (case insensitive)
-            const shouldScroll = scrollPatterns.some(pattern => 
-                dataStr.toLowerCase().includes(pattern.toLowerCase())
-            );
-            
-            if (shouldScroll) {
-                // Small delay to ensure content is rendered
-                setTimeout(() => {
-                    this.scrollTerminalToBottom(quadrant);
-                }, 50);
+            // Don't auto-scroll if user is manually scrolling
+            if (!this.userScrolling.get(quadrant)) {
+                // Patterns that indicate important output requiring attention
+                const scrollPatterns = [
+                    'Welcome to Claude Code',
+                    'Do you want to',
+                    'Would you like to',
+                    'Continue?',
+                    'Press Enter',
+                    'Process exited',
+                    'Finished',
+                    'Complete',
+                    'Error:',
+                    'Failed',
+                    'Success',
+                    '✓',
+                    '✗',
+                    '⚠',
+                    '❌',
+                    '✅',
+                    '🎉',
+                    '🚀',
+                    'task completed',
+                    'task finished'
+                ];
+                
+                // Check if any pattern matches (case insensitive)
+                const shouldScroll = scrollPatterns.some(pattern => 
+                    dataStr.toLowerCase().includes(pattern.toLowerCase())
+                );
+                
+                if (shouldScroll) {
+                    // Small delay to ensure content is rendered
+                    setTimeout(() => {
+                        // Double-check user isn't scrolling before actually scrolling
+                        if (!this.userScrolling.get(quadrant)) {
+                            this.scrollTerminalToBottom(quadrant);
+                        }
+                    }, 50);
+                }
             }
         });
 
@@ -1445,6 +1655,9 @@ class TerminalManager {
             ipcRenderer.send('terminal-resize', quadrant, cols, rows);
         });
 
+        // Initialize user scrolling state for this terminal
+        this.userScrolling.set(quadrant, false);
+        
         // Store terminal info
         this.terminals.set(quadrant, {
             terminal,
@@ -1559,28 +1772,46 @@ class TerminalManager {
     }
 
     scrollTerminalToBottom(quadrant) {
+        // Don't force scroll if user is manually scrolling
+        if (this.userScrolling.get(quadrant)) {
+            console.log(`📜 User is manually scrolling terminal ${quadrant}, skipping auto-scroll`);
+            return;
+        }
+        
         const terminal = this.terminals.get(quadrant);
         if (terminal && terminal.terminal) {
             // Use setTimeout to ensure the terminal has rendered any new content
             setTimeout(() => {
+                // Double-check user isn't scrolling before actually scrolling
+                if (this.userScrolling.get(quadrant)) {
+                    console.log(`📜 User still scrolling terminal ${quadrant}, aborting auto-scroll`);
+                    return;
+                }
+                
                 try {
-                    // Method 1: Use xterm's scrollToBottom
-                    if (terminal.terminal.scrollToBottom) {
-                        terminal.terminal.scrollToBottom();
-                    }
-                    
-                    // Method 2: Also scroll the viewport directly as backup
                     const terminalDiv = terminal.element || document.querySelector(`[data-quadrant="${quadrant}"] .terminal`);
-                    if (terminalDiv) {
-                        const viewport = terminalDiv.querySelector('.xterm-viewport');
-                        if (viewport) {
-                            viewport.scrollTop = viewport.scrollHeight;
-                        }
-                    }
+                    const viewport = terminalDiv?.querySelector('.xterm-viewport');
                     
-                    // Method 3: Use the scroll button's stored function if available
-                    if (terminal.terminal.scrollToBottomFn) {
-                        terminal.terminal.scrollToBottomFn();
+                    if (viewport) {
+                        // Check if already at bottom before scrolling
+                        const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 10);
+                        
+                        if (!isAtBottom) {
+                            // Method 1: Use xterm's scrollToBottom
+                            if (terminal.terminal.scrollToBottom) {
+                                terminal.terminal.scrollToBottom();
+                            }
+                            
+                            // Method 2: Also scroll the viewport directly as backup
+                            viewport.scrollTop = viewport.scrollHeight;
+                            
+                            // Method 3: Use the scroll button's stored function if available
+                            if (terminal.terminal.scrollToBottomFn) {
+                                terminal.terminal.scrollToBottomFn();
+                            }
+                            
+                            console.log(`📜 Auto-scrolled terminal ${quadrant} to bottom`);
+                        }
                     }
                     
                     // Update scroll button visibility
@@ -1588,6 +1819,8 @@ class TerminalManager {
                     if (scrollBtn) {
                         scrollBtn.classList.remove('show');
                     }
+                    
+                    // Don't clear user scrolling flag here - let the scroll event handler manage it
                 } catch (e) {
                     console.error(`Error scrolling terminal ${quadrant} to bottom:`, e);
                 }
@@ -2999,13 +3232,108 @@ class TerminalManager {
                 
                 if (!isAtBottom && hasContent) {
                     scrollBtn.classList.add('show');
+                    // User has scrolled up - mark as user scrolling
+                    this.userScrolling.set(quadrant, true);
+                    
+                    // Clear any existing timeout for this terminal
+                    if (this.scrollTimeouts.has(quadrant)) {
+                        clearTimeout(this.scrollTimeouts.get(quadrant));
+                    }
+                    
+                    // Reset user scrolling flag after 30 seconds of no scroll activity
+                    // Increased from 10 to 30 seconds for longer Claude outputs
+                    const timeoutId = setTimeout(() => {
+                        // Don't clear if Claude is still outputting
+                        if (!this.claudeOutputting.get(quadrant)) {
+                            this.userScrolling.set(quadrant, false);
+                            this.scrollTimeouts.delete(quadrant);
+                            console.log(`📜 Cleared user scrolling flag for terminal ${quadrant} after timeout`);
+                        } else {
+                            // Claude is still outputting, extend the timeout
+                            console.log(`📜 Claude still outputting to terminal ${quadrant}, extending scroll lock`);
+                            const newTimeoutId = setTimeout(() => {
+                                this.userScrolling.set(quadrant, false);
+                                this.scrollTimeouts.delete(quadrant);
+                            }, 30000);
+                            this.scrollTimeouts.set(quadrant, newTimeoutId);
+                        }
+                    }, 30000);
+                    
+                    this.scrollTimeouts.set(quadrant, timeoutId);
                 } else {
                     scrollBtn.classList.remove('show');
+                    // User is at bottom - clear user scrolling flag
+                    this.userScrolling.set(quadrant, false);
+                    
+                    // Clear timeout if exists
+                    if (this.scrollTimeouts.has(quadrant)) {
+                        clearTimeout(this.scrollTimeouts.get(quadrant));
+                        this.scrollTimeouts.delete(quadrant);
+                    }
                 }
             };
             
+            // Track if scroll is from user interaction
+            let isUserScroll = false;
+            
+            // Detect user scroll interactions
+            viewport.addEventListener('wheel', () => {
+                isUserScroll = true;
+                setTimeout(() => { isUserScroll = false; }, 200);
+            });
+            
+            viewport.addEventListener('touchstart', () => {
+                isUserScroll = true;
+            });
+            
+            viewport.addEventListener('touchend', () => {
+                setTimeout(() => { isUserScroll = false; }, 200);
+            });
+            
+            // Detect keyboard scrolling (arrows, page up/down)
+            terminalDiv.addEventListener('keydown', (e) => {
+                const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End'];
+                if (scrollKeys.includes(e.key)) {
+                    isUserScroll = true;
+                    setTimeout(() => { isUserScroll = false; }, 200);
+                }
+            });
+            
             // Check scroll position on scroll events
             viewport.addEventListener('scroll', () => {
+                // Only mark as user scrolling if it was triggered by user interaction
+                if (isUserScroll) {
+                    const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 5);
+                    if (!isAtBottom) {
+                        this.userScrolling.set(quadrant, true);
+                        console.log(`📜 User manually scrolled terminal ${quadrant}`);
+                        
+                        // Clear and reset timeout
+                        if (this.scrollTimeouts.has(quadrant)) {
+                            clearTimeout(this.scrollTimeouts.get(quadrant));
+                        }
+                        
+                        const timeoutId = setTimeout(() => {
+                            // Don't clear if Claude is still outputting
+                            if (!this.claudeOutputting.get(quadrant)) {
+                                this.userScrolling.set(quadrant, false);
+                                this.scrollTimeouts.delete(quadrant);
+                                console.log(`📜 Cleared user scrolling flag for terminal ${quadrant} after timeout`);
+                            } else {
+                                // Claude is still outputting, extend the timeout
+                                console.log(`📜 Claude still outputting to terminal ${quadrant}, extending scroll lock`);
+                                const newTimeoutId = setTimeout(() => {
+                                    this.userScrolling.set(quadrant, false);
+                                    this.scrollTimeouts.delete(quadrant);
+                                }, 30000);
+                                this.scrollTimeouts.set(quadrant, newTimeoutId);
+                            }
+                        }, 30000);
+                        
+                        this.scrollTimeouts.set(quadrant, timeoutId);
+                    }
+                }
+                
                 clearTimeout(scrollTimeout);
                 scrollTimeout = setTimeout(checkScrollPosition, 100);
             });

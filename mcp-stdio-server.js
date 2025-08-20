@@ -300,13 +300,37 @@ class MCPStdioServer {
 
     // Task management methods
     async createTask(params) {
-        const { title, description, terminal_id, project } = params;
+        const { title, description, terminal_id, project, parent_task_id } = params;
         
         if (!title) {
             throw new Error('Title is required');
         }
         
-        const result = await this.db.createTask(title, description, terminal_id, project);
+        // Auto-detect terminal if not provided
+        let actualTerminalId = terminal_id;
+        if (actualTerminalId === undefined || actualTerminalId === null) {
+            const envTerminalId = process.env.CODEAGENTSWARM_CURRENT_QUADRANT;
+            if (envTerminalId) {
+                actualTerminalId = parseInt(envTerminalId);
+                this.logError(`Auto-detected terminal ID: ${actualTerminalId}`);
+            }
+        }
+        
+        // If parent_task_id is provided, try to inherit project from parent
+        let actualProject = project;
+        if (parent_task_id && !actualProject) {
+            try {
+                const parentTask = this.db.getTaskWithParent(parent_task_id);
+                if (parentTask && parentTask.project) {
+                    actualProject = parentTask.project;
+                    this.logError(`Inherited project "${actualProject}" from parent task #${parent_task_id}`);
+                }
+            } catch (e) {
+                // Ignore error, use provided project or null
+            }
+        }
+        
+        const result = await this.db.createTask(title, description, actualTerminalId, actualProject, parent_task_id);
         
         if (!result.success) {
             throw new Error(result.error);
@@ -316,8 +340,9 @@ class MCPStdioServer {
             id: result.taskId,
             title,
             description,
-            terminal_id,
-            project: project || null,
+            terminal_id: actualTerminalId,
+            project: actualProject || null,
+            parent_task_id: parent_task_id || null,
             status: 'pending'
         };
     }
@@ -616,6 +641,340 @@ class MCPStdioServer {
         return { tasks };
     }
 
+    // Subtask management methods
+    async createSubtask(params) {
+        const { title, description, parent_task_id, terminal_id, project } = params;
+        
+        if (!title) {
+            throw new Error('Title is required');
+        }
+        
+        if (!parent_task_id) {
+            throw new Error('parent_task_id is required for subtasks');
+        }
+        
+        // Auto-detect terminal if not provided
+        let actualTerminalId = terminal_id;
+        if (actualTerminalId === undefined || actualTerminalId === null) {
+            const envTerminalId = process.env.CODEAGENTSWARM_CURRENT_QUADRANT;
+            if (envTerminalId) {
+                actualTerminalId = parseInt(envTerminalId);
+            }
+        }
+        
+        // Inherit project from parent if not provided
+        let actualProject = project;
+        if (!actualProject) {
+            try {
+                const parentTask = this.db.getTaskWithParent(parent_task_id);
+                if (parentTask && parentTask.project) {
+                    actualProject = parentTask.project;
+                }
+            } catch (e) {
+                // Ignore error
+            }
+        }
+        
+        const result = await this.db.createTask(title, description, actualTerminalId, actualProject, parent_task_id);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            id: result.taskId,
+            title,
+            description,
+            terminal_id: actualTerminalId,
+            project: actualProject || null,
+            parent_task_id,
+            status: 'pending',
+            created: true
+        };
+    }
+
+    async getSubtasks(params) {
+        const { parent_task_id } = params;
+        
+        if (!parent_task_id) {
+            throw new Error('parent_task_id is required');
+        }
+        
+        const subtasks = this.db.getSubtasks(parent_task_id);
+        return { subtasks };
+    }
+
+    async linkTaskToParent(params) {
+        const { task_id, parent_task_id } = params;
+        
+        if (!task_id || !parent_task_id) {
+            throw new Error('task_id and parent_task_id are required');
+        }
+        
+        const result = this.db.linkTaskToParent(task_id, parent_task_id);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            parent_task_id,
+            linked: true
+        };
+    }
+
+    async unlinkTaskFromParent(params) {
+        const { task_id } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        const result = this.db.unlinkTaskFromParent(task_id);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            unlinked: true
+        };
+    }
+
+    async getTaskHierarchy(params) {
+        const { task_id } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        const hierarchy = await this.db.getTaskHierarchy(task_id);
+        
+        if (!hierarchy) {
+            throw new Error('Task not found');
+        }
+        
+        return { hierarchy };
+    }
+
+    async suggestParentTasks(params) {
+        const { title, description, limit = 5 } = params;
+        
+        if (!title) {
+            throw new Error('title is required');
+        }
+        
+        // Get recent tasks that could be parents (last 30 days)
+        const recentTasks = await this.db.getRecentTasks(30);
+        
+        // Calculate similarity scores for each task
+        const scoredTasks = recentTasks.map(task => {
+            const score = this.calculateSimilarityScore(
+                title, 
+                description || '',
+                task.title,
+                task.description || '',
+                task.plan || '',
+                task.implementation || ''
+            );
+            
+            return {
+                ...task,
+                similarity_score: score,
+                reason: this.generateSuggestionReason(title, description, task, score)
+            };
+        });
+        
+        // Filter out tasks with very low scores and sort by score
+        const suggestions = scoredTasks
+            .filter(task => task.similarity_score > 0.3) // Increased minimum to 30% similarity
+            .sort((a, b) => b.similarity_score - a.similarity_score)
+            .slice(0, limit);
+        
+        return { 
+            suggestions,
+            message: suggestions.length > 0 
+                ? `Found ${suggestions.length} potential parent task(s)` 
+                : 'No suitable parent tasks found'
+        };
+    }
+    
+    calculateSimilarityScore(newTitle, newDesc, taskTitle, taskDesc, taskPlan, taskImpl) {
+        // Normalize strings for comparison
+        const normalize = (str) => str.toLowerCase().trim();
+        
+        // Extract keywords (words longer than 3 characters, excluding common words)
+        const stopWords = new Set(['the', 'and', 'for', 'with', 'this', 'that', 'from', 'into', 'when', 'where', 'what', 'which', 'how']);
+        
+        // Also exclude overly generic verbs from keyword matching
+        const genericVerbs = new Set(['fix', 'add', 'update', 'improve', 'change', 'modify', 'edit', 'create', 'make', 'build']);
+        
+        const extractKeywords = (text) => {
+            return text
+                .toLowerCase()
+                .split(/\W+/)
+                .filter(word => word.length > 3 && !stopWords.has(word) && !genericVerbs.has(word));
+        };
+        
+        // Give more weight to description when extracting keywords
+        const newKeywords = new Set([
+            ...extractKeywords(newTitle),
+            ...extractKeywords(newDesc),
+            ...extractKeywords(newDesc) // Count description twice for more weight
+        ]);
+        
+        const taskKeywords = new Set([
+            ...extractKeywords(taskTitle),
+            ...extractKeywords(taskDesc),
+            ...extractKeywords(taskDesc), // Count description twice
+            ...extractKeywords(taskPlan),
+            ...extractKeywords(taskImpl)
+        ]);
+        
+        // Calculate keyword overlap
+        let matchCount = 0;
+        for (const keyword of newKeywords) {
+            if (taskKeywords.has(keyword)) {
+                matchCount++;
+            }
+        }
+        
+        // Base score from keyword overlap
+        const keywordScore = newKeywords.size > 0 
+            ? matchCount / Math.max(newKeywords.size, taskKeywords.size)
+            : 0;
+        
+        // Bonus points for specific patterns
+        let bonusScore = 0;
+        let factorCount = 0; // Count how many factors match
+        
+        // Check for related action verbs (reduced weight for generic ones)
+        const actionPatterns = [
+            // Generic patterns - very low weight
+            { parent: 'implement', child: ['fix', 'add', 'enhance'], weight: 0.05 },
+            { parent: 'create', child: ['add', 'setup'], weight: 0.05 },
+            
+            // More specific patterns - higher weight
+            { parent: 'implement authentication', child: ['fix auth', 'fix login'], weight: 0.2 },
+            { parent: 'create database', child: ['fix schema', 'add table'], weight: 0.2 },
+            { parent: 'build api', child: ['fix endpoint', 'add route'], weight: 0.2 },
+            
+            // Spanish patterns
+            { parent: 'implementar', child: ['arreglar', 'añadir'], weight: 0.05 },
+            { parent: 'hacer', child: ['arreglar', 'mejorar'], weight: 0.05 }
+        ];
+        
+        // Check if the action verb is used WITH context
+        let verbMatchFound = false;
+        for (const pattern of actionPatterns) {
+            const parentWords = pattern.parent.split(' ');
+            const parentVerb = parentWords[0];
+            const parentContext = parentWords.slice(1).join(' ');
+            
+            if (normalize(taskTitle).includes(parentVerb)) {
+                for (const childPhrase of pattern.child) {
+                    if (normalize(newTitle).includes(childPhrase)) {
+                        // Only give bonus if there's also keyword overlap
+                        if (matchCount > 0) {
+                            bonusScore += pattern.weight;
+                            verbMatchFound = true;
+                            factorCount++;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Check for component/feature references (higher weight for specific components)
+        const componentWords = [
+            'auth', 'database', 'api', 'backend', 'frontend', 'server', 'client', 
+            'login', 'user', 'task', 'subtask', 'kanban', 'terminal', 'mcp', 'notification',
+            'hook', 'claude', 'agent', 'swarm', 'quadrant', 'layout', 'diff', 'commit',
+            'push', 'git', 'scroll', 'wizard', 'install', 'dmg', 'electron', 'react', 'sqlite', 'permission'
+        ];
+        
+        let componentMatches = 0;
+        for (const component of componentWords) {
+            // Check in both title AND description
+            const inNewContent = (normalize(newTitle).includes(component) || normalize(newDesc).includes(component));
+            const inTaskContent = (normalize(taskTitle).includes(component) || normalize(taskDesc).includes(component));
+            
+            if (inNewContent && inTaskContent) {
+                bonusScore += 0.25; // Increased from 0.15
+                componentMatches++;
+                factorCount++;
+            }
+        }
+        
+        // Check if task mentions bugs/fixes and new task is about fixing
+        if ((normalize(taskTitle).includes('bug') || normalize(taskDesc).includes('bug')) &&
+            (normalize(newTitle).includes('fix') || normalize(newTitle).includes('arreglar'))) {
+            // Only if there's also component match
+            if (componentMatches > 0) {
+                bonusScore += 0.2;
+                factorCount++;
+            }
+        }
+        
+        // Check for continuation patterns in description
+        const continuationWords = ['continuar', 'continue', 'seguir', 'more', 'additional', 'also', 'furthermore'];
+        for (const word of continuationWords) {
+            if (normalize(newDesc).includes(word)) {
+                bonusScore += 0.1;
+                factorCount++;
+                break;
+            }
+        }
+        
+        // Require at least 2 matching factors for any suggestion
+        if (factorCount < 2 && keywordScore < 0.5) {
+            return 0; // Not enough evidence for relationship
+        }
+        
+        // Final score is combination of keyword match and bonus points
+        return Math.min(1.0, keywordScore + bonusScore);
+    }
+    
+    generateSuggestionReason(newTitle, newDesc, task, score) {
+        const reasons = [];
+        
+        if (score > 0.7) {
+            reasons.push('High similarity in keywords and context');
+        } else if (score > 0.5) {
+            reasons.push('Moderate similarity found');
+        } else {
+            reasons.push('Some related keywords detected');
+        }
+        
+        // Check for specific relationships
+        const lowerNewTitle = newTitle.toLowerCase();
+        const lowerTaskTitle = task.title.toLowerCase();
+        
+        if (lowerNewTitle.includes('fix') && lowerTaskTitle.includes('implement')) {
+            reasons.push('Fixing issues in implemented feature');
+        }
+        
+        if (lowerNewTitle.includes('test') && !lowerTaskTitle.includes('test')) {
+            reasons.push('Adding tests to existing functionality');
+        }
+        
+        if (lowerNewTitle.includes('improve') || lowerNewTitle.includes('enhance')) {
+            reasons.push('Enhancement of existing feature');
+        }
+        
+        if (task.status === 'in_testing' || task.status === 'completed') {
+            const hoursSinceUpdate = (Date.now() - new Date(task.updated_at).getTime()) / (1000 * 60 * 60);
+            if (hoursSinceUpdate < 24) {
+                reasons.push(`Recently ${task.status} (${Math.round(hoursSinceUpdate)} hours ago)`);
+            }
+        }
+        
+        return reasons.join('. ');
+    }
+
     // MCP Tools
     listTools() {
         return {
@@ -629,7 +988,8 @@ class MCPStdioServer {
                             title: { type: 'string', description: 'Task title' },
                             description: { type: 'string', description: 'Task description' },
                             terminal_id: { type: 'number', description: 'Terminal ID (0-3)' },
-                            project: { type: 'string', description: 'Project name (optional, defaults to CodeAgentSwarm)' }
+                            project: { type: 'string', description: 'Project name (optional, defaults to CodeAgentSwarm)' },
+                            parent_task_id: { type: 'number', description: 'Parent task ID to create this as a subtask (optional)' }
                         },
                         required: ['title']
                     }
@@ -768,6 +1128,79 @@ class MCPStdioServer {
                         },
                         required: ['project_name']
                     }
+                },
+                {
+                    name: 'create_subtask',
+                    description: 'Create a subtask under a parent task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Subtask title' },
+                            description: { type: 'string', description: 'Subtask description' },
+                            parent_task_id: { type: 'number', description: 'Parent task ID' },
+                            terminal_id: { type: 'number', description: 'Terminal ID (optional, auto-detected)' },
+                            project: { type: 'string', description: 'Project name (optional, inherited from parent)' }
+                        },
+                        required: ['title', 'parent_task_id']
+                    }
+                },
+                {
+                    name: 'get_subtasks',
+                    description: 'Get all subtasks of a parent task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            parent_task_id: { type: 'number', description: 'Parent task ID' }
+                        },
+                        required: ['parent_task_id']
+                    }
+                },
+                {
+                    name: 'link_task_to_parent',
+                    description: 'Link an existing task to a parent task (make it a subtask)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID to link' },
+                            parent_task_id: { type: 'number', description: 'Parent task ID' }
+                        },
+                        required: ['task_id', 'parent_task_id']
+                    }
+                },
+                {
+                    name: 'unlink_task_from_parent',
+                    description: 'Unlink a task from its parent (make it standalone)',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID to unlink' }
+                        },
+                        required: ['task_id']
+                    }
+                },
+                {
+                    name: 'get_task_hierarchy',
+                    description: 'Get a task with all its subtasks recursively',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' }
+                        },
+                        required: ['task_id']
+                    }
+                },
+                {
+                    name: 'suggest_parent_tasks',
+                    description: 'Suggest potential parent tasks for a new task based on semantic analysis',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            title: { type: 'string', description: 'Title of the task to find parents for' },
+                            description: { type: 'string', description: 'Description of the task (optional)' },
+                            limit: { type: 'number', description: 'Maximum number of suggestions (default: 5)' }
+                        },
+                        required: ['title']
+                    }
                 }
             ]
         };
@@ -787,6 +1220,29 @@ class MCPStdioServer {
                         this.logError(`Auto-detected terminal_id from environment: ${args.terminal_id}`);
                     } else {
                         this.logError('Warning: No terminal_id provided and CODEAGENTSWARM_CURRENT_QUADRANT not set');
+                    }
+                }
+                
+                // Auto-suggest parent tasks if not already specified
+                if (!args.parent_task_id) {
+                    try {
+                        const suggestions = await this.suggestParentTasks({
+                            title: args.title,
+                            description: args.description,
+                            limit: 3
+                        });
+                        
+                        if (suggestions.suggestions && suggestions.suggestions.length > 0) {
+                            const topSuggestion = suggestions.suggestions[0];
+                            if (topSuggestion.similarity_score > 0.5) { // Only suggest if confidence is high
+                                this.logError(`🔗 Found potential parent task: #${topSuggestion.id} "${topSuggestion.title}" (score: ${topSuggestion.similarity_score.toFixed(2)})`);
+                                this.logError(`   Reason: ${topSuggestion.reason}`);
+                                // Note: We don't auto-assign, just log the suggestion
+                            }
+                        }
+                    } catch (e) {
+                        // Silent fail for suggestions
+                        this.logError('Could not generate parent suggestions:', e.message);
                     }
                 }
                 
@@ -873,9 +1329,12 @@ class MCPStdioServer {
                 
             case 'complete_task':
                 // First check if task is already in_testing
+                this.logError(`[complete_task] Looking for task ID: ${args.task_id}`);
                 const task = await this.db.getTaskById(args.task_id);
+                this.logError(`[complete_task] Task result:`, task ? `Found with status: ${task.status}` : 'Not found');
+                
                 if (!task) {
-                    throw new Error('Task not found');
+                    throw new Error(`Task with ID ${args.task_id} not found in database`);
                 }
                 
                 if (task.status === 'in_testing') {
@@ -901,7 +1360,8 @@ class MCPStdioServer {
                     result = await this.updateTaskStatus({ task_id: args.task_id, status: 'in_testing' });
                     result.message = 'Task moved to testing phase. Manual review required before completion. Minimum testing time: 30 seconds.';
                 } else {
-                    throw new Error(`Cannot complete task with status '${task.status}'. Task must be 'in_progress' or 'in_testing'.`);
+                    const taskStatus = task ? task.status : 'null';
+                    throw new Error(`Cannot complete task with status '${taskStatus}'. Task must be 'in_progress' or 'in_testing'.`);
                 }
                 break;
                 
@@ -959,6 +1419,30 @@ class MCPStdioServer {
                 
             case 'get_project_tasks':
                 result = await this.getProjectTasks(args);
+                break;
+                
+            case 'create_subtask':
+                result = await this.createSubtask(args);
+                break;
+                
+            case 'get_subtasks':
+                result = await this.getSubtasks(args);
+                break;
+                
+            case 'link_task_to_parent':
+                result = await this.linkTaskToParent(args);
+                break;
+                
+            case 'unlink_task_from_parent':
+                result = await this.unlinkTaskFromParent(args);
+                break;
+                
+            case 'get_task_hierarchy':
+                result = await this.getTaskHierarchy(args);
+                break;
+                
+            case 'suggest_parent_tasks':
+                result = await this.suggestParentTasks(args);
                 break;
                 
             default:

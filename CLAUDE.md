@@ -38,7 +38,7 @@ Before ANY development action, you MUST verify:
 
 ## Project Configuration
 
-**Project Name**: codeagentswarm-app
+**Project Name**: CodeAgentSwarm
 
 _This project name is used for task organization in CodeAgentSwarm. All tasks created in this directory will be associated with this project._
 
@@ -47,10 +47,11 @@ _This project name is used for task organization in CodeAgentSwarm. All tasks cr
 ### Task Manager
 
 - **Command**: `node mcp-stdio-server.js`
-- **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, update_terminal_title, create_project, get_projects, get_project_tasks
+- **Description**: Task management system for CodeAgentSwarm with project organization and subtask support
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, update_terminal_title, create_project, get_projects, get_project_tasks, create_subtask, get_subtasks, link_task_to_parent, unlink_task_from_parent, get_task_hierarchy
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
 - **Projects**: Tasks are now organized by projects. Each task belongs to a project, and projects are detected automatically based on the terminal working directory
+- **Subtasks**: Tasks can now have subtasks for better organization of complex work
 
 _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
 
@@ -321,6 +322,12 @@ The following MCP tools are available for task management:
 - **`create_project`**: Create a new project with name and optional color
 - **`get_projects`**: Get list of all projects
 - **`get_project_tasks`**: Get all tasks for a specific project
+- **`create_subtask`**: Create a subtask under a parent task
+- **`get_subtasks`**: Get all subtasks of a parent task
+- **`link_task_to_parent`**: Link an existing task to a parent task (make it a subtask)
+- **`unlink_task_from_parent`**: Unlink a task from its parent (make it standalone)
+- **`get_task_hierarchy`**: Get a task with all its subtasks recursively
+- **`suggest_parent_tasks`**: Get AI-powered suggestions for potential parent tasks based on semantic analysis
 
 **`update_task_plan` parameters:**
 - `task_id` (number, required): Task ID
@@ -360,7 +367,77 @@ create_project(name="AnotherProject")  # Color will be auto-assigned
 get_projects()  # Returns all projects with their colors
 
 get_project_tasks(project_name="CodeAgentSwarm")  # Get all tasks for a project
+
+# Subtask management
+create_subtask(title="Fix database connection", parent_task_id=123)  # Create subtask
+get_subtasks(parent_task_id=123)  # Get all subtasks of a task
+link_task_to_parent(task_id=456, parent_task_id=123)  # Make existing task a subtask
+get_task_hierarchy(task_id=123)  # Get task with all its subtasks recursively
 ```
+
+## 🔗 Subtask System - IMPORTANT
+
+### When to Use Subtasks
+
+**USE SUBTASKS when:**
+- Breaking down a complex task into smaller, manageable pieces
+- A task naturally has multiple components that can be worked on separately
+- You need to track progress on individual parts of a larger feature
+- The user asks to add something to an existing task (even if completed)
+
+**DON'T CREATE NEW TASKS when:**
+- The work is clearly part of an existing task's scope
+- You're fixing a bug in a recently completed task
+- Adding minor enhancements to existing functionality
+- The parent task is still relevant to the current work
+
+### Subtask Creation Rules
+
+1. **Automatic Inheritance:**
+   - Subtasks automatically inherit the project from their parent
+   - Terminal ID can be different from parent (for parallel work)
+   - Parent task status doesn't block subtask creation
+
+2. **When Parent is Completed:**
+   - **STILL CREATE SUBTASKS** under completed parent tasks
+   - This maintains logical grouping and history
+   - Example: Bug fixes for a completed feature should be subtasks of that feature
+
+3. **Intelligent Parent Detection:**
+   - When user mentions work related to an existing task, ask: "Should this be a subtask of task #X?"
+   - Look for keywords like "add to", "fix in", "enhance", "improve" + task reference
+   - Check recently completed tasks (last 48 hours) for relevance
+
+4. **Hierarchy Management:**
+   - Use `get_task_hierarchy` to see the full structure
+   - Subtasks can have their own subtasks (nested hierarchy)
+   - Avoid circular dependencies (system prevents this automatically)
+
+### Example Subtask Workflow
+
+```
+User: "Add error handling to the authentication feature we just completed"
+
+Agent thinking: Task #123 "Implement authentication" was just completed. 
+This is clearly related work that should be grouped under it.
+
+Agent: "I'll create this as a subtask of task #123 (Implement authentication) 
+to keep related work organized together."
+
+create_subtask(
+    title="Add error handling", 
+    description="Add comprehensive error handling to auth flow",
+    parent_task_id=123
+)
+```
+
+### Best Practices
+
+- **Always check** if work relates to an existing task before creating standalone tasks
+- **Group related work** even if the parent task is completed
+- **Use descriptive titles** that make sense in context of the parent
+- **Document relationships** in task descriptions when relevant
+- **Review hierarchy** with `get_task_hierarchy` for complex features
 
 ## Project Organization
 

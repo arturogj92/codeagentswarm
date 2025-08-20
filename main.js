@@ -912,6 +912,65 @@ fi
       return;
     }
     
+    // Custom /run command for CodeAgentSwarm
+    if (command === '/run') {
+      this.sendOutput('🚀 Starting CodeAgentSwarm app development server...\r\n');
+      
+      // Try to find codeagentswarm-app directory
+      // First check if we're already in the project structure
+      let appDir = null;
+      const fs = require('fs');
+      
+      // Check if codeagentswarm-app is in current directory
+      const localAppPath = path.join(this.cwd, 'codeagentswarm-app');
+      if (fs.existsSync(localAppPath)) {
+        appDir = localAppPath;
+      } else {
+        // Check if we're inside codeagentswarm and need to go to the app subdirectory
+        const parentAppPath = path.join(this.cwd, '..', 'codeagentswarm-app');
+        if (fs.existsSync(parentAppPath)) {
+          appDir = path.resolve(parentAppPath);
+        } else {
+          // Check if we're already inside codeagentswarm-app
+          if (path.basename(this.cwd) === 'codeagentswarm-app') {
+            appDir = this.cwd;
+          } else {
+            // Try to find it in parent directories
+            let currentPath = this.cwd;
+            for (let i = 0; i < 5; i++) {
+              const testPath = path.join(currentPath, 'codeagentswarm-app');
+              if (fs.existsSync(testPath)) {
+                appDir = testPath;
+                break;
+              }
+              currentPath = path.dirname(currentPath);
+              if (currentPath === '/') break;
+            }
+          }
+        }
+      }
+      
+      // If still not found, show error
+      if (!appDir || !fs.existsSync(appDir)) {
+        this.sendOutput(`❌ Error: Could not find codeagentswarm-app directory\r\n`);
+        this.sendOutput(`   Current directory: ${this.cwd}\r\n`);
+        this.sendOutput(`   Please navigate to the CodeAgentSwarm project directory\r\n`);
+        if (!silent) this.sendPrompt();
+        return;
+      }
+      
+      // Change to app directory and run npm run dev
+      const originalCwd = this.cwd;
+      this.cwd = appDir;
+      this.sendOutput(`📁 Changed to: ${appDir}\r\n`);
+      this.sendOutput('▶️  Running: npm run dev\r\n\r\n');
+      
+      // Execute npm run dev
+      this.executeRealCommand('npm run dev');
+      // Note: The working directory will remain in codeagentswarm-app after this command
+      return;
+    }
+    
     if (command === 'path' || command === 'echo $PATH') {
       this.sendOutput(`${process.env.PATH}\r\n`);
       if (!silent) this.sendPrompt();
@@ -1328,25 +1387,27 @@ ipcMain.handle('get-terminals-for-project', async (event, projectName) => {
   try {
     const activeTerminals = [];
     
-    // Iterate through all active terminals
+    // Iterate through all active terminals - no project filtering
     for (const [terminalId, shell] of terminals) {
       if (shell && shell.cwd) {
-        // Check if this terminal has a CLAUDE.md file
-        const claudeMdPath = path.join(shell.cwd, 'CLAUDE.md');
+        let terminalProject = 'Unknown';
         
+        // Try to get the project name from CLAUDE.md if it exists
+        const claudeMdPath = path.join(shell.cwd, 'CLAUDE.md');
         if (fs.existsSync(claudeMdPath)) {
-          // Read CLAUDE.md to get project name
           const claudeMdContent = fs.readFileSync(claudeMdPath, 'utf8');
           const projectMatch = claudeMdContent.match(/\*\*Project Name\*\*:\s*(.+)/);
-          
-          if (projectMatch && projectMatch[1].trim() === projectName) {
-            activeTerminals.push({
-              id: terminalId,
-              currentDir: shell.cwd,
-              project: projectName
-            });
+          if (projectMatch) {
+            terminalProject = projectMatch[1].trim();
           }
         }
+        
+        // Add ALL terminals, not just ones matching the project
+        activeTerminals.push({
+          id: terminalId,
+          currentDir: shell.cwd,
+          project: terminalProject
+        });
       }
     }
     
@@ -2902,10 +2963,25 @@ ipcMain.handle('db-get-all-directories', async () => {
 });
 
 // Task management handlers
-ipcMain.handle('task-create', async (event, title, description, terminalId, project) => {
+ipcMain.handle('task-create', async (event, taskData) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
-    const result = db.createTask(title, description, terminalId, project);
+    
+    // Handle both old format (separate arguments) and new format (object)
+    let title, description, terminalId, project, parentTaskId;
+    if (typeof taskData === 'object' && taskData !== null && taskData.title) {
+      // New format with object
+      ({ title, description, terminal_id: terminalId, project, parent_task_id: parentTaskId } = taskData);
+    } else {
+      // Old format with separate arguments (for backward compatibility)
+      title = taskData;
+      description = arguments[2];
+      terminalId = arguments[3];
+      project = arguments[4];
+      parentTaskId = null;
+    }
+    
+    const result = db.createTask(title, description, terminalId, project, parentTaskId);
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -2949,6 +3025,20 @@ ipcMain.handle('task-delete', async (event, taskId) => {
     const result = db.deleteTask(taskId);
     return result;
   } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-create-subtask', async (event, subtaskData) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    
+    const { title, description, parent_task_id, project } = subtaskData;
+    
+    const result = db.createTask(title, description, null, project, parent_task_id);
+    return result;
+  } catch (error) {
+    console.error('Error creating subtask:', error);
     return { success: false, error: error.message };
   }
 });
@@ -3007,6 +3097,37 @@ ipcMain.handle('task-update-implementation', async (event, taskId, implementatio
   }
 });
 
+// Subtask/Parent task handlers
+ipcMain.handle('task-link-to-parent', async (event, taskId, parentTaskId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.linkTaskToParent(taskId, parentTaskId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-unlink-from-parent', async (event, taskId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.unlinkTaskFromParent(taskId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-get-subtasks', async (event, parentTaskId) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const subtasks = db.getSubtasks(parentTaskId);
+    return { success: true, subtasks };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
 // Project management handlers
 ipcMain.handle('project-get-all', async () => {
   try {
@@ -3030,6 +3151,76 @@ ipcMain.handle('select-project-folder', async (event) => {
   }
   
   return result.filePaths[0];
+});
+
+// Handle creating project directory
+ipcMain.handle('create-project-directory', async (event, dirPath) => {
+  try {
+    const fs = require('fs').promises;
+    
+    // Check if directory exists
+    try {
+      await fs.access(dirPath);
+      // Directory exists, that's fine
+      return { success: true };
+    } catch {
+      // Directory doesn't exist, create it
+      await fs.mkdir(dirPath, { recursive: true });
+      return { success: true };
+    }
+  } catch (error) {
+    console.error('Error creating project directory:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle initializing git repository
+ipcMain.handle('init-git-repo', async (event, dirPath) => {
+  try {
+    const { exec } = require('child_process');
+    const util = require('util');
+    const execPromise = util.promisify(exec);
+    
+    // Initialize git repository
+    await execPromise('git init', { cwd: dirPath });
+    
+    // Create a .gitignore file with common patterns
+    const gitignorePath = path.join(dirPath, '.gitignore');
+    const gitignoreContent = `# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Build
+dist/
+build/
+*.log
+`;
+    
+    fs.writeFileSync(gitignorePath, gitignoreContent, 'utf8');
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error initializing git repository:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 ipcMain.handle('project-create', async (event, name, color, folderPath) => {
@@ -3361,7 +3552,8 @@ ipcMain.on('create-task', async (event, taskData) => {
       taskData.title,
       taskData.description || '',
       taskData.terminal_id,
-      taskData.project
+      taskData.project,
+      taskData.parent_task_id || null
     );
     
     // Notify the renderer of successful creation
@@ -3380,6 +3572,49 @@ ipcMain.on('create-task', async (event, taskData) => {
       success: false,
       error: error.message
     });
+  }
+});
+
+// Handle subtask operations
+ipcMain.handle('get-subtasks', async (event, parentTaskId) => {
+  try {
+    const subtasks = db.getSubtasks(parentTaskId);
+    return { success: true, subtasks };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('link-task-to-parent', async (event, taskId, parentTaskId) => {
+  try {
+    const result = db.linkTaskToParent(taskId, parentTaskId);
+    if (result.success) {
+      mainWindow.webContents.send('refresh-tasks');
+    }
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('unlink-task-from-parent', async (event, taskId) => {
+  try {
+    const result = db.unlinkTaskFromParent(taskId);
+    if (result.success) {
+      mainWindow.webContents.send('refresh-tasks');
+    }
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('get-task-hierarchy', async (event, taskId) => {
+  try {
+    const hierarchy = db.getTaskHierarchy(taskId);
+    return { success: true, hierarchy };
+  } catch (error) {
+    return { success: false, error: error.message };
   }
 });
 

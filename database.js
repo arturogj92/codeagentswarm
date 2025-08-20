@@ -70,7 +70,9 @@ class DatabaseManager {
                 sort_order INTEGER DEFAULT 0,
                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                project TEXT
+                project TEXT,
+                parent_task_id INTEGER,
+                FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL
             )
         `);
         
@@ -119,6 +121,9 @@ class DatabaseManager {
         
         // Add last_opened column if it doesn't exist (migration)
         this.addLastOpenedColumnIfNeeded();
+        
+        // Add parent_task_id column if it doesn't exist (migration)
+        this.addParentTaskIdColumnIfNeeded();
         
         console.log('✅ DatabaseManager initialization completed');
     }
@@ -284,7 +289,9 @@ class DatabaseManager {
                     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                     implementation TEXT,
-                    project TEXT
+                    project TEXT,
+                    parent_task_id INTEGER,
+                    FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL
                 )
             `);
             
@@ -292,8 +299,8 @@ class DatabaseManager {
             // Restore data
             if (existingTasks.length > 0) {
                 const insertStmt = this.db.prepare(`
-                    INSERT INTO tasks (id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation, project)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    INSERT INTO tasks (id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation, project, parent_task_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 `);
                 
                 for (const task of existingTasks) {
@@ -308,7 +315,8 @@ class DatabaseManager {
                         task.created_at,
                         task.updated_at,
                         task.implementation,
-                        task.project || null
+                        task.project || null,
+                        task.parent_task_id || null
                     );
                 }
             }
@@ -463,6 +471,21 @@ class DatabaseManager {
             }
         } catch (error) {
             console.error('Error checking/adding last_opened column:', error);
+        }
+    }
+
+    addParentTaskIdColumnIfNeeded() {
+        try {
+            // Check if parent_task_id column exists
+            const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+            const hasParentTaskId = columns.some(col => col.name === 'parent_task_id');
+            
+            if (!hasParentTaskId) {
+                this.db.exec("ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL");
+                console.log('Added parent_task_id column to tasks table for subtask support');
+            }
+        } catch (error) {
+            console.error('Error checking/adding parent_task_id column:', error);
         }
     }
 
@@ -664,15 +687,15 @@ class DatabaseManager {
     // Task management methods
     
     // Create a new task
-    createTask(title, description, terminalId = null, project = null) {
+    createTask(title, description, terminalId = null, project = null, parentTaskId = null) {
         try {
             const stmt = this.db.prepare(`
-                INSERT INTO tasks (title, description, terminal_id, status, project)
-                VALUES (?, ?, ?, 'pending', ?)
+                INSERT INTO tasks (title, description, terminal_id, status, project, parent_task_id)
+                VALUES (?, ?, ?, 'pending', ?, ?)
             `);
             
             // Allow null project for tasks without a project
-            const result = stmt.run(title, description, terminalId, project || null);
+            const result = stmt.run(title, description, terminalId, project || null, parentTaskId || null);
             return { success: true, taskId: result.lastInsertRowid };
         } catch (err) {
             return { success: false, error: err.message };
@@ -846,6 +869,145 @@ class DatabaseManager {
             return { success: true };
         } catch (err) {
             return { success: false, error: err.message };
+        }
+    }
+
+    // Subtask management methods
+    
+    // Get subtasks of a parent task
+    getSubtasks(parentTaskId) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT * FROM tasks 
+                WHERE parent_task_id = ?
+                ORDER BY sort_order ASC, created_at DESC
+            `);
+            
+            return stmt.all(parentTaskId);
+        } catch (err) {
+            return [];
+        }
+    }
+
+    // Link a task to a parent (make it a subtask)
+    linkTaskToParent(taskId, parentTaskId) {
+        try {
+            // Check if parent task exists
+            const parentStmt = this.db.prepare(`SELECT id FROM tasks WHERE id = ?`);
+            const parent = parentStmt.get(parentTaskId);
+            
+            if (!parent) {
+                return { success: false, error: 'Parent task not found' };
+            }
+            
+            // Check for circular dependency
+            if (this.wouldCreateCircularDependency(taskId, parentTaskId)) {
+                return { success: false, error: 'Cannot create circular dependency' };
+            }
+            
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET parent_task_id = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(parentTaskId, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Unlink a task from its parent (make it a standalone task)
+    unlinkTaskFromParent(taskId) {
+        try {
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET parent_task_id = NULL, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
+    // Check if linking would create a circular dependency
+    wouldCreateCircularDependency(taskId, potentialParentId) {
+        try {
+            // If task and parent are the same, it's circular
+            if (taskId === potentialParentId) {
+                return true;
+            }
+            
+            // Check if potentialParentId is already a descendant of taskId
+            const checkDescendants = (currentId) => {
+                const stmt = this.db.prepare(`SELECT id FROM tasks WHERE parent_task_id = ?`);
+                const children = stmt.all(currentId);
+                
+                for (const child of children) {
+                    if (child.id === potentialParentId) {
+                        return true;
+                    }
+                    if (checkDescendants(child.id)) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            
+            return checkDescendants(taskId);
+        } catch (err) {
+            // On error, play it safe and prevent the operation
+            return true;
+        }
+    }
+
+    // Get task with its parent info
+    getTaskWithParent(taskId) {
+        try {
+            const stmt = this.db.prepare(`
+                SELECT 
+                    t.*,
+                    p.id as parent_id,
+                    p.title as parent_title,
+                    p.status as parent_status
+                FROM tasks t
+                LEFT JOIN tasks p ON t.parent_task_id = p.id
+                WHERE t.id = ?
+            `);
+            
+            return stmt.get(taskId);
+        } catch (err) {
+            return null;
+        }
+    }
+
+    // Get task hierarchy (task with all its subtasks recursively)
+    getTaskHierarchy(taskId) {
+        try {
+            const task = this.db.prepare(`SELECT * FROM tasks WHERE id = ?`).get(taskId);
+            
+            if (!task) {
+                return null;
+            }
+            
+            const getSubtasksRecursive = (parentId) => {
+                const subtasks = this.getSubtasks(parentId);
+                return subtasks.map(subtask => ({
+                    ...subtask,
+                    subtasks: getSubtasksRecursive(subtask.id)
+                }));
+            };
+            
+            return {
+                ...task,
+                subtasks: getSubtasksRecursive(taskId)
+            };
+        } catch (err) {
+            return null;
         }
     }
 

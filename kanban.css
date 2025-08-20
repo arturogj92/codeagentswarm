@@ -1451,6 +1451,62 @@ body::before {
     display: inline-block;
 }
 
+/* Task Hierarchy Indicators */
+.task-hierarchy-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.15rem 0.35rem;
+    border-radius: 8px;
+    font-size: 0.65rem;
+    font-weight: 500;
+    margin-left: 0.25rem;
+    transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.parent-indicator {
+    background: rgba(138, 180, 248, 0.15);
+    color: #8ab4f8;
+    border: 1px solid rgba(138, 180, 248, 0.3);
+}
+
+.parent-indicator:hover {
+    background: rgba(138, 180, 248, 0.25);
+    transform: scale(1.05);
+}
+
+.parent-indicator.clickable {
+    cursor: pointer;
+}
+
+.parent-indicator.clickable:hover {
+    background: rgba(138, 180, 248, 0.35);
+    transform: scale(1.1);
+    box-shadow: 0 2px 8px rgba(138, 180, 248, 0.3);
+}
+
+.subtask-indicator {
+    background: rgba(129, 201, 149, 0.15);
+    color: #81c995;
+    border: 1px solid rgba(129, 201, 149, 0.3);
+}
+
+.subtask-indicator:hover {
+    background: rgba(129, 201, 149, 0.25);
+    transform: scale(1.05);
+}
+
+.task-hierarchy-indicator i {
+    width: 12px;
+    height: 12px;
+}
+
+.parent-ref,
+.subtask-count {
+    font-weight: 600;
+    font-size: 0.65rem;
+}
+
 /* Project Filter with modern design */
 .project-filter {
     display: flex;
@@ -1696,27 +1752,68 @@ body::before {
 
 .status-dropdown-menu {
     position: absolute;
-    top: calc(100% + 4px);
+    top: calc(100% + 8px);
     left: 0;
-    min-width: 200px;
-    background: rgba(30, 30, 30, 0.98);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    min-width: 150px;
+    width: max-content;
+    z-index: 1000;
+    background: linear-gradient(135deg,
+        rgba(30, 30, 35, 0.98) 0%,
+        rgba(20, 20, 25, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 14px;
+    box-shadow: 
+        0 12px 32px rgba(0, 0, 0, 0.6),
+        0 2px 8px rgba(0, 0, 0, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.05);
     overflow: hidden;
     z-index: 1000;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    animation: dropdown-slide-in 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes dropdown-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .status-option {
-    padding: 0.75rem 1.25rem;
+    position: relative;
+    padding: 0.85rem 1.25rem;
     cursor: pointer;
-    transition: all 0.2s ease;
-    font-size: 0.95rem;
-    font-weight: 500;
-    color: var(--text-primary);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.85);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    overflow: hidden;
+}
+
+.status-option:before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.05) 50%,
+        transparent 100%);
+    transition: left 0.5s ease;
+}
+
+.status-option:hover:before {
+    left: 100%;
 }
 
 .status-option:last-child {
@@ -1724,8 +1821,40 @@ body::before {
 }
 
 .status-option:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    padding-left: 1.5rem;
 }
+
+/* Status-specific option colors */
+.status-option[data-value="pending"]:hover {
+    background: linear-gradient(90deg,
+        rgba(148, 163, 184, 0.15) 0%,
+        rgba(148, 163, 184, 0.05) 100%);
+    color: #e2e8f0;
+}
+
+.status-option[data-value="in_progress"]:hover {
+    background: linear-gradient(90deg,
+        rgba(59, 130, 246, 0.15) 0%,
+        rgba(59, 130, 246, 0.05) 100%);
+    color: #93c5fd;
+}
+
+.status-option[data-value="in_testing"]:hover {
+    background: linear-gradient(90deg,
+        rgba(251, 146, 60, 0.15) 0%,
+        rgba(251, 146, 60, 0.05) 100%);
+    color: #fed7aa;
+}
+
+.status-option[data-value="completed"]:hover {
+    background: linear-gradient(90deg,
+        rgba(34, 197, 94, 0.15) 0%,
+        rgba(34, 197, 94, 0.05) 100%);
+    color: #86efac;
+}
+
 
 .status-option.active {
     background: rgba(0, 122, 204, 0.1);
@@ -1935,6 +2064,168 @@ input[type="radio"]:checked + .color-option {
     position: relative;
 }
 
+/* Redesigned Subtasks Section */
+.parent-task-section {
+    margin: 1rem 0;
+    padding: 1.25rem;
+    background: rgba(127, 90, 240, 0.05);
+    border: 1px solid rgba(127, 90, 240, 0.2);
+    border-radius: 0.75rem;
+    backdrop-filter: blur(10px);
+}
+
+.parent-task-section h5 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #a0a0a0;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.subtasks-section {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(129, 201, 149, 0.03) 0%, rgba(127, 90, 240, 0.03) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 1rem;
+    backdrop-filter: blur(10px);
+}
+
+.subtasks-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.subtasks-header h5 {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #e0e0e0;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.subtasks-header h5 i {
+    width: 18px;
+    height: 18px;
+    color: #81c995;
+}
+
+#create-subtask-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.85rem;
+}
+
+.subtasks-list-redesigned {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.subtasks-list-redesigned::-webkit-scrollbar {
+    width: 6px;
+}
+
+.subtasks-list-redesigned::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 3px;
+}
+
+.subtasks-list-redesigned::-webkit-scrollbar-thumb {
+    background: rgba(127, 90, 240, 0.5);
+    border-radius: 3px;
+}
+
+.subtasks-list-redesigned .subtask-item {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 0.5rem;
+    padding: 1rem;
+    transition: all 0.2s ease;
+}
+
+.subtasks-list-redesigned .subtask-item:hover {
+    background: rgba(127, 90, 240, 0.08);
+    border-color: rgba(127, 90, 240, 0.3);
+    transform: translateX(4px);
+}
+
+.subtasks-list-redesigned .subtask-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: inherit;
+}
+
+.subtasks-list-redesigned .task-id-badge {
+    background: rgba(127, 90, 240, 0.15);
+    color: #a78bfa;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.subtasks-list-redesigned .subtask-title {
+    flex: 1;
+    font-size: 0.95rem;
+    color: #e0e0e0;
+}
+
+.subtasks-list-redesigned .subtask-status {
+    margin-left: auto;
+    padding: 0.25rem 0.75rem;
+    border-radius: 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* Subtask Creation Modal Styles */
+#subtask-modal .modal-content {
+    background: linear-gradient(135deg, #1a1a2e 0%, #2a2a3e 100%);
+}
+
+.parent-task-info-modal {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: rgba(127, 90, 240, 0.1);
+    border: 1px solid rgba(127, 90, 240, 0.2);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.parent-task-info-modal .label {
+    font-size: 0.85rem;
+    color: #a0a0a0;
+    font-weight: 600;
+}
+
+#parent-task-display {
+    color: #e0e0e0;
+    font-weight: 500;
+}
+
+.no-subtasks {
+    color: #888;
+    text-align: center;
+    padding: 1rem;
+    font-style: italic;
+}
+
 @keyframes taskFocusPulse {
     0% {
         box-shadow: 0 0 0 0 rgba(127, 90, 240, 0.7);
@@ -1948,4 +2239,759 @@ input[type="radio"]:checked + .color-option {
         box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
         transform: scale(1);
     }
+}
+
+/* Enhanced Task Details Modal - Dark Theme */
+/* Specific styles for task details modal to make it larger */
+#task-details-modal .modal-content {
+    max-width: 900px;  /* Much wider than default 500px */
+    width: 95%;        /* Take up most of the screen width */
+    max-height: 90vh;  /* Taller than default 80vh */
+    background: rgba(20, 20, 20, 0.98);  /* Darker background */
+}
+
+.task-hierarchy-info {
+    margin: 1rem 0;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.task-hierarchy-info h5 {
+    margin: 0 0 0.75rem 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.parent-task-card {
+    margin-top: 0.5rem;
+}
+
+.parent-task-link, .subtask-link {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0.75rem;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s ease;
+}
+
+.parent-task-link:hover, .subtask-link:hover {
+    background: rgba(127, 90, 240, 0.15);
+    border-color: rgba(127, 90, 240, 0.3);
+    transform: translateX(4px);
+}
+
+.task-id-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 2.5rem;
+    padding: 0.25rem 0.5rem;
+    background: linear-gradient(135deg, #7f5af0 0%, #9b59b6 100%);
+    color: white;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.parent-task-title, .subtask-title {
+    flex: 1;
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.subtasks-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+}
+
+.subtask-item {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.subtask-item:hover {
+    border-color: rgba(127, 90, 240, 0.4);
+    background: rgba(127, 90, 240, 0.08);
+    box-shadow: 0 2px 8px rgba(127, 90, 240, 0.2);
+}
+
+.subtask-status {
+    margin-left: auto;
+    padding: 0.2rem 0.6rem;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.subtask-status.status-pending {
+    background: rgba(251, 191, 36, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.subtask-status.status-in_progress {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.subtask-status.status-in_testing {
+    background: rgba(139, 92, 246, 0.15);
+    color: #8b5cf6;
+    border: 1px solid rgba(139, 92, 246, 0.3);
+}
+
+.subtask-status.status-completed {
+    background: rgba(34, 197, 94, 0.15);
+    color: #22c55e;
+    border: 1px solid rgba(34, 197, 94, 0.3);
+}
+
+.task-details-info {
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    padding: 1.25rem;
+    border-radius: 12px;
+    margin: 1rem 0;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+}
+
+.info-row:first-child {
+    padding-top: 0;
+}
+
+.info-label {
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+}
+
+.info-value {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
+.task-description-section,
+.task-plan-section,
+.task-implementation-section {
+    margin: 1.5rem 0;
+    padding: 1.25rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.task-description-section h5,
+.task-plan-section h5,
+.task-implementation-section h5 {
+    margin: 0 0 1rem 0;
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.task-description-section p,
+.task-plan-section p,
+.task-implementation-section p {
+    line-height: 1.7;
+    color: rgba(255, 255, 255, 0.85);
+    white-space: pre-wrap;
+    font-size: 0.95rem;
+}
+
+/* Editable fields in task details */
+.editable-title {
+    width: 100%;
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: #ffffff;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    transition: all 0.2s ease;
+}
+
+.editable-title:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.editable-title:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.1);
+}
+
+.editable-textarea {
+    width: 100%;
+    min-height: 80px;
+    color: rgba(255, 255, 255, 0.9);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 0.75rem;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    transition: all 0.2s ease;
+}
+
+.editable-textarea:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+.editable-textarea:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.06);
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.1);
+}
+
+.editable-select {
+    min-width: 150px;
+    padding: 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.editable-select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.editable-select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.1);
+}
+
+.editable-select option {
+    background: #1a1a1a;
+    color: #ffffff;
+}
+
+/* Adjust spacing for editable sections */
+.task-description-section textarea,
+.task-plan-section textarea,
+.task-implementation-section textarea {
+    margin-top: 0.5rem;
+}
+
+/* Modern Task Header Redesign */
+.task-header-redesigned {
+    background: linear-gradient(135deg, rgba(30, 30, 35, 0.98) 0%, rgba(25, 25, 30, 0.98) 100%);
+    padding: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px 12px 0 0;
+}
+
+.task-header-wrapper {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+}
+
+.task-header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem 0 1.5rem;
+    width: 100%;
+}
+
+.task-header-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+}
+
+.task-header-status {
+    position: relative;
+    display: inline-block;
+}
+
+.status-display-modern {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.85rem;
+    position: relative;
+    background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.08) 0%, 
+        rgba(255, 255, 255, 0.03) 100%);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    position: relative;
+    overflow: hidden;
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.1),
+        0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.status-display-modern:before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(
+        circle at center,
+        rgba(255, 255, 255, 0.15) 0%,
+        transparent 70%
+    );
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+.status-display-modern:after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.08) 50%,
+        transparent 100%
+    );
+    transform: translateX(-100%);
+    transition: transform 0.8s ease;
+}
+
+.status-display-modern:hover:before {
+    opacity: 1;
+}
+
+.status-display-modern:hover:after {
+    transform: translateX(100%);
+}
+
+.status-display-modern:hover {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 
+        inset 0 1px 0 rgba(255, 255, 255, 0.15),
+        0 6px 20px rgba(0, 0, 0, 0.25);
+}
+
+.status-display-modern .status-dropdown-icon {
+    width: 12px;
+    height: 12px;
+    transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+    opacity: 0.7;
+}
+
+.status-display-modern:hover .status-dropdown-icon {
+    transform: rotate(180deg);
+    opacity: 1;
+}
+
+.status-display-modern.active .status-dropdown-icon {
+    transform: rotate(180deg);
+}
+
+/* Status-specific colors with beautiful gradients and glow effects */
+.status-display-modern.status-pending {
+    background: linear-gradient(135deg, 
+        rgba(148, 163, 184, 0.2) 0%, 
+        rgba(100, 116, 139, 0.15) 100%);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #e2e8f0;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.status-display-modern.status-pending:hover {
+    background: linear-gradient(135deg, 
+        rgba(148, 163, 184, 0.3) 0%, 
+        rgba(100, 116, 139, 0.25) 100%);
+    border-color: rgba(148, 163, 184, 0.5);
+    box-shadow: 
+        inset 0 1px 0 rgba(226, 232, 240, 0.2),
+        0 6px 20px rgba(148, 163, 184, 0.2),
+        0 0 24px rgba(148, 163, 184, 0.1);
+}
+
+.status-display-modern.status-in_progress {
+    background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.25) 0%, 
+        rgba(37, 99, 235, 0.15) 100%);
+    border: 1px solid rgba(59, 130, 246, 0.4);
+    color: #93c5fd;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    animation: pulse-glow-blue 3s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-blue {
+    0%, 100% { 
+        box-shadow: 
+            inset 0 1px 0 rgba(147, 197, 253, 0.2),
+            0 2px 8px rgba(59, 130, 246, 0.15);
+    }
+    50% { 
+        box-shadow: 
+            inset 0 1px 0 rgba(147, 197, 253, 0.3),
+            0 2px 12px rgba(59, 130, 246, 0.25),
+            0 0 20px rgba(59, 130, 246, 0.15);
+    }
+}
+
+.status-display-modern.status-in_progress:hover {
+    background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.35) 0%, 
+        rgba(37, 99, 235, 0.25) 100%);
+    border-color: rgba(59, 130, 246, 0.6);
+    animation: none;
+    box-shadow: 
+        inset 0 1px 0 rgba(147, 197, 253, 0.3),
+        0 6px 20px rgba(59, 130, 246, 0.3),
+        0 0 32px rgba(59, 130, 246, 0.2);
+}
+
+.status-display-modern.status-in_testing {
+    background: linear-gradient(135deg, 
+        rgba(251, 146, 60, 0.25) 0%, 
+        rgba(249, 115, 22, 0.15) 100%);
+    border: 1px solid rgba(251, 146, 60, 0.4);
+    color: #fed7aa;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    animation: pulse-glow-orange 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow-orange {
+    0%, 100% { 
+        box-shadow: 
+            inset 0 1px 0 rgba(254, 215, 170, 0.2),
+            0 2px 8px rgba(251, 146, 60, 0.15);
+    }
+    50% { 
+        box-shadow: 
+            inset 0 1px 0 rgba(254, 215, 170, 0.3),
+            0 2px 12px rgba(251, 146, 60, 0.3),
+            0 0 20px rgba(251, 146, 60, 0.2);
+    }
+}
+
+.status-display-modern.status-in_testing:hover {
+    background: linear-gradient(135deg, 
+        rgba(251, 146, 60, 0.35) 0%, 
+        rgba(249, 115, 22, 0.25) 100%);
+    border-color: rgba(251, 146, 60, 0.6);
+    animation: none;
+    box-shadow: 
+        inset 0 1px 0 rgba(254, 215, 170, 0.3),
+        0 6px 20px rgba(251, 146, 60, 0.35),
+        0 0 32px rgba(251, 146, 60, 0.25);
+}
+
+.status-display-modern.status-completed {
+    background: linear-gradient(135deg, 
+        rgba(34, 197, 94, 0.25) 0%, 
+        rgba(16, 185, 129, 0.15) 100%);
+    border: 1px solid rgba(34, 197, 94, 0.4);
+    color: #86efac;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+    position: relative;
+}
+
+.status-display-modern.status-completed:hover {
+    background: linear-gradient(135deg, 
+        rgba(34, 197, 94, 0.35) 0%, 
+        rgba(16, 185, 129, 0.25) 100%);
+    border-color: rgba(34, 197, 94, 0.6);
+    box-shadow: 
+        inset 0 1px 0 rgba(134, 239, 172, 0.3),
+        0 6px 20px rgba(34, 197, 94, 0.3),
+        0 0 32px rgba(34, 197, 94, 0.2);
+}
+
+/* Special effect for completed status */
+.status-display-modern.status-completed::after {
+    content: '✓';
+    position: absolute;
+    right: -20px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 0.9rem;
+    color: #86efac;
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.status-display-modern.status-completed:hover::after {
+    right: 8px;
+    opacity: 0.6;
+}
+
+.task-header-project,
+.task-header-terminal,
+.task-header-parent,
+.task-header-created {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.5rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 5px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.75rem;
+}
+
+.header-icon {
+    width: 11px;
+    height: 11px;
+    color: rgba(127, 90, 240, 0.7);
+    flex-shrink: 0;
+}
+
+.header-select {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 0.75rem;
+    cursor: pointer;
+    outline: none;
+    padding: 0;
+    margin: 0;
+    min-width: 80px;
+    max-width: 130px;
+}
+
+.header-select:hover {
+    color: #ffffff;
+}
+
+.header-select:focus {
+    color: #ffffff;
+}
+
+.header-select option {
+    background: #1a1a1a;
+    color: #ffffff;
+    padding: 0.25rem;
+}
+
+.task-header-id {
+    padding: 0.2rem 0.5rem;
+    background: rgba(127, 90, 240, 0.1);
+    border: 1px solid rgba(127, 90, 240, 0.2);
+    border-radius: 5px;
+    color: rgba(147, 197, 253, 0.9);
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.task-header-parent {
+    background: rgba(251, 146, 60, 0.1);
+    border-color: rgba(251, 146, 60, 0.2);
+}
+
+.task-header-parent .header-icon {
+    color: rgba(251, 146, 60, 0.7);
+}
+
+.task-header-parent span {
+    color: rgba(251, 191, 36, 0.9);
+    font-weight: 600;
+    font-family: 'SF Mono', 'Monaco', 'Inconsolata', monospace;
+}
+
+.task-header-created {
+    background: rgba(156, 163, 175, 0.05);
+    border-color: rgba(156, 163, 175, 0.1);
+}
+
+.task-header-created .header-icon {
+    color: rgba(156, 163, 175, 0.6);
+}
+
+.task-header-created span {
+    color: rgba(156, 163, 175, 0.8);
+    font-size: 0.75rem;
+}
+
+.task-header-title {
+    padding: 0.5rem 1.5rem 0.75rem 1.5rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    margin-top: 0.25rem;
+}
+
+.editable-title-modern {
+    width: 100%;
+    background: transparent;
+    border: none;
+    color: #ffffff;
+    font-size: 1.4rem;
+    font-weight: 600;
+    padding: 0.35rem 0;
+    border-bottom: 2px solid transparent;
+    transition: all 0.3s ease;
+    line-height: 1.2;
+}
+
+.editable-title-modern:hover {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.editable-title-modern:focus {
+    outline: none;
+    border-bottom-color: rgba(127, 90, 240, 0.5);
+}
+
+.editable-title-modern::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* Update modal close button for new header */
+.task-header-redesigned .modal-close {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.5);
+    transition: all 0.2s ease;
+}
+
+.task-header-redesigned .modal-close:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: rgba(239, 68, 68, 0.2);
+    color: rgba(239, 68, 68, 0.8);
+}
+
+.task-header-redesigned .modal-close i {
+    width: 16px;
+    height: 16px;
+}
+
+/* Specific adjustments for task details modal content */
+#task-details-modal .modal-body {
+    padding: 2rem;  /* More spacious padding */
+}
+
+#task-details-modal .details-content {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+#task-details-modal .modal-header {
+    padding: 1.75rem 2rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#task-details-modal .modal-footer {
+    padding: 1.5rem 2rem;
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Task Details Modal Title and Status */
+#task-details-modal h2 {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+#task-details-modal .status-display {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#task-details-modal .status-display:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Details sections text color adjustments */
+#task-details-modal #details-description,
+#task-details-modal #details-plan,
+#task-details-modal #details-implementation {
+    color: rgba(255, 255, 255, 0.85);
+    background: rgba(255, 255, 255, 0.02);
+    padding: 1rem;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+#task-details-modal .details-meta {
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Edit mode textareas in dark theme */
+#task-details-modal textarea {
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#task-details-modal textarea:focus {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(127, 90, 240, 0.5);
+    outline: none;
 }

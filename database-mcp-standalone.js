@@ -102,7 +102,9 @@ class DatabaseManagerMCP {
           project TEXT,
           sort_order INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+          updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          parent_task_id INTEGER,
+          FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL
         );
         
         CREATE TABLE IF NOT EXISTS projects (
@@ -136,17 +138,18 @@ class DatabaseManagerMCP {
   }
 
   // Task management methods
-  async createTask(title, description, terminalId, project = null) {
+  async createTask(title, description, terminalId, project = null, parentTaskId = null) {
     try {
       // Combine INSERT and SELECT in a single SQLite session to get the correct ID
       // Using a temporary file to avoid command line escaping issues
       const tempFile = path.join(os.tmpdir(), `mcp_task_${Date.now()}.sql`);
       const sqlCommands = `
-        INSERT INTO tasks (title, description, terminal_id, project) 
+        INSERT INTO tasks (title, description, terminal_id, project, parent_task_id) 
         VALUES ('${(title || '').replace(/'/g, "''")}', 
                 '${(description || '').replace(/'/g, "''")}', 
                 ${terminalId || 0}, 
-                ${project ? `'${project.replace(/'/g, "''")}'` : 'NULL'});
+                ${project ? `'${project.replace(/'/g, "''")}'` : 'NULL'},
+                ${parentTaskId || 'NULL'});
         SELECT last_insert_rowid();
       `;
       
@@ -241,6 +244,51 @@ class DatabaseManagerMCP {
     }
   }
 
+  async getRecentTasks(days = 30) {
+    try {
+      // First set the output mode to list with pipe separator
+      this.execSQL('.mode list');
+      this.execSQL('.separator "|"');
+      
+      // Only get root tasks (not subtasks) from recent days, limit to 15
+      const query = `
+        SELECT id, title, description, plan, implementation, status, terminal_id, project, parent_task_id, sort_order, created_at, updated_at
+        FROM tasks
+        WHERE datetime(updated_at) > datetime('now', '-${days} days')
+          AND parent_task_id IS NULL
+        ORDER BY updated_at DESC
+        LIMIT 15
+      `;
+      
+      const output = this.execSQL(query);
+      
+      if (!output) return [];
+      
+      const lines = output.split('\n').filter(line => line.trim());
+      
+      return lines.map(line => {
+        const values = line.split('|');
+        return {
+          id: parseInt(values[0]) || 0,
+          title: values[1] || '',
+          description: values[2] || '',
+          plan: values[3] || '',
+          implementation: values[4] || '',
+          status: values[5] || 'pending',
+          terminal_id: values[6] ? parseInt(values[6]) : null,
+          project: values[7] || null,
+          parent_task_id: values[8] ? parseInt(values[8]) : null,
+          sort_order: parseInt(values[9] || 0),
+          created_at: values[10] || '',
+          updated_at: values[11] || ''
+        };
+      });
+    } catch (error) {
+      console.error('[MCP Database] Error getting recent tasks:', error.message);
+      return [];
+    }
+  }
+
   async searchTasks(searchQuery, options = {}) {
     try {
       // Sanitize search query for SQL LIKE
@@ -308,26 +356,48 @@ class DatabaseManagerMCP {
   async getTaskById(taskId) {
     try {
       // Use JSON mode for better handling of multiline fields
-      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks WHERE id = ${parseInt(taskId)}`;
+      console.error(`[MCP Database] getTaskById called with ID: ${taskId}`);
+      console.error(`[MCP Database] Using database path: ${this.dbPath}`);
+      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at, parent_task_id FROM tasks WHERE id = ${parseInt(taskId)}`;
       const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
       if (!result || result.trim() === '') {
+        console.error(`[MCP Database] No task found with ID ${taskId}`);
         return null;
       }
       
       const tasks = JSON.parse(result);
       
-      if (tasks.length === 0) return null;
+      if (tasks.length === 0) {
+        console.error(`[MCP Database] Empty result for task ID ${taskId}`);
+        return null;
+      }
       
       const task = tasks[0];
-      return {
-        ...task,
+      console.error(`[MCP Database] Found task ${taskId} with status: ${task.status}`);
+      console.error(`[MCP Database] Raw task object:`, JSON.stringify(task));
+      
+      // Ensure all fields are present
+      const formattedTask = {
         id: parseInt(task.id),
+        title: task.title || '',
+        description: task.description || '',
+        plan: task.plan || null,
+        implementation: task.implementation || null,
+        status: task.status || 'pending',
         terminal_id: task.terminal_id ? parseInt(task.terminal_id) : null,
-        sort_order: parseInt(task.sort_order) || 0
+        project: task.project || null,
+        sort_order: parseInt(task.sort_order) || 0,
+        created_at: task.created_at || null,
+        updated_at: task.updated_at || null,
+        parent_task_id: task.parent_task_id ? parseInt(task.parent_task_id) : null
       };
+      
+      console.error(`[MCP Database] Formatted task:`, JSON.stringify(formattedTask));
+      return formattedTask;
     } catch (error) {
       console.error('[MCP Database] Error getting task by ID:', error.message);
+      console.error('[MCP Database] Query was:', `SELECT * FROM tasks WHERE id = ${parseInt(taskId)}`);
       return null;
     }
   }
@@ -590,6 +660,137 @@ class DatabaseManagerMCP {
   logTaskAction(taskId, action, details) {
     // Not implemented in standalone version
   }
+
+  // Subtask management methods
+  
+  getSubtasks(parentTaskId) {
+    try {
+      // Enable column mode for parsing
+      const result = this.execSQL('.mode list\n.separator |\nSELECT * FROM tasks WHERE parent_task_id = ? ORDER BY sort_order ASC, created_at DESC;', [parentTaskId]);
+      
+      if (!result) return [];
+      
+      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at', 'parent_task_id'];
+      return this.parseRows(result, columns);
+    } catch (error) {
+      console.error('[MCP Database] Error getting subtasks:', error);
+      return [];
+    }
+  }
+
+  linkTaskToParent(taskId, parentTaskId) {
+    try {
+      // Check if parent task exists
+      const parentResult = this.execSQL('.mode list\nSELECT id FROM tasks WHERE id = ?;', [parentTaskId]);
+      if (!parentResult) {
+        return { success: false, error: 'Parent task not found' };
+      }
+      
+      // Check for circular dependency
+      if (this.wouldCreateCircularDependency(taskId, parentTaskId)) {
+        return { success: false, error: 'Cannot create circular dependency' };
+      }
+      
+      this.execSQL('UPDATE tasks SET parent_task_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [parentTaskId, taskId]);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  unlinkTaskFromParent(taskId) {
+    try {
+      this.execSQL('UPDATE tasks SET parent_task_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?;', [taskId]);
+      return { success: true };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  wouldCreateCircularDependency(taskId, potentialParentId) {
+    try {
+      // If task and parent are the same, it's circular
+      if (taskId === potentialParentId) {
+        return true;
+      }
+      
+      // Check if potentialParentId is already a descendant of taskId
+      const checkDescendants = (currentId) => {
+        const result = this.execSQL('.mode list\nSELECT id FROM tasks WHERE parent_task_id = ?;', [currentId]);
+        if (!result) return false;
+        
+        const childIds = result.split('\n').filter(id => id).map(id => parseInt(id));
+        
+        for (const childId of childIds) {
+          if (childId === potentialParentId) {
+            return true;
+          }
+          if (checkDescendants(childId)) {
+            return true;
+          }
+        }
+        return false;
+      };
+      
+      return checkDescendants(taskId);
+    } catch (error) {
+      // On error, play it safe and prevent the operation
+      return true;
+    }
+  }
+
+  getTaskWithParent(taskId) {
+    try {
+      const result = this.execSQL(`.mode list
+.separator |
+SELECT 
+  t.*,
+  p.id as parent_id,
+  p.title as parent_title,
+  p.status as parent_status
+FROM tasks t
+LEFT JOIN tasks p ON t.parent_task_id = p.id
+WHERE t.id = ?;`, [taskId]);
+      
+      if (!result) return null;
+      
+      const columns = ['id', 'title', 'description', 'plan', 'implementation', 'status', 'terminal_id', 'project', 'sort_order', 'created_at', 'updated_at', 'parent_task_id', 'parent_id', 'parent_title', 'parent_status'];
+      const rows = this.parseRows(result, columns);
+      return rows[0] || null;
+    } catch (error) {
+      console.error('[MCP Database] Error getting task with parent:', error);
+      return null;
+    }
+  }
+
+  async getTaskHierarchy(taskId) {
+    try {
+      const task = await this.getTaskById(taskId);
+      
+      if (!task) {
+        return null;
+      }
+      
+      const getSubtasksRecursive = (parentId) => {
+        const subtasks = this.getSubtasks(parentId);
+        return subtasks.map(subtask => ({
+          ...subtask,
+          subtasks: getSubtasksRecursive(subtask.id)
+        }));
+      };
+      
+      return {
+        ...task,
+        subtasks: getSubtasksRecursive(taskId)
+      };
+    } catch (error) {
+      console.error('[MCP Database] Error getting task hierarchy:', error);
+      return null;
+    }
+  }
+
+  // Synchronous version removed - use async getTaskById instead
+  // This was causing conflicts with the async version
 
   close() {
     // Nothing to close when using CLI

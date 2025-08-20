@@ -15,10 +15,12 @@ _This project name is used for task organization in CodeAgentSwarm. All tasks cr
 ### Task Manager
 
 - **Command**: \`node mcp-stdio-server.js\`
-- **Description**: Task management system for CodeAgentSwarm with project organization
-- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, update_task_plan, update_task_implementation, update_task_terminal, update_terminal_title, create_project, get_projects, get_project_tasks
+- **Description**: Task management system for CodeAgentSwarm with project organization and subtask support
+- **Tools**: create_task, start_task, complete_task, submit_for_testing, list_tasks, search_tasks, update_task_plan, update_task_implementation, update_task_terminal, update_terminal_title, create_project, get_projects, get_project_tasks, create_subtask, get_subtasks, link_task_to_parent, unlink_task_from_parent, get_task_hierarchy, suggest_parent_tasks
 - **Resources**: All tasks, pending tasks, in-progress tasks, completed tasks, projects
 - **Projects**: Tasks are now organized by projects. Each task belongs to a project, and projects are detected automatically based on the terminal working directory
+- **Subtasks**: Tasks can now have subtasks for better organization of complex work
+- **AI Parent Detection**: New tasks automatically get suggestions for potential parent tasks using semantic analysis
 
 _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not remove this section as it's required for task management functionality._
 
@@ -143,12 +145,44 @@ Before doing ANY work, including research, investigation, or code changes, you M
 ### Workflow
 
 1. **When receiving a user request:**
-   - Review existing tasks with \`list_tasks\`
-   - **CHECK FIRST:** Is this a bug fix or modification of a recently completed task?
+   - **FIRST:** Review recent parent tasks (not subtasks) with \`list_tasks\` status: "pending" or "in_progress"
+   - **CHECK:** Is this a bug fix or modification of a recently completed task?
      - If YES → Ask if should continue with the existing task
      - If NO → Check if a related task exists
    - If related task exists, use it
    - If not, create a new descriptive task
+   
+   **📍 IMPORTANT: Context-aware task creation:**
+   
+   **Step 1: Review recent parent tasks**
+   - Use \`list_tasks\` to see recent tasks (they're already filtered to exclude subtasks)
+   - Or use \`suggest_parent_tasks\` for AI-powered suggestions
+   - Look for tasks that mention similar components or features
+   
+   **Step 2: Analyze the context**
+   - What component/feature area? (kanban, terminal, settings, etc.)
+   - Check HTML IDs/classes mentioned (details-modal → kanban, terminal-output → terminal)
+   - What files will be modified? (kanban.js → kanban context)
+   
+   **Step 3: Include context in the task title**
+   - ❌ "Fix modal close button"
+   - ✅ "Fix kanban modal close button"
+   
+   **Step 4: When in doubt, ASK THE USER**
+   - Example scenario:
+     - You see task #3445 "IMPROVEMENTS TASKS & KANBAN"
+     - User mentions a modal but doesn't specify which
+     - **ASK:** "I found these recent tasks that might be related:
+       - #3445 'IMPROVEMENTS TASKS & KANBAN'
+       - #2150 'arreglar el diff system'
+       
+       Is this modal work related to:
+       a) The kanban system → I'll create it as 'Fix kanban modal close button'
+       b) The diff viewer → I'll create it as 'Fix diff modal close button'
+       c) Something else → I'll create it as a standalone task
+       
+       Please confirm which component this belongs to."
+   - Let the user confirm the context before creating the task
 
 2. **During work:**
    - Current task will show in terminal bar
@@ -277,11 +311,12 @@ Before doing ANY work, including research, investigation, or code changes, you M
 
 The following MCP tools are available for task management:
 
-- **\`create_task\`**: Create new task (terminal_id and project are auto-detected)
+- **\`create_task\`**: Create new task (terminal_id and project are auto-detected, suggests parent tasks automatically)
 - **\`start_task\`**: Mark task as "in_progress"
 - **\`complete_task\`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **\`submit_for_testing\`**: Mark task as "in_testing"
 - **\`list_tasks\`**: List all tasks (optional: filter by status)
+- **\`search_tasks\`**: Search for tasks by keywords in title, description, plan, or implementation
 - **\`update_task_plan\`**: Update specific task plan
 - **\`update_task_implementation\`**: Update task implementation
 - **\`update_task_terminal\`**: Update terminal_id associated with task
@@ -289,6 +324,12 @@ The following MCP tools are available for task management:
 - **\`create_project\`**: Create a new project with name and optional color
 - **\`get_projects\`**: Get list of all projects
 - **\`get_project_tasks\`**: Get all tasks for a specific project
+- **\`create_subtask\`**: Create a subtask under a parent task
+- **\`get_subtasks\`**: Get all subtasks of a parent task
+- **\`link_task_to_parent\`**: Link an existing task to a parent task (make it a subtask)
+- **\`unlink_task_from_parent\`**: Unlink a task from its parent (make it standalone)
+- **\`get_task_hierarchy\`**: Get a task with all its subtasks recursively
+- **\`suggest_parent_tasks\`**: Get AI-powered suggestions for potential parent tasks based on semantic analysis
 
 **\`update_task_plan\` parameters:**
 - \`task_id\` (number, required): Task ID
@@ -328,7 +369,121 @@ create_project(name="AnotherProject")  # Color will be auto-assigned
 get_projects()  # Returns all projects with their colors
 
 get_project_tasks(project_name="CodeAgentSwarm")  # Get all tasks for a project
+
+# Subtask management
+create_subtask(title="Fix database connection", parent_task_id=123)  # Create subtask
+get_subtasks(parent_task_id=123)  # Get all subtasks of a task
+link_task_to_parent(task_id=456, parent_task_id=123)  # Make existing task a subtask
+get_task_hierarchy(task_id=123)  # Get task with all its subtasks recursively
 \`\`\`
+
+## 🔗 Subtask System - IMPORTANT
+
+### When to Use Subtasks
+
+**USE SUBTASKS when:**
+- Breaking down a complex task into smaller, manageable pieces
+- A task naturally has multiple components that can be worked on separately
+- You need to track progress on individual parts of a larger feature
+- The user asks to add something to an existing task (even if completed)
+
+**DON'T CREATE NEW TASKS when:**
+- The work is clearly part of an existing task's scope
+- You're fixing a bug in a recently completed task
+- Adding minor enhancements to existing functionality
+- The parent task is still relevant to the current work
+
+### Subtask Creation Rules
+
+1. **Automatic Inheritance:**
+   - Subtasks automatically inherit the project from their parent
+   - Terminal ID can be different from parent (for parallel work)
+   - Parent task status doesn't block subtask creation
+
+2. **When Parent is Completed:**
+   - **STILL CREATE SUBTASKS** under completed parent tasks
+   - This maintains logical grouping and history
+   - Example: Bug fixes for a completed feature should be subtasks of that feature
+
+3. **🆕 AI-Powered Parent Detection:**
+   - **Automatic Suggestions**: When creating a new task, the system automatically suggests potential parent tasks
+   - **Semantic Analysis**: Uses keyword matching, action verb patterns, and component analysis
+   - **Confidence Scoring**: Shows similarity scores (0-1) for each suggestion
+   - **Smart Patterns**: Recognizes relationships like "fix" → "implement", "test" → "create", etc.
+   - **Multi-language**: Supports both English and Spanish patterns (fix/arreglar, create/crear, etc.)
+   
+4. **Manual Parent Detection:**
+   - When user mentions work related to an existing task, ask: "Should this be a subtask of task #X?"
+   - Look for keywords like "add to", "fix in", "enhance", "improve" + task reference
+   - Check recently completed tasks (last 48 hours) for relevance
+   - Use \`suggest_parent_tasks\` tool to get AI suggestions
+
+5. **Hierarchy Management:**
+   - Use \`get_task_hierarchy\` to see the full structure
+   - Subtasks can have their own subtasks (nested hierarchy)
+   - Avoid circular dependencies (system prevents this automatically)
+
+### Example Subtask Workflow
+
+\`\`\`
+User: "Add error handling to the authentication feature we just completed"
+
+Agent thinking: Task #123 "Implement authentication" was just completed. 
+This is clearly related work that should be grouped under it.
+
+Agent: "I'll create this as a subtask of task #123 (Implement authentication) 
+to keep related work organized together."
+
+create_subtask(
+    title="Add error handling", 
+    description="Add comprehensive error handling to auth flow",
+    parent_task_id=123
+)
+\`\`\`
+
+### 🤔 When Context is Unclear - ASK!
+
+**Use \`suggest_parent_tasks\` to help identify relationships:**
+
+\`\`\`
+// User mentions a generic component
+User: "Fix the close button in the modal"
+
+// 1. First, check for potential parent tasks
+suggest_parent_tasks({
+    title: "Fix modal close button",
+    description: "User mentioned fixing a modal close button"
+})
+
+// 2. If suggestions found, ASK the user
+Agent: "I found these potentially related tasks:
+- #3445 'IMPROVEMENTS TASKS & KANBAN' 
+- #1459 'Create installation wizard'
+
+Is this modal part of:
+a) The kanban system (I'll create it under #3445)
+b) The installation wizard (I'll create it under #1459)  
+c) Something else (I'll create it as a standalone task)
+
+Which component does this modal belong to?"
+
+// 3. Create task with proper context based on user response
+User: "It's the kanban task details modal"
+
+Agent: "Got it! Creating as a subtask of the kanban improvements."
+create_subtask({
+    title: "Fix kanban task details modal close button",
+    parent_task_id: 3445
+})
+\`\`\`
+
+### Best Practices
+
+- **Always check** if work relates to an existing task before creating standalone tasks
+- **Group related work** even if the parent task is completed
+- **Use descriptive titles** that make sense in context of the parent
+- **Document relationships** in task descriptions when relevant
+- **Review hierarchy** with \`get_task_hierarchy\` for complex features
 
 ## Project Organization
 

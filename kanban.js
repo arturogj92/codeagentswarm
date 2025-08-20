@@ -6,11 +6,15 @@ class KanbanManager {
         this.tasks = [];
         this.projects = [];
         this.currentTask = null;
-        this.editingTaskId = null;
         this.currentProjectFilter = 'all';
         this.searchQuery = '';
         this.searchDebounceTimer = null;
         this.isSelectingDirectory = false;
+        
+        // Performance optimizations
+        this.taskIndex = new Map(); // Quick task lookup by ID
+        this.subtaskIndex = new Map(); // Parent ID -> subtask IDs mapping
+        
         this.sortStates = {
             pending: 'default',
             in_progress: 'default',
@@ -180,39 +184,81 @@ class KanbanManager {
             this.hideTaskDetailsModal();
         });
 
-        document.getElementById('edit-task-btn').addEventListener('click', () => {
-            this.editCurrentTask();
+        // Create Subtask button
+        document.getElementById('create-subtask-btn').addEventListener('click', () => {
+            this.openSubtaskModal();
         });
+
+        // Subtask modal handlers
+        document.getElementById('close-subtask-modal').addEventListener('click', () => {
+            this.closeSubtaskModal();
+        });
+
+        document.getElementById('cancel-subtask-btn').addEventListener('click', () => {
+            this.closeSubtaskModal();
+        });
+
+        document.getElementById('create-subtask-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            await this.createSubtask();
+        });
+
+        // Close subtask modal when clicking outside
+        document.getElementById('subtask-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'subtask-modal') {
+                this.closeSubtaskModal();
+            }
+        });
+
+        // Edit button removed - now using inline editing
 
         document.getElementById('delete-task-btn').addEventListener('click', () => {
             this.deleteCurrentTask();
         });
 
-        // Plan editing controls
-        document.getElementById('edit-plan-btn').addEventListener('click', () => {
-            this.showPlanEditMode();
-        });
+        // Plan editing controls - Check if elements exist before adding listeners
+        const editPlanBtn = document.getElementById('edit-plan-btn');
+        if (editPlanBtn) {
+            editPlanBtn.addEventListener('click', () => {
+                this.showPlanEditMode();
+            });
+        }
 
-        document.getElementById('save-plan-btn').addEventListener('click', () => {
-            this.savePlan();
-        });
+        const savePlanBtn = document.getElementById('save-plan-btn');
+        if (savePlanBtn) {
+            savePlanBtn.addEventListener('click', () => {
+                this.savePlan();
+            });
+        }
 
-        document.getElementById('cancel-plan-btn').addEventListener('click', () => {
-            this.hidePlanEditMode();
-        });
+        const cancelPlanBtn = document.getElementById('cancel-plan-btn');
+        if (cancelPlanBtn) {
+            cancelPlanBtn.addEventListener('click', () => {
+                this.hidePlanEditMode();
+            });
+        }
 
-        // Implementation editing controls
-        document.getElementById('edit-implementation-btn').addEventListener('click', () => {
-            this.showImplementationEditMode();
-        });
+        // Implementation editing controls - Check if elements exist before adding listeners
+        const editImplBtn = document.getElementById('edit-implementation-btn');
+        if (editImplBtn) {
+            editImplBtn.addEventListener('click', () => {
+                this.showImplementationEditMode();
+            });
+        }
 
-        document.getElementById('save-implementation-btn').addEventListener('click', () => {
-            this.saveImplementation();
-        });
+        const saveImplBtn = document.getElementById('save-implementation-btn');
+        if (saveImplBtn) {
+            saveImplBtn.addEventListener('click', () => {
+                this.saveImplementation();
+            });
+        }
 
-        document.getElementById('cancel-implementation-btn').addEventListener('click', () => {
-            this.hideImplementationEditMode();
-        });
+        const cancelImplBtn = document.getElementById('cancel-implementation-btn');
+        if (cancelImplBtn) {
+            cancelImplBtn.addEventListener('click', () => {
+                this.hideImplementationEditMode();
+            });
+        }
 
         // Status change controls
         document.getElementById('status-display').addEventListener('click', (e) => {
@@ -849,6 +895,62 @@ class KanbanManager {
         });
     }
 
+    populateParentTaskSelect(excludeTaskId = null) {
+        const parentSelect = document.getElementById('task-parent');
+        parentSelect.innerHTML = '<option value="">No parent (standalone task)</option>';
+        
+        // Get all tasks that could be potential parents
+        // Sort by status and then by title for better organization
+        const sortedTasks = [...this.tasks].sort((a, b) => {
+            const statusOrder = { 'in_progress': 0, 'in_testing': 1, 'pending': 2, 'completed': 3 };
+            const statusCompare = statusOrder[a.status] - statusOrder[b.status];
+            if (statusCompare !== 0) return statusCompare;
+            return a.title.localeCompare(b.title);
+        });
+        
+        // Helper function to check if taskId is a descendant of excludeTaskId
+        const isDescendant = (taskId, ancestorId) => {
+            if (!ancestorId) return false;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return false;
+            if (task.parent_task_id === ancestorId) return true;
+            return isDescendant(task.parent_task_id, ancestorId);
+        };
+        
+        sortedTasks.forEach(task => {
+            // Skip the task itself and its descendants when editing
+            if (excludeTaskId) {
+                if (task.id === excludeTaskId || isDescendant(task.id, excludeTaskId)) {
+                    return;
+                }
+            }
+            
+            const option = document.createElement('option');
+            option.value = task.id;
+            
+            // Format the option text with status and title
+            const statusEmoji = {
+                'pending': '⏳',
+                'in_progress': '▶️',
+                'in_testing': '🧪',
+                'completed': '✅'
+            };
+            
+            const emoji = statusEmoji[task.status] || '📝';
+            const projectInfo = task.project ? ` [${task.project}]` : '';
+            option.textContent = `${emoji} #${task.id} - ${task.title}${projectInfo}`;
+            
+            // Add visual indication of task status through color
+            if (task.status === 'completed') {
+                option.style.color = '#888';
+            } else if (task.status === 'in_progress') {
+                option.style.fontWeight = 'bold';
+            }
+            
+            parentSelect.appendChild(option);
+        });
+    }
+
     async loadTasks(showLoading = false) {
         // Only show skeletons during initial load or when explicitly requested
         if (showLoading) {
@@ -859,6 +961,22 @@ class KanbanManager {
             const result = await ipcRenderer.invoke('task-get-all');
             if (result.success) {
                 this.tasks = result.tasks;
+                
+                // Build indexes for faster lookups
+                this.taskIndex.clear();
+                this.subtaskIndex.clear();
+                
+                for (const task of this.tasks) {
+                    this.taskIndex.set(task.id, task);
+                    
+                    if (task.parent_task_id) {
+                        if (!this.subtaskIndex.has(task.parent_task_id)) {
+                            this.subtaskIndex.set(task.parent_task_id, []);
+                        }
+                        this.subtaskIndex.get(task.parent_task_id).push(task.id);
+                    }
+                }
+                
                 this.renderTasks();
                 
                 // Check if there's a pending task to focus
@@ -1066,16 +1184,42 @@ class KanbanManager {
             </span>`;
         }
 
+        // Create parent/subtask indicators
+        let hierarchyIndicators = '';
+        
+        // Check if this task has a parent
+        if (task.parent_task_id) {
+            const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
+            if (parentTask) {
+                hierarchyIndicators += `
+                    <span class="task-hierarchy-indicator parent-indicator clickable" 
+                          onclick="kanban.showTaskDetails(${parentTask.id}); event.stopPropagation();" 
+                          title="Subtask of: ${this.escapeHtml(parentTask.title)} (Click to view)">
+                        <i data-lucide="git-branch"></i>
+                        <span class="parent-ref">#${parentTask.id}</span>
+                    </span>
+                `;
+            }
+        }
+        
+        // Check if this task has subtasks
+        const subtasks = this.tasks.filter(t => t.parent_task_id === task.id);
+        if (subtasks.length > 0) {
+            hierarchyIndicators += `
+                <span class="task-hierarchy-indicator subtask-indicator" title="${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}">
+                    <i data-lucide="git-merge"></i>
+                    <span class="subtask-count">${subtasks.length}</span>
+                </span>
+            `;
+        }
 
         taskCard.innerHTML = `
             <div class="task-header">
                 ${projectTag}
+                ${hierarchyIndicators}
                 <div class="task-header-right">
                     <span class="task-id">#${task.id}</span>
                     <div class="task-actions">
-                        <button class="task-action-btn" onclick="kanban.editTask(${task.id})" title="Edit Task">
-                            <i data-lucide="edit-3"></i>
-                        </button>
                         <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
                             <i data-lucide="trash-2"></i>
                         </button>
@@ -1147,7 +1291,7 @@ class KanbanManager {
             this.dragoverThrottle = null;
         });
 
-        // Add click listener
+        // Add optimized click listener with immediate feedback
         taskCard.addEventListener('click', (e) => {
             // Don't open details if clicking on editable elements
             if (e.target.closest('.task-actions') || 
@@ -1155,14 +1299,39 @@ class KanbanManager {
                 e.target.closest('.task-terminal-wrapper')) {
                 return;
             }
-            this.showTaskDetails(task.id);
+            
+            // Show modal IMMEDIATELY for instant feedback
+            const modal = document.getElementById('task-details-modal');
+            if (modal) {
+                // Pre-populate title and ID for instant visual feedback
+                const titleEl = document.getElementById('details-title');
+                const idEl = document.getElementById('header-task-id');
+                const statusEl = document.getElementById('details-status-text');
+                
+                if (titleEl) titleEl.value = task.title || '';
+                if (idEl) idEl.textContent = `#${task.id}`;
+                if (statusEl) statusEl.textContent = task.status.replace('_', ' ').toUpperCase();
+                
+                // Show modal instantly
+                modal.classList.add('show');
+                
+                // Quick visual feedback on the card
+                taskCard.style.transform = 'scale(0.98)';
+                setTimeout(() => {
+                    taskCard.style.transform = '';
+                }, 100);
+            }
+            
+            // Load full details asynchronously without blocking
+            setTimeout(() => {
+                this.showTaskDetails(task.id);
+            }, 0);
         });
 
         return taskCard;
     }
 
     showCreateTaskModal() {
-        this.editingTaskId = null;
         document.getElementById('modal-title').textContent = 'Create New Task';
         document.getElementById('task-title').value = '';
         document.getElementById('task-description').value = '';
@@ -1179,30 +1348,24 @@ class KanbanManager {
             projectSelect.value = '';
         }
         
+        // Populate parent task dropdown
+        this.populateParentTaskSelect();
+        document.getElementById('task-parent').value = '';
+        
         document.getElementById('task-terminal').value = '';
         document.getElementById('save-task-btn').textContent = 'Save Task';
         document.getElementById('task-modal').classList.add('show');
         document.getElementById('task-title').focus();
+        
+        // Initialize markdown editors for create modal
+        if (typeof initializeCreateMarkdownEditors === 'function') {
+            setTimeout(() => initializeCreateMarkdownEditors(), 50);
+        }
     }
 
-    showEditTaskModal(task) {
-        this.editingTaskId = task.id;
-        document.getElementById('modal-title').textContent = 'Edit Task';
-        document.getElementById('task-title').value = task.title;
-        document.getElementById('task-description').value = task.description || '';
-        document.getElementById('task-plan').value = task.plan || '';
-        document.getElementById('task-implementation').value = task.implementation || '';
-        document.getElementById('task-status').value = task.status || 'pending';
-        document.getElementById('task-project').value = task.project || '';
-        document.getElementById('task-terminal').value = task.terminal_id || '';
-        document.getElementById('save-task-btn').textContent = 'Update Task';
-        document.getElementById('task-modal').classList.add('show');
-        document.getElementById('task-title').focus();
-    }
 
     hideTaskModal() {
         document.getElementById('task-modal').classList.remove('show');
-        this.editingTaskId = null;
     }
 
     async saveTask() {
@@ -1212,6 +1375,8 @@ class KanbanManager {
         const implementation = document.getElementById('task-implementation').value.trim();
         const status = document.getElementById('task-status').value;
         const project = document.getElementById('task-project').value;
+        const parentTaskIdValue = document.getElementById('task-parent').value;
+        const parentTaskId = parentTaskIdValue ? parseInt(parentTaskIdValue) : null;
         const terminalIdValue = document.getElementById('task-terminal').value;
         let terminalId = null;
         if (terminalIdValue !== '') {
@@ -1231,62 +1396,29 @@ class KanbanManager {
         try {
             let result;
             
-            if (this.editingTaskId) {
-                // Update existing task
-                result = await ipcRenderer.invoke('task-update', this.editingTaskId, title, description, project);
+            // Create new task with parent_task_id
+            result = await ipcRenderer.invoke('task-create', {
+                title,
+                description,
+                terminal_id: terminalId,
+                project,
+                parent_task_id: parentTaskId
+            });
                 
-                // Update plan separately
-                if (result.success) {
-                    const planResult = await ipcRenderer.invoke('task-update-plan', this.editingTaskId, plan);
-                    if (!planResult.success) {
-                        console.error('Failed to update plan:', planResult.error);
-                    }
+            
+            // Update plan for new task
+            if (result.success && plan) {
+                const planResult = await ipcRenderer.invoke('task-update-plan', result.taskId, plan);
+                if (!planResult.success) {
+                    console.error('Failed to update plan for new task:', planResult.error);
                 }
+            }
 
-                // Update implementation separately
-                if (result.success) {
-                    const implementationResult = await ipcRenderer.invoke('task-update-implementation', this.editingTaskId, implementation);
-                    if (!implementationResult.success) {
-                        console.error('Failed to update implementation:', implementationResult.error);
-                    }
-                }
-                
-                // Update status if changed
-                if (result.success && status) {
-                    const currentTask = this.tasks.find(t => t.id === this.editingTaskId);
-                    if (currentTask && currentTask.status !== status) {
-                        const statusResult = await ipcRenderer.invoke('task-update-status', this.editingTaskId, status);
-                        if (!statusResult.success) {
-                            console.error('Failed to update status:', statusResult.error);
-                        }
-                    }
-                }
-                
-                // If terminal ID was provided and the update was successful, update terminal separately
-                if (result.success && terminalId !== undefined) {
-                    const terminalResult = await ipcRenderer.invoke('task-update-terminal', this.editingTaskId, terminalId);
-                    if (!terminalResult.success) {
-                        console.error('Failed to update terminal ID:', terminalResult.error);
-                    }
-                }
-            } else {
-                // Create new task
-                result = await ipcRenderer.invoke('task-create', title, description, terminalId, project);
-                
-                // Update plan for new task
-                if (result.success && plan) {
-                    const planResult = await ipcRenderer.invoke('task-update-plan', result.taskId, plan);
-                    if (!planResult.success) {
-                        console.error('Failed to update plan for new task:', planResult.error);
-                    }
-                }
-
-                // Update implementation for new task
-                if (result.success && implementation) {
-                    const implementationResult = await ipcRenderer.invoke('task-update-implementation', result.taskId, implementation);
-                    if (!implementationResult.success) {
-                        console.error('Failed to update implementation for new task:', implementationResult.error);
-                    }
+            // Update implementation for new task
+            if (result.success && implementation) {
+                const implementationResult = await ipcRenderer.invoke('task-update-implementation', result.taskId, implementation);
+                if (!implementationResult.success) {
+                    console.error('Failed to update implementation for new task:', implementationResult.error);
                 }
             }
 
@@ -1304,28 +1436,203 @@ class KanbanManager {
     }
 
     async showTaskDetails(taskId) {
-        const task = this.tasks.find(t => t.id === taskId);
+        // Use index for O(1) lookup instead of O(n) array search
+        const task = this.taskIndex.get(taskId) || this.tasks.find(t => t.id === taskId);
         if (!task) return;
 
         this.currentTask = task;
-
-        document.getElementById('details-title').textContent = task.title;
-        document.getElementById('details-description').textContent = task.description || 'No description';
-        document.getElementById('details-plan').textContent = task.plan || 'No plan set';
-        document.getElementById('details-implementation').textContent = task.implementation || 'No implementation details';
         
+        // Track if editors are already initialized for this modal
+        if (!this.markdownEditorsInitialized) {
+            this.markdownEditorsInitialized = false;
+        }
+        
+        // Update only the most critical fields immediately
+        const titleEl = document.getElementById('details-title');
+        const descEl = document.getElementById('details-description');
+        if (titleEl) titleEl.value = task.title;
+        if (descEl) descEl.value = task.description || '';
+        
+        // Defer ALL other updates to avoid blocking
+        setTimeout(() => {
+            // Update remaining fields
+            const planEl = document.getElementById('details-plan');
+            const implEl = document.getElementById('details-implementation');
+            if (planEl) planEl.value = task.plan || '';
+            if (implEl) implEl.value = task.implementation || '';
+            
+            // Setup modal send icon
+            this.setupModalSendIcon(taskId);
+        }, 0);
+        
+        // Status with modern styling
         const statusText = task.status.replace('_', ' ').toUpperCase();
-        const terminalText = task.terminal_id !== null && task.terminal_id > 0 ? `Terminal ${parseInt(task.terminal_id)}` : 'No specific terminal';
-        const createdText = new Date(task.created_at).toLocaleString();
+        const statusTextElement = document.getElementById('details-status-text');
+        if (statusTextElement) {
+            statusTextElement.textContent = statusText;
+        }
         
-        // Update status display
-        document.getElementById('details-status-text').textContent = statusText;
-        document.getElementById('status-display').setAttribute('data-status', task.status);
-        document.getElementById('status-dropdown-menu').style.display = 'none';
-        document.getElementById('status-display').classList.remove('dropdown-open');
+        const statusDisplay = document.getElementById('status-display');
+        if (statusDisplay) {
+            statusDisplay.setAttribute('data-status', task.status);
+            statusDisplay.className = `status-display-modern clickable status-${task.status}`;
+            statusDisplay.classList.remove('dropdown-open');
+        }
         
-        document.getElementById('details-terminal').textContent = terminalText;
-        document.getElementById('details-created').textContent = `Created: ${createdText}`;
+        const statusDropdown = document.getElementById('status-dropdown-menu');
+        if (statusDropdown) {
+            statusDropdown.style.display = 'none';
+        }
+        
+        // Populate header meta information (will be set again below, removing duplicate)
+        const headerTaskIdTop = document.getElementById('header-task-id');
+        if (headerTaskIdTop) {
+            headerTaskIdTop.textContent = `#${task.id}`;
+        }
+        
+        // Parent task ID if exists
+        const parentInfo = document.getElementById('header-parent-info');
+        if (task.parent_task_id) {
+            parentInfo.style.display = 'flex';
+            document.getElementById('header-parent-id').textContent = `#${task.parent_task_id}`;
+        } else {
+            parentInfo.style.display = 'none';
+        }
+        
+        // Project dropdown - defer population to not block
+        const headerProjectSelect = document.getElementById('header-project-select');
+        if (headerProjectSelect) {
+            // Set current value immediately
+            headerProjectSelect.value = task.project || '';
+            // Populate options asynchronously
+            requestAnimationFrame(() => {
+                this.populateProjectSelectHeader();
+                headerProjectSelect.value = task.project || '';
+            });
+        }
+        
+        // Terminal dropdown
+        const headerTerminalSelect = document.getElementById('header-terminal-select');
+        headerTerminalSelect.value = task.terminal_id ? task.terminal_id.toString() : '';
+        
+        // Created at for header
+        const headerCreatedDate = new Date(task.created_at);
+        const month = headerCreatedDate.toLocaleDateString('en-US', { month: 'short' });
+        const day = headerCreatedDate.getDate();
+        const time = headerCreatedDate.toLocaleTimeString('en-US', { 
+            hour: 'numeric', 
+            minute: '2-digit',
+            hour12: true 
+        }).toLowerCase();
+        document.getElementById('header-created-at').textContent = `${month} ${day}, ${time}`;
+        
+        // Parent task information
+        const parentTaskInfo = document.getElementById('parent-task-info');
+        const parentTaskLink = document.getElementById('parent-task-link');
+        if (task.parent_task_id) {
+            const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
+            if (parentTask) {
+                parentTaskInfo.style.display = 'block';
+                parentTaskLink.innerHTML = `
+                    <a href="#" onclick="kanban.showTaskDetails(${parentTask.id}); return false;" class="parent-task-link">
+                        <span class="task-id-badge">#${parentTask.id}</span>
+                        <span class="parent-task-title">${this.escapeHtml(parentTask.title)}</span>
+                        <i data-lucide="arrow-right"></i>
+                    </a>
+                `;
+            } else {
+                parentTaskInfo.style.display = 'none';
+            }
+        } else {
+            parentTaskInfo.style.display = 'none';
+        }
+        
+        // Subtasks information - defer rendering for better initial performance
+        const subtasksSection = document.getElementById('subtasks-section');
+        const subtasksList = document.getElementById('subtasks-list');
+        
+        if (subtasksSection) {
+            // Always show the subtasks section for the Create Subtask button
+            subtasksSection.style.display = 'block';
+            
+            // Store current task ID for subtask creation
+            this.currentDetailTaskId = task.id;
+            
+            // Render subtasks asynchronously to not block initial modal display
+            if (subtasksList) {
+                // Show loading state immediately
+                subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem;">Loading...</div>';
+                
+                // Render subtasks in next frame
+                requestAnimationFrame(() => {
+                    // Use index for O(1) lookup instead of O(n) filter
+                    const subtaskIds = this.subtaskIndex.get(task.id) || [];
+                    const subtasks = subtaskIds.map(id => this.taskIndex.get(id)).filter(Boolean);
+                    
+                    if (subtasks.length > 0) {
+                        subtasksList.innerHTML = subtasks.map(subtask => `
+                            <div class="subtask-item">
+                                <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
+                                    <div class="subtask-header">
+                                        <span class="task-id-badge">#${subtask.id}</span>
+                                        <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
+                                        <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${task.id}); return false;" title="Delete subtask">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="subtask-title">${this.escapeHtml(subtask.title)}</div>
+                                </a>
+                            </div>
+                        `).join('');
+                    } else {
+                        subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px; font-style: italic;">No subtasks yet. Click "Create Subtask" to add one.</div>';
+                    }
+                });
+            }
+        }
+        
+        // Project and terminal information
+        // Populate project dropdown asynchronously without blocking
+        this.populateProjectSelect().then(() => {
+            const projectSelect = document.getElementById('header-project-select');
+            if (projectSelect) {
+                projectSelect.value = task.project || '';
+            }
+        });
+        
+        // Terminal information - set the dropdown value
+        const terminalSelect = document.getElementById('header-terminal-select');
+        if (terminalSelect) {
+            terminalSelect.value = task.terminal_id ? task.terminal_id.toString() : '';
+        }
+        
+        const terminalText = task.terminal_id !== null && task.terminal_id > 0 
+            ? `Terminal ${parseInt(task.terminal_id)}` 
+            : 'Not assigned';
+        
+        // Timestamps
+        const createdDate = new Date(task.created_at);
+        const updatedDate = new Date(task.updated_at);
+        
+        // Created timestamp in header
+        const headerCreatedAt = document.getElementById('header-created-at');
+        if (headerCreatedAt) {
+            headerCreatedAt.textContent = createdDate.toLocaleString();
+        }
+        
+        // Legacy terminal and created fields (for backward compatibility)
+        const detailsTerminal = document.getElementById('details-terminal');
+        if (detailsTerminal) {
+            detailsTerminal.textContent = terminalText;
+        }
+        
+        const detailsCreated = document.getElementById('details-created');
+        if (detailsCreated) {
+            detailsCreated.textContent = `Created: ${createdDate.toLocaleString()}`;
+        }
 
         // Reset plan and implementation editing modes
         this.hidePlanEditMode();
@@ -1334,8 +1641,50 @@ class KanbanManager {
         // Show/hide delete button based on status
         const deleteBtn = document.getElementById('delete-task-btn');
         deleteBtn.style.display = task.status === 'in_progress' ? 'none' : 'block';
-
-        document.getElementById('task-details-modal').classList.add('show');
+        
+        // Get modal element once
+        const modalElement = document.getElementById('task-details-modal');
+        
+        // Show modal if not already shown (in case called directly, not from click)
+        if (modalElement && !modalElement.classList.contains('show')) {
+            modalElement.classList.add('show');
+        }
+        
+        // Initialize Lucide icons ONLY when browser is idle to avoid blocking
+        if (window.lucide && modalElement) {
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => {
+                    window.lucide.createIcons({ 
+                        el: modalElement,
+                        icons: window.lucide.icons
+                    });
+                }, { timeout: 500 });
+            } else {
+                // Fallback with longer delay
+                setTimeout(() => {
+                    window.lucide.createIcons({ 
+                        el: modalElement,
+                        icons: window.lucide.icons
+                    });
+                }, 100);
+            }
+        }
+        
+        // Setup auto-save listeners after a delay to not block initial render
+        requestIdleCallback(() => {
+            this.setupAutoSaveListeners();
+        }, { timeout: 100 });
+        
+        // Initialize markdown editors only once per modal lifetime
+        if (typeof initializeMarkdownEditors === 'function' && !this.markdownEditorsInitialized) {
+            this.markdownEditorsInitialized = true;
+            // Use requestIdleCallback for non-critical initialization
+            if ('requestIdleCallback' in window) {
+                requestIdleCallback(() => initializeMarkdownEditors(), { timeout: 50 });
+            } else {
+                setTimeout(() => initializeMarkdownEditors(), 10);
+            }
+        }
     }
 
     // Focus on a specific task (called from IPC)
@@ -1369,13 +1718,363 @@ class KanbanManager {
         this.currentTask = null;
         // Reset status dropdown
         this.hideStatusDropdown();
+        // Remove auto-save listeners
+        this.removeAutoSaveListeners();
+        // Reset markdown editors flag
+        this.markdownEditorsInitialized = false;
     }
 
-    editCurrentTask() {
-        if (this.currentTask) {
-            const taskToEdit = this.currentTask; // Store reference before hiding modal
-            this.hideTaskDetailsModal();
-            this.showEditTaskModal(taskToEdit);
+    openSubtaskModal() {
+        const modal = document.getElementById('subtask-modal');
+        if (!modal || !this.currentDetailTaskId) return;
+        
+        // Set parent task display
+        const parentTask = this.tasks.find(t => t.id === this.currentDetailTaskId);
+        if (parentTask) {
+            document.getElementById('parent-task-display').textContent = 
+                `#${parentTask.id} - ${parentTask.title}`;
+        }
+        
+        // Clear form
+        document.getElementById('subtask-title').value = '';
+        document.getElementById('subtask-description').value = '';
+        
+        // Show modal
+        modal.classList.add('show');
+        
+        // Focus on title input
+        setTimeout(() => {
+            document.getElementById('subtask-title').focus();
+        }, 100);
+    }
+
+    closeSubtaskModal() {
+        const modal = document.getElementById('subtask-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    async createSubtask() {
+        const title = document.getElementById('subtask-title').value.trim();
+        const description = document.getElementById('subtask-description').value.trim();
+        
+        if (!title) {
+            this.showNotification('Please enter a subtask title', 'error');
+            return;
+        }
+        
+        if (!this.currentDetailTaskId) {
+            this.showNotification('No parent task selected', 'error');
+            return;
+        }
+        
+        try {
+            // Get parent task to inherit project
+            const parentTask = this.tasks.find(t => t.id === this.currentDetailTaskId);
+            
+            const result = await ipcRenderer.invoke('task-create-subtask', {
+                title,
+                description,
+                parent_task_id: this.currentDetailTaskId,
+                project: parentTask?.project || null
+            });
+            
+            if (result.success) {
+                this.showNotification('Subtask created successfully', 'success');
+                this.closeSubtaskModal();
+                
+                // Reload tasks and refresh the current task details
+                await this.loadTasks();
+                
+                // Refresh the task details view to show the new subtask
+                if (this.currentDetailTaskId) {
+                    await this.showTaskDetails(this.currentDetailTaskId);
+                }
+            } else {
+                this.showNotification(result.error || 'Failed to create subtask', 'error');
+            }
+        } catch (error) {
+            console.error('Error creating subtask:', error);
+            this.showNotification('Failed to create subtask', 'error');
+        }
+    }
+
+    renderProjectOptions(selectElement, projects) {
+        selectElement.innerHTML = '<option value="">No project</option>';
+        projects.forEach(project => {
+            const option = document.createElement('option');
+            option.value = project.name;
+            option.textContent = project.display_name || project.name;
+            selectElement.appendChild(option);
+        });
+    }
+
+    async populateProjectSelect() {
+        const projectSelect = document.getElementById('header-project-select');
+        if (!projectSelect) return;
+        
+        // Use cached projects if available and fresh (less than 5 seconds old)
+        const now = Date.now();
+        if (this.cachedProjects && this.cachedProjectsTimestamp && (now - this.cachedProjectsTimestamp < 5000)) {
+            this.renderProjectOptions(projectSelect, this.cachedProjects);
+            return;
+        }
+        
+        const result = await ipcRenderer.invoke('project-get-all');
+        
+        // Cache the projects and render
+        if (result.success && result.projects) {
+            this.cachedProjects = result.projects;
+            this.cachedProjectsTimestamp = now;
+            this.renderProjectOptions(projectSelect, result.projects);
+        } else {
+            projectSelect.innerHTML = '<option value="">No project</option>';
+        }
+    }
+    
+    async populateProjectSelectHeader() {
+        const projectSelect = document.getElementById('header-project-select');
+        if (!projectSelect) return;
+        
+        // Use cached projects if available and fresh (less than 5 seconds old)
+        const now = Date.now();
+        if (this.cachedProjects && this.cachedProjectsTimestamp && (now - this.cachedProjectsTimestamp < 5000)) {
+            this.renderProjectOptions(projectSelect, this.cachedProjects);
+            return;
+        }
+        
+        const result = await ipcRenderer.invoke('project-get-all');
+        
+        // Cache the projects and render
+        if (result.success && result.projects) {
+            this.cachedProjects = result.projects;
+            this.cachedProjectsTimestamp = now;
+            this.renderProjectOptions(projectSelect, result.projects);
+        } else {
+            projectSelect.innerHTML = '<option value="">No project</option>';
+        }
+    }
+
+    setupAutoSaveListeners() {
+        if (!this.currentTask) return;
+        
+        // Create debounced save function
+        const debouncedSave = this.debounce(async (field, value) => {
+            if (!this.currentTask) return;
+            
+            // Save task ID before async operations
+            const taskId = this.currentTask.id;
+            
+            try {
+                let result;
+                
+                // Handle different fields with their appropriate IPC calls
+                if (field === 'title' || field === 'description') {
+                    // For title and description, use task-update
+                    const title = field === 'title' ? value : this.currentTask.title;
+                    const description = field === 'description' ? value : (this.currentTask.description || '');
+                    const project = this.currentTask.project;
+                    result = await ipcRenderer.invoke('task-update', taskId, title, description, project);
+                } else if (field === 'plan') {
+                    // For plan, use task-update-plan
+                    result = await ipcRenderer.invoke('task-update-plan', taskId, value);
+                } else if (field === 'implementation') {
+                    // For implementation, use task-update-implementation
+                    result = await ipcRenderer.invoke('task-update-implementation', taskId, value);
+                } else if (field === 'project') {
+                    // For project, use task-update with current title and description
+                    result = await ipcRenderer.invoke('task-update', taskId, this.currentTask.title, this.currentTask.description || '', value);
+                } else if (field === 'terminal_id') {
+                    // For terminal, use task-update-terminal
+                    result = await ipcRenderer.invoke('task-update-terminal', taskId, value);
+                }
+                
+                if (result && result.success) {
+                    // Update local task data only if currentTask still exists
+                    if (this.currentTask) {
+                        this.currentTask[field] = value;
+                    }
+                    
+                    // Update the task in the tasks array and render just that task card
+                    const taskIndex = this.tasks.findIndex(t => t.id === (this.currentTask?.id || result.taskId));
+                    if (taskIndex !== -1) {
+                        this.tasks[taskIndex][field] = value;
+                        
+                        // Update only the specific task card instead of re-rendering everything
+                        const taskCard = document.querySelector(`.task-card[data-task-id="${this.tasks[taskIndex].id}"]`);
+                        if (taskCard) {
+                            // Update the task card content directly without full re-render
+                            this.updateTaskCard(taskCard, this.tasks[taskIndex]);
+                        }
+                    }
+                    
+                    console.log(`Auto-saved ${field}:`, value);
+                } else {
+                    console.error(`Failed to auto-save ${field}:`, result?.error);
+                }
+            } catch (error) {
+                console.error('Error auto-saving:', error);
+            }
+        }, 500);
+        
+        // Title field
+        document.getElementById('details-title').addEventListener('input', (e) => {
+            debouncedSave('title', e.target.value);
+        });
+        
+        // Description field
+        document.getElementById('details-description').addEventListener('input', (e) => {
+            debouncedSave('description', e.target.value);
+        });
+        
+        // Plan field
+        document.getElementById('details-plan').addEventListener('input', (e) => {
+            debouncedSave('plan', e.target.value);
+        });
+        
+        // Implementation field
+        document.getElementById('details-implementation').addEventListener('input', (e) => {
+            debouncedSave('implementation', e.target.value);
+        });
+        
+        // Header project select (only one project dropdown in the header)
+        const headerProjectSelect = document.getElementById('header-project-select');
+        if (headerProjectSelect) {
+            headerProjectSelect.addEventListener('change', (e) => {
+                debouncedSave('project', e.target.value);
+            });
+        }
+        
+        // Header terminal select (only one terminal dropdown in the header)
+        const headerTerminalSelect = document.getElementById('header-terminal-select');
+        if (headerTerminalSelect) {
+            headerTerminalSelect.addEventListener('change', (e) => {
+                debouncedSave('terminal_id', e.target.value ? parseInt(e.target.value) : null);
+            });
+        }
+    }
+
+    removeAutoSaveListeners() {
+        // Clone and replace elements to remove all listeners
+        // Note: details-project and details-terminal-info have been removed from HTML
+        ['details-title', 'details-description', 'details-plan', 'details-implementation', 
+         'header-project-select', 'header-terminal-select'].forEach(id => {
+            const element = document.getElementById(id);
+            if (element) {
+                const newElement = element.cloneNode(true);
+                element.parentNode.replaceChild(newElement, element);
+            }
+        });
+    }
+
+    updateTaskCard(taskCard, task) {
+        // Update title
+        const titleElement = taskCard.querySelector('.task-title-text');
+        if (titleElement) {
+            titleElement.textContent = task.title;
+        }
+
+        // Update description
+        const descElement = taskCard.querySelector('.task-description');
+        if (task.description) {
+            if (descElement) {
+                descElement.textContent = task.description;
+            } else {
+                // Add description element if it doesn't exist
+                const titleDiv = taskCard.querySelector('.task-title');
+                if (titleDiv) {
+                    const newDesc = document.createElement('div');
+                    newDesc.className = 'task-description';
+                    newDesc.textContent = task.description;
+                    titleDiv.insertAdjacentElement('afterend', newDesc);
+                }
+            }
+        } else if (descElement) {
+            // Remove description element if description is empty
+            descElement.remove();
+        }
+
+        // Update project tag
+        const projectTag = taskCard.querySelector('.task-project-tag');
+        if (task.project) {
+            const project = this.projects.find(p => p.name === task.project) || 
+                           { name: task.project, display_name: task.project, color: '#007ACC' };
+            const displayName = project.display_name || project.name;
+            const gradient = this.getProjectGradient(project.color);
+            
+            if (projectTag) {
+                projectTag.style.background = gradient;
+                const projectNameElement = projectTag.querySelector('.project-name');
+                if (projectNameElement) {
+                    projectNameElement.textContent = displayName;
+                }
+            } else {
+                // Add project tag if it doesn't exist
+                const taskHeader = taskCard.querySelector('.task-header');
+                if (taskHeader) {
+                    const newTag = document.createElement('span');
+                    newTag.className = 'task-project-tag';
+                    newTag.style.background = gradient;
+                    newTag.innerHTML = `<span class="project-name">${this.escapeHtml(displayName)}</span>`;
+                    taskHeader.insertAdjacentElement('afterbegin', newTag);
+                }
+            }
+        } else if (projectTag) {
+            // Remove project tag if project is empty
+            projectTag.remove();
+        }
+
+        // Update terminal badge (already handled by selectTerminal method)
+        // No need to update here as it's updated separately
+    }
+
+    debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    async deleteSubtask(subtaskId, parentTaskId) {
+        const subtask = this.tasks.find(t => t.id === subtaskId);
+        if (!subtask) return;
+
+        if (subtask.status === 'in_progress') {
+            alert('Cannot delete task in progress');
+            return;
+        }
+
+        const confirmed = confirm(`Are you sure you want to delete subtask "${subtask.title}"?`);
+        if (!confirmed) return;
+
+        try {
+            const result = await ipcRenderer.invoke('task-delete', subtaskId);
+            if (result.success) {
+                // Remove from local tasks array
+                const index = this.tasks.findIndex(t => t.id === subtaskId);
+                if (index !== -1) {
+                    this.tasks.splice(index, 1);
+                }
+                
+                // Refresh the parent task details if it's open
+                if (this.currentTask && this.currentTask.id === parentTaskId) {
+                    await this.showTaskDetails(parentTaskId);
+                }
+                
+                // Refresh the kanban board
+                this.renderTasks();
+            } else {
+                alert('Failed to delete subtask: ' + (result.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Error deleting subtask:', error);
+            alert('Failed to delete subtask');
         }
     }
 
@@ -1467,7 +2166,8 @@ class KanbanManager {
                     task.terminal_id = terminalValue;
                 }
                 
-                this.showNotification(`Terminal updated successfully`, 'success');
+                // Notification removed as requested - terminal update still works
+                // this.showNotification(`Terminal updated successfully`, 'success');
             } else {
                 // Revert the select to previous value
                 await this.loadTasks();
@@ -1687,12 +2387,6 @@ class KanbanManager {
         }
     }
 
-    editTask(taskId) {
-        const task = this.tasks.find(t => t.id === taskId);
-        if (task) {
-            this.showEditTaskModal(task);
-        }
-    }
 
     showNotification(message, type = 'info') {
         // Console log for debugging
@@ -2062,15 +2756,23 @@ class KanbanManager {
     showPlanEditMode() {
         if (!this.currentTask) return;
         
-        document.getElementById('details-plan-content').style.display = 'none';
-        document.getElementById('edit-plan-section').style.display = 'block';
-        document.getElementById('edit-plan-textarea').value = this.currentTask.plan || '';
-        document.getElementById('edit-plan-textarea').focus();
+        const planContent = document.getElementById('details-plan-content');
+        const editSection = document.getElementById('edit-plan-section');
+        const textarea = document.getElementById('edit-plan-textarea');
+        
+        if (planContent) planContent.style.display = 'none';
+        if (editSection) editSection.style.display = 'block';
+        if (textarea) {
+            textarea.value = this.currentTask.plan || '';
+            textarea.focus();
+        }
     }
 
     hidePlanEditMode() {
-        document.getElementById('details-plan-content').style.display = 'block';
-        document.getElementById('edit-plan-section').style.display = 'none';
+        const planContent = document.getElementById('details-plan-content');
+        const editSection = document.getElementById('edit-plan-section');
+        if (planContent) planContent.style.display = 'block';
+        if (editSection) editSection.style.display = 'none';
     }
 
     async savePlan() {
@@ -2098,15 +2800,23 @@ class KanbanManager {
     showImplementationEditMode() {
         if (!this.currentTask) return;
         
-        document.getElementById('details-implementation-content').style.display = 'none';
-        document.getElementById('edit-implementation-section').style.display = 'block';
-        document.getElementById('edit-implementation-textarea').value = this.currentTask.implementation || '';
-        document.getElementById('edit-implementation-textarea').focus();
+        const implContent = document.getElementById('details-implementation-content');
+        const editSection = document.getElementById('edit-implementation-section');
+        const textarea = document.getElementById('edit-implementation-textarea');
+        
+        if (implContent) implContent.style.display = 'none';
+        if (editSection) editSection.style.display = 'block';
+        if (textarea) {
+            textarea.value = this.currentTask.implementation || '';
+            textarea.focus();
+        }
     }
 
     hideImplementationEditMode() {
-        document.getElementById('details-implementation-content').style.display = 'block';
-        document.getElementById('edit-implementation-section').style.display = 'none';
+        const implContent = document.getElementById('details-implementation-content');
+        const editSection = document.getElementById('edit-implementation-section');
+        if (implContent) implContent.style.display = 'block';
+        if (editSection) editSection.style.display = 'none';
     }
 
     async saveImplementation() {
@@ -2183,7 +2893,8 @@ class KanbanManager {
                 // Reload tasks to update the board
                 await this.loadTasks();
                 
-                this.showNotification(`Status updated to ${statusText}`, 'success');
+                // Notification removed - no popup when changing status from modal
+                // this.showNotification(`Status updated to ${statusText}`, 'success');
             } else {
                 // Close dropdown on error
                 this.hideStatusDropdown();
@@ -2203,73 +2914,40 @@ class KanbanManager {
         const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
         const button = event.currentTarget || event.target;
         const taskCard = button?.closest('.task-card');
-        const taskList = taskCard?.closest('.task-list');
-        const kanbanColumn = taskList?.closest('.kanban-column');
         
-        // Close all other dropdowns and restore their overflow
+        // Close all other dropdowns
         document.querySelectorAll('.send-terminal-dropdown').forEach(d => {
             if (d !== dropdown && d.style.display === 'block') {
                 d.style.display = 'none';
-                // Restore overflow for other cards
+                // Reset z-index for other cards
                 const otherCard = d.closest('.task-card');
-                const otherList = otherCard?.closest('.task-list');
-                const otherColumn = otherList?.closest('.kanban-column');
-                if (otherCard) otherCard.style.overflow = '';
-                if (otherList) otherList.style.overflow = '';
-                if (otherColumn) otherColumn.style.overflow = '';
+                if (otherCard) {
+                    otherCard.style.zIndex = '';
+                }
             }
         });
         
         if (dropdown.style.display === 'none') {
-            // Get task and available terminals
+            // Get task
             const task = this.tasks.find(t => t.id === taskId);
             if (!task) return;
             
-            // Temporarily set overflow to visible for parent containers
-            if (taskCard) {
-                taskCard.style.overflow = 'visible';
-                taskCard.style.zIndex = '1000';
-            }
-            if (taskList) {
-                taskList.style.overflow = 'visible';
-            }
-            if (kanbanColumn) {
-                kanbanColumn.style.overflow = 'visible';
-            }
-            
-            // Request available terminals from main process
-            const terminals = await ipcRenderer.invoke('get-terminals-for-project', task.project);
-            
-            // Build dropdown content
-            let dropdownHTML = '';
-            
-            if (terminals && terminals.length > 0) {
-                dropdownHTML = terminals.map(terminal => `
-                    <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
-                        <i data-lucide="terminal"></i>
-                        Terminal ${terminal.id + 1}
-                        <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
-                    </div>
-                `).join('');
-            } else {
-                dropdownHTML = `
-                    <div class="send-terminal-option no-terminals">
-                        <i data-lucide="alert-circle"></i>
-                        No terminals with this project
-                    </div>
-                `;
-            }
-            
-            // Always add copy option
-            dropdownHTML += `
-                <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
-                    <i data-lucide="clipboard-copy"></i>
-                    Copy Task Summary
+            // Show dropdown immediately with loading state
+            dropdown.innerHTML = `
+                <div class="send-terminal-option loading">
+                    <i data-lucide="loader-2" class="spinner"></i>
+                    Loading terminals...
                 </div>
             `;
-            
-            dropdown.innerHTML = dropdownHTML;
             dropdown.style.display = 'block';
+            
+            // Set higher z-index for the task card to ensure dropdown is visible
+            if (taskCard) {
+                taskCard.style.zIndex = '1000';
+            }
+            
+            // Find the wrapper element (parent of the dropdown)
+            const wrapper = dropdown.parentElement;
             
             // Rotate dropdown icon
             const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
@@ -2277,22 +2955,72 @@ class KanbanManager {
                 dropdownIcon.style.transform = 'rotate(180deg)';
             }
             
-            // Re-initialize icons
+            // Re-initialize icons for the loading state
             this.initializeLucideIcons();
+            
+            // Request available terminals from main process asynchronously
+            ipcRenderer.invoke('get-terminals-for-project', task.project).then(terminals => {
+                // Build dropdown content
+                let dropdownHTML = '';
+                
+                if (terminals && terminals.length > 0) {
+                    dropdownHTML = terminals.map(terminal => `
+                        <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
+                            <i data-lucide="terminal"></i>
+                            Terminal ${terminal.id + 1} (${terminal.project})
+                            <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
+                        </div>
+                    `).join('');
+                } else {
+                    dropdownHTML = `
+                        <div class="send-terminal-option no-terminals">
+                            <i data-lucide="alert-circle"></i>
+                            No active terminals available
+                        </div>
+                    `;
+                }
+                
+                // Always add copy option
+                dropdownHTML += `
+                    <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                        <i data-lucide="clipboard-copy"></i>
+                        Copy Task Summary
+                    </div>
+                `;
+                
+                // Update dropdown content if it's still open
+                if (dropdown.style.display === 'block') {
+                    dropdown.innerHTML = dropdownHTML;
+                    // Re-initialize icons for the new content
+                    this.initializeLucideIcons();
+                }
+            }).catch(error => {
+                console.error('Error loading terminals:', error);
+                if (dropdown.style.display === 'block') {
+                    dropdown.innerHTML = `
+                        <div class="send-terminal-option error">
+                            <i data-lucide="alert-triangle"></i>
+                            Error loading terminals
+                        </div>
+                        <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                            <i data-lucide="clipboard-copy"></i>
+                            Copy Task Summary
+                        </div>
+                    `;
+                    this.initializeLucideIcons();
+                }
+            });
             
             // Add click handler to close dropdown when clicking outside
             setTimeout(() => {
                 const closeHandler = (e) => {
-                    if (!wrapper.contains(e.target)) {
+                    if (!dropdown.contains(e.target) && !button.contains(e.target)) {
                         dropdown.style.display = 'none';
                         if (dropdownIcon) dropdownIcon.style.transform = '';
-                        // Restore overflow
+                        // Reset z-index
                         if (taskCard) {
-                            taskCard.style.overflow = '';
                             taskCard.style.zIndex = '';
                         }
-                        if (taskList) taskList.style.overflow = '';
-                        if (kanbanColumn) kanbanColumn.style.overflow = '';
                         document.removeEventListener('click', closeHandler);
                     }
                 };
@@ -2300,15 +3028,13 @@ class KanbanManager {
             }, 0);
         } else {
             dropdown.style.display = 'none';
+            const wrapper = dropdown.parentElement;
             const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
             if (dropdownIcon) dropdownIcon.style.transform = '';
-            // Restore overflow
+            // Reset z-index
             if (taskCard) {
-                taskCard.style.overflow = '';
                 taskCard.style.zIndex = '';
             }
-            if (taskList) taskList.style.overflow = '';
-            if (kanbanColumn) kanbanColumn.style.overflow = '';
         }
     }
 
@@ -2360,6 +3086,88 @@ class KanbanManager {
         
         // Close Task Manager window immediately
         window.close();
+    }
+
+    setupModalSendIcon(taskId) {
+        const modalSendIcon = document.getElementById('modal-send-icon');
+        if (!modalSendIcon) return;
+        
+        // Remove old event listeners by cloning the element
+        const newModalSendIcon = modalSendIcon.cloneNode(true);
+        modalSendIcon.parentNode.replaceChild(newModalSendIcon, modalSendIcon);
+        
+        // Add click event listener
+        newModalSendIcon.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            await this.toggleModalSendDropdown(e, taskId);
+        });
+        
+        // Re-initialize the lucide icon
+        if (typeof lucide !== 'undefined') {
+            lucide.createIcons();
+        }
+    }
+    
+    async toggleModalSendDropdown(event, taskId) {
+        event.stopPropagation();
+        event.preventDefault();
+        
+        const dropdown = document.getElementById('modal-send-dropdown');
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) return;
+        
+        if (dropdown.style.display === 'none') {
+            // Request available terminals from main process
+            const terminals = await ipcRenderer.invoke('get-terminals-for-project', task.project);
+            
+            // Build dropdown content (same as regular task cards)
+            let dropdownHTML = '';
+            
+            if (terminals && terminals.length > 0) {
+                dropdownHTML = terminals.map(terminal => `
+                    <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
+                        <i data-lucide="terminal"></i>
+                        Terminal ${terminal.id + 1} (${terminal.project})
+                        <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
+                    </div>
+                `).join('');
+            } else {
+                dropdownHTML = `
+                    <div class="send-terminal-option no-terminals">
+                        <i data-lucide="alert-circle"></i>
+                        No active terminals available
+                    </div>
+                `;
+            }
+            
+            // Always add copy option
+            dropdownHTML += `
+                <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                    <i data-lucide="clipboard-copy"></i>
+                    Copy Task Summary
+                </div>
+            `;
+            
+            dropdown.innerHTML = dropdownHTML;
+            dropdown.style.display = 'block';
+            
+            // Re-initialize icons
+            this.initializeLucideIcons();
+            
+            // Add click handler to close dropdown when clicking outside
+            setTimeout(() => {
+                const closeHandler = (e) => {
+                    if (!e.target.closest('.task-header-send-wrapper')) {
+                        dropdown.style.display = 'none';
+                        document.removeEventListener('click', closeHandler);
+                    }
+                };
+                document.addEventListener('click', closeHandler);
+            }, 0);
+        } else {
+            dropdown.style.display = 'none';
+        }
     }
 
     async copyTaskSummary(taskId) {

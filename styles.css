@@ -937,8 +937,63 @@ body::before {
   z-index: 2000;
 }
 
+/* Form styles for modals */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.form-input {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.1);
+}
+
+.form-input:hover {
+  border-color: var(--border-hover);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .modal-content {
-  background: rgba(20, 20, 20, 0.98); /* Increased opacity to compensate for no blur */
+  background: rgba(10, 10, 10, 1); /* Made much darker for better visibility */
   /* backdrop-filter: none; - Removed: causes performance issues in Electron */
   border: 1px solid var(--border);
   border-radius: 16px;

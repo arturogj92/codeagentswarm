@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <title>Task Manager - Kanban Board</title>
     <link rel="stylesheet" href="kanban.css">
+    <link rel="stylesheet" href="styles/task-modal-modern.css">
+    <link rel="stylesheet" href="styles/markdown-editor.css">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 </head>
 <body> 
@@ -210,15 +212,186 @@
                     </div>
                     <div class="form-group">
                         <label for="task-description">Description</label>
-                        <textarea id="task-description" rows="4" maxlength="50000"></textarea>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="task-description" class="markdown-textarea" rows="4" maxlength="50000" placeholder="Add description... (supports Markdown)"></textarea>
+                            <div class="markdown-preview" id="create-description-preview"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="task-plan">Plan</label>
-                        <textarea id="task-plan" rows="3" maxlength="100000" placeholder="Enter your plan for this task..."></textarea>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="task-plan" class="markdown-textarea" rows="3" maxlength="100000" placeholder="Enter your plan for this task... (supports Markdown)"></textarea>
+                            <div class="markdown-preview" id="create-plan-preview"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="task-implementation">Implementation</label>
-                        <textarea id="task-implementation" rows="3" maxlength="100000" placeholder="Files modified, summary and implementation details..."></textarea>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button type="button" class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button type="button" class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="task-implementation" class="markdown-textarea" rows="3" maxlength="100000" placeholder="Files modified, summary and implementation details... (supports Markdown)"></textarea>
+                            <div class="markdown-preview" id="create-implementation-preview"></div>
+                        </div>
                     </div>
                     <div class="form-group">
                         <label for="task-status">Status</label>
@@ -234,6 +407,13 @@
                         <select id="task-project">
                             <option value="CodeAgentSwarm">CodeAgentSwarm</option>
                         </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="task-parent">Parent Task (optional)</label>
+                        <select id="task-parent">
+                            <option value="">No parent (standalone task)</option>
+                        </select>
+                        <small class="form-help">Make this task a subtask of another task</small>
                     </div>
                     <div class="form-group">
                         <label for="task-terminal">Terminal (optional)</label>
@@ -259,70 +439,327 @@
     <!-- Task Details Modal -->
     <div class="modal" id="task-details-modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3>Task Details</h3>
-                <button class="modal-close" id="details-modal-close-btn">
-                    <i data-lucide="x"></i>
-                </button>
-            </div>
-            <div class="modal-body">
-                <div class="task-info">
-                    <div class="task-status-header">
-                        <div id="status-display" class="status-display clickable">
-                            <span id="details-status-text"></span>
-                            <i data-lucide="chevron-down" class="status-dropdown-icon"></i>
-                        </div>
-                        <div id="status-dropdown-menu" class="status-dropdown-menu" style="display: none;">
-                            <div class="status-option" data-value="pending">Pending</div>
-                            <div class="status-option" data-value="in_progress">In Progress</div>
-                            <div class="status-option" data-value="in_testing">In Testing</div>
-                            <div class="status-option" data-value="completed">Completed</div>
-                        </div>
-                    </div>
-                    <h4 id="details-title"></h4>
-                    <p id="details-description"></p>
-                    <div class="task-plan-section">
-                        <h5>Plan:</h5>
-                        <div id="details-plan-content">
-                            <p id="details-plan"></p>
-                            <button type="button" class="btn btn-small" id="edit-plan-btn">
-                                <i data-lucide="edit-3"></i> Edit Plan
-                            </button>
-                        </div>
-                        <div id="edit-plan-section" style="display: none;">
-                            <textarea id="edit-plan-textarea" rows="4" maxlength="1000"></textarea>
-                            <div class="plan-actions">
-                                <button type="button" class="btn btn-primary btn-small" id="save-plan-btn">Save</button>
-                                <button type="button" class="btn btn-secondary btn-small" id="cancel-plan-btn">Cancel</button>
+            <div class="modal-header task-header-redesigned">
+                <div class="task-header-wrapper">
+                    <div class="task-header-top">
+                        <div class="task-header-meta">
+                            <div class="task-header-status">
+                                <div id="status-display" class="status-display-modern clickable">
+                                    <span id="details-status-text"></span>
+                                    <i data-lucide="chevron-down" class="status-dropdown-icon"></i>
+                                </div>
+                                <div id="status-dropdown-menu" class="status-dropdown-menu" style="display: none;">
+                                    <div class="status-option" data-value="pending">
+                                        <span>Pending</span>
+                                    </div>
+                                    <div class="status-option" data-value="in_progress">
+                                        <span>In Progress</span>
+                                    </div>
+                                    <div class="status-option" data-value="in_testing">
+                                        <span>In Testing</span>
+                                    </div>
+                                    <div class="status-option" data-value="completed">
+                                        <span>Completed</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="task-header-id">
+                                <span id="header-task-id">#0000</span>
+                            </div>
+                            <div class="task-header-parent" id="header-parent-info" style="display: none;">
+                                <i data-lucide="git-branch" class="header-icon"></i>
+                                <span id="header-parent-id"></span>
+                            </div>
+                            <div class="task-header-project">
+                                <i data-lucide="folder" class="header-icon"></i>
+                                <select id="header-project-select" class="header-select">
+                                    <option value="">No project</option>
+                                </select>
+                            </div>
+                            <div class="task-header-terminal">
+                                <i data-lucide="terminal" class="header-icon"></i>
+                                <select id="header-terminal-select" class="header-select">
+                                    <option value="">Not assigned</option>
+                                    <option value="1">Terminal 1</option>
+                                    <option value="2">Terminal 2</option>
+                                    <option value="3">Terminal 3</option>
+                                    <option value="4">Terminal 4</option>
+                                    <option value="5">Terminal 5</option>
+                                    <option value="6">Terminal 6</option>
+                                </select>
+                            </div>
+                            <div class="task-header-send-wrapper">
+                                <div class="send-to-terminal-icon modal-send-icon" id="modal-send-icon" title="Send task to terminal">
+                                    <i data-lucide="send"></i>
+                                </div>
+                                <div class="send-terminal-dropdown modal-send-dropdown" id="modal-send-dropdown" style="display: none;">
+                                    <!-- Dropdown will be populated dynamically -->
+                                </div>
+                            </div>
+                            <div class="task-header-created">
+                                <i data-lucide="clock" class="header-icon"></i>
+                                <span id="header-created-at"></span>
                             </div>
                         </div>
+                        <button class="modal-close" id="details-modal-close-btn">
+                            <i data-lucide="x"></i>
+                        </button>
                     </div>
-                    <div class="task-implementation-section">
-                        <h5>Implementation:</h5>
-                        <div id="details-implementation-content">
-                            <p id="details-implementation"></p>
-                            <button type="button" class="btn btn-small" id="edit-implementation-btn">
-                                <i data-lucide="edit-3"></i> Edit Implementation
-                            </button>
-                        </div>
-                        <div id="edit-implementation-section" style="display: none;">
-                            <textarea id="edit-implementation-textarea" rows="4" maxlength="1000"></textarea>
-                            <div class="implementation-actions">
-                                <button type="button" class="btn btn-primary btn-small" id="save-implementation-btn">Save</button>
-                                <button type="button" class="btn btn-secondary btn-small" id="cancel-implementation-btn">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="task-meta">
-                        <span id="details-terminal"></span>
-                        <span id="details-created"></span>
+                    <div class="task-header-title">
+                        <input type="text" id="details-title" class="editable-title-modern" placeholder="Task title...">
                     </div>
                 </div>
             </div>
+            <div class="modal-body">
+                <div class="task-info">
+                    
+                    <!-- Parent Task Information (kept at top) -->
+                    <div id="parent-task-info" class="parent-task-section" style="display: none;">
+                        <h5>Parent Task:</h5>
+                        <div class="parent-task-card">
+                            <span id="parent-task-link"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group task-description-section">
+                        <label><i data-lucide="file-text"></i> Description</label>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="details-description" class="markdown-textarea" placeholder="Add description... (supports Markdown)" rows="4"></textarea>
+                            <div class="markdown-preview" id="description-preview"></div>
+                            <div class="editor-status-bar">
+                                <span class="char-count" id="description-char-count">0 characters</span>
+                                <span class="editor-mode-indicator">
+                                    <i data-lucide="edit-3"></i> Edit mode
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group task-plan-section">
+                        <label><i data-lucide="list"></i> Plan</label>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="details-plan" class="markdown-textarea" placeholder="Add plan... (supports Markdown)" rows="6"></textarea>
+                            <div class="markdown-preview" id="plan-preview"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group task-implementation-section">
+                        <label><i data-lucide="code"></i> Implementation</label>
+                        <div class="markdown-editor-container">
+                            <div class="editor-toolbar">
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="bold" data-tooltip="Bold (Ctrl+B)">
+                                        <i data-lucide="bold"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="italic" data-tooltip="Italic (Ctrl+I)">
+                                        <i data-lucide="italic"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="strikethrough" data-tooltip="Strikethrough">
+                                        <i data-lucide="strikethrough"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="h1" data-tooltip="Heading 1">
+                                        <i data-lucide="heading-1"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h2" data-tooltip="Heading 2">
+                                        <i data-lucide="heading-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="h3" data-tooltip="Heading 3">
+                                        <i data-lucide="heading-3"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="ul" data-tooltip="Bullet List">
+                                        <i data-lucide="list"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="ol" data-tooltip="Numbered List">
+                                        <i data-lucide="list-ordered"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="checklist" data-tooltip="Checklist">
+                                        <i data-lucide="list-checks"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="code" data-tooltip="Code">
+                                        <i data-lucide="code"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="codeblock" data-tooltip="Code Block">
+                                        <i data-lucide="code-2"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="quote" data-tooltip="Quote">
+                                        <i data-lucide="quote"></i>
+                                    </button>
+                                </div>
+                                <div class="editor-toolbar-group">
+                                    <button class="editor-btn" data-action="link" data-tooltip="Link">
+                                        <i data-lucide="link"></i>
+                                    </button>
+                                    <button class="editor-btn" data-action="preview" data-tooltip="Preview">
+                                        <i data-lucide="eye"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <textarea id="details-implementation" class="markdown-textarea" placeholder="Add implementation details... (supports Markdown)" rows="6"></textarea>
+                            <div class="markdown-preview" id="implementation-preview"></div>
+                        </div>
+                    </div>
+                    
+                    <!-- Subtasks Section (moved to bottom) -->
+                    <div id="subtasks-section" class="subtasks-section" style="display: none;">
+                        <div class="subtasks-header">
+                            <h5><i data-lucide="git-branch"></i> Subtasks</h5>
+                            <button type="button" class="btn-modern btn-primary-modern btn-sm" id="create-subtask-btn">
+                                <i data-lucide="plus"></i> Create Subtask
+                            </button>
+                        </div>
+                        <div id="subtasks-list" class="subtasks-list-redesigned"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer modal-actions">
+                <button type="button" class="btn-modern btn-danger-modern" id="delete-task-btn"><i data-lucide="trash-2"></i> Delete</button>
+                <button type="button" class="btn-modern btn-secondary-modern" id="close-details-btn"><i data-lucide="x"></i> Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Subtask Creation Modal -->
+    <div class="modal" id="subtask-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Create Subtask</h2>
+                <button type="button" class="close-btn" id="close-subtask-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="create-subtask-form">
+                    <div class="form-group">
+                        <label for="subtask-title"><i data-lucide="type"></i> Title</label>
+                        <input type="text" id="subtask-title" placeholder="Enter subtask title" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="subtask-description"><i data-lucide="file-text"></i> Description (optional)</label>
+                        <textarea id="subtask-description" placeholder="Enter subtask description" rows="4"></textarea>
+                    </div>
+                    <div class="parent-task-info-modal">
+                        <span class="label">Parent Task:</span>
+                        <span id="parent-task-display"></span>
+                    </div>
+                </form>
+            </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-danger" id="delete-task-btn">Delete</button>
-                <button type="button" class="btn btn-secondary" id="edit-task-btn">Edit</button>
-                <button type="button" class="btn btn-primary" id="close-details-btn">Close</button>
+                <button type="button" class="btn-modern btn-secondary-modern" id="cancel-subtask-btn">Cancel</button>
+                <button type="submit" form="create-subtask-form" class="btn-modern btn-primary-modern">
+                    <i data-lucide="plus"></i> Create Subtask
+                </button>
             </div>
         </div>
     </div>
@@ -453,6 +890,7 @@
         </div>
     </div>
 
+    <script src="markdown-editor.js"></script>
     <script src="kanban.js"></script>
 </body>
 </html>
