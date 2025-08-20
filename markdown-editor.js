@@ -327,22 +327,22 @@ function initializeMarkdownEditors() {
     new MarkdownEditor('details-description', 'description-preview', 'description-char-count');
     
     // Plan editor
-    new MarkdownEditor('details-plan', 'plan-preview');
+    new MarkdownEditor('details-plan', 'plan-preview', 'plan-char-count');
     
     // Implementation editor
-    new MarkdownEditor('details-implementation', 'implementation-preview');
+    new MarkdownEditor('details-implementation', 'implementation-preview', 'implementation-char-count');
 }
 
 // Initialize editors for task creation modal
 function initializeCreateMarkdownEditors() {
     // Description editor for creation
-    new MarkdownEditor('task-description', 'create-description-preview');
+    new MarkdownEditor('task-description', 'create-description-preview', 'create-description-char-count');
     
     // Plan editor for creation
-    new MarkdownEditor('task-plan', 'create-plan-preview');
+    new MarkdownEditor('task-plan', 'create-plan-preview', 'create-plan-char-count');
     
     // Implementation editor for creation
-    new MarkdownEditor('task-implementation', 'create-implementation-preview');
+    new MarkdownEditor('task-implementation', 'create-implementation-preview', 'create-implementation-char-count');
 }
 
 // Export for use in kanban.js

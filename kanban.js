@@ -1588,7 +1588,7 @@ class KanbanManager {
                             </div>
                         `).join('');
                     } else {
-                        subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100px; font-style: italic;">No subtasks yet. Click "Create Subtask" to add one.</div>';
+                        subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; font-style: italic; width: 100%; grid-column: 1 / -1;">No subtasks yet. Click "Create Subtask" to add one.</div>';
                     }
                 });
             }
@@ -1926,16 +1926,31 @@ class KanbanManager {
         // Description field
         document.getElementById('details-description').addEventListener('input', (e) => {
             debouncedSave('description', e.target.value);
+            // Update character count
+            const charCount = document.getElementById('description-char-count');
+            if (charCount) {
+                charCount.textContent = `${e.target.value.length} characters`;
+            }
         });
         
         // Plan field
         document.getElementById('details-plan').addEventListener('input', (e) => {
             debouncedSave('plan', e.target.value);
+            // Update character count
+            const charCount = document.getElementById('plan-char-count');
+            if (charCount) {
+                charCount.textContent = `${e.target.value.length} characters`;
+            }
         });
         
         // Implementation field
         document.getElementById('details-implementation').addEventListener('input', (e) => {
             debouncedSave('implementation', e.target.value);
+            // Update character count
+            const charCount = document.getElementById('implementation-char-count');
+            if (charCount) {
+                charCount.textContent = `${e.target.value.length} characters`;
+            }
         });
         
         // Header project select (only one project dropdown in the header)
@@ -2062,9 +2077,35 @@ class KanbanManager {
                     this.tasks.splice(index, 1);
                 }
                 
-                // Refresh the parent task details if it's open
+                // Update the subtasks list in the modal if it's open
                 if (this.currentTask && this.currentTask.id === parentTaskId) {
-                    await this.showTaskDetails(parentTaskId);
+                    // Re-filter subtasks and update the UI
+                    const subtasks = this.tasks.filter(t => t.parent_task_id === parentTaskId);
+                    const subtasksList = document.getElementById('subtasks-list');
+                    
+                    if (subtasksList) {
+                        if (subtasks.length > 0) {
+                            subtasksList.innerHTML = subtasks.map(subtask => `
+                                <div class="subtask-item">
+                                    <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
+                                        <div class="subtask-header">
+                                            <span class="task-id-badge">#${subtask.id}</span>
+                                            <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
+                                            <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Delete subtask">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                </svg>
+                                            </button>
+                                        </div>
+                                        <div class="subtask-title">${this.escapeHtml(subtask.title)}</div>
+                                    </a>
+                                </div>
+                            `).join('');
+                        } else {
+                            subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; font-style: italic; width: 100%; grid-column: 1 / -1;">No subtasks yet. Click "Create Subtask" to add one.</div>';
+                        }
+                    }
                 }
                 
                 // Refresh the kanban board

@@ -233,6 +233,7 @@
 /* Title Section */
 .task-header-title {
   padding: 3px var(--task-spacing-lg) 5px;
+  padding-left: 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
