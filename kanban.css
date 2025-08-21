@@ -692,7 +692,7 @@ body::before {
     background: transparent;
     color: var(--text-muted);
     font-weight: 600;
-    font-size: 0.5rem;
+    font-size: 0.85rem;
     padding: 0;
     border-radius: 0;
     letter-spacing: 0.2px;
@@ -1968,23 +1968,7 @@ body::before {
     overflow: hidden;
 }
 
-.status-option:before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg,
-        transparent 0%,
-        rgba(255, 255, 255, 0.05) 50%,
-        transparent 100%);
-    transition: left 0.5s ease;
-}
-
-.status-option:hover:before {
-    left: 100%;
-}
+/* Removed sliding animation on hover */
 
 .status-option:last-child {
     border-bottom: none;
@@ -3336,4 +3320,73 @@ input[type="radio"]:checked + .color-option {
     background: rgba(255, 255, 255, 0.08);
     border-color: rgba(127, 90, 240, 0.5);
     outline: none;
+}
+
+/* Load More Button Styles */
+.load-more-container {
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+}
+
+.load-more-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    background: linear-gradient(135deg, rgba(127, 90, 240, 0.1) 0%, rgba(127, 90, 240, 0.05) 100%);
+    border: 1px solid rgba(127, 90, 240, 0.3);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+}
+
+.load-more-btn:hover {
+    background: linear-gradient(135deg, rgba(127, 90, 240, 0.2) 0%, rgba(127, 90, 240, 0.1) 100%);
+    border-color: rgba(127, 90, 240, 0.5);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2);
+}
+
+.load-more-btn:active {
+    transform: translateY(0);
+}
+
+.load-more-btn i {
+    width: 16px;
+    height: 16px;
+}
+
+.load-more-btn .remaining-count {
+    opacity: 0.7;
+    font-size: 0.75rem;
+    margin-left: 0.25rem;
+}
+
+.load-more-btn:hover .remaining-count {
+    opacity: 1;
+}
+
+/* Loading state animation */
+.load-more-btn.loading {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.load-more-btn.loading i {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }

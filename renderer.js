@@ -644,8 +644,90 @@ class TerminalManager {
         });
     }
 
+    async findUninitializedTerminal() {
+        // Find a terminal that exists but hasn't been initialized (is showing placeholder)
+        try {
+            const activeResult = await ipcRenderer.invoke('get-active-terminals');
+            if (!activeResult.success) return null;
+            
+            for (const terminalId of activeResult.terminals) {
+                // Check if this terminal is uninitialized (no directory selected)
+                if (!this.lastSelectedDirectories[terminalId]) {
+                    // Also check if there's no active shell for this terminal
+                    const hasShell = await ipcRenderer.invoke('terminal-has-shell', terminalId);
+                    if (!hasShell) {
+                        return terminalId;
+                    }
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('Error finding uninitialized terminal:', error);
+            return null;
+        }
+    }
+
+    async findProjectDirectories(projectName) {
+        // Try to find directories that match this project
+        try {
+            // Check all saved directories in localStorage
+            const directories = [];
+            for (let i = 0; i < 6; i++) {
+                const dir = this.lastSelectedDirectories[i];
+                if (dir) {
+                    // Check if this directory has a CLAUDE.md with matching project
+                    const result = await ipcRenderer.invoke('check-project-match', dir, projectName);
+                    if (result && result.matches) {
+                        directories.push(dir);
+                    }
+                }
+            }
+            
+            // Also check recent projects from database
+            const recentProjects = await ipcRenderer.invoke('get-recent-project-directories', projectName);
+            if (recentProjects && recentProjects.directories) {
+                directories.push(...recentProjects.directories);
+            }
+            
+            // Remove duplicates
+            return [...new Set(directories)];
+        } catch (error) {
+            console.error('Error finding project directories:', error);
+            return [];
+        }
+    }
+
     async showDirectorySelector(quadrant) {
         console.log(`showDirectorySelector called for quadrant ${quadrant}, mode: ${this.layoutMode}`);
+        
+        // Check if there's a pending task for this terminal
+        if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
+            const taskData = window.pendingTerminalTasks[quadrant];
+            console.log(`📋 Found pending task for terminal ${quadrant}:`, taskData);
+            
+            // Try to find a directory for the project
+            // First check if we have existing directories for this project
+            const projectDirs = await this.findProjectDirectories(taskData.project);
+            
+            if (projectDirs && projectDirs.length > 0) {
+                // Use the first matching directory
+                const selectedDir = projectDirs[0];
+                console.log(`📁 Auto-selecting directory for project ${taskData.project}: ${selectedDir}`);
+                
+                // Start terminal directly with this directory
+                this.lastSelectedDirectories[quadrant] = selectedDir;
+                this.saveDirectoryToStorage(quadrant, selectedDir);
+                await ipcRenderer.invoke('project-update-last-opened', selectedDir);
+                
+                // Start terminal with "new" session for tasks
+                this.startTerminal(quadrant, selectedDir, 'new');
+                return;
+            } else {
+                // No existing directory, show selector but with project context
+                console.log(`📁 No existing directory found for project ${taskData.project}, showing selector`);
+            }
+        }
         
         // Debug: log all terminal-quadrant elements (not placeholders)
         const allQuadrants = document.querySelectorAll('.terminal-quadrant');
@@ -1582,6 +1664,91 @@ class TerminalManager {
                 console.log(`📜 Claude stopped outputting to terminal ${quadrant}`);
             }, 1000);
             
+            // Check if Claude is ready and we have a pending task
+            const dataStr = data.toString();
+            
+            // More comprehensive Claude detection patterns including visual prompts
+            const claudeReadyPatterns = [
+                'Welcome to Claude Code',
+                'claude-opus-4-1',
+                'Human:',
+                'Assistant:',
+                'Type your message',
+                'Working directory:',
+                'Claude Code is ready',
+                'Enter your prompt',
+                '╭─', // Claude's visual prompt box
+                'Try "how does', // Claude's suggestion prompt
+                '│ ✻', // Claude's prompt symbol
+                '[?2004h' // Terminal ready sequence
+            ];
+            
+            const isClaudeReady = claudeReadyPatterns.some(pattern => 
+                dataStr.includes(pattern)
+            );
+            
+            // Debug logging for terminal output
+            if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
+                console.log(`📝 Terminal ${quadrant} output (has pending task):`, dataStr.substring(0, 100));
+                
+                // Also check if we see Claude's visual prompt
+                if (dataStr.includes('╭─') || dataStr.includes('Try "how does')) {
+                    console.log(`🎯 Claude visual prompt detected in terminal ${quadrant}`);
+                }
+            }
+            
+            if (!this.claudeCodeReady[quadrant] && isClaudeReady) {
+                console.log(`🎉 Claude is ready in terminal ${quadrant} (detected pattern in output)`);
+                this.claudeCodeReady[quadrant] = true;
+                
+                // Hide loader if present
+                const loader = document.getElementById(`loader-${quadrant}`);
+                const terminalDiv = document.getElementById(`terminal-${quadrant}`);
+                if (loader && terminalDiv) {
+                    loader.style.display = 'none';
+                    terminalDiv.style.display = 'block';
+                }
+                
+                // Check for pending task for this terminal
+                if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
+                    const taskData = window.pendingTerminalTasks[quadrant];
+                    console.log(`📬 Sending pending task to terminal ${quadrant}:`, taskData);
+                    
+                    // Build the message to send
+                    let message = `\n# Work on task #${taskData.taskId}: ${taskData.title}\n\n`;
+                    
+                    if (taskData.description) {
+                        message += `## Description:\n${taskData.description}\n\n`;
+                    }
+                    
+                    if (taskData.implementation) {
+                        message += `## Previous Implementation:\n${taskData.implementation}\n\n`;
+                    }
+                    
+                    if (taskData.plan) {
+                        message += `## Plan:\n${taskData.plan}\n\n`;
+                    }
+                    
+                    message += `## Command:\nWork on this task\n`;
+                    
+                    // Send the task info to Claude with a delay to ensure it's ready
+                    setTimeout(() => {
+                        console.log(`📤 Sending task message to terminal ${quadrant}`);
+                        ipcRenderer.send('send-to-terminal', quadrant, message);
+                        
+                        // Then send the command to start the task
+                        setTimeout(() => {
+                            const startCommand = `mcp__codeagentswarm-tasks__start_task --task_id ${taskData.taskId}\n`;
+                            console.log(`📤 Sending start command to terminal ${quadrant}: ${startCommand}`);
+                            ipcRenderer.send('send-to-terminal', quadrant, startCommand);
+                        }, 500);
+                    }, 2000); // Increased delay to 2 seconds to ensure Claude is fully ready
+                    
+                    // Clear the pending task
+                    delete window.pendingTerminalTasks[quadrant];
+                }
+            }
+            
             // Set terminal activity for spinner in tabbed mode
             this.setTerminalActivity(quadrant, true);
             
@@ -1598,7 +1765,7 @@ class TerminalManager {
             this.activityTimers.set(quadrant, timer);
             
             // Auto-scroll on certain patterns - but NOT if user is manually scrolling
-            const dataStr = data.toString();
+            // dataStr already defined above
             
             // Don't auto-scroll if user is manually scrolling
             if (!this.userScrolling.get(quadrant)) {
@@ -9137,6 +9304,73 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (gitStatusBtn) {
             gitStatusBtn.click();
         }
+    });
+    
+    // Handle opening a new terminal with a task
+    ipcRenderer.on('open-terminal-for-task', async (event, terminalId, taskData) => {
+        console.log('📧 Received request to open terminal for task:', terminalId, taskData);
+        
+        if (!window.terminalManager) {
+            console.error('Terminal manager not initialized');
+            return;
+        }
+        
+        // Store task data for when terminal is ready
+        if (!window.pendingTerminalTasks) {
+            window.pendingTerminalTasks = {};
+        }
+        window.pendingTerminalTasks[terminalId] = taskData;
+        
+        // Try to find a project directory for automatic initialization
+        const projectDirs = await window.terminalManager.findProjectDirectories(taskData.project);
+        const selectedDir = projectDirs && projectDirs.length > 0 ? projectDirs[0] : null;
+        
+        // Check if there are uninitialized terminals (placeholders) we can use
+        const uninitializedTerminal = await window.terminalManager.findUninitializedTerminal();
+        if (uninitializedTerminal !== null) {
+            console.log('📦 Found uninitialized terminal to reuse:', uninitializedTerminal);
+            // Use the existing uninitialized terminal
+            window.pendingTerminalTasks[uninitializedTerminal] = taskData;
+            
+            if (selectedDir) {
+                // Directly start the terminal with the project directory
+                console.log(`📁 Auto-initializing terminal ${uninitializedTerminal} with directory: ${selectedDir}`);
+                window.terminalManager.startTerminal(uninitializedTerminal, selectedDir, 'new');
+            } else {
+                // Show directory selector if no directory found
+                window.terminalManager.showDirectorySelector(uninitializedTerminal);
+            }
+        } else {
+            // Need to add a new terminal
+            const result = await ipcRenderer.invoke('add-terminal');
+            if (result.success) {
+                const newTerminalId = result.terminalId;
+                window.pendingTerminalTasks[newTerminalId] = taskData;
+                
+                // In tabbed mode, set active terminal before rendering
+                if (window.terminalManager.layoutMode === 'tabbed' && newTerminalId !== undefined) {
+                    window.terminalManager.activeTabTerminal = newTerminalId;
+                }
+                
+                // Render terminals
+                await window.terminalManager.renderTerminals();
+                await window.terminalManager.updateTerminalManagementButtons();
+                
+                // Now initialize the terminal with the directory if we have one
+                if (selectedDir) {
+                    console.log(`📁 Auto-initializing new terminal ${newTerminalId} with directory: ${selectedDir}`);
+                    // Small delay to ensure DOM is ready
+                    setTimeout(() => {
+                        window.terminalManager.startTerminal(newTerminalId, selectedDir, 'new');
+                    }, 200);
+                } else {
+                    // The placeholder will be shown and user can select directory
+                    console.log('📂 No project directory found, showing directory selector');
+                }
+            }
+        }
+        
+        // The task will be sent once Claude is ready (handled in terminal output handler)
     });
     
     // Debug functions for terminal titles

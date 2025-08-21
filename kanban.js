@@ -15,6 +15,38 @@ class KanbanManager {
         this.taskIndex = new Map(); // Quick task lookup by ID
         this.subtaskIndex = new Map(); // Parent ID -> subtask IDs mapping
         
+        // Pagination configuration for each column
+        this.paginationConfig = {
+            pending: {
+                initialLimit: 50,      // Show 50 tasks initially
+                increment: 30,         // Load 30 more each time
+                currentLimit: 50       // Track current limit
+            },
+            in_progress: {
+                initialLimit: 50,      // Show 50 tasks initially
+                increment: 30,         // Load 30 more each time
+                currentLimit: 50       // Track current limit
+            },
+            in_testing: {
+                initialLimit: 50,      // Show 50 tasks initially
+                increment: 30,         // Load 30 more each time
+                currentLimit: 50       // Track current limit
+            },
+            completed: {
+                initialLimit: 30,      // Show 30 tasks initially (less because there are many)
+                increment: 30,         // Load 30 more each time
+                currentLimit: 30       // Track current limit
+            }
+        };
+        
+        // Store all tasks by status for pagination
+        this.allTasksByStatus = {
+            pending: [],
+            in_progress: [],
+            in_testing: [],
+            completed: []
+        };
+        
         this.sortStates = {
             pending: 'default',
             in_progress: 'default',
@@ -50,6 +82,21 @@ class KanbanManager {
                     // Use preloaded data
                     this.tasks = data.tasks;
                     this.projects = data.projects;
+                    
+                    // CRITICAL: Build indexes for preloaded data (was missing!)
+                    this.taskIndex.clear();
+                    this.subtaskIndex.clear();
+                    
+                    for (const task of this.tasks) {
+                        this.taskIndex.set(task.id, task);
+                        
+                        if (task.parent_task_id) {
+                            if (!this.subtaskIndex.has(task.parent_task_id)) {
+                                this.subtaskIndex.set(task.parent_task_id, []);
+                            }
+                            this.subtaskIndex.get(task.parent_task_id).push(task.id);
+                        }
+                    }
                     
                     // Update UI immediately
                     this.updateProjectSelects();
@@ -141,6 +188,12 @@ class KanbanManager {
             searchInput.value = '';
             clearSearchBtn.style.display = 'none';
             document.getElementById('search-results-count').style.display = 'none';
+            
+            // Reset pagination for all columns when clearing search
+            Object.keys(this.paginationConfig).forEach(status => {
+                this.paginationConfig[status].currentLimit = this.paginationConfig[status].initialLimit;
+            });
+            
             this.renderTasks();
         });
         
@@ -1127,6 +1180,11 @@ class KanbanManager {
                 tasksByStatus[task.status].push(task);
             }
         });
+        
+        // Store all tasks by status for pagination
+        Object.keys(tasksByStatus).forEach(status => {
+            this.allTasksByStatus[status] = tasksByStatus[status];
+        });
 
         // Render tasks in each column
         Object.keys(tasksByStatus).forEach(status => {
@@ -1137,9 +1195,21 @@ class KanbanManager {
             // Sort tasks by creation date according to the current sort direction
             tasks = this.sortTasksByCreatedDate(tasks, this.sortStates[status]);
             
+            // Always show the real total count
             count.textContent = tasks.length;
-
-            if (tasks.length === 0) {
+            
+            // Apply pagination only if not searching
+            let tasksToDisplay = tasks;
+            let showLoadMore = false;
+            const config = this.paginationConfig[status];
+            
+            if (!this.searchQuery && tasks.length > config.currentLimit) {
+                // Take only the first N tasks
+                tasksToDisplay = tasks.slice(0, config.currentLimit);
+                showLoadMore = true;
+            }
+            
+            if (tasksToDisplay.length === 0) {
                 let emptyMessage = 'No tasks ' + status.replace('_', ' ');
                 if (this.searchQuery) {
                     emptyMessage = 'No matching tasks found';
@@ -1151,10 +1221,29 @@ class KanbanManager {
                     </div>
                 `;
             } else {
-                tasks.forEach(task => {
+                // Clear container first (removes any existing Load More buttons)
+                container.innerHTML = '';
+                
+                // Add tasks
+                tasksToDisplay.forEach(task => {
                     const taskElement = this.createTaskElement(task);
                     container.appendChild(taskElement);
                 });
+                
+                // Add Load More button if needed
+                if (showLoadMore) {
+                    const remainingTasks = tasks.length - config.currentLimit;
+                    const loadMoreBtn = document.createElement('div');
+                    loadMoreBtn.className = 'load-more-container';
+                    loadMoreBtn.innerHTML = `
+                        <button class="load-more-btn" onclick="kanban.loadMoreTasks('${status}')">
+                            <i data-lucide="chevron-down"></i>
+                            Load ${Math.min(remainingTasks, config.increment)} more
+                            <span class="remaining-count">(${remainingTasks} remaining)</span>
+                        </button>
+                    `;
+                    container.appendChild(loadMoreBtn);
+                }
             }
         });
 
@@ -1297,17 +1386,19 @@ class KanbanManager {
         let hierarchyIndicators = '';
         
         // Only add subtask indicator to header (parent moved to actions)
-        // Check if this task has subtasks
-        const subtasks = this.tasks.filter(t => t.parent_task_id === task.id);
-        if (subtasks.length > 0) {
+        // Check if this task has subtasks - use the same index method as the modal for consistency
+        const subtaskIds = this.subtaskIndex.get(task.id) || [];
+        const subtaskCount = subtaskIds.filter(id => this.taskIndex.has(id)).length;
+        
+        if (subtaskCount > 0) {
             hierarchyIndicators += `
-                <span class="task-hierarchy-indicator subtask-indicator" title="${subtasks.length} subtask${subtasks.length > 1 ? 's' : ''}">
+                <span class="task-hierarchy-indicator subtask-indicator" title="${subtaskCount} subtask${subtaskCount > 1 ? 's' : ''}">
                     <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                         <circle cx="18" cy="18" r="3"></circle>
                         <circle cx="6" cy="6" r="3"></circle>
                         <path d="M6 21V9a9 9 0 0 0 9 9"></path>
                     </svg>
-                    <span class="subtask-count">${subtasks.length}</span>
+                    <span class="subtask-count">${subtaskCount}</span>
                 </span>
             `;
         }
@@ -1944,7 +2035,7 @@ class KanbanManager {
             });
             
             if (result.success) {
-                this.showNotification('Subtask created successfully', 'success');
+                // Notification removed - no success message on subtask creation
                 this.closeSubtaskModal();
                 
                 // Reload tasks and refresh the current task details
@@ -2240,6 +2331,21 @@ class KanbanManager {
                     this.tasks.splice(index, 1);
                 }
                 
+                // Update indexes - CRITICAL for proper subtask display
+                // Remove from taskIndex
+                this.taskIndex.delete(subtaskId);
+                
+                // Remove from subtaskIndex
+                if (this.subtaskIndex.has(parentTaskId)) {
+                    const subtaskIds = this.subtaskIndex.get(parentTaskId);
+                    const filteredIds = subtaskIds.filter(id => id !== subtaskId);
+                    if (filteredIds.length > 0) {
+                        this.subtaskIndex.set(parentTaskId, filteredIds);
+                    } else {
+                        this.subtaskIndex.delete(parentTaskId);
+                    }
+                }
+                
                 // Update the subtasks list in the modal if it's open
                 if (this.currentTask && this.currentTask.id === parentTaskId) {
                     // Re-filter subtasks and update the UI
@@ -2298,7 +2404,7 @@ class KanbanManager {
             if (result.success) {
                 this.hideTaskDetailsModal();
                 await this.loadTasks();
-                this.showNotification('Task deleted successfully', 'success');
+                // Notification removed - no success message on delete
             } else {
                 alert(`Failed to delete task: ${result.error}`);
             }
@@ -2581,7 +2687,7 @@ class KanbanManager {
             const result = await ipcRenderer.invoke('task-delete', taskId);
             if (result.success) {
                 await this.loadTasks();
-                this.showNotification('Task deleted successfully', 'success');
+                // Notification removed - no success message on delete
             } else {
                 this.showNotification(`Failed to delete task: ${result.error}`, 'error');
             }
@@ -2926,6 +3032,61 @@ class KanbanManager {
             }
         });
     }
+    
+    loadMoreTasks(status) {
+        const container = document.getElementById(`${status}-tasks`);
+        const config = this.paginationConfig[status];
+        
+        // Get sorted tasks for this status
+        let tasks = this.allTasksByStatus[status];
+        tasks = this.sortTasksByCreatedDate(tasks, this.sortStates[status]);
+        
+        // Calculate how many tasks to load
+        const currentlyShowing = config.currentLimit;
+        const totalTasks = tasks.length;
+        const tasksToLoad = Math.min(config.increment, totalTasks - currentlyShowing);
+        
+        // Get the new tasks to add
+        const newTasks = tasks.slice(currentlyShowing, currentlyShowing + tasksToLoad);
+        
+        // Remove the existing Load More button
+        const existingLoadMore = container.querySelector('.load-more-container');
+        if (existingLoadMore) {
+            existingLoadMore.remove();
+        }
+        
+        // Add the new tasks
+        newTasks.forEach(task => {
+            const taskElement = this.createTaskElement(task);
+            container.appendChild(taskElement);
+        });
+        
+        // Update the limit
+        config.currentLimit += tasksToLoad;
+        
+        // Add new Load More button if there are still more tasks
+        if (config.currentLimit < totalTasks) {
+            const remainingTasks = totalTasks - config.currentLimit;
+            const loadMoreBtn = document.createElement('div');
+            loadMoreBtn.className = 'load-more-container';
+            loadMoreBtn.innerHTML = `
+                <button class="load-more-btn" onclick="kanban.loadMoreTasks('${status}')">
+                    <i data-lucide="chevron-down"></i>
+                    Load ${Math.min(remainingTasks, config.increment)} more
+                    <span class="remaining-count">(${remainingTasks} remaining)</span>
+                </button>
+            `;
+            container.appendChild(loadMoreBtn);
+        }
+        
+        // Re-initialize Lucide icons for the new tasks and button
+        this.initializeLucideIcons();
+    }
+    
+    // Keep old method for backward compatibility
+    loadMoreCompletedTasks() {
+        this.loadMoreTasks('completed');
+    }
 
 
     escapeHtml(text) {
@@ -3175,13 +3336,40 @@ class KanbanManager {
                             <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
                         </div>
                     `).join('');
+                    
+                    // Add "Open New Terminal" option only if:
+                    // 1. We have less than 6 terminals AND
+                    // 2. The task has a project assigned
+                    if (terminals.length < 6 && task.project && task.project !== 'Unknown') {
+                        dropdownHTML += `
+                            <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
+                                <i data-lucide="plus-circle"></i>
+                                Open New Terminal
+                                <span class="terminal-status">Create & send</span>
+                            </div>
+                        `;
+                    }
                 } else {
-                    dropdownHTML = `
-                        <div class="send-terminal-option no-terminals">
-                            <i data-lucide="alert-circle"></i>
-                            No active terminals available
-                        </div>
-                    `;
+                    // No terminals open
+                    // Only show "Open New Terminal" if task has a project
+                    if (task.project && task.project !== 'Unknown') {
+                        dropdownHTML = `
+                            <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
+                                <i data-lucide="plus-circle"></i>
+                                Open New Terminal
+                                <span class="terminal-status">No terminals active</span>
+                            </div>
+                        `;
+                    } else {
+                        // No project assigned, show informative message
+                        dropdownHTML = `
+                            <div class="send-terminal-option no-terminals">
+                                <i data-lucide="alert-circle"></i>
+                                No terminals available
+                                <span class="terminal-status">Task needs project</span>
+                            </div>
+                        `;
+                    }
                 }
                 
                 // Always add copy option
@@ -3290,6 +3478,58 @@ class KanbanManager {
         
         // Close Task Manager window immediately
         window.close();
+    }
+
+    async sendTaskToNewTerminal(taskId) {
+        const task = this.tasks.find(t => t.id === taskId);
+        if (!task) {
+            console.error('Task not found');
+            return;
+        }
+
+        // Hide dropdown while processing
+        const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
+        if (dropdown) {
+            dropdown.style.display = 'none';
+            // Reset z-index for task card
+            const taskCard = dropdown.closest('.task-card');
+            if (taskCard) {
+                taskCard.style.zIndex = '';
+                taskCard.style.position = '';
+            }
+        }
+
+        try {
+            // Request main window to open a new terminal with the task
+            const result = await ipcRenderer.invoke('open-terminal-with-task', {
+                taskId: task.id,
+                title: task.title,
+                description: task.description,
+                implementation: task.implementation,
+                plan: task.plan,
+                project: task.project
+            });
+
+            if (result.success) {
+                // Send notification
+                ipcRenderer.send('show-badge-notification', 'New terminal opened with task');
+                
+                // Close Task Manager window
+                window.close();
+            } else {
+                // Show error
+                const errorMsg = result.error || 'Failed to open new terminal';
+                ipcRenderer.send('show-badge-notification', errorMsg);
+                
+                // If it's because max terminals reached, show in UI
+                if (result.error && result.error.includes('Maximum')) {
+                    alert('Maximum number of terminals (6) reached. Please close a terminal first.');
+                }
+            }
+        } catch (error) {
+            console.error('Error opening new terminal:', error);
+            ipcRenderer.send('show-badge-notification', 'Error opening terminal');
+        }
     }
 
     setupModalSendIcon(taskId) {

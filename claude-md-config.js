@@ -40,9 +40,26 @@ _Note: This MCP configuration is automatically managed by CodeAgentSwarm. Do not
 - ✅ **ANALYSIS**: Architecture review, code analysis, performance checks
 - ✅ **LITERALLY EVERYTHING**: If the user asks for ANYTHING, create a task FIRST
 
-**NO EXCEPTIONS. NO EXCUSES. NO "QUICK FIXES" WITHOUT A TASK.**
+### ⚠️ EXCEPTIONS - Operations that DON'T require tasks:
 
-Before doing ANY work, including research, investigation, or code changes, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL work.
+**The following git operations DO NOT require creating a task:**
+- ✅ `git commit` - Creating commits after task work is done
+- ✅ `git push` - Pushing changes to remote
+- ✅ `git pull` - Pulling changes from remote
+- ✅ `git fetch` - Fetching remote changes
+- ✅ `git status` - Checking repository status
+- ✅ `git log` - Viewing commit history
+- ✅ `git branch` - Managing branches
+- ✅ `git checkout` - Switching branches
+- ✅ `git merge` - Merging branches
+- ✅ `git rebase` - Rebasing branches
+- ✅ `git stash` - Stashing changes
+
+**These are ADMINISTRATIVE operations that are part of normal workflow and DO NOT require task creation.**
+
+**IMPORTANT:** If the user asks you to "implement a git workflow" or "create git hooks" or any actual development work related to git, THAT STILL REQUIRES A TASK. The exceptions are ONLY for routine git operations.
+
+Before doing ANY work (except the exceptions above), including research, investigation, or code changes, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL work.
 
 **VIOLATIONS WILL BE TRACKED AND REPORTED**
 

@@ -6,15 +6,25 @@ const { execSync } = require('child_process');
 
 class DatabaseManagerMCP {
   constructor() {
-    // Always use the system path for MCP
-    const homeDir = os.homedir();
-    const appDataDir = path.join(homeDir, 'Library', 'Application Support', 'codeagentswarm');
-    
-    if (!fs.existsSync(appDataDir)) {
-      fs.mkdirSync(appDataDir, { recursive: true });
+    // Check for environment override (for testing)
+    if (process.env.CODEAGENTSWARM_DB_PATH) {
+      this.dbPath = process.env.CODEAGENTSWARM_DB_PATH;
+      // Ensure parent directory exists
+      const dir = path.dirname(this.dbPath);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+    } else {
+      // Use the system path for MCP
+      const homeDir = os.homedir();
+      const appDataDir = path.join(homeDir, 'Library', 'Application Support', 'codeagentswarm');
+      
+      if (!fs.existsSync(appDataDir)) {
+        fs.mkdirSync(appDataDir, { recursive: true });
+      }
+      
+      this.dbPath = path.join(appDataDir, 'codeagentswarm.db');
     }
-    
-    this.dbPath = path.join(appDataDir, 'codeagentswarm.db');
     console.log('[MCP Database] Using database at:', this.dbPath);
     
     // Initialize database if needed
@@ -166,10 +176,24 @@ class DatabaseManagerMCP {
       }
       
       const lastId = result.split('\n').pop(); // Get the last line which should be the ID
+      const taskId = parseInt(lastId) || 0;
+      
+      // Return the created task
+      if (taskId > 0) {
+        const task = this.getTaskById(taskId);
+        if (task) {
+          return task;
+        }
+      }
       
       return {
-        success: true,
-        taskId: parseInt(lastId) || 0
+        id: taskId,
+        title,
+        description,
+        terminal_id: terminalId,
+        project,
+        parent_task_id: parentTaskId,
+        status: 'pending'
       };
     } catch (error) {
       return {
@@ -191,6 +215,21 @@ class DatabaseManagerMCP {
         error: error.message
       };
     }
+  }
+
+  startTask(taskId, terminalId) {
+    return this.updateTaskStatus(taskId, 'in_progress');
+  }
+
+  completeTask(taskId) {
+    // First time moves to in_testing, second time to completed
+    const currentTask = this.getTaskById(taskId);
+    if (!currentTask) {
+      return { success: false, error: 'Task not found' };
+    }
+    
+    const newStatus = currentTask.status === 'in_testing' ? 'completed' : 'in_testing';
+    return this.updateTaskStatus(taskId, newStatus);
   }
 
   async getAllTasks() {
@@ -662,6 +701,24 @@ class DatabaseManagerMCP {
   }
 
   // Subtask management methods
+  
+  async createSubtask(title, description, parentTaskId, terminalId) {
+    try {
+      // Get parent task to inherit project
+      const parentTask = this.getTaskById(parentTaskId);
+      if (!parentTask) {
+        throw new Error('Parent task not found');
+      }
+      
+      const project = parentTask.project;
+      
+      // Create task with parent_task_id
+      return await this.createTask(title, description, terminalId, project, parentTaskId);
+    } catch (error) {
+      console.error('[MCP Database] Error creating subtask:', error);
+      throw error;
+    }
+  }
   
   getSubtasks(parentTaskId) {
     try {

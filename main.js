@@ -1383,6 +1383,128 @@ ipcMain.on('send-to-terminal', (event, terminalId, message) => {
   }
 });
 
+ipcMain.handle('open-terminal-with-task', async (event, taskData) => {
+  try {
+    // First check if there's an uninitialized terminal we can use
+    let targetTerminalId = null;
+    
+    // Look for terminals that are placeholders (not initialized)
+    for (const [terminalId, shell] of terminals) {
+      if (shell && shell.placeholder && !shell.isActive) {
+        targetTerminalId = terminalId;
+        console.log(`Found uninitialized terminal ${terminalId} to reuse`);
+        break;
+      }
+    }
+    
+    // If no uninitialized terminal found, create a new one
+    if (targetTerminalId === null) {
+      // Check if we have reached the maximum number of terminals
+      const existingTerminals = Array.from(terminals.keys());
+      const maxTerminals = 6;
+      
+      if (existingTerminals.length >= maxTerminals) {
+        return { success: false, error: 'Maximum number of terminals (6) reached' };
+      }
+      
+      // Find the next available terminal ID
+      for (let i = 0; i < maxTerminals; i++) {
+        if (!existingTerminals.includes(i)) {
+          targetTerminalId = i;
+          break;
+        }
+      }
+      
+      if (targetTerminalId === null) {
+        return { success: false, error: 'No available terminal slots' };
+      }
+    }
+    
+    // Store the task data for this terminal
+    if (!global.pendingTerminalTasks) {
+      global.pendingTerminalTasks = {};
+    }
+    global.pendingTerminalTasks[targetTerminalId] = taskData;
+    
+    // Focus main window and trigger terminal creation or activation
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.focus();
+      
+      // Send command to renderer to use this terminal for the task
+      mainWindow.webContents.send('open-terminal-for-task', targetTerminalId, taskData);
+      
+      return { success: true, terminalId: targetTerminalId };
+    } else {
+      return { success: false, error: 'Main window not available' };
+    }
+  } catch (error) {
+    console.error('Error opening terminal with task:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('check-project-match', async (event, directory, projectName) => {
+  try {
+    const claudeMdPath = path.join(directory, 'CLAUDE.md');
+    if (fs.existsSync(claudeMdPath)) {
+      const content = fs.readFileSync(claudeMdPath, 'utf8');
+      const projectMatch = content.match(/\*\*Project Name\*\*:\s*(.+)/);
+      if (projectMatch) {
+        const dirProjectName = projectMatch[1].trim();
+        return { matches: dirProjectName === projectName };
+      }
+    }
+    return { matches: false };
+  } catch (error) {
+    console.error('Error checking project match:', error);
+    return { matches: false };
+  }
+});
+
+ipcMain.handle('get-recent-project-directories', async (event, projectName) => {
+  try {
+    const directories = [];
+    
+    // Get project info from database using getProjectByName
+    const projectInfo = db.getProjectByName(projectName);
+    if (projectInfo && projectInfo.path) {
+      // The project has a stored path
+      directories.push(projectInfo.path);
+    }
+    
+    // Also check all terminals to see if any are in this project
+    for (const [terminalId, shell] of terminals) {
+      if (shell && shell.cwd) {
+        const claudeMdPath = path.join(shell.cwd, 'CLAUDE.md');
+        if (fs.existsSync(claudeMdPath)) {
+          const content = fs.readFileSync(claudeMdPath, 'utf8');
+          const projectMatch = content.match(/\*\*Project Name\*\*:\s*(.+)/);
+          if (projectMatch && projectMatch[1].trim() === projectName) {
+            directories.push(shell.cwd);
+          }
+        }
+      }
+    }
+    
+    // Remove duplicates and return
+    return { directories: [...new Set(directories)] };
+  } catch (error) {
+    console.error('Error getting recent project directories:', error);
+    return { directories: [] };
+  }
+});
+
+ipcMain.handle('terminal-has-shell', async (event, terminalId) => {
+  try {
+    const shell = terminals.get(terminalId);
+    // Check if the terminal has an active shell (not just a placeholder)
+    return !!(shell && shell.isActive && !shell.placeholder);
+  } catch (error) {
+    console.error('Error checking terminal shell:', error);
+    return false;
+  }
+});
+
 ipcMain.handle('get-terminals-for-project', async (event, projectName) => {
   try {
     const activeTerminals = [];
@@ -3234,32 +3356,42 @@ ipcMain.handle('project-create', async (event, name, color, folderPath) => {
       // Create or update CLAUDE.md in the selected folder
       try {
         const claudeMdPath = path.join(folderPath, 'CLAUDE.md');
-        const { getCodeAgentSwarmSection, SECTION_START, SECTION_END } = require('./claude-md-config');
+        const { getProjectClaudeMdSection } = require('./claude-md-global-config');
         
         let content = '';
-        let existingContent = '';
+        const oldStartMarker = '<!-- CODEAGENTSWARM CONFIG START';
+        const oldEndMarker = '<!-- CODEAGENTSWARM CONFIG END';
+        const newStartMarker = '<!-- CODEAGENTSWARM PROJECT CONFIG START';
+        const newEndMarker = '<!-- CODEAGENTSWARM PROJECT CONFIG END';
         
         // Read existing content if file exists
         if (fs.existsSync(claudeMdPath)) {
-          existingContent = fs.readFileSync(claudeMdPath, 'utf8');
+          content = fs.readFileSync(claudeMdPath, 'utf8');
           
-          // Check if CodeAgentSwarm section exists
-          const startIndex = existingContent.indexOf(SECTION_START);
-          const endIndex = existingContent.indexOf(SECTION_END);
-          
-          if (startIndex !== -1 && endIndex !== -1) {
-            // Replace existing section
-            content = existingContent.substring(0, startIndex) +
-                     getCodeAgentSwarmSection(name) +
-                     existingContent.substring(endIndex + SECTION_END.length);
-          } else {
-            // Append new section
-            content = existingContent + (existingContent.endsWith('\n') ? '' : '\n') +
-                     getCodeAgentSwarmSection(name);
+          // Remove old full config if exists
+          if (content.includes(oldStartMarker) && content.includes(oldEndMarker)) {
+            const startIdx = content.indexOf(oldStartMarker);
+            const endIdx = content.indexOf(oldEndMarker) + oldEndMarker.length + 4;
+            content = content.substring(0, startIdx) + content.substring(endIdx);
+            content = content.trim() + '\n\n';
           }
         } else {
-          // Create new file with CodeAgentSwarm section
-          content = getCodeAgentSwarmSection(name);
+          // Create new file with title
+          content = `# ${name} Project Configuration\n\n`;
+        }
+        
+        // Get minimal project section
+        const newSection = getProjectClaudeMdSection(name);
+        
+        // Update or add new minimal project config
+        if (content.includes(newStartMarker) && content.includes(newEndMarker)) {
+          // Replace existing project config
+          const startIdx = content.indexOf(newStartMarker);
+          const endIdx = content.indexOf(newEndMarker) + newEndMarker.length + 4;
+          content = content.substring(0, startIdx) + newSection + content.substring(endIdx);
+        } else {
+          // Add new project config
+          content = content.trim() + '\n\n' + newSection;
         }
         
         // Write the file
@@ -3748,6 +3880,9 @@ function registerDatabaseHandlers() {
 }
 
 app.whenReady().then(async () => {
+  // Ensure global CLAUDE.md exists with CodeAgentSwarm instructions
+  ensureGlobalClaudeMdConfiguration();
+  
   // Initialize wizard window
   const wizardWindow = new WizardWindow();
   
@@ -5539,7 +5674,7 @@ app.on('before-quit', (event) => {
 function ensureClaudeMdConfiguration(projectPath) {
   const fs = require('fs');
   const path = require('path');
-  const { SECTION_START, SECTION_END, getCodeAgentSwarmSection } = require('./claude-md-config');
+  const { getProjectClaudeMdSection } = require('./claude-md-global-config');
   
   const claudeMdPath = path.join(projectPath, 'CLAUDE.md');
   let projectName = path.basename(projectPath);
@@ -5560,74 +5695,141 @@ function ensureClaudeMdConfiguration(projectPath) {
   }
   
   try {
-    let fileContent = '';
-    let existingUserContent = '';
+    const oldStartMarker = '<!-- CODEAGENTSWARM CONFIG START';
+    const oldEndMarker = '<!-- CODEAGENTSWARM CONFIG END';
+    const newStartMarker = '<!-- CODEAGENTSWARM PROJECT CONFIG START';
+    const newEndMarker = '<!-- CODEAGENTSWARM PROJECT CONFIG END';
+    
+    let content = '';
     
     // Check if CLAUDE.md already exists
     if (fs.existsSync(claudeMdPath)) {
-      // Read existing content
-      const currentContent = fs.readFileSync(claudeMdPath, 'utf8');
+      content = fs.readFileSync(claudeMdPath, 'utf8');
       
-      // Check if it has our section markers
-      const startIndex = currentContent.indexOf(SECTION_START);
-      const endIndex = currentContent.indexOf(SECTION_END);
-      
-      if (startIndex !== -1 && endIndex !== -1) {
-        // Extract user content before and after our section
-        const beforeSection = currentContent.substring(0, startIndex).trim();
-        const afterSection = currentContent.substring(endIndex + SECTION_END.length).trim();
-        
-        // Combine user content
-        existingUserContent = beforeSection;
-        if (afterSection) {
-          existingUserContent += (existingUserContent ? '\n\n' : '') + afterSection;
-        }
-      } else {
-        // No markers found, keep all existing content
-        existingUserContent = currentContent;
-      }
-    }
-    
-    // Build the new file content
-    if (existingUserContent.trim()) {
-      // Check if user content has a project title
-      const titleMatch = existingUserContent.match(/^#\s+(.+?)(?:\s+Project Configuration)?\s*$/m);
-      
-      if (titleMatch) {
-        // User has a title, place our section after it
-        const titleLine = titleMatch[0];
-        const titleIndex = existingUserContent.indexOf(titleLine);
-        const afterTitle = titleIndex + titleLine.length;
-        
-        fileContent = existingUserContent.substring(0, afterTitle) + 
-                     '\n\n' + getCodeAgentSwarmSection(projectName) + 
-                     '\n\n' + existingUserContent.substring(afterTitle).trim();
-      } else {
-        // No title, add our section with a generic title
-        fileContent = `# ${projectName} Project Configuration\n\n` +
-                     getCodeAgentSwarmSection(projectName) + 
-                     '\n\n---\n\n' + existingUserContent;
+      // Remove old full config if exists
+      if (content.includes(oldStartMarker) && content.includes(oldEndMarker)) {
+        const startIdx = content.indexOf(oldStartMarker);
+        const endIdx = content.indexOf(oldEndMarker) + oldEndMarker.length + 4; // +4 for -->
+        content = content.substring(0, startIdx) + content.substring(endIdx);
+        content = content.trim() + '\n\n';
       }
     } else {
-      // New file or empty file
-      fileContent = `# ${projectName} Project Configuration\n\n` + getCodeAgentSwarmSection(projectName);
+      // Create new file with title
+      content = `# ${projectName} Project Configuration\n\n`;
     }
     
-    // Only write if content has changed
-    if (fs.existsSync(claudeMdPath)) {
-      const currentContent = fs.readFileSync(claudeMdPath, 'utf8');
-      if (currentContent === fileContent) {
-        console.log(`✅ CLAUDE.md already up-to-date for: ${projectName}`);
-        return;
+    // Get minimal project section
+    const newSection = getProjectClaudeMdSection(projectName);
+    
+    // Update or add new minimal project config
+    if (content.includes(newStartMarker) && content.includes(newEndMarker)) {
+      // Replace existing project config
+      const startIdx = content.indexOf(newStartMarker);
+      const endIdx = content.indexOf(newEndMarker) + newEndMarker.length + 4;
+      content = content.substring(0, startIdx) + newSection + content.substring(endIdx);
+    } else {
+      // Add new project config at the beginning (after title if exists)
+      const lines = content.split('\n');
+      let insertIndex = 0;
+      
+      // Find where to insert (after main title if exists)
+      for (let i = 0; i < Math.min(lines.length, 5); i++) {
+        if (lines[i].startsWith('# ')) {
+          insertIndex = i + 1;
+          // Skip empty lines after title
+          while (insertIndex < lines.length && lines[insertIndex].trim() === '') {
+            insertIndex++;
+          }
+          break;
+        }
       }
+      
+      lines.splice(insertIndex, 0, '', newSection, '');
+      content = lines.join('\n');
     }
     
     // Write the updated content
-    fs.writeFileSync(claudeMdPath, fileContent, 'utf8');
-    console.log(`✅ Updated CLAUDE.md with CodeAgentSwarm configuration for: ${projectName}`);
+    fs.writeFileSync(claudeMdPath, content, 'utf8');
+    console.log(`✅ Updated CLAUDE.md with minimal project configuration for: ${projectName}`);
     
   } catch (error) {
     console.error('❌ Failed to configure CLAUDE.md:', error);
+  }
+}
+
+// Function to ensure global CLAUDE.md exists with CodeAgentSwarm instructions
+function ensureGlobalClaudeMdConfiguration() {
+  try {
+    const os = require('os');
+    const { 
+      getGlobalCodeAgentSwarmSection, 
+      CODEAGENTSWARM_START,
+      CODEAGENTSWARM_END
+    } = require('./claude-md-global-config');
+    const MCPInstructionsManager = require('./mcp-instructions-manager');
+    
+    const globalPath = path.join(os.homedir(), '.claude', 'CLAUDE.md');
+    const claudeDir = path.join(os.homedir(), '.claude');
+    
+    // Ensure directory exists
+    if (!fs.existsSync(claudeDir)) {
+      fs.mkdirSync(claudeDir, { recursive: true });
+    }
+    
+    let content = '';
+    let needsUpdate = false;
+    
+    if (fs.existsSync(globalPath)) {
+      content = fs.readFileSync(globalPath, 'utf8');
+      // Check if CodeAgentSwarm section exists
+      if (!content.includes(CODEAGENTSWARM_START)) {
+        needsUpdate = true;
+      }
+    } else {
+      // Create new file
+      content = `# Claude Global Configuration
+
+This file contains global instructions for all Claude agents across all projects.
+
+`;
+      needsUpdate = true;
+    }
+    
+    if (needsUpdate) {
+      // Add or update CodeAgentSwarm section
+      const codeagentSection = getGlobalCodeAgentSwarmSection();
+      
+      if (content.includes(CODEAGENTSWARM_START) && content.includes(CODEAGENTSWARM_END)) {
+        // Update existing section
+        const startIdx = content.indexOf(CODEAGENTSWARM_START);
+        const endIdx = content.indexOf(CODEAGENTSWARM_END) + CODEAGENTSWARM_END.length;
+        content = content.substring(0, startIdx) + codeagentSection + content.substring(endIdx);
+      } else {
+        // Add new section before MCP instructions if they exist
+        const mcpStart = '<!-- MCP INSTRUCTIONS START';
+        if (content.includes(mcpStart)) {
+          const mcpIdx = content.indexOf(mcpStart);
+          content = content.substring(0, mcpIdx) + codeagentSection + '\n\n' + content.substring(mcpIdx);
+        } else {
+          // Add at the end
+          content = content.trim() + '\n\n' + codeagentSection + '\n';
+        }
+      }
+      
+      fs.writeFileSync(globalPath, content, 'utf8');
+      console.log('✅ Global CLAUDE.md configured with CodeAgentSwarm instructions');
+    }
+    
+    // Also update MCP instructions
+    const mcpManager = new MCPInstructionsManager();
+    mcpManager.updateClaudeMd(true).then(result => {
+      if (result) {
+        console.log('✅ MCP instructions updated in global CLAUDE.md');
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Failed to configure global CLAUDE.md:', error);
   }
 }
 
