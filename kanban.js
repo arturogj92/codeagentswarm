@@ -1029,14 +1029,14 @@ class KanbanManager {
                 }[task.status] || '📝';
                 
                 const projectInfo = task.project ? ` <span class="task-project-badge">${task.project}</span>` : '';
-                taskDiv.innerHTML = `${statusEmoji} <strong>#${task.id}</strong> - ${task.title}${projectInfo}`;
+                taskDiv.innerHTML = `${statusEmoji} <strong>#${task.id}</strong> - ${this.capitalizeFirstLetter(task.title)}${projectInfo}`;
                 
                 if (task.status === 'completed') {
                     taskDiv.style.opacity = '0.7';
                 }
                 
                 taskDiv.addEventListener('click', () => {
-                    searchInput.value = `#${task.id} - ${task.title}`;
+                    searchInput.value = `#${task.id} - ${this.capitalizeFirstLetter(task.title)}`;
                     hiddenInput.value = task.id;
                     dropdown.style.display = 'none';
                 });
@@ -1305,7 +1305,7 @@ class KanbanManager {
                 parentIndicatorInActions = `
                     <span class="task-hierarchy-indicator parent-indicator clickable in-actions" 
                           onclick="kanban.showTaskDetails(${parentTask.id}); event.stopPropagation();" 
-                          title="Subtask of: ${this.escapeHtml(parentTask.title)} (Click to view)">
+                          title="Subtask of: ${this.escapeHtml(this.capitalizeFirstLetter(parentTask.title))} (Click to view)">
                         <svg xmlns="http://www.w3.org/2000/svg" width="7" height="7" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
                             <line x1="6" x2="6" y1="3" y2="15"></line>
                             <circle cx="18" cy="6" r="3"></circle>
@@ -1412,7 +1412,7 @@ class KanbanManager {
                 </div>
             </div>
             <div class="task-title">
-                <span class="task-title-text" data-task-id="${task.id}">${this.escapeHtml(task.title)}</span>
+                <span class="task-title-text" data-task-id="${task.id}">${this.escapeHtml(this.capitalizeFirstLetter(task.title))}</span>
             </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
             <div class="task-meta">
@@ -1837,7 +1837,7 @@ class KanbanManager {
                                             </svg>
                                         </button>
                                     </div>
-                                    <div class="subtask-title">${this.escapeHtml(subtask.title)}</div>
+                                    <div class="subtask-title">${this.escapeHtml(this.capitalizeFirstLetter(subtask.title))}</div>
                                 </a>
                             </div>
                         `).join('');
@@ -2241,7 +2241,7 @@ class KanbanManager {
         // Update title
         const titleElement = taskCard.querySelector('.task-title-text');
         if (titleElement) {
-            titleElement.textContent = task.title;
+            titleElement.textContent = this.capitalizeFirstLetter(task.title);
         }
 
         // Update description
@@ -2319,7 +2319,7 @@ class KanbanManager {
             return;
         }
 
-        const confirmed = confirm(`Are you sure you want to delete subtask "${subtask.title}"?`);
+        const confirmed = confirm(`Are you sure you want to delete subtask "${this.capitalizeFirstLetter(subtask.title)}"?`);
         if (!confirmed) return;
 
         try {
@@ -2367,7 +2367,7 @@ class KanbanManager {
                                                 </svg>
                                             </button>
                                         </div>
-                                        <div class="subtask-title">${this.escapeHtml(subtask.title)}</div>
+                                        <div class="subtask-title">${this.escapeHtml(this.capitalizeFirstLetter(subtask.title))}</div>
                                     </a>
                                 </div>
                             `).join('');
@@ -2435,16 +2435,16 @@ class KanbanManager {
                         
                         // Create meaningful notification messages
                         if (newStatus === 'in_progress' && oldStatus === 'pending') {
-                            notificationMessage = `Task "${task.title}" started`;
+                            notificationMessage = `Task "${this.capitalizeFirstLetter(task.title)}" started`;
                             notificationType = 'info';
                         } else if (newStatus === 'in_testing') {
-                            notificationMessage = `Task "${task.title}" is ready for testing`;
+                            notificationMessage = `Task "${this.capitalizeFirstLetter(task.title)}" is ready for testing`;
                             notificationType = 'warning';
                         } else if (newStatus === 'completed') {
-                            notificationMessage = `Task "${task.title}" completed! 🎉`;
+                            notificationMessage = `Task "${this.capitalizeFirstLetter(task.title)}" completed! 🎉`;
                             notificationType = 'success';
                         } else if (newStatus === 'pending' && oldStatus !== 'pending') {
-                            notificationMessage = `Task "${task.title}" moved back to pending`;
+                            notificationMessage = `Task "${this.capitalizeFirstLetter(task.title)}" moved back to pending`;
                             notificationType = 'warning';
                         }
                         
@@ -2624,7 +2624,7 @@ class KanbanManager {
         if (!trimmedTitle) {
             const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
             if (titleElement) {
-                titleElement.textContent = task.title;
+                titleElement.textContent = this.capitalizeFirstLetter(task.title);
             }
             return;
         }
@@ -2642,7 +2642,7 @@ class KanbanManager {
                 // Revert to original title
                 const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
                 if (titleElement) {
-                    titleElement.textContent = task.title;
+                    titleElement.textContent = this.capitalizeFirstLetter(task.title);
                 }
                 this.showNotification(`Failed to update title: ${result.error}`, 'error');
             }
@@ -2651,7 +2651,7 @@ class KanbanManager {
             // Revert to original title
             const titleElement = document.querySelector(`[data-task-id="${taskId}"].task-title-text`);
             if (titleElement) {
-                titleElement.textContent = task.title;
+                titleElement.textContent = this.capitalizeFirstLetter(task.title);
             }
             this.showNotification('Error updating title', 'error');
         }
@@ -2669,7 +2669,7 @@ class KanbanManager {
             event.preventDefault();
             const task = this.tasks.find(t => t.id === taskId);
             if (task) {
-                event.target.textContent = task.title;
+                event.target.textContent = this.capitalizeFirstLetter(task.title);
                 event.target.blur();
             }
         }
@@ -2681,7 +2681,7 @@ class KanbanManager {
         if (!task) return;
 
         // Quick confirmation
-        if (!confirm(`Delete "${task.title}"?`)) return;
+        if (!confirm(`Delete "${this.capitalizeFirstLetter(task.title)}"?`)) return;
 
         try {
             const result = await ipcRenderer.invoke('task-delete', taskId);
@@ -3095,6 +3095,11 @@ class KanbanManager {
         return div.innerHTML;
     }
     
+    capitalizeFirstLetter(text) {
+        if (!text) return text;
+        return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+    
     getFilteredTasksCount() {
         // Filter tasks by project if needed
         let filteredTasks = this.tasks;
@@ -3283,12 +3288,7 @@ class KanbanManager {
         // Close all other dropdowns
         document.querySelectorAll('.send-terminal-dropdown').forEach(d => {
             if (d !== dropdown && d.style.display === 'block') {
-                d.style.display = 'none';
-                // Reset z-index for other cards
-                const otherCard = d.closest('.task-card');
-                if (otherCard) {
-                    otherCard.style.zIndex = '';
-                }
+                this.closeDropdownPortal(d);
             }
         });
         
@@ -3306,10 +3306,8 @@ class KanbanManager {
             `;
             dropdown.style.display = 'block';
             
-            // Set higher z-index for the task card to ensure dropdown is visible
-            if (taskCard) {
-                taskCard.style.zIndex = '1000';
-            }
+            // Open dropdown as portal
+            this.openDropdownPortal(dropdown, button);
             
             // Find the wrapper element (parent of the dropdown)
             const wrapper = dropdown.parentElement;
@@ -3407,26 +3405,18 @@ class KanbanManager {
             setTimeout(() => {
                 const closeHandler = (e) => {
                     if (!dropdown.contains(e.target) && !button.contains(e.target)) {
-                        dropdown.style.display = 'none';
+                        this.closeDropdownPortal(dropdown);
                         if (dropdownIcon) dropdownIcon.style.transform = '';
-                        // Reset z-index
-                        if (taskCard) {
-                            taskCard.style.zIndex = '';
-                        }
                         document.removeEventListener('click', closeHandler);
                     }
                 };
                 document.addEventListener('click', closeHandler);
             }, 0);
         } else {
-            dropdown.style.display = 'none';
+            this.closeDropdownPortal(dropdown);
             const wrapper = dropdown.parentElement;
             const dropdownIcon = wrapper?.querySelector('.dropdown-icon');
             if (dropdownIcon) dropdownIcon.style.transform = '';
-            // Reset z-index
-            if (taskCard) {
-                taskCard.style.zIndex = '';
-            }
         }
     }
 
@@ -3438,7 +3428,7 @@ class KanbanManager {
         }
 
         // Build the message to send to terminal
-        let message = `\n# Work on task #${task.id}: ${task.title}\n\n`;
+        let message = `\n# Work on task #${task.id}: ${this.capitalizeFirstLetter(task.title)}\n\n`;
         
         if (task.description) {
             message += `## Description:\n${task.description}\n\n`;
@@ -3460,13 +3450,7 @@ class KanbanManager {
         // Hide dropdown
         const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
         if (dropdown) {
-            dropdown.style.display = 'none';
-            // Reset z-index for task card
-            const taskCard = dropdown.closest('.task-card');
-            if (taskCard) {
-                taskCard.style.zIndex = '';
-                taskCard.style.position = '';
-            }
+            this.closeDropdownPortal(dropdown);
         }
         
         // Send command to start the task
@@ -3614,12 +3598,112 @@ class KanbanManager {
         }
     }
 
+    openDropdownPortal(dropdown, triggerButton) {
+        // Store reference to original parent
+        dropdown._originalParent = dropdown.parentElement;
+        dropdown._originalNextSibling = dropdown.nextSibling;
+        
+        // Move dropdown to body
+        document.body.appendChild(dropdown);
+        
+        // Add portal class
+        dropdown.classList.add('dropdown-portal');
+        
+        // Calculate position
+        this.updateDropdownPortalPosition(dropdown, triggerButton);
+        
+        // Store reference to trigger button for position updates
+        dropdown._triggerButton = triggerButton;
+        
+        // Add scroll and resize listeners
+        dropdown._scrollHandler = () => this.updateDropdownPortalPosition(dropdown, triggerButton);
+        dropdown._resizeHandler = () => this.updateDropdownPortalPosition(dropdown, triggerButton);
+        
+        window.addEventListener('scroll', dropdown._scrollHandler, true);
+        window.addEventListener('resize', dropdown._resizeHandler);
+    }
+    
+    updateDropdownPortalPosition(dropdown, triggerButton) {
+        const buttonRect = triggerButton.getBoundingClientRect();
+        const dropdownHeight = 200; // Approximate height
+        const dropdownWidth = 250; // Approximate width
+        
+        // Calculate position
+        let top = buttonRect.bottom + 4;
+        let left = buttonRect.left;
+        
+        // Check if dropdown would go off-screen bottom
+        if (top + dropdownHeight > window.innerHeight - 20) {
+            // Position above the button
+            top = buttonRect.top - dropdownHeight - 4;
+        }
+        
+        // Check if dropdown would go off-screen right
+        if (left + dropdownWidth > window.innerWidth - 20) {
+            // Align to right edge of button
+            left = buttonRect.right - dropdownWidth;
+        }
+        
+        // Ensure it doesn't go off-screen left
+        if (left < 20) {
+            left = 20;
+        }
+        
+        // Apply position
+        dropdown.style.position = 'fixed';
+        dropdown.style.top = `${top}px`;
+        dropdown.style.left = `${left}px`;
+        dropdown.style.right = 'auto';
+        dropdown.style.bottom = 'auto';
+    }
+    
+    closeDropdownPortal(dropdown) {
+        if (!dropdown) return;
+        
+        // Remove portal class
+        dropdown.classList.remove('dropdown-portal');
+        
+        // Reset position styles
+        dropdown.style.position = '';
+        dropdown.style.top = '';
+        dropdown.style.left = '';
+        dropdown.style.right = '';
+        dropdown.style.bottom = '';
+        
+        // Remove event listeners
+        if (dropdown._scrollHandler) {
+            window.removeEventListener('scroll', dropdown._scrollHandler, true);
+            delete dropdown._scrollHandler;
+        }
+        if (dropdown._resizeHandler) {
+            window.removeEventListener('resize', dropdown._resizeHandler);
+            delete dropdown._resizeHandler;
+        }
+        
+        // Return dropdown to original position
+        if (dropdown._originalParent) {
+            if (dropdown._originalNextSibling) {
+                dropdown._originalParent.insertBefore(dropdown, dropdown._originalNextSibling);
+            } else {
+                dropdown._originalParent.appendChild(dropdown);
+            }
+        }
+        
+        // Hide dropdown
+        dropdown.style.display = 'none';
+        
+        // Clean up references
+        delete dropdown._originalParent;
+        delete dropdown._originalNextSibling;
+        delete dropdown._triggerButton;
+    }
+
     async copyTaskSummary(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return;
 
         // Build task summary
-        let summary = `Task #${task.id}: ${task.title}\n\n`;
+        let summary = `Task #${task.id}: ${this.capitalizeFirstLetter(task.title)}\n\n`;
         
         if (task.description) {
             summary += `Description:\n${task.description}\n\n`;
@@ -3653,13 +3737,7 @@ class KanbanManager {
         // Hide dropdown
         const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
         if (dropdown) {
-            dropdown.style.display = 'none';
-            // Reset z-index for task card
-            const taskCard = dropdown.closest('.task-card');
-            if (taskCard) {
-                taskCard.style.zIndex = '';
-                taskCard.style.position = '';
-            }
+            this.closeDropdownPortal(dropdown);
         }
     }
 }

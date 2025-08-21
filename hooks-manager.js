@@ -23,6 +23,30 @@ class HooksManager {
                 }]
             }]
         };
+
+        // Define CodeAgentSwarm MCP permissions
+        this.codeAgentSwarmMCPPermissions = [
+            "mcp__codeagentswarm-tasks__*",
+            "mcp__codeagentswarm-tasks__create_task",
+            "mcp__codeagentswarm-tasks__start_task",
+            "mcp__codeagentswarm-tasks__complete_task",
+            "mcp__codeagentswarm-tasks__submit_for_testing",
+            "mcp__codeagentswarm-tasks__list_tasks",
+            "mcp__codeagentswarm-tasks__search_tasks",
+            "mcp__codeagentswarm-tasks__update_task_plan",
+            "mcp__codeagentswarm-tasks__update_task_implementation",
+            "mcp__codeagentswarm-tasks__update_task_terminal",
+            "mcp__codeagentswarm-tasks__update_terminal_title",
+            "mcp__codeagentswarm-tasks__create_project",
+            "mcp__codeagentswarm-tasks__get_projects",
+            "mcp__codeagentswarm-tasks__get_project_tasks",
+            "mcp__codeagentswarm-tasks__create_subtask",
+            "mcp__codeagentswarm-tasks__get_subtasks",
+            "mcp__codeagentswarm-tasks__link_task_to_parent",
+            "mcp__codeagentswarm-tasks__unlink_task_from_parent",
+            "mcp__codeagentswarm-tasks__get_task_hierarchy",
+            "mcp__codeagentswarm-tasks__suggest_parent_tasks"
+        ];
     }
 
     buildHookCommand(eventType, tool = '') {
@@ -157,6 +181,104 @@ class HooksManager {
         } catch (error) {
             return {
                 installed: false,
+                error: error.message
+            };
+        }
+    }
+
+    async configureMCPPermissions() {
+        try {
+            const settings = await this.readSettings();
+            
+            // Initialize permissions if they don't exist
+            if (!settings.permissions) {
+                settings.permissions = {
+                    allow: [],
+                    deny: [],
+                    ask: []
+                };
+            }
+            
+            // Get current allow list
+            const currentAllow = settings.permissions.allow || [];
+            
+            // Create a Set to avoid duplicates
+            const allowSet = new Set(currentAllow);
+            
+            // Add all CodeAgentSwarm MCP permissions
+            this.codeAgentSwarmMCPPermissions.forEach(permission => {
+                allowSet.add(permission);
+            });
+            
+            // Update the allow list
+            settings.permissions.allow = Array.from(allowSet);
+            
+            // Write back the updated settings
+            const success = await this.writeSettings(settings);
+            
+            if (success) {
+                console.log('MCP permissions configured successfully');
+                return { success: true, permissionsAdded: this.codeAgentSwarmMCPPermissions.length };
+            } else {
+                return { success: false, error: 'Failed to write settings' };
+            }
+        } catch (error) {
+            console.error('Error configuring MCP permissions:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async checkMCPPermissionsStatus() {
+        try {
+            const settings = await this.readSettings();
+            const allowList = settings.permissions?.allow || [];
+            
+            // Check which permissions are installed
+            const installedPermissions = this.codeAgentSwarmMCPPermissions.filter(permission => 
+                allowList.includes(permission)
+            );
+            
+            const allInstalled = installedPermissions.length === this.codeAgentSwarmMCPPermissions.length;
+            
+            return {
+                allInstalled,
+                installedCount: installedPermissions.length,
+                totalRequired: this.codeAgentSwarmMCPPermissions.length,
+                missingPermissions: this.codeAgentSwarmMCPPermissions.filter(permission => 
+                    !allowList.includes(permission)
+                )
+            };
+        } catch (error) {
+            return {
+                allInstalled: false,
+                error: error.message
+            };
+        }
+    }
+
+    async ensureFullConfiguration() {
+        try {
+            // Install hooks
+            const hooksResult = await this.installHooks();
+            if (!hooksResult.success) {
+                console.error('Failed to install hooks:', hooksResult.error);
+            }
+            
+            // Configure MCP permissions
+            const mcpResult = await this.configureMCPPermissions();
+            if (!mcpResult.success) {
+                console.error('Failed to configure MCP permissions:', mcpResult.error);
+            }
+            
+            return {
+                success: hooksResult.success && mcpResult.success,
+                hooks: hooksResult,
+                mcp: mcpResult
+            };
+        } catch (error) {
+            console.error('Error ensuring full configuration:', error);
+            return {
+                success: false,
                 error: error.message
             };
         }

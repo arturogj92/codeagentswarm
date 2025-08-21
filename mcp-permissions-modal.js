@@ -148,8 +148,16 @@ class MCPPermissionsModal {
     }
     
     async detectMCPServers() {
-        // Return known MCPs with real logo paths - excluding CodeAgentSwarm
-        const servers = {
+        const fs = require('fs');
+        const path = require('path');
+        const os = require('os');
+        
+        // Read actual MCP servers from both Claude config files
+        const desktopConfigPath = path.join(os.homedir(), 'Library', 'Application Support', 'Claude', 'claude_desktop_config.json');
+        const userConfigPath = path.join(os.homedir(), '.claude.json');
+        
+        // Known MCP metadata (tools and icons) - used as fallback
+        const knownMCPMetadata = {
             'supabase': {
                 displayName: 'Supabase',
                 logo: 'assets/mcp-icons/supabase.png',
@@ -169,7 +177,7 @@ class MCPPermissionsModal {
             },
             'context7': {
                 displayName: 'Context7',
-                logo: null, // No logo file found, will use default
+                logo: null,
                 tools: ['resolve-library-id', 'get-library-docs']
             },
             'filesystem': {
@@ -190,11 +198,68 @@ class MCPPermissionsModal {
                 displayName: 'PostgreSQL',
                 logo: 'assets/mcp-icons/postgres.png',
                 tools: ['query']
+            },
+            'codeagentswarm-tasks': {
+                displayName: 'CodeAgentSwarm Tasks',
+                logo: null,
+                tools: [
+                    'create_task', 'start_task', 'complete_task', 'submit_for_testing',
+                    'list_tasks', 'search_tasks', 'update_task_plan', 'update_task_implementation',
+                    'update_task_terminal', 'update_terminal_title', 'create_project',
+                    'get_projects', 'get_project_tasks', 'create_subtask', 'get_subtasks',
+                    'link_task_to_parent', 'unlink_task_from_parent', 'get_task_hierarchy',
+                    'suggest_parent_tasks'
+                ]
             }
         };
         
-        // Add any other detected MCPs that aren't in our known list
-        // These would get the default puzzle icon
+        const servers = {};
+        const allMcpServers = {};
+        
+        try {
+            // Read from desktop config file
+            if (fs.existsSync(desktopConfigPath)) {
+                const desktopConfig = JSON.parse(fs.readFileSync(desktopConfigPath, 'utf8'));
+                const desktopMcpServers = desktopConfig.mcpServers || {};
+                Object.assign(allMcpServers, desktopMcpServers);
+            }
+            
+            // Read from user config file (~/.claude.json)
+            if (fs.existsSync(userConfigPath)) {
+                const userConfig = JSON.parse(fs.readFileSync(userConfigPath, 'utf8'));
+                const userMcpServers = userConfig.mcpServers || {};
+                Object.assign(allMcpServers, userMcpServers);
+            }
+            
+            // Process all detected MCP servers from both config files
+            for (const [serverKey, serverConfig] of Object.entries(allMcpServers)) {
+                // Skip CodeAgentSwarm Tasks - it should be hidden from users
+                if (serverKey === 'codeagentswarm-tasks') {
+                    continue;
+                }
+                
+                // Use metadata from knownMCPMetadata if available, otherwise use defaults
+                if (knownMCPMetadata[serverKey]) {
+                    servers[serverKey] = knownMCPMetadata[serverKey];
+                } else {
+                    // Unknown MCP - create default entry
+                    const displayName = serverKey
+                        .split('-')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                        .join(' ');
+                    
+                    servers[serverKey] = {
+                        displayName: displayName,
+                        logo: null, // Will use default puzzle icon
+                        tools: ['*'] // Wildcard - we don't know the tools
+                    };
+                }
+            }
+        } catch (error) {
+            console.error('Error reading Claude config:', error);
+            // Return empty object if we can't read the config
+            return {};
+        }
         
         return servers;
     }

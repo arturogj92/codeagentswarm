@@ -57,24 +57,47 @@ class MCPPermissionsManager {
     
     async detectMCPServers() {
         try {
+            const allMcpServers = {};
+            
+            // Read from desktop config file
             if (fs.existsSync(this.claudeConfigPath)) {
                 const config = JSON.parse(fs.readFileSync(this.claudeConfigPath, 'utf8'));
                 const servers = config.mcpServers || {};
-                
-                // Process each MCP server
-                for (const [serverName, serverConfig] of Object.entries(servers)) {
-                    const normalizedName = serverName.replace('@modelcontextprotocol/', '').replace('mcp-', '');
-                    
-                    // Try to get available tools from the server
-                    // This would need actual MCP client connection in production
-                    this.mcpServers[serverName] = {
-                        name: normalizedName,
-                        displayName: this.formatServerName(normalizedName),
-                        command: serverConfig.command,
-                        args: serverConfig.args || [],
-                        tools: await this.getMCPTools(serverName) || this.getDefaultTools(normalizedName)
-                    };
+                Object.assign(allMcpServers, servers);
+            }
+            
+            // Also read from user config file (~/.claude.json)
+            const userConfigPath = path.join(os.homedir(), '.claude.json');
+            if (fs.existsSync(userConfigPath)) {
+                const userConfig = JSON.parse(fs.readFileSync(userConfigPath, 'utf8'));
+                const userServers = userConfig.mcpServers || {};
+                Object.assign(allMcpServers, userServers);
+            }
+            
+            // Process all detected MCP servers from both config files
+            for (const [serverName, serverConfig] of Object.entries(allMcpServers)) {
+                // Skip CodeAgentSwarm Tasks - it should be hidden from users
+                if (serverName === 'codeagentswarm-tasks') {
+                    continue;
                 }
+                
+                // Use the original server name as-is (don't normalize)
+                const displayName = this.formatServerName(serverName);
+                
+                // Get tools for this server
+                const tools = await this.getMCPTools(serverName) || this.getDefaultTools(serverName);
+                
+                // Get logo if available
+                const logo = this.getMCPLogo(serverName);
+                
+                this.mcpServers[serverName] = {
+                    name: serverName,
+                    displayName: displayName,
+                    command: serverConfig.command,
+                    args: serverConfig.args || [],
+                    tools: tools,
+                    logo: logo
+                };
             }
         } catch (error) {
             console.error('Error detecting MCP servers:', error);
@@ -95,7 +118,9 @@ class MCPPermissionsManager {
                 'create_task', 'start_task', 'complete_task', 'submit_for_testing',
                 'list_tasks', 'search_tasks', 'update_task_plan', 'update_task_implementation',
                 'update_task_terminal', 'update_terminal_title', 'create_project',
-                'get_projects', 'get_project_tasks'
+                'get_projects', 'get_project_tasks', 'create_subtask', 'get_subtasks',
+                'link_task_to_parent', 'unlink_task_from_parent', 'get_task_hierarchy',
+                'suggest_parent_tasks'
             ],
             'supabase': [
                 'list_projects', 'get_project', 'create_project', 'pause_project',
@@ -117,16 +142,37 @@ class MCPPermissionsManager {
                 'write_file', 'edit_file', 'create_directory', 'list_directory',
                 'list_directory_with_sizes', 'directory_tree', 'move_file',
                 'search_files', 'get_file_info', 'list_allowed_directories'
+            ],
+            'brave-search': [
+                'brave_web_search', 'brave_local_search'
+            ],
+            'postgres': [
+                'query'
             ]
         };
         
-        const normalizedName = serverName.replace('@modelcontextprotocol/', '').replace('mcp-', '');
-        return toolMappings[normalizedName] || [];
+        // Use the server name directly (no normalization needed since we're using actual names from config)
+        return toolMappings[serverName] || [];
     }
     
     getDefaultTools(serverName) {
         // Fallback tools if we can't detect them
         return ['*']; // Wildcard for all tools
+    }
+    
+    getMCPLogo(serverName) {
+        // Map of known MCP logos
+        const logoMap = {
+            'supabase': 'assets/mcp-icons/supabase.png',
+            'notion': 'assets/mcp-icons/notion.png',
+            'filesystem': 'assets/mcp-icons/filesystem.png',
+            'brave-search': 'assets/mcp-icons/brave-search.png',
+            'postgres': 'assets/mcp-icons/postgres.png',
+            'context7': null, // No logo, will use default icon
+            'codeagentswarm-tasks': null // No logo, will use default icon
+        };
+        
+        return logoMap[serverName] || null;
     }
     
     setupEventListeners() {
@@ -215,11 +261,16 @@ class MCPPermissionsManager {
             const permissions = this.getServerPermissions(serverKey);
             const status = this.getServerStatus(permissions);
             
+            // Use logo if available, otherwise use default puzzle icon
+            const iconHtml = server.logo 
+                ? `<img src="${server.logo}" alt="${server.displayName}" style="width: 24px; height: 24px; object-fit: contain;">`
+                : '<i data-lucide="puzzle"></i>';
+            
             serverEl.innerHTML = `
                 <div class="mcp-server-header">
                     <div class="mcp-server-info">
                         <div class="mcp-server-icon">
-                            <i data-lucide="puzzle"></i>
+                            ${iconHtml}
                         </div>
                         <div>
                             <div class="mcp-server-name">${server.displayName}</div>

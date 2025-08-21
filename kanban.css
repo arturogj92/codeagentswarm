@@ -1126,6 +1126,7 @@ body::before {
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
+    right: auto;
     background: rgba(20, 20, 20, 0.98);
     border: 1px solid rgba(255, 255, 255, 0.15);
     border-radius: 8px;
@@ -1138,21 +1139,39 @@ body::before {
     -webkit-backdrop-filter: blur(10px);
     min-width: 200px;
     width: max-content;
+    max-width: calc(100vw - 40px); /* Prevent dropdown from going off-screen */
+}
+
+/* Portal mode - when dropdown is attached to body */
+.send-terminal-dropdown.dropdown-portal {
+    position: fixed !important;
+    z-index: 99999 !important;
+    max-width: 300px;
+    width: 250px;
+}
+
+/* Position dropdown above task if near bottom of viewport */
+.task-card.dropdown-above .send-terminal-dropdown {
+    top: auto;
+    bottom: calc(100% + 4px);
 }
 
 /* Fix z-index stacking when dropdown is open */
 .task-card:has(.send-terminal-dropdown[style*="block"]) {
     z-index: 1000 !important;
     overflow: visible !important;
+    position: relative;
 }
 
-/* Ensure parent containers don't clip the dropdown */
+/* Keep scrolling enabled but ensure dropdown is visible */
 .task-list:has(.send-terminal-dropdown[style*="block"]) {
-    overflow: visible !important;
+    /* Don't disable scrolling - keep overflow-y as auto */
+    /* overflow: visible !important; - REMOVED to maintain scroll */
 }
 
 .kanban-column:has(.send-terminal-dropdown[style*="block"]) {
-    overflow: visible !important;
+    /* Don't disable scrolling on the column */
+    /* overflow: visible !important; - REMOVED to maintain scroll */
     z-index: 10 !important;
 }
 

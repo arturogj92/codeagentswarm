@@ -1385,55 +1385,18 @@ ipcMain.on('send-to-terminal', (event, terminalId, message) => {
 
 ipcMain.handle('open-terminal-with-task', async (event, taskData) => {
   try {
-    // First check if there's an uninitialized terminal we can use
-    let targetTerminalId = null;
+    // The renderer will handle finding uninitialized terminals
+    // We just need to pass the task data along
     
-    // Look for terminals that are placeholders (not initialized)
-    for (const [terminalId, shell] of terminals) {
-      if (shell && shell.placeholder && !shell.isActive) {
-        targetTerminalId = terminalId;
-        console.log(`Found uninitialized terminal ${terminalId} to reuse`);
-        break;
-      }
-    }
-    
-    // If no uninitialized terminal found, create a new one
-    if (targetTerminalId === null) {
-      // Check if we have reached the maximum number of terminals
-      const existingTerminals = Array.from(terminals.keys());
-      const maxTerminals = 6;
-      
-      if (existingTerminals.length >= maxTerminals) {
-        return { success: false, error: 'Maximum number of terminals (6) reached' };
-      }
-      
-      // Find the next available terminal ID
-      for (let i = 0; i < maxTerminals; i++) {
-        if (!existingTerminals.includes(i)) {
-          targetTerminalId = i;
-          break;
-        }
-      }
-      
-      if (targetTerminalId === null) {
-        return { success: false, error: 'No available terminal slots' };
-      }
-    }
-    
-    // Store the task data for this terminal
-    if (!global.pendingTerminalTasks) {
-      global.pendingTerminalTasks = {};
-    }
-    global.pendingTerminalTasks[targetTerminalId] = taskData;
-    
-    // Focus main window and trigger terminal creation or activation
+    // Focus main window and let renderer handle terminal selection
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.focus();
       
-      // Send command to renderer to use this terminal for the task
-      mainWindow.webContents.send('open-terminal-for-task', targetTerminalId, taskData);
+      // Send command to renderer to handle the task
+      // The renderer will find an uninitialized terminal or create a new one
+      mainWindow.webContents.send('open-terminal-for-task', null, taskData);
       
-      return { success: true, terminalId: targetTerminalId };
+      return { success: true };
     } else {
       return { success: false, error: 'Main window not available' };
     }
@@ -1820,6 +1783,39 @@ ipcMain.handle('hooks-remove', async () => {
       return { success: false, error: 'Hooks manager not initialized' };
     }
     return await hooksManager.removeHooks();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('mcp-check-status', async () => {
+  try {
+    if (!hooksManager) {
+      return { allInstalled: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.checkMCPPermissionsStatus();
+  } catch (error) {
+    return { allInstalled: false, error: error.message };
+  }
+});
+
+ipcMain.handle('mcp-configure', async () => {
+  try {
+    if (!hooksManager) {
+      return { success: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.configureMCPPermissions();
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('configure-all', async () => {
+  try {
+    if (!hooksManager) {
+      return { success: false, error: 'Hooks manager not initialized' };
+    }
+    return await hooksManager.ensureFullConfiguration();
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -4060,7 +4056,7 @@ async function initializeApp() {
         console.error('[Background] Webhook server error:', error);
       });
       
-      // Install hooks automatically (also async)
+      // Install hooks and configure MCP permissions automatically (also async)
       hooksManager.checkHooksStatus().then(async hooksStatus => {
         if (!hooksStatus.installed) {
           console.log('Installing CodeAgentSwarm hooks...');
@@ -4072,6 +4068,20 @@ async function initializeApp() {
           }
         } else {
           console.log('Hooks already installed');
+        }
+        
+        // Check and configure MCP permissions
+        const mcpStatus = await hooksManager.checkMCPPermissionsStatus();
+        if (!mcpStatus.allInstalled) {
+          console.log(`Configuring MCP permissions... (${mcpStatus.installedCount}/${mcpStatus.totalRequired} already configured)`);
+          const mcpResult = await hooksManager.configureMCPPermissions();
+          if (mcpResult.success) {
+            console.log(`MCP permissions configured successfully - ${mcpResult.permissionsAdded} permissions set`);
+          } else {
+            console.error('Failed to configure MCP permissions:', mcpResult.error);
+          }
+        } else {
+          console.log('All MCP permissions already configured');
         }
       }).catch(error => {
         console.error('Failed to check hooks status:', error);
