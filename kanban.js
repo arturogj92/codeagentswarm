@@ -1426,12 +1426,23 @@ class KanbanManager {
     }
 
     showCreateTaskModal() {
-        document.getElementById('modal-title').textContent = 'Create New Task';
+        // Clear form fields
         document.getElementById('task-title').value = '';
         document.getElementById('task-description').value = '';
         document.getElementById('task-plan').value = '';
         document.getElementById('task-implementation').value = '';
-        document.getElementById('task-status').value = 'pending';
+        
+        // Set default status to pending using the new display
+        const statusDisplay = document.getElementById('create-status-display');
+        const statusText = document.getElementById('create-status-text');
+        if (statusDisplay && statusText) {
+            statusDisplay.className = 'status-display-modern clickable status-pending';
+            statusDisplay.dataset.status = 'pending';
+            statusText.textContent = 'PENDING';
+        }
+        
+        // Update project selects to ensure they have the latest projects
+        this.updateProjectSelects();
         
         // Use the currently selected project filter as default, or let user choose
         const projectSelect = document.getElementById('task-project');
@@ -1447,7 +1458,7 @@ class KanbanManager {
         document.getElementById('task-parent').value = '';
         
         document.getElementById('task-terminal').value = '';
-        document.getElementById('save-task-btn').textContent = 'Save Task';
+        document.getElementById('save-task-btn').innerHTML = '<i data-lucide="check"></i> Save Task';
         document.getElementById('task-modal').classList.add('show');
         document.getElementById('task-title').focus();
         
@@ -1455,8 +1466,65 @@ class KanbanManager {
         if (typeof initializeCreateMarkdownEditors === 'function') {
             setTimeout(() => initializeCreateMarkdownEditors(), 50);
         }
+        
+        // Setup status dropdown for create modal
+        this.setupCreateModalStatusDropdown();
     }
 
+    setupCreateModalStatusDropdown() {
+        const statusDisplay = document.getElementById('create-status-display');
+        const statusDropdown = document.getElementById('create-status-dropdown-menu');
+        const statusText = document.getElementById('create-status-text');
+        
+        if (!statusDisplay || !statusDropdown) return;
+        
+        // Handle status display click
+        statusDisplay.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (statusDropdown.style.display === 'none') {
+                statusDropdown.style.display = 'block';
+                statusDisplay.classList.add('dropdown-open');
+                
+                // Highlight current status
+                const currentStatus = statusDisplay.dataset.status;
+                statusDropdown.querySelectorAll('.status-option').forEach(option => {
+                    if (option.getAttribute('data-value') === currentStatus) {
+                        option.classList.add('active');
+                    } else {
+                        option.classList.remove('active');
+                    }
+                });
+            } else {
+                statusDropdown.style.display = 'none';
+                statusDisplay.classList.remove('dropdown-open');
+            }
+        });
+        
+        // Handle status option clicks
+        statusDropdown.querySelectorAll('.status-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const newStatus = option.getAttribute('data-value');
+                
+                // Update display
+                statusDisplay.dataset.status = newStatus;
+                statusDisplay.className = `status-display-modern clickable status-${newStatus}`;
+                statusText.textContent = newStatus.replace('_', ' ').toUpperCase();
+                
+                // Hide dropdown
+                statusDropdown.style.display = 'none';
+                statusDisplay.classList.remove('dropdown-open');
+            });
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#create-status-display') && !e.target.closest('#create-status-dropdown-menu')) {
+                statusDropdown.style.display = 'none';
+                statusDisplay.classList.remove('dropdown-open');
+            }
+        });
+    }
 
     hideTaskModal() {
         document.getElementById('task-modal').classList.remove('show');
@@ -1467,7 +1535,8 @@ class KanbanManager {
         const description = document.getElementById('task-description').value.trim();
         const plan = document.getElementById('task-plan').value.trim();
         const implementation = document.getElementById('task-implementation').value.trim();
-        const status = document.getElementById('task-status').value;
+        const statusDisplay = document.getElementById('create-status-display');
+        const status = statusDisplay ? statusDisplay.dataset.status : 'pending';
         const project = document.getElementById('task-project').value;
         const parentTaskIdValue = document.getElementById('task-parent').value;
         const parentTaskId = parentTaskIdValue ? parseInt(parentTaskIdValue) : null;

@@ -198,20 +198,79 @@
     <!-- Task Creation Modal -->
     <div class="modal" id="task-modal">
         <div class="modal-content">
-            <div class="modal-header">
-                <h3 id="modal-title">Create New Task</h3>
-                <button class="modal-close" id="modal-close-btn">
-                    <i data-lucide="x"></i>
-                </button>
+            <div class="modal-header task-header-redesigned">
+                <div class="task-header-wrapper">
+                    <div class="task-header-top">
+                        <div class="task-header-meta">
+                            <div class="task-header-status">
+                                <div id="create-status-display" class="status-display-modern clickable status-pending" data-status="pending">
+                                    <span id="create-status-text">PENDING</span>
+                                    <i data-lucide="chevron-down" class="status-dropdown-icon"></i>
+                                </div>
+                                <div id="create-status-dropdown-menu" class="status-dropdown-menu" style="display: none;">
+                                    <div class="status-option" data-value="pending">
+                                        <span>Pending</span>
+                                    </div>
+                                    <div class="status-option" data-value="in_progress">
+                                        <span>In Progress</span>
+                                    </div>
+                                    <div class="status-option" data-value="in_testing">
+                                        <span>In Testing</span>
+                                    </div>
+                                    <div class="status-option" data-value="completed">
+                                        <span>Completed</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="task-header-project">
+                                <i data-lucide="folder" class="header-icon"></i>
+                                <select id="task-project" class="header-select"></select>
+                            </div>
+                            <div class="task-header-terminal">
+                                <i data-lucide="terminal" class="header-icon"></i>
+                                <select id="task-terminal" class="header-select">
+                                    <option value="">Not assigned</option>
+                                    <option value="1">Terminal 1</option>
+                                    <option value="2">Terminal 2</option>
+                                    <option value="3">Terminal 3</option>
+                                    <option value="4">Terminal 4</option>
+                                    <option value="5">Terminal 5</option>
+                                    <option value="6">Terminal 6</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="modal-close" id="modal-close-btn">
+                            <i data-lucide="x"></i>
+                        </button>
+                    </div>
+                    <div class="task-header-title">
+                        <input type="text" id="task-title" class="editable-title-modern" placeholder="Enter task title..." required maxlength="5000">
+                    </div>
+                </div>
             </div>
             <div class="modal-body">
                 <form id="task-form">
+                    <!-- Parent Task (optional) -->
                     <div class="form-group">
-                        <label for="task-title">Title *</label>
-                        <input type="text" id="task-title" required maxlength="5000">
+                        <label for="task-parent-search"><i data-lucide="git-branch"></i> Parent Task (optional)</label>
+                        <div class="parent-task-search-wrapper">
+                            <input 
+                                type="text" 
+                                id="task-parent-search" 
+                                class="form-control" 
+                                placeholder="Search by task ID or title..."
+                                autocomplete="off"
+                            />
+                            <input type="hidden" id="task-parent" value="" />
+                            <div id="parent-task-dropdown" class="parent-task-dropdown" style="display: none;">
+                                <!-- Dropdown items will be populated dynamically -->
+                            </div>
+                        </div>
+                        <small class="form-help">Make this task a subtask of another task</small>
                     </div>
-                    <div class="form-group">
-                        <label for="task-description">Description</label>
+                    
+                    <div class="form-group task-description-section">
+                        <label><i data-lucide="file-text"></i> Description</label>
                         <div class="markdown-editor-container">
                             <div class="editor-toolbar">
                                 <div class="editor-toolbar-group">
@@ -277,8 +336,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="task-plan">Plan</label>
+                    <div class="form-group task-plan-section">
+                        <label><i data-lucide="list"></i> Plan</label>
                         <div class="markdown-editor-container">
                             <div class="editor-toolbar">
                                 <div class="editor-toolbar-group">
@@ -344,8 +403,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="task-implementation">Implementation</label>
+                    <div class="form-group task-implementation-section">
+                        <label><i data-lucide="code"></i> Implementation</label>
                         <div class="markdown-editor-container">
                             <div class="editor-toolbar">
                                 <div class="editor-toolbar-group">
@@ -411,55 +470,11 @@
                             </div>
                         </div>
                     </div>
-                    <div class="form-group">
-                        <label for="task-status">Status</label>
-                        <select id="task-status">
-                            <option value="pending">Pending</option>
-                            <option value="in_progress">In Progress</option>
-                            <option value="in_testing">In Testing</option>
-                            <option value="completed">Completed</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-project">Project</label>
-                        <select id="task-project">
-                            <option value="CodeAgentSwarm">CodeAgentSwarm</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-parent-search">Parent Task (optional)</label>
-                        <div class="parent-task-search-wrapper">
-                            <input 
-                                type="text" 
-                                id="task-parent-search" 
-                                class="form-control" 
-                                placeholder="Search by task ID or title..."
-                                autocomplete="off"
-                            />
-                            <input type="hidden" id="task-parent" value="" />
-                            <div id="parent-task-dropdown" class="parent-task-dropdown" style="display: none;">
-                                <!-- Dropdown items will be populated dynamically -->
-                            </div>
-                        </div>
-                        <small class="form-help">Make this task a subtask of another task</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="task-terminal">Terminal (optional)</label>
-                        <select id="task-terminal">
-                            <option value="">Terminal no seleccionado</option>
-                            <option value="1">Terminal 1</option>
-                            <option value="2">Terminal 2</option>
-                            <option value="3">Terminal 3</option>
-                            <option value="4">Terminal 4</option>
-                            <option value="5">Terminal 5</option>
-                            <option value="6">Terminal 6</option>
-                        </select>
-                    </div>
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="cancel-btn">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="save-task-btn">Save Task</button>
+            <div class="modal-footer modal-actions">
+                <button type="button" class="btn-modern btn-secondary-modern" id="cancel-btn"><i data-lucide="x"></i> Cancel</button>
+                <button type="submit" class="btn-modern btn-primary-modern" id="save-task-btn"><i data-lucide="check"></i> Save Task</button>
             </div>
         </div>
     </div>

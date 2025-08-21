@@ -1315,11 +1315,59 @@ body::before {
     animation: slideUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Make task creation modal much wider */
+/* Make task creation modal much wider and match task details design */
 #task-modal .modal-content {
     max-width: 900px;  /* Much wider than default 500px */
     width: 95%;        /* Take up most of the screen width */
     max-height: 90vh;  /* Taller for better visibility */
+    background: rgba(20, 20, 20, 0.98);  /* Match task details modal */
+}
+
+#task-modal .modal-header {
+    padding: 1.75rem 2rem;  /* Match task details modal padding */
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#task-modal .modal-body {
+    padding: 2rem;  /* More spacious padding */
+}
+
+#task-modal .modal-footer {
+    padding: 1.5rem 2rem;  /* Match task details modal footer */
+    background: rgba(255, 255, 255, 0.02);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+#task-modal .task-header-meta {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+}
+
+#task-modal .status-select-modern {
+    padding: 0.4rem 0.8rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+#task-modal .status-select-modern:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+/* Use the same header-select styles as task details modal */
+#task-modal .header-icon {
+    width: 16px;
+    height: 16px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 @keyframes slideUp {
