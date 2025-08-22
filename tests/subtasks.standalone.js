@@ -11,7 +11,7 @@ const fs = require('fs');
 const os = require('os');
 
 // Import the database manager
-const DatabaseManagerMCP = require('./database-mcp-standalone');
+const DatabaseManagerMCP = require('../database-mcp-standalone');
 
 // Test configuration
 const TEST_DB_PATH = path.join(os.tmpdir(), `test-subtasks-${Date.now()}.db`);

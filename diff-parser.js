@@ -254,9 +254,13 @@ class DiffParser {
                 });
             }
 
-            // Add chunk lines
-            chunk.lines.forEach(line => {
+            // Process chunk lines with smart pairing to avoid consecutive empty lines
+            let i = 0;
+            while (i < chunk.lines.length) {
+                const line = chunk.lines[i];
+                
                 if (line.type === 'unchanged') {
+                    // Unchanged lines are simple - add to both sides
                     leftLines.push({
                         number: line.oldLine,
                         content: line.content,
@@ -267,30 +271,58 @@ class DiffParser {
                         content: line.content,
                         type: 'unchanged'
                     });
-                } else if (line.type === 'removed') {
-                    leftLines.push({
-                        number: line.oldLine,
-                        content: line.content,
-                        type: 'removed'
-                    });
-                    rightLines.push({
-                        number: null,
-                        content: '',
-                        type: 'empty'
-                    });
-                } else if (line.type === 'added') {
-                    leftLines.push({
-                        number: null,
-                        content: '',
-                        type: 'empty'
-                    });
-                    rightLines.push({
-                        number: line.newLine,
-                        content: line.content,
-                        type: 'added'
-                    });
+                    i++;
+                } else {
+                    // Collect consecutive removed and added lines for better pairing
+                    const removedLines = [];
+                    const addedLines = [];
+                    
+                    // Collect all consecutive removed/added lines
+                    let j = i;
+                    while (j < chunk.lines.length && chunk.lines[j].type !== 'unchanged') {
+                        if (chunk.lines[j].type === 'removed') {
+                            removedLines.push(chunk.lines[j]);
+                        } else if (chunk.lines[j].type === 'added') {
+                            addedLines.push(chunk.lines[j]);
+                        }
+                        j++;
+                    }
+                    
+                    // Pair them up intelligently
+                    const maxLength = Math.max(removedLines.length, addedLines.length);
+                    for (let k = 0; k < maxLength; k++) {
+                        if (k < removedLines.length) {
+                            leftLines.push({
+                                number: removedLines[k].oldLine,
+                                content: removedLines[k].content,
+                                type: 'removed'
+                            });
+                        } else {
+                            leftLines.push({
+                                number: null,
+                                content: '',
+                                type: 'empty'
+                            });
+                        }
+                        
+                        if (k < addedLines.length) {
+                            rightLines.push({
+                                number: addedLines[k].newLine,
+                                content: addedLines[k].content,
+                                type: 'added'
+                            });
+                        } else {
+                            rightLines.push({
+                                number: null,
+                                content: '',
+                                type: 'empty'
+                            });
+                        }
+                    }
+                    
+                    i = j;
                 }
-            });
+            }
 
             // Add expansion placeholder at the bottom if expandable
             if (chunk.expandableBottom && (chunk.trimmedBottom > 0 || chunk.hiddenBottomLines > 0)) {

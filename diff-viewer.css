@@ -412,7 +412,10 @@
 }
 
 .diff-line-empty {
-  background: rgba(0, 0, 0, 0.1);
+  /* Empty lines are placeholders for alignment in side-by-side view */
+  /* They should be invisible to avoid confusion */
+  background: transparent;
+  min-height: 24px; /* Maintain line height for alignment */
 }
 
 .diff-line-separator {

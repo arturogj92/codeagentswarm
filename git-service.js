@@ -148,21 +148,36 @@ class GitService {
 
             // Ensure commit service is initialized
             if (!commitServiceFactory.getDefaultAdapterName()) {
-                await this.initializeCommitService();
-                
-                if (!commitServiceFactory.getDefaultAdapterName()) {
+                return { 
+                    success: false, 
+                    error: 'Commit service not initialized. Please install Claude Code to use AI-powered commit messages.' 
+                };
+            }
+
+            // Get the commit service
+            const commitService = commitServiceFactory.createCommitService();
+            
+            // Get the diff
+            const diffResult = await this.getDiff(cwd, true); // Get staged diff
+            if (!diffResult.success || !diffResult.diff) {
+                // If no staged diff, get unstaged diff
+                const unstagedDiff = await this.getDiff(cwd, false);
+                if (!unstagedDiff.success || !unstagedDiff.diff) {
                     return { 
                         success: false, 
-                        error: 'Commit generation service not available. Please install Claude Code to use AI-powered commit messages.' 
+                        error: 'No changes to generate commit message for' 
                     };
                 }
             }
-
-            // Create use case and execute
-            const useCase = commitServiceFactory.createUseCase();
-            const result = await useCase.execute({ workingDirectory: cwd, style });
             
-            return result;
+            // Generate commit message
+            const commitMessage = await commitService.generateCommitMessage();
+            const formattedMessage = commitMessage.format();
+            
+            return { 
+                success: true, 
+                message: formattedMessage 
+            };
         } catch (error) {
             console.error('Generate commit message error:', error);
             return { 
@@ -201,11 +216,33 @@ class GitService {
         }
     }
 
+    // Commit changes
+    async commit(cwd, message) {
+        try {
+            if (!this.isGitRepository(cwd)) {
+                return { success: false, error: 'Not a git repository' };
+            }
+            
+            const output = execSync(`git commit -m "${message}"`, { cwd, encoding: 'utf8' });
+            return { success: true, message: output };
+        } catch (error) {
+            console.error('Git commit error:', error);
+            return { 
+                success: false, 
+                error: error.message || 'Failed to commit changes' 
+            };
+        }
+    }
+
     // Push changes
     async push(cwd) {
         try {
+            if (!this.isGitRepository(cwd)) {
+                return { success: false, error: 'Not a git repository' };
+            }
+            
             const output = execSync('git push', { cwd, encoding: 'utf8' });
-            return { success: true, output };
+            return { success: true, message: output };
         } catch (error) {
             console.error('Git push error:', error);
             return { 
@@ -218,8 +255,12 @@ class GitService {
     // Pull changes
     async pull(cwd) {
         try {
+            if (!this.isGitRepository(cwd)) {
+                return { success: false, error: 'Not a git repository' };
+            }
+            
             const output = execSync('git pull', { cwd, encoding: 'utf8' });
-            return { success: true, output };
+            return { success: true, message: output };
         } catch (error) {
             console.error('Git pull error:', error);
             return { 
@@ -230,9 +271,19 @@ class GitService {
     }
 
     // Get diff
-    async getDiff(cwd, fileName) {
+    async getDiff(cwd, staged = false, fileName = null) {
         try {
-            const command = fileName ? `git diff "${fileName}"` : 'git diff';
+            if (!this.isGitRepository(cwd)) {
+                return { success: false, error: 'Not a git repository' };
+            }
+            
+            let command;
+            if (fileName) {
+                command = staged ? `git diff --cached "${fileName}"` : `git diff "${fileName}"`;
+            } else {
+                command = staged ? 'git diff --cached' : 'git diff';
+            }
+            
             const output = execSync(command, { cwd, encoding: 'utf8' });
             return { success: true, diff: output };
         } catch (error) {
@@ -309,26 +360,28 @@ class GitService {
                 encoding: 'utf8' 
             });
             
-            const branches = branchesOutput
+            const localBranches = [];
+            const remoteBranches = [];
+            
+            branchesOutput
                 .split('\n')
                 .map(line => line.trim())
                 .filter(line => line && !line.includes('HEAD'))
-                .map(line => {
-                    const isCurrent = line.startsWith('*');
+                .forEach(line => {
                     const name = line.replace(/^\*?\s+/, '').trim();
-                    const isRemote = name.startsWith('remotes/');
                     
-                    return {
-                        name: isRemote ? name.replace('remotes/origin/', '') : name,
-                        current: isCurrent,
-                        remote: isRemote
-                    };
+                    if (name.startsWith('remotes/')) {
+                        remoteBranches.push(name.replace('remotes/', ''));
+                    } else {
+                        localBranches.push(name);
+                    }
                 });
             
             return { 
                 success: true, 
-                branches,
-                currentBranch
+                current: currentBranch,
+                local: localBranches,
+                remote: remoteBranches
             };
         } catch (error) {
             console.error('Git get branches error:', error);

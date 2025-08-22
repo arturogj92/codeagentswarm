@@ -6,41 +6,60 @@ class ChildProcessLogger extends EventEmitter {
     super();
     this.sourceName = sourceName;
     this.enabled = process.env.ENABLE_DEBUG_LOGS === 'true' || process.env.NODE_ENV === 'development' || process.argv.includes('--dev');
+    this.intercepted = false;
     
-    // Override console methods for this process
-    this.interceptConsole();
+    // Don't intercept automatically - allow tests to control this
+    // this.interceptConsole();
   }
 
   interceptConsole() {
-    const originalLog = console.log;
-    const originalError = console.error;
-    const originalWarn = console.warn;
-    const originalInfo = console.info;
-    const originalDebug = console.debug;
-
-    console.log = (...args) => {
-      this.log('log', args);
-      originalLog.apply(console, args);
+    if (this.intercepted) return; // Prevent double interception
+    this.intercepted = true;
+    
+    // Store original console methods
+    this.originalConsole = {
+      log: console.log.bind ? console.log.bind(console) : console.log,
+      error: console.error.bind ? console.error.bind(console) : console.error,
+      warn: console.warn.bind ? console.warn.bind(console) : console.warn,
+      info: console.info.bind ? console.info.bind(console) : console.info,
+      debug: console.debug.bind ? console.debug.bind(console) : console.debug
     };
 
-    console.error = (...args) => {
-      this.log('error', args);
-      originalError.apply(console, args);
+    const self = this;
+    
+    console.log = function(...args) {
+      self.log('log', args);
+      if (self.originalConsole && self.originalConsole.log) {
+        self.originalConsole.log(...args);
+      }
     };
 
-    console.warn = (...args) => {
-      this.log('warn', args);
-      originalWarn.apply(console, args);
+    console.error = function(...args) {
+      self.log('error', args);
+      if (self.originalConsole && self.originalConsole.error) {
+        self.originalConsole.error(...args);
+      }
     };
 
-    console.info = (...args) => {
-      this.log('info', args);
-      originalInfo.apply(console, args);
+    console.warn = function(...args) {
+      self.log('warn', args);
+      if (self.originalConsole && self.originalConsole.warn) {
+        self.originalConsole.warn(...args);
+      }
     };
 
-    console.debug = (...args) => {
-      this.log('debug', args);
-      originalDebug.apply(console, args);
+    console.info = function(...args) {
+      self.log('info', args);
+      if (self.originalConsole && self.originalConsole.info) {
+        self.originalConsole.info(...args);
+      }
+    };
+
+    console.debug = function(...args) {
+      self.log('debug', args);
+      if (self.originalConsole && self.originalConsole.debug) {
+        self.originalConsole.debug(...args);
+      }
     };
   }
 
@@ -63,7 +82,8 @@ class ChildProcessLogger extends EventEmitter {
       source: this.sourceName,
       level,
       message,
-      timestamp: new Date().toISOString()
+      args,
+      timestamp: new Date()
     });
 
     // If this is a spawned process with IPC, send to parent

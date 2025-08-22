@@ -1,0 +1,51 @@
+File                         | % Stmts | % Branch | % Funcs | % Lines | Uncovered Line #s                                                                                                          
+-----------------------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------------------------------
+All files                    |   69.89 |     59.1 |   67.07 |   70.81 |                                                                                                                            
+ claude-md-global-config.js  |     100 |      100 |     100 |     100 |                                                                                                                            
+ diff-parser.js              |   83.95 |    77.31 |      75 |    87.5 | 149,169,316-317,371-395                                                                                                    
+ feature-highlight.js        |   55.95 |    41.96 |   51.72 |   56.83 | 64-65,70-71,76-77,86,93-94,118,129,140-233,258-259,311-326,335,339,349-350,361-363,385-386,392-393,428-431,446-460,473-474 
+ hooks-manager.js            |   66.66 |    58.97 |   66.66 |   66.66 | 121-182,226-227,252,270,279-280                                                                                            
+ mcp-instructions-manager.js |   74.54 |    62.79 |   88.88 |   74.54 | 282-286,294-295,318,357-358,399-437                                                                                        
+-----------------------------|---------|----------|---------|---------|----------------------------------------------------------------------------------------------------------------------------
+Summary of all failing tests
+FAIL tests/feature-highlight.test.js
+  ● FeatureHighlight › show method › should handle badge type
+
+    TypeError: targetElement.querySelector is not a function
+
+      137 |     showBadge(targetElement, featureName, position, showOnce) {
+      138 |         // Check if badge already exists
+    > 139 |         if (targetElement.querySelector('.feature-badge')) {
+          |                           ^
+      140 |             return;
+      141 |         }
+      142 |
+
+      at FeatureHighlight.querySelector [as showBadge] (feature-highlight.js:139:27)
+      at Object.showBadge (tests/feature-highlight.test.js:234:30)
+
+  ● FeatureHighlight › dismiss method › should dismiss highlight
+
+    expect(jest.fn()).toHaveBeenCalled()
+
+    Expected number of calls: >= 1
+    Received number of calls:    0
+
+      255 |             featureHighlight.dismiss();
+      256 |             
+    > 257 |             expect(mockElement.remove).toHaveBeenCalled();
+          |                                        ^
+      258 |             expect(featureHighlight.currentHighlight).toBeNull();
+      259 |         });
+      260 |
+
+      at Object.toHaveBeenCalled (tests/feature-highlight.test.js:257:40)
+
+  ● FeatureHighlight › dismiss method › should clear timeout on dismiss
+
+    TypeError: Cannot read properties of undefined (reading 'remove')
+
+      378 |
+      379 |         // Fade out animation
+    > 380 |         element.classList.remove('show');
+          |                           ^

@@ -1753,16 +1753,18 @@ class KanbanManager {
             parentInfo.style.display = 'none';
         }
         
-        // Project dropdown - defer population to not block
+        // Project dropdown - ensure projects are loaded before setting value
         const headerProjectSelect = document.getElementById('header-project-select');
         if (headerProjectSelect) {
-            // Set current value immediately
-            headerProjectSelect.value = task.project || '';
-            // Populate options asynchronously
-            requestAnimationFrame(() => {
-                this.populateProjectSelectHeader();
+            // First populate the select with projects, then set the value
+            this.populateProjectSelectHeader().then(() => {
+                // After projects are loaded, set the correct value
                 headerProjectSelect.value = task.project || '';
             });
+            // Also set value immediately in case projects are already cached
+            if (this.cachedProjects && this.cachedProjects.length > 0) {
+                headerProjectSelect.value = task.project || '';
+            }
         }
         
         // Terminal dropdown
@@ -1817,18 +1819,40 @@ class KanbanManager {
                 // Show loading state immediately
                 subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem;">Loading...</div>';
                 
-                // Render subtasks in next frame
-                requestAnimationFrame(() => {
+                // Function to render subtasks
+                const renderSubtasks = () => {
                     // Use index for O(1) lookup instead of O(n) filter
                     const subtaskIds = this.subtaskIndex.get(task.id) || [];
                     const subtasks = subtaskIds.map(id => this.taskIndex.get(id)).filter(Boolean);
                     
                     if (subtasks.length > 0) {
-                        subtasksList.innerHTML = subtasks.map(subtask => `
+                        subtasksList.innerHTML = subtasks.map(subtask => {
+                            // Get project info for the subtask
+                            let projectBadge = '';
+                            if (subtask.project) {
+                                // Wait for projects to be loaded
+                                if (this.projects && this.projects.length > 0) {
+                                    const project = this.projects.find(p => p.name === subtask.project);
+                                    if (project) {
+                                        const displayName = project.display_name || project.name;
+                                        const gradient = this.getProjectGradient(project.color);
+                                        projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
+                                    } else {
+                                        // Project not found in list, show with default color
+                                        projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
+                                    }
+                                } else {
+                                    // Projects not loaded yet, show with default color
+                                    projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
+                                }
+                            }
+                            
+                            return `
                             <div class="subtask-item">
                                 <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                     <div class="subtask-header">
                                         <span class="task-id-badge">#${subtask.id}</span>
+                                        ${projectBadge}
                                         <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
                                         <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${task.id}); return false;" title="Delete subtask">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1840,11 +1864,24 @@ class KanbanManager {
                                     <div class="subtask-title">${this.escapeHtml(this.capitalizeFirstLetter(subtask.title))}</div>
                                 </a>
                             </div>
-                        `).join('');
+                            `;
+                        }).join('');
                     } else {
                         subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; font-style: italic; width: 100%; grid-column: 1 / -1;">No subtasks yet. Click "Create Subtask" to add one.</div>';
                     }
-                });
+                };
+                
+                // Wait a bit for projects to load, then render
+                setTimeout(() => {
+                    renderSubtasks();
+                }, 100);
+                
+                // Also render immediately in case projects are already loaded
+                if (this.projects && this.projects.length > 0) {
+                    requestAnimationFrame(() => {
+                        renderSubtasks();
+                    });
+                }
             }
         }
         
@@ -2091,6 +2128,16 @@ class KanbanManager {
         const projectSelect = document.getElementById('header-project-select');
         if (!projectSelect) return;
         
+        // Always try to load projects first if not cached
+        if (!this.cachedProjects || this.cachedProjects.length === 0) {
+            const result = await ipcRenderer.invoke('project-get-all');
+            if (result.success && result.projects) {
+                this.cachedProjects = result.projects;
+                this.cachedProjectsTimestamp = Date.now();
+                this.projects = result.projects; // Also update the main projects array
+            }
+        }
+        
         // Use cached projects if available and fresh (less than 5 seconds old)
         const now = Date.now();
         if (this.cachedProjects && this.cachedProjectsTimestamp && (now - this.cachedProjectsTimestamp < 5000)) {
@@ -2098,12 +2145,14 @@ class KanbanManager {
             return;
         }
         
+        // Reload projects if cache is stale
         const result = await ipcRenderer.invoke('project-get-all');
         
         // Cache the projects and render
         if (result.success && result.projects) {
             this.cachedProjects = result.projects;
             this.cachedProjectsTimestamp = now;
+            this.projects = result.projects; // Also update the main projects array
             this.renderProjectOptions(projectSelect, result.projects);
         } else {
             projectSelect.innerHTML = '<option value="">No project</option>';
@@ -2354,11 +2403,23 @@ class KanbanManager {
                     
                     if (subtasksList) {
                         if (subtasks.length > 0) {
-                            subtasksList.innerHTML = subtasks.map(subtask => `
+                            subtasksList.innerHTML = subtasks.map(subtask => {
+                                // Get project info for the subtask
+                                let projectBadge = '';
+                                if (subtask.project) {
+                                    const project = this.projects.find(p => p.name === subtask.project) || 
+                                                   { name: subtask.project, display_name: subtask.project, color: '#007ACC' };
+                                    const displayName = project.display_name || project.name;
+                                    const gradient = this.getProjectGradient(project.color);
+                                    projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
+                                }
+                                
+                                return `
                                 <div class="subtask-item">
                                     <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                         <div class="subtask-header">
                                             <span class="task-id-badge">#${subtask.id}</span>
+                                            ${projectBadge}
                                             <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
                                             <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Delete subtask">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2370,7 +2431,8 @@ class KanbanManager {
                                         <div class="subtask-title">${this.escapeHtml(this.capitalizeFirstLetter(subtask.title))}</div>
                                     </a>
                                 </div>
-                            `).join('');
+                                `;
+                            }).join('');
                         } else {
                             subtasksList.innerHTML = '<div class="no-subtasks" style="color: #888; text-align: center; padding: 2rem; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; font-style: italic; width: 100%; grid-column: 1 / -1;">No subtasks yet. Click "Create Subtask" to add one.</div>';
                         }
@@ -3524,6 +3586,9 @@ class KanbanManager {
         const newModalSendIcon = modalSendIcon.cloneNode(true);
         modalSendIcon.parentNode.replaceChild(newModalSendIcon, modalSendIcon);
         
+        // Store taskId in data attribute for later use
+        newModalSendIcon.dataset.taskId = taskId;
+        
         // Add click event listener
         newModalSendIcon.addEventListener('click', async (e) => {
             e.stopPropagation();
@@ -3549,29 +3614,54 @@ class KanbanManager {
             // Request available terminals from main process
             const terminals = await ipcRenderer.invoke('get-terminals-for-project', task.project);
             
-            // Build dropdown content (same as regular task cards)
+            // Build dropdown content with data attributes instead of onclick
             let dropdownHTML = '';
             
             if (terminals && terminals.length > 0) {
                 dropdownHTML = terminals.map(terminal => `
-                    <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
+                    <div class="send-terminal-option modal-terminal-option" data-task-id="${taskId}" data-terminal-id="${terminal.id}" data-action="send">
                         <i data-lucide="terminal"></i>
                         Terminal ${terminal.id + 1} (${terminal.project})
                         <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
                     </div>
                 `).join('');
+                
+                // Add "Open New Terminal" option only if:
+                // 1. We have less than 6 terminals AND
+                // 2. The task has a project assigned
+                if (terminals.length < 6 && task.project && task.project !== 'Unknown') {
+                    dropdownHTML += `
+                        <div class="send-terminal-option new-terminal modal-new-terminal" data-task-id="${taskId}" data-action="new-terminal">
+                            <i data-lucide="plus-circle"></i>
+                            Open New Terminal
+                            <span class="terminal-status">Create & send</span>
+                        </div>
+                    `;
+                }
             } else {
-                dropdownHTML = `
-                    <div class="send-terminal-option no-terminals">
-                        <i data-lucide="alert-circle"></i>
-                        No active terminals available
-                    </div>
-                `;
+                // No terminals open
+                // Only show "Open New Terminal" if task has a project
+                if (task.project && task.project !== 'Unknown') {
+                    dropdownHTML = `
+                        <div class="send-terminal-option new-terminal modal-new-terminal" data-task-id="${taskId}" data-action="new-terminal">
+                            <i data-lucide="plus-circle"></i>
+                            Open New Terminal
+                            <span class="terminal-status">No terminals active</span>
+                        </div>
+                    `;
+                } else {
+                    dropdownHTML = `
+                        <div class="send-terminal-option no-terminals">
+                            <i data-lucide="alert-circle"></i>
+                            No active terminals available
+                        </div>
+                    `;
+                }
             }
             
             // Always add copy option
             dropdownHTML += `
-                <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                <div class="send-terminal-option copy-option modal-copy-option" data-task-id="${taskId}" data-action="copy">
                     <i data-lucide="clipboard-copy"></i>
                     Copy Task Summary
                 </div>
@@ -3582,6 +3672,30 @@ class KanbanManager {
             
             // Re-initialize icons
             this.initializeLucideIcons();
+            
+            // Add click handlers to all options using event delegation
+            const options = dropdown.querySelectorAll('.modal-terminal-option, .modal-copy-option, .modal-new-terminal');
+            options.forEach(option => {
+                option.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    const action = option.dataset.action;
+                    const taskId = parseInt(option.dataset.taskId);
+                    
+                    if (action === 'send') {
+                        const terminalId = parseInt(option.dataset.terminalId);
+                        await this.sendTaskToSpecificTerminal(taskId, terminalId);
+                    } else if (action === 'copy') {
+                        await this.copyTaskSummary(taskId);
+                    } else if (action === 'new-terminal') {
+                        await this.sendTaskToNewTerminal(taskId);
+                    }
+                    
+                    // Close dropdown after action
+                    dropdown.style.display = 'none';
+                });
+            });
             
             // Add click handler to close dropdown when clicking outside
             setTimeout(() => {
@@ -3746,6 +3860,8 @@ class KanbanManager {
 let kanban;
 document.addEventListener('DOMContentLoaded', () => {
     kanban = new KanbanManager();
+    // Make kanban accessible globally for inline onclick handlers
+    window.kanban = kanban;
 });
 
 // Handle window keyboard shortcuts

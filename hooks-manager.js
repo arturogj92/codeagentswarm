@@ -160,16 +160,16 @@ class HooksManager {
             const settings = await this.readSettings();
             
             // Check if our hooks are installed with the correct format
-            const hasNotificationHook = settings.hooks?.Notification?.some(item => 
+            const hasNotificationHook = !!(settings.hooks?.Notification?.some(item => 
                 item.hooks?.some(hook => 
                     hook.command?.includes('confirmation_needed')
                 )
-            );
-            const hasStopHook = settings.hooks?.Stop?.some(item => 
+            ));
+            const hasStopHook = !!(settings.hooks?.Stop?.some(item => 
                 item.hooks?.some(hook => 
                     hook.command?.includes('claude_finished')
                 )
-            );
+            ));
             
             return {
                 installed: hasNotificationHook && hasStopHook,

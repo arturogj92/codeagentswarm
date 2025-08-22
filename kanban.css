@@ -3328,6 +3328,59 @@ input[type="radio"]:checked + .color-option {
     color: rgba(255, 255, 255, 0.6);
 }
 
+/* Modal Send to Terminal Dropdown Styles */
+#task-details-modal .task-header-send-wrapper {
+    position: relative;
+    display: inline-block;
+}
+
+#task-details-modal .modal-send-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: auto;
+    right: 0;
+    background: rgba(20, 20, 20, 0.98);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+    z-index: 100000;  /* Very high z-index to ensure visibility in modal */
+    max-height: 200px;
+    overflow-y: auto;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    min-width: 220px;
+}
+
+/* Ensure modal body doesn't clip the dropdown */
+#task-details-modal .modal-body {
+    overflow: visible;
+}
+
+#task-details-modal .task-header-container {
+    overflow: visible;
+}
+
+#task-details-modal .modal-send-dropdown .send-terminal-option {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+#task-details-modal .modal-send-dropdown .send-terminal-option:hover {
+    background: rgba(255, 255, 255, 0.08);
+}
+
+#task-details-modal .modal-send-dropdown .send-terminal-option:last-child {
+    border-bottom: none;
+}
+
 /* Edit mode textareas in dark theme */
 #task-details-modal textarea {
     background: rgba(255, 255, 255, 0.05);
