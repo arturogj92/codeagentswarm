@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, nativeImage, shell } = require('electron');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
 const path = require('path');
@@ -96,6 +96,113 @@ ipcMain.on('export-logs', (event) => {
 });
 
 // Database-dependent handlers are registered in registerDatabaseHandlers() after db initialization
+
+// ============= AUTHENTICATION DEEP LINKING =============
+// Register protocol for deep linking
+if (process.defaultApp) {
+  if (process.argv.length >= 2) {
+    app.setAsDefaultProtocolClient('codeagentswarm', process.execPath, [path.resolve(process.argv[1])]);
+  }
+} else {
+  app.setAsDefaultProtocolClient('codeagentswarm');
+}
+
+// Store for auth data
+let authData = null;
+
+// Handle protocol on macOS
+app.on('open-url', (event, url) => {
+  event.preventDefault();
+  handleAuthCallback(url);
+});
+
+// Handle protocol on Windows/Linux
+app.on('second-instance', (event, commandLine, workingDirectory) => {
+  // Someone tried to run a second instance, we should focus our window instead.
+  const mainWindow = BrowserWindow.getAllWindows()[0];
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+  
+  // Handle the protocol url
+  const url = commandLine.find(arg => arg.startsWith('codeagentswarm://'));
+  if (url) {
+    handleAuthCallback(url);
+  }
+});
+
+// Function to handle auth callback
+function handleAuthCallback(url) {
+  try {
+    const urlObj = new URL(url);
+    
+    if (urlObj.hostname === 'auth') {
+      const token = urlObj.searchParams.get('token');
+      const refreshToken = urlObj.searchParams.get('refresh');
+      const userStr = urlObj.searchParams.get('user');
+      
+      if (token && refreshToken) {
+        const user = userStr ? JSON.parse(decodeURIComponent(userStr)) : null;
+        
+        // Store auth data
+        authData = { token, refreshToken, user };
+        
+        // Send to all renderer windows
+        BrowserWindow.getAllWindows().forEach(window => {
+          if (!window.isDestroyed()) {
+            window.webContents.send('auth-success', authData);
+          }
+        });
+        
+        // Show success notification
+        new Notification({
+          title: 'Login Successful',
+          body: user ? `Welcome back, ${user.name || user.email}!` : 'You have been successfully logged in.',
+          icon: nativeImage.createFromPath(path.join(__dirname, 'assets/icon.png'))
+        }).show();
+        
+        logger.addLog('info', ['User authenticated successfully:', user?.email || 'Unknown']);
+      }
+    }
+  } catch (error) {
+    logger.addLog('error', ['Error handling auth callback:', error.message]);
+    
+    // Send error to renderer
+    BrowserWindow.getAllWindows().forEach(window => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('auth-error', { error: error.message });
+      }
+    });
+  }
+}
+
+// IPC handlers for auth
+ipcMain.handle('get-auth-data', () => {
+  return authData;
+});
+
+ipcMain.handle('clear-auth-data', () => {
+  authData = null;
+  return { success: true };
+});
+
+ipcMain.handle('open-auth-url', async (event, provider) => {
+  const backendUrl = process.env.BACKEND_URL || 'https://codeagentswarm-backend-production.up.railway.app';
+  const authUrl = `${backendUrl}/api/auth/login/${provider}`;
+  
+  logger.addLog('info', [`Opening auth URL for provider: ${provider}`]);
+  
+  try {
+    await shell.openExternal(authUrl);
+    return { success: true };
+  } catch (error) {
+    logger.addLog('error', [`Failed to open auth URL: ${error.message}`]);
+    return { success: false, error: error.message };
+  }
+});
+
+// ============= END AUTHENTICATION =============
 
 // Handle updater operations
 ipcMain.handle('check-for-updates', async () => {

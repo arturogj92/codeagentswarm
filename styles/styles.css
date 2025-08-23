@@ -2072,16 +2072,36 @@ body::before {
 /* Recent projects styles */
 .recent-projects-section {
   margin: 0;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 24px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 
 .recent-projects-section h4 {
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-bottom: 8px;
+  font-size: 1rem;
+  font-weight: 300;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 20px;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 2px;
   text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.recent-projects-section h4::before {
+  content: '⚡';
+  font-size: 1.2rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.2); opacity: 0.8; }
 }
 
 .recent-projects-list {

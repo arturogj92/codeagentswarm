@@ -1,0 +1,1026 @@
+/* Beautiful Full-Screen Directory Selector - Ultra Responsive */
+
+.directory-selector {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, 
+    #0a0a0f 0%, 
+    #1a0f1f 25%,
+    #1f141f 50%,
+    #141a28 75%,
+    #0f1420 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 101;
+  border-radius: 8px;
+  padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  animation: selectorFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes selectorFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Animated gradient background */
+.directory-selector::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(127, 90, 240, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 50% 30%, rgba(127, 90, 240, 0.08) 0%, transparent 50%);
+  animation: backgroundFloat 25s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes backgroundFloat {
+  0%, 100% { 
+    transform: rotate(0deg) scale(1) translateX(0);
+  }
+  33% { 
+    transform: rotate(120deg) scale(1.1) translateX(-50px);
+  }
+  66% { 
+    transform: rotate(240deg) scale(0.95) translateX(50px);
+  }
+}
+
+/* Grid pattern overlay */
+.directory-selector::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    linear-gradient(rgba(127, 90, 240, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(127, 90, 240, 0.03) 1px, transparent 1px);
+  background-size: 50px 50px;
+  animation: gridMove 10s linear infinite;
+  pointer-events: none;
+  opacity: 0.5;
+}
+
+@keyframes gridMove {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
+}
+
+.directory-selector-content {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: min(20px, 3%);
+  max-width: 100%;
+  width: 100%;
+  height: 100%;
+  box-shadow: none;
+  display: flex;
+  flex-direction: column;
+  gap: min(20px, 3vh);
+  position: relative;
+  z-index: 1;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Main title with gradient animation */
+.directory-selector h3 {
+  margin: 0 0 min(20px, 3vh) 0;
+  font-size: min(1.8rem, 5vh);
+  font-weight: 200;
+  letter-spacing: -0.5px;
+  background: linear-gradient(90deg, 
+    #ffffff 0%, 
+    #7f5af0 25%, 
+    #667eea 50%, 
+    #7f5af0 75%,
+    #ffffff 100%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-align: center;
+  animation: titleGradient 4s linear infinite;
+  line-height: 1.1;
+  flex-shrink: 0;
+}
+
+@keyframes titleGradient {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes titleGlow {
+  0%, 100% { 
+    filter: brightness(1) drop-shadow(0 0 20px rgba(127, 90, 240, 0.3));
+    transform: scale(1);
+  }
+  50% { 
+    filter: brightness(1.2) drop-shadow(0 0 30px rgba(127, 90, 240, 0.5));
+    transform: scale(1.02);
+  }
+}
+
+/* Main container - ALWAYS 2 rows: projects then buttons */
+.directory-selector-main {
+  display: flex;
+  flex-direction: column;
+  gap: min(16px, 2vh);
+  align-items: stretch;
+  flex: 1;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* Projects row */
+.directory-selector-row-projects {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Buttons row */
+.directory-selector-row-buttons {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  gap: 10px;
+}
+
+/* Two column layout ONLY for very large screens */
+@media (min-width: 1200px) and (min-height: 800px) {
+  .directory-selector-main {
+    flex-direction: row;
+    gap: 30px;
+  }
+  
+  .directory-selector-row-projects,
+  .directory-selector-row-buttons {
+    flex: 1;
+  }
+  
+  /* Restore original left/right layout */
+  .directory-selector-left {
+    flex: 1.2;
+  }
+  
+  .directory-selector-right {
+    flex: 1;
+  }
+}
+
+/* Left column - projects section (inside row-projects) */
+.directory-selector-left {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  animation: slideInLeft 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.1s backwards;
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Right column - directory and buttons (inside row-buttons) */
+.directory-selector-right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  justify-content: flex-start;
+  flex-shrink: 0;
+  width: 100%;
+  animation: slideInUp 0.5s cubic-bezier(0.4, 0, 0.2, 1) 0.2s backwards;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Recent projects container with glass effect */
+.recent-projects-section {
+  flex: 1 1 auto;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.06) 0%, 
+    rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: min(16px, 2vh);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  position: relative;
+  overflow: hidden;
+  min-height: 100px;
+  max-height: calc(100vh - 200px);
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+/* Use more height for projects on small screens */
+@media (max-height: 600px) {
+  .recent-projects-section {
+    max-height: calc(100vh - 160px);
+  }
+}
+
+/* Glow effect for recent projects */
+.recent-projects-section::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, 
+    transparent, 
+    rgba(127, 90, 240, 0.3), 
+    transparent, 
+    rgba(102, 126, 234, 0.3));
+  border-radius: 20px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+}
+
+.recent-projects-section:hover::before {
+  opacity: 1;
+}
+
+.recent-projects-section h4 {
+  font-size: min(0.9rem, 2.5vh);
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: min(12px, 2vh);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.recent-projects-section h4::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 10px solid rgba(255, 255, 255, 0.7);
+  animation: iconPulse 2s ease-in-out infinite;
+}
+
+@keyframes iconPulse {
+  0%, 100% { 
+    transform: scale(1) rotate(0deg);
+    filter: brightness(1);
+  }
+  50% { 
+    transform: scale(1.2) rotate(10deg);
+    filter: brightness(1.5);
+  }
+}
+
+/* Projects list with custom scrollbar */
+.recent-projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: min(8px, 1.5vh);
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(127, 90, 240, 0.3) transparent;
+  min-height: 0;
+}
+
+.recent-projects-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.recent-projects-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.recent-projects-list::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, 
+    rgba(127, 90, 240, 0.5), 
+    rgba(102, 126, 234, 0.5));
+  border-radius: 4px;
+}
+
+.recent-projects-list::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, 
+    rgba(127, 90, 240, 0.7), 
+    rgba(102, 126, 234, 0.7));
+}
+
+/* Individual project items */
+.recent-project-item {
+  display: flex;
+  align-items: center;
+  padding: min(12px, 2vh) min(14px, 3vw);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.05) 0%, 
+    rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  min-height: 40px;
+  flex-shrink: 0;
+}
+
+/* Sweep animation on hover */
+.recent-project-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(127, 90, 240, 0.15), 
+    transparent);
+  transition: left 0.6s ease;
+}
+
+.recent-project-item:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.15) 0%, 
+    rgba(102, 126, 234, 0.1) 100%);
+  border-color: rgba(127, 90, 240, 0.4);
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2);
+}
+
+.recent-project-item:hover::before {
+  left: 100%;
+}
+
+/* Delete button styling */
+.delete-project-btn {
+  position: absolute;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(255, 59, 48, 0.3);
+  background: rgba(255, 59, 48, 0.1);
+  color: rgba(255, 59, 48, 0.8);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: all 0.2s ease;
+}
+
+.recent-project-item:hover .delete-project-btn {
+  opacity: 1;
+}
+
+.delete-project-btn:hover {
+  background: rgba(255, 59, 48, 0.2);
+  border-color: rgba(255, 59, 48, 0.5);
+  transform: translateY(-50%) scale(1.1);
+}
+
+/* Project info layout */
+.project-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+  min-width: 0;
+  padding-right: 40px;
+}
+
+/* Color indicator with glow */
+.project-color-indicator {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 
+    0 0 20px currentColor,
+    inset 0 0 10px rgba(255, 255, 255, 0.3);
+  animation: colorPulse 3s ease-in-out infinite;
+}
+
+@keyframes colorPulse {
+  0%, 100% { 
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% { 
+    transform: scale(1.3);
+    filter: brightness(1.3);
+  }
+}
+
+.project-name {
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.95);
+  font-size: min(0.9rem, 2.5vh);
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.project-path {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: min(0.75rem, 2vh);
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+  display: none;
+}
+
+@media (min-width: 700px) {
+  .project-path {
+    display: block;
+  }
+  .project-name {
+    max-width: 250px;
+  }
+}
+
+/* Create new project button */
+#create-new-project-btn {
+  width: 100%;
+  margin-top: min(12px, 2vh);
+  background: linear-gradient(135deg, 
+    rgba(46, 213, 115, 0.9) 0%, 
+    rgba(0, 184, 148, 0.9) 100%);
+  border: 1px solid rgba(46, 213, 115, 0.3);
+  color: white;
+  font-weight: 500;
+  padding: min(12px, 2vh);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: min(0.9rem, 2.5vh);
+  letter-spacing: 0.3px;
+  position: relative;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+#create-new-project-btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.5s, height 0.5s;
+}
+
+#create-new-project-btn:hover {
+  background: linear-gradient(135deg, 
+    rgba(46, 213, 115, 1) 0%, 
+    rgba(0, 184, 148, 1) 100%);
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(46, 213, 115, 0.4);
+}
+
+#create-new-project-btn:hover::before {
+  width: 400px;
+  height: 400px;
+}
+
+#create-new-project-btn i {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 4px;
+}
+
+/* Last directory section */
+.last-directory-section {
+  padding: min(14px, 2vh);
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.1) 0%, 
+    rgba(102, 126, 234, 0.05) 100%);
+  border: 1px solid rgba(127, 90, 240, 0.25);
+  border-radius: 10px;
+  margin-bottom: min(12px, 2vh);
+  position: relative;
+  overflow: hidden;
+}
+
+.last-directory-section::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(45deg, 
+    rgba(127, 90, 240, 0.3),
+    rgba(102, 126, 234, 0.3),
+    rgba(127, 90, 240, 0.3));
+  border-radius: 16px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: -1;
+  animation: borderGlow 3s linear infinite;
+}
+
+@keyframes borderGlow {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.6; }
+}
+
+.last-directory-label {
+  font-size: min(0.75rem, 2vh);
+  color: rgba(127, 90, 240, 0.9);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: min(8px, 1.5vh);
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.last-directory-label::before {
+  content: '';
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(127, 90, 240, 0.7);
+  border-radius: 50%;
+  position: relative;
+  display: inline-block;
+}
+
+.last-directory-label::after {
+  content: '';
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  background: rgba(127, 90, 240, 0.9);
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+/* Directory display */
+.selected-directory-display {
+  padding: min(14px, 2vh) min(16px, 3vw);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.06) 0%, 
+    rgba(255, 255, 255, 0.02) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.9);
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace;
+  font-size: min(0.85rem, 2.2vh);
+  word-break: break-all;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.selected-directory-display::before {
+  content: '';
+  position: absolute;
+  right: 16px;
+  width: 24px;
+  height: 20px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.05) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  opacity: 0.3;
+}
+
+.selected-directory-display.clickable {
+  cursor: pointer;
+}
+
+.selected-directory-display.clickable:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.12) 0%, 
+    rgba(102, 126, 234, 0.08) 100%);
+  border-color: rgba(127, 90, 240, 0.4);
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 32px rgba(127, 90, 240, 0.2);
+}
+
+.selected-directory-display.clickable:hover::before {
+  animation: folderBounce 0.5s ease;
+}
+
+@keyframes folderBounce {
+  0%, 100% { transform: translateY(0) rotate(0); }
+  25% { transform: translateY(-8px) rotate(-5deg); }
+  75% { transform: translateY(-8px) rotate(5deg); }
+}
+
+/* Action buttons - Always visible at bottom */
+.directory-selector-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: stretch;
+  margin-top: 10px;
+  flex-shrink: 0;
+  min-height: 36px;
+  width: 100%;
+}
+
+.directory-selector-buttons .btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: clamp(0.7rem, 2vw, 0.9rem);
+  font-weight: 500;
+  letter-spacing: 0.2px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.08) 0%, 
+    rgba(255, 255, 255, 0.04) 100%);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.directory-selector-buttons .btn::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  transform: translate(-50%, -50%);
+  transition: width 0.5s, height 0.5s;
+}
+
+.directory-selector-buttons .btn:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.3);
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.12) 0%, 
+    rgba(255, 255, 255, 0.06) 100%);
+}
+
+.directory-selector-buttons .btn:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Primary button special styling */
+.directory-selector-buttons .btn-primary {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.9) 0%, 
+    rgba(102, 126, 234, 0.9) 100%);
+  border: 1px solid rgba(127, 90, 240, 0.3);
+  color: white;
+  font-weight: 600;
+}
+
+.directory-selector-buttons .btn-primary:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 1) 0%, 
+    rgba(102, 126, 234, 1) 100%);
+  box-shadow: 
+    0 12px 32px rgba(127, 90, 240, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-3px) scale(1.03);
+}
+
+/* No projects message */
+.no-projects-message {
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+  text-align: center;
+  padding: 80px 40px;
+  font-size: 1.1rem;
+  line-height: 1.8;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.03) 0%, 
+    rgba(255, 255, 255, 0.01) 100%);
+  border-radius: 16px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+}
+
+/* Small terminals - Force 2-row layout */
+@media (max-height: 650px), (max-width: 700px) {
+  /* Disable heavy animations */
+  .directory-selector::before,
+  .directory-selector::after {
+    display: none;
+  }
+  
+  * {
+    animation-duration: 0.2s !important;
+  }
+  
+  .directory-selector-content {
+    padding: 8px;
+    gap: 8px;
+    justify-content: flex-start;
+  }
+  
+  .directory-selector h3 {
+    font-size: 1rem;
+    margin-bottom: 8px;
+    animation: none;
+    flex-shrink: 0;
+  }
+  
+  /* FORCE 2-row layout */
+  .directory-selector-main {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px;
+    flex: 1;
+    overflow: hidden;
+  }
+  
+  /* Projects take most space */
+  .directory-selector-left {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+  
+  .recent-projects-section {
+    padding: 8px;
+    max-height: calc(100% - 20px);
+    height: 100%;
+    min-height: 80px;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.7rem;
+    margin-bottom: 6px;
+  }
+  
+  .recent-projects-section h4::before {
+    border-bottom-width: 6px;
+    border-left-width: 3px;
+    border-right-width: 3px;
+  }
+  
+  .recent-projects-list {
+    gap: 3px;
+    flex: 1;
+    overflow-y: auto;
+  }
+  
+  .recent-project-item {
+    padding: 5px 8px;
+    min-height: 28px;
+  }
+  
+  .project-name {
+    font-size: 0.7rem;
+  }
+  
+  .project-color-indicator {
+    width: 7px;
+    height: 7px;
+  }
+  
+  .delete-project-btn {
+    width: 16px;
+    height: 16px;
+    font-size: 11px;
+    right: 6px;
+  }
+  
+  #create-new-project-btn {
+    padding: 5px;
+    font-size: 0.7rem;
+    margin-top: 5px;
+  }
+  
+  #create-new-project-btn i {
+    display: none;
+  }
+  
+  /* Buttons section at bottom */
+  .directory-selector-right {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  
+  .last-directory-section {
+    padding: 6px;
+    margin-bottom: 4px;
+  }
+  
+  .last-directory-label {
+    font-size: 0.65rem;
+  }
+  
+  .selected-directory-display {
+    padding: 6px;
+    font-size: 0.65rem;
+    min-height: 26px;
+  }
+  
+  .selected-directory-display::before {
+    width: 14px;
+    height: 12px;
+    right: 6px;
+  }
+  
+  .directory-selector-buttons {
+    margin-top: 6px;
+    gap: 4px;
+    min-height: 30px;
+    display: flex !important;
+    width: 100%;
+  }
+  
+  .directory-selector-buttons .btn {
+    padding: 6px 8px;
+    font-size: 0.68rem;
+    flex: 1;
+  }
+}
+
+/* Extra small terminals */
+@media (max-height: 400px) or (max-width: 350px) {
+  .directory-selector-content {
+    padding: 6px;
+    gap: 4px;
+  }
+  
+  .directory-selector h3 {
+    font-size: 0.9rem;
+    margin-bottom: 4px;
+  }
+  
+  .recent-projects-section {
+    padding: 6px;
+    border-radius: 6px;
+    max-height: 22vh;
+    min-height: 60px;
+  }
+  
+  .recent-projects-section h4::before {
+    display: none;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.65rem;
+    gap: 0;
+    margin-bottom: 4px;
+  }
+  
+  .recent-projects-list {
+    gap: 2px;
+  }
+  
+  .recent-project-item {
+    padding: 4px 6px;
+    min-height: 24px;
+    border-radius: 4px;
+  }
+  
+  .project-info {
+    gap: 6px;
+  }
+  
+  .project-name {
+    font-size: 0.65rem;
+    max-width: 120px;
+  }
+  
+  .project-color-indicator {
+    width: 6px;
+    height: 6px;
+  }
+  
+  #create-new-project-btn {
+    padding: 4px;
+    font-size: 0.65rem;
+    border-radius: 4px;
+    margin-top: 4px;
+  }
+  
+  .last-directory-section {
+    padding: 6px;
+    margin-bottom: 4px;
+  }
+  
+  .selected-directory-display {
+    padding: 6px;
+    font-size: 0.65rem;
+    min-height: 24px;
+  }
+  
+  .directory-selector-buttons {
+    gap: 3px;
+    margin-top: 6px;
+    min-height: 28px;
+  }
+  
+  .directory-selector-buttons .btn {
+    padding: 5px 6px;
+    font-size: 0.65rem;
+    border-radius: 4px;
+    min-width: 50px;
+  }
+  
+  .directory-selector-buttons .btn-primary {
+    background: rgba(127, 90, 240, 0.8);
+  }
+}
