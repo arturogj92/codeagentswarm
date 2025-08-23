@@ -202,8 +202,8 @@ describe('renderer.js integration tests', () => {
             'xterm',
             'xterm-addon-fit',
             'xterm-addon-web-links',
-            './log-viewer',
-            './feature-highlight'
+            './src/presentation/components/log-viewer',
+            './src/shared/utils/feature-highlight'
         ];
         
         modules.forEach(module => {

@@ -2,7 +2,7 @@
  * Tests for database.js
  */
 
-const Database = require('../database');
+const Database = require('../src/infrastructure/database/database');
 const fs = require('fs');
 const path = require('path');
 

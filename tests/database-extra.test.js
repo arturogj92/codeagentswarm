@@ -1,5 +1,5 @@
 // Extra tests for database
-const Database = require('../database');
+const Database = require('../src/infrastructure/database/database');
 const sqlite3 = require('better-sqlite3');
 const fs = require('fs');
 const os = require('os');

@@ -1,4 +1,4 @@
-const MCPValidator = require('../../../modules/mcp/MCPValidator');
+const MCPValidator = require('../../../src/modules/mcp/MCPValidator');
 
 describe('MCPValidator', () => {
     let validator;

@@ -1,19 +1,19 @@
-const { app, BrowserWindow, ipcMain, dialog, Notification } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Notification, nativeImage } = require('electron');
 const { spawn } = require('child_process');
 const pty = require('node-pty');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const DatabaseManager = require('./database');
-const MCPTaskServer = require('./mcp-server');
-const HooksManager = require('./hooks-manager');
-const WebhookServer = require('./webhook-server');
-const GitService = require('./git-service');
-const UpdaterService = require('./services/updater-service');
-const WizardWindow = require('./wizard-window');
+const DatabaseManager = require('./src/infrastructure/database/database');
+const MCPTaskServer = require('./src/infrastructure/mcp/mcp-server');
+const HooksManager = require('./src/infrastructure/hooks/hooks-manager');
+const WebhookServer = require('./src/infrastructure/services/webhook-server');
+const GitService = require('./src/infrastructure/services/git-service');
+const UpdaterService = require('./src/infrastructure/services/updater-service');
+const WizardWindow = require('./src/presentation/windows/wizard-window');
 
 // Initialize the centralized logger
-const logger = require('./logger');
+const logger = require('./src/shared/logger/logger');
 
 // Logging setup for file output (keep existing file logging)
 const logDir = path.join(app.getPath('userData'), 'logs');
@@ -243,8 +243,8 @@ ipcMain.on('run-mcp-diagnostic', async (event) => {
   
   // Check MCP server file
   console.log('2. MCP Server Files:');
-  const mcpServerPath = path.join(__dirname, 'mcp-stdio-server.js');
-  const dbModulePath = path.join(__dirname, 'database-mcp-standalone.js');
+  const mcpServerPath = path.join(__dirname, 'src', 'infrastructure', 'mcp', 'mcp-stdio-server.js');
+  const dbModulePath = path.join(__dirname, 'src', 'infrastructure', 'database', 'database-mcp-standalone.js');
   
   if (fs.existsSync(mcpServerPath)) {
     const stats = fs.statSync(mcpServerPath);
@@ -283,7 +283,7 @@ ipcMain.on('run-mcp-diagnostic', async (event) => {
   
   // Test MCP server startup
   console.log('4. Testing MCP Server Startup:');
-  const testCommand = `cd "${__dirname}" && CODEAGENTSWARM_DB_PATH="${dbPath}" node mcp-stdio-server.js`;
+  const testCommand = `cd "${__dirname}" && CODEAGENTSWARM_DB_PATH="${dbPath}" node src/infrastructure/mcp/mcp-stdio-server.js`;
   
   exec(testCommand, { timeout: 5000 }, (error, stdout, stderr) => {
     if (error) {
@@ -346,7 +346,11 @@ if (process.argv.includes('--dev')) {
     }
     
     // Watch kanban files for changes
-    const kanbanFiles = ['kanban.html', 'kanban.css', 'kanban.js'];
+    const kanbanFiles = [
+        path.join('..', 'src', 'presentation', 'pages', 'kanban.html'),
+        path.join('..', 'styles', 'kanban.css'),
+        path.join('..', 'src', 'presentation', 'pages', 'kanban.js')
+    ];
     kanbanFiles.forEach(file => {
         const filePath = path.join(__dirname, file);
         fs.watchFile(filePath, { interval: 1000 }, (curr, prev) => {
@@ -399,7 +403,7 @@ function createSplashWindow() {
     backgroundColor: '#1a1a1a'
   });
 
-  splashWindow.loadFile('splash.html');
+  splashWindow.loadFile(path.join(__dirname, 'src', 'presentation', 'pages', 'splash.html'));
   
   // Update splash status function
   global.updateSplashStatus = (message, progress) => {
@@ -453,7 +457,7 @@ function createWindow() {
   });
 
   // Load the HTML file
-  mainWindow.loadFile('index.html');
+  mainWindow.loadFile(path.join(__dirname, 'src', 'presentation', 'pages', 'index.html'));
   
   // Show window only when completely ready with all resources loaded
   mainWindow.once('ready-to-show', () => {
@@ -1887,7 +1891,7 @@ async function configureMCPInClaudeCLI() {
       }
     } else {
       // Development mode - use direct path
-      serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+      serverPath = path.join(__dirname, 'src', 'infrastructure', 'mcp', 'mcp-stdio-server.js');
     }
     
     console.log('🔧 Configuring MCP in Claude CLI...');
@@ -2114,7 +2118,7 @@ function startMCPServerAndRegister() {
       }
     } else {
       // Development mode - use direct path
-      serverPath = path.join(__dirname, 'mcp-stdio-server.js');
+      serverPath = path.join(__dirname, 'src', 'infrastructure', 'mcp', 'mcp-stdio-server.js');
       workingDir = __dirname;
     }
     
@@ -2332,7 +2336,7 @@ function updateClaudeConfigFile() {
     // Only update codeagentswarm-tasks configuration
     const serverPath = app.isPackaged 
       ? path.join(app.getPath('userData'), 'mcp', 'mcp-stdio-server.js')
-      : path.join(__dirname, 'mcp-stdio-server.js');
+      : path.join(__dirname, 'src', 'infrastructure', 'mcp', 'mcp-stdio-server.js');
     
     config.mcpServers['codeagentswarm-tasks'] = {
       command: 'node',
@@ -2700,7 +2704,7 @@ ipcMain.on('mcp:update-claude-instructions', async (event, { serverId }) => {
     console.log(`[MCP] Updating global CLAUDE.md instructions for: ${serverId}`);
     
     // Import the instructions manager
-    const MCPInstructionsManager = require('./mcp-instructions-manager');
+    const MCPInstructionsManager = require('./src/infrastructure/mcp/mcp-instructions-manager');
     const manager = new MCPInstructionsManager();
     
     // Update the global CLAUDE.md
@@ -2897,7 +2901,7 @@ function registerWithClaude() {
           new Notification({
             title: 'Claude Code instalado',
             body: 'Claude Code se ha instalado correctamente. Configurando MCP...',
-            icon: path.join(__dirname, 'icon.png')
+            icon: path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png')
           }).show();
           
           // Configure MCP after successful installation
@@ -2912,13 +2916,16 @@ function registerWithClaude() {
           console.error('❌ Failed to install Claude Code:', errorOutput);
           
           // Show error dialog with more options
+          const iconPath = path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png');
+          const icon = nativeImage.createFromPath(iconPath);
           dialog.showMessageBox(mainWindow, {
             type: 'error',
             title: 'Error de instalación',
             message: 'No se pudo instalar Claude Code automáticamente',
             detail: `Esto puede deberse a permisos de npm o problemas de red.\n\nPuedes intentar:\n1. Ejecutar manualmente: npm install -g @anthropic-ai/claude-code\n2. Usar sudo si estás en macOS/Linux\n3. Descargar desde: https://claude.ai/code`,
             buttons: ['OK', 'Abrir página de descarga'],
-            defaultId: 0
+            defaultId: 0,
+            icon: icon
           }).then(result => {
             if (result.response === 1) {
               require('electron').shell.openExternal('https://claude.ai/code');
@@ -2941,7 +2948,7 @@ function registerWithClaude() {
       // Use claude mcp add to register our server
       const serverPath = app.isPackaged 
         ? path.join(process.resourcesPath, 'app.asar', 'mcp-stdio-server.js')
-        : path.join(__dirname, 'mcp-stdio-server.js');
+        : path.join(__dirname, 'src', 'infrastructure', 'mcp', 'mcp-stdio-server.js');
         
       const registerProcess = spawn('claude', [
         'mcp', 'add', 
@@ -2998,13 +3005,16 @@ ipcMain.handle('show-alert', async (event, options) => {
   
   console.log('Showing alert:', message, 'Type:', type); // Debug log
   
+  const iconPath = path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png');
+  const icon = nativeImage.createFromPath(iconPath);
+  
   const dialogOptions = {
     type: type, // 'none', 'info', 'error', 'question', 'warning'
     buttons: ['OK'],
     defaultId: 0,
     title: 'CodeAgentSwarm',
     message: message,
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: icon,
     noLink: true
   };
   
@@ -3137,6 +3147,67 @@ ipcMain.handle('task-get-current', async (event, terminalId) => {
   }
 });
 
+// Handler for showing confirmation dialogs with app icon
+ipcMain.handle('show-confirm-dialog', async (event, options) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  
+  // Try different icon formats for better macOS compatibility
+  let iconPath = path.join(__dirname, 'assets', 'icons', 'dmg-icon.icns');
+  if (!fs.existsSync(iconPath)) {
+    iconPath = path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png');
+  }
+  
+  console.log('Dialog icon path:', iconPath);
+  console.log('Icon exists:', fs.existsSync(iconPath));
+  
+  // Create native image for the icon
+  const icon = nativeImage.createFromPath(iconPath);
+  
+  console.log('Icon size:', icon.getSize());
+  console.log('Icon empty?:', icon.isEmpty());
+  
+  // On macOS, we need to ensure the icon is not empty
+  if (icon.isEmpty()) {
+    console.error('Warning: Icon could not be loaded from:', iconPath);
+  }
+  
+  const result = await dialog.showMessageBox(window, {
+    type: 'question',
+    buttons: options.buttons || ['Cancel', 'OK'],
+    defaultId: options.defaultId !== undefined ? options.defaultId : 0,
+    cancelId: options.cancelId !== undefined ? options.cancelId : 0,
+    title: options.title || 'Confirm',
+    message: options.message,
+    detail: options.detail || '',
+    icon: icon,
+    noLink: true
+  });
+  
+  return result.response === 1; // Return true if OK was clicked
+});
+
+// Handler for showing alert dialogs with app icon
+ipcMain.handle('show-alert-dialog', async (event, options) => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  const iconPath = path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png');
+  
+  // Create native image for the icon
+  const icon = nativeImage.createFromPath(iconPath);
+  
+  await dialog.showMessageBox(window, {
+    type: options.type || 'info',
+    buttons: ['OK'],
+    defaultId: 0,
+    title: options.title || 'Alert',
+    message: options.message,
+    detail: options.detail || '',
+    icon: icon,
+    noLink: true
+  });
+  
+  return true;
+});
+
 ipcMain.handle('task-delete', async (event, taskId) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
@@ -3241,6 +3312,16 @@ ipcMain.handle('task-get-subtasks', async (event, parentTaskId) => {
     if (!db) return { success: false, error: 'Database not initialized' };
     const subtasks = db.getSubtasks(parentTaskId);
     return { success: true, subtasks };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-search', async (event, { query, limit = 10 }) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const tasks = db.searchTasks(query, limit);
+    return { success: true, tasks };
   } catch (error) {
     return { success: false, error: error.message };
   }
@@ -3533,24 +3614,6 @@ ipcMain.handle('dialog-open-directory', async (event) => {
   }
 });
 
-// Show confirmation dialog
-ipcMain.handle('show-confirm-dialog', async (event, options) => {
-  try {
-    const result = await dialog.showMessageBox({
-      type: 'question',
-      buttons: options.buttons || ['OK', 'Cancel'],
-      defaultId: 1,
-      cancelId: 1,
-      title: options.title || 'Confirm',
-      message: options.message || 'Are you sure?'
-    });
-    return result.response;
-  } catch (error) {
-    console.error('Error in show-confirm-dialog:', error);
-    return 1; // Return cancel index on error
-  }
-});
-
 // Cache for preloaded data
 let preloadedTaskData = null;
 let preloadedProjectData = null;
@@ -3630,14 +3693,14 @@ function openOrFocusKanbanWindow(options = {}) {
     maximizable: true,
     closable: true,
     // Add icon to make it look like a separate app
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png'),
     // Focus the window when it opens
     alwaysOnTop: false,
     center: true,
     focusable: true
   });
 
-  kanbanWindow.loadFile('kanban.html');
+  kanbanWindow.loadFile(path.join(__dirname, 'src', 'presentation', 'pages', 'kanban.html'));
   
   // Send preloaded data immediately when DOM is ready
   kanbanWindow.webContents.once('dom-ready', () => {
@@ -4427,7 +4490,7 @@ ipcMain.on('show-badge-notification', (event, message) => {
 ipcMain.on('show-desktop-notification', (event, title, message) => {
   if (Notification.isSupported()) {
     // Use the app logo as notification icon
-    const iconPath = path.join(__dirname, 'logo_prod_512.png');
+    const iconPath = path.join(__dirname, 'assets', 'icons', 'logo_prod_512.png');
     
     const notification = new Notification({
       title: title,
@@ -4503,8 +4566,7 @@ ipcMain.handle('check-task-notifications', async () => {
     let notifications = JSON.parse(content);
     
     // Debug: Log what we're reading
-    // IMPORTANT: We process ALL terminal_title_update notifications, not just unprocessed ones
-    // This ensures titles always update when MCP is called
+    // Process terminal_title_update notifications that haven't been processed yet
     const terminalTitleNotifications = notifications.filter(n => n.type === 'terminal_title_update');
     if (terminalTitleNotifications.length > 0) {
       console.log(`[Main] Found ${terminalTitleNotifications.length} terminal title notifications (processing all)`);
@@ -4631,6 +4693,17 @@ ipcMain.handle('mark-terminal-titles-processed', async () => {
         return { ...n, processed: true };
       }
       return n;
+    });
+    
+    // Clean up old processed notifications (keep only last 24 hours)
+    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    notifications = notifications.filter(n => {
+      // Keep unprocessed notifications
+      if (!n.processed) return true;
+      // Keep recent processed notifications (last 24 hours)
+      if (n.timestamp && new Date(n.timestamp) > oneDayAgo) return true;
+      // Remove old processed notifications
+      return false;
     });
     
     // Write back to file
@@ -5776,7 +5849,7 @@ function ensureGlobalClaudeMdConfiguration() {
       CODEAGENTSWARM_START,
       CODEAGENTSWARM_END
     } = require('./claude-md-global-config');
-    const MCPInstructionsManager = require('./mcp-instructions-manager');
+    const MCPInstructionsManager = require('./src/infrastructure/mcp/mcp-instructions-manager');
     
     const globalPath = path.join(os.homedir(), '.claude', 'CLAUDE.md');
     const claudeDir = path.join(os.homedir(), '.claude');

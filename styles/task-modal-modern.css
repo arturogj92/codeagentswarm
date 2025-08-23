@@ -61,8 +61,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--task-spacing-md) var(--task-spacing-lg);
-  gap: var(--task-spacing-md);
+  padding: 16px 20px;
+  gap: 12px;
 }
 
 .task-header-meta {
@@ -76,19 +76,19 @@
 .status-display-modern {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  gap: 6px;
+  padding: 6px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: var(--task-radius-sm);
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.3px;
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
-  height: 22px;
+  height: 28px;
   opacity: 0.9;
 }
 
@@ -176,14 +176,15 @@
 .task-header-created {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 7px;
+  gap: 6px;
+  padding: 6px 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--task-radius-sm);
-  font-size: 11px;
+  font-size: 12px;
   color: var(--task-text-secondary);
   transition: all 0.2s ease;
+  height: 28px;
 }
 
 .task-header-id {
@@ -201,8 +202,8 @@
 }
 
 .header-icon {
-  width: 11px;
-  height: 11px;
+  width: 14px;
+  height: 14px;
   opacity: 0.7;
 }
 
@@ -232,8 +233,8 @@
 
 /* Title Section */
 .task-header-title {
-  padding: 3px var(--task-spacing-lg) 5px;
-  padding-left: 12px;
+  padding: 12px 20px 16px;
+  padding-left: 20px;
   border-top: 1px solid rgba(255, 255, 255, 0.03);
 }
 
@@ -242,12 +243,12 @@
   background: transparent;
   border: none;
   color: var(--task-text-primary);
-  font-size: 1.05rem;
+  font-size: 1.25rem;
   font-weight: 600;
-  padding: 2px 0;
+  padding: 4px 0;
   border-bottom: 2px solid transparent;
   transition: all 0.2s ease;
-  line-height: 1.15;
+  line-height: 1.3;
 }
 
 .editable-title-modern:hover {
@@ -665,4 +666,229 @@
 
 #task-details-modal .modal-body::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* ================ Task Creation Modal Styles ================ */
+/* Override styles for the task creation modal to use modern design */
+
+/* Apply modern styles to task creation modal */
+.modal .modal-content {
+  background: var(--task-bg-primary);
+  border: 1px solid var(--task-border);
+  border-radius: var(--task-radius-lg);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  overflow: hidden;
+  max-width: 900px;
+  width: 90%;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Apply header styles to creation modal */
+.modal .task-header-redesigned {
+  background: linear-gradient(180deg, var(--task-bg-secondary) 0%, var(--task-bg-primary) 100%);
+  border-bottom: 1px solid var(--task-border);
+  padding: 0;
+}
+
+/* Modal body styles */
+.modal .modal-body {
+  background: var(--task-bg-primary);
+  padding: var(--task-spacing-xl);
+  overflow-y: auto;
+  flex: 1;
+}
+
+/* Form group styles for creation modal */
+.modal .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--task-spacing-sm);
+  margin-bottom: var(--task-spacing-lg);
+}
+
+.modal .form-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--task-spacing-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--task-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.modal .form-group label svg {
+  width: 14px;
+  height: 14px;
+  opacity: 0.6;
+}
+
+/* Input styles for creation modal */
+.modal .form-group input[type="text"],
+.modal .form-group textarea,
+.modal .form-group select {
+  background: var(--task-bg-secondary);
+  border: 1px solid var(--task-border);
+  border-radius: var(--task-radius-sm);
+  padding: 10px 12px;
+  color: var(--task-text-primary);
+  font-size: 14px;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.modal .form-group input[type="text"]:hover,
+.modal .form-group textarea:hover,
+.modal .form-group select:hover {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: var(--task-border-hover);
+}
+
+.modal .form-group input[type="text"]:focus,
+.modal .form-group textarea:focus,
+.modal .form-group select:focus {
+  outline: none;
+  border-color: var(--task-accent-primary);
+  background: rgba(127, 90, 240, 0.03);
+  box-shadow: 0 0 0 3px rgba(127, 90, 240, 0.1);
+}
+
+/* Modal footer styles */
+.modal .modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--task-border);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+  background: var(--task-bg-primary);
+  border-radius: 0 0 var(--task-radius-lg) var(--task-radius-lg);
+}
+
+/* Parent task search dropdown */
+.parent-task-search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
+.parent-task-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 300px;
+    overflow-y: auto;
+    background: linear-gradient(145deg, #1e1e2e, #2a2a3e);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin-top: 8px;
+    z-index: 100000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7),
+                0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    backdrop-filter: blur(20px);
+}
+
+.parent-task-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.parent-task-dropdown::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}
+
+.parent-task-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.parent-task-dropdown::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.parent-task-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    position: relative;
+}
+
+.parent-task-item:last-child {
+    border-bottom: none;
+}
+
+.parent-task-item:hover {
+    background: linear-gradient(90deg, 
+        rgba(127, 90, 240, 0.1) 0%, 
+        rgba(127, 90, 240, 0.05) 100%);
+    padding-left: 20px;
+}
+
+.parent-task-item:hover::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 3px;
+    background: linear-gradient(180deg, #7f5af0, #9c7af0);
+}
+
+.parent-task-item .task-status-icon {
+    font-size: 16px;
+    min-width: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.parent-task-item .task-id {
+    background: linear-gradient(135deg, rgba(127, 90, 240, 0.2), rgba(127, 90, 240, 0.1));
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #9c7af0;
+    border: 1px solid rgba(127, 90, 240, 0.2);
+    min-width: 60px;
+    text-align: center;
+}
+
+.parent-task-item .task-title {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 14px;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.parent-task-item .task-project {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.5);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.parent-task-item.selected {
+    background: linear-gradient(90deg, 
+        rgba(127, 90, 240, 0.15) 0%, 
+        rgba(127, 90, 240, 0.08) 100%);
+}
+
+.parent-task-item.no-parent {
+    color: rgba(255, 255, 255, 0.4);
+    font-style: italic;
+    justify-content: center;
 }

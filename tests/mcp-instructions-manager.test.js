@@ -5,7 +5,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
-const MCPInstructionsManager = require('../mcp-instructions-manager');
+const MCPInstructionsManager = require('../src/infrastructure/mcp/mcp-instructions-manager');
 
 // Mock fs module
 jest.mock('fs');
@@ -326,7 +326,7 @@ ${manager.MCP_END}`;
             // Now require the module - it should execute the CLI code
             jest.isolateModules(() => {
                 // Set require.main to mimic being called directly
-                const module = require('../mcp-instructions-manager');
+                const module = require('../src/infrastructure/mcp/mcp-instructions-manager');
                 // Manually trigger the CLI logic since require.main doesn't work in Jest
                 if (process.argv[2] === 'list') {
                     const manager = new MCPInstructionsManager();
@@ -348,7 +348,7 @@ ${manager.MCP_END}`;
             
             // Manually trigger the help display
             jest.isolateModules(() => {
-                const module = require('../mcp-instructions-manager');
+                const module = require('../src/infrastructure/mcp/mcp-instructions-manager');
                 // Manually trigger the CLI logic since require.main doesn't work in Jest
                 const command = process.argv[2];
                 if (!command) {

@@ -44,7 +44,7 @@ describe('CLAUDE.md Configuration Tests', () => {
   function generateTestFiles() {
     // Generate global CLAUDE.md for testing
     const { getGlobalCodeAgentSwarmSection } = require('../claude-md-global-config');
-    const MCPInstructionsManager = require('../mcp-instructions-manager');
+    const MCPInstructionsManager = require('../src/infrastructure/mcp/mcp-instructions-manager');
     
     // Create global content
     let globalContent = '# Claude Global Configuration\n\n';
@@ -227,7 +227,7 @@ describe('CLAUDE.md Configuration Tests', () => {
     });
 
     test('regenerate-claude-md.js should exist', () => {
-      const scriptPath = path.join(__dirname, '..', 'regenerate-claude-md.js');
+      const scriptPath = path.join(__dirname, '..', 'scripts', 'regenerate-claude-md.js');
       expect(fs.existsSync(scriptPath)).toBe(true);
     });
   });
@@ -261,7 +261,7 @@ describe('CLAUDE.md Configuration Tests', () => {
       
       // Run regeneration script with temp HOME
       expect(() => {
-        execSync('node regenerate-claude-md.js', {
+        execSync('node scripts/regenerate-claude-md.js', {
           cwd: path.join(__dirname, '..'),
           env: { ...process.env, HOME: tempDir },
           stdio: 'pipe'

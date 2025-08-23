@@ -58,7 +58,7 @@ global.document = {
     removeEventListener: jest.fn()
 };
 
-const FeatureHighlight = require('../feature-highlight');
+const FeatureHighlight = require('../src/shared/utils/feature-highlight');
 
 describe('FeatureHighlight', () => {
     let featureHighlight;

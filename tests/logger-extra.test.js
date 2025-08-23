@@ -1,5 +1,5 @@
 // Extra tests for logger
-const logger = require('../logger');
+const logger = require('../src/shared/logger/logger');
 
 describe('Logger Extra Tests', () => {
     beforeEach(() => {

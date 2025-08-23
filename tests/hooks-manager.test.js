@@ -11,7 +11,7 @@ jest.mock('fs');
 jest.mock('os');
 
 // Import after mocks
-const HooksManager = require('../hooks-manager');
+const HooksManager = require('../src/infrastructure/hooks/hooks-manager');
 
 describe('HooksManager', () => {
     let hooksManager;

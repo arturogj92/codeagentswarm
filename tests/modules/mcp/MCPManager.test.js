@@ -1,5 +1,5 @@
-const MCPManager = require('../../../modules/mcp/MCPManager');
-const MCPValidator = require('../../../modules/mcp/MCPValidator');
+const MCPManager = require('../../../src/modules/mcp/MCPManager');
+const MCPValidator = require('../../../src/modules/mcp/MCPValidator');
 
 describe('MCPManager', () => {
     let manager;

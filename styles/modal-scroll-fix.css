@@ -1,0 +1,87 @@
+/* Modal Scroll Fix - Ensures all modals have proper scrolling */
+
+/* Fix for all modal content containers */
+.modal-content {
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  -webkit-overflow-scrolling: touch !important;
+  position: relative !important;
+}
+
+/* Ensure modal body can scroll */
+.modal-body {
+  overflow-y: auto !important;
+  max-height: calc(90vh - 120px) !important; /* Account for header and footer */
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Fix for specific modal types */
+.settings-modal-content,
+.kanban-modal-content,
+.task-details-modal,
+.permissions-modal-content,
+.marketplace-modal-content {
+  max-height: 85vh !important;
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Ensure scrollbars are visible */
+.modal-content::-webkit-scrollbar,
+.modal-body::-webkit-scrollbar {
+  width: 8px !important;
+  height: 8px !important;
+}
+
+.modal-content::-webkit-scrollbar-track,
+.modal-body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 4px !important;
+}
+
+.modal-content::-webkit-scrollbar-thumb,
+.modal-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 4px !important;
+}
+
+.modal-content::-webkit-scrollbar-thumb:hover,
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Fix for nested scrollable areas */
+.modal-content .scrollable-content,
+.modal-content .tab-content,
+.modal-content .settings-content {
+  overflow-y: auto !important;
+  max-height: calc(100% - 20px) !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Prevent body scroll when modal is open */
+body.modal-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+/* Ensure modal backdrop doesn't interfere with scrolling */
+.modal {
+  overflow-y: auto !important;
+  -webkit-overflow-scrolling: touch !important;
+}
+
+/* Fix for task details modal specifically */
+#task-details-modal .modal-content {
+  max-height: 85vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#task-details-modal .modal-body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  min-height: 0 !important;
+}

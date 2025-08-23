@@ -70,7 +70,7 @@
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
-      "icon": "logomac.png",
+      "icon": "assets/icons/dmg-icon.icns",
       "target": [
         {
           "target": "dmg"
@@ -112,10 +112,10 @@
     },
     "afterSign": "scripts/notarize.js",
     "win": {
-      "icon": "logo_prod_512.png"
+      "icon": "assets/icons/logo_prod_512.png"
     },
     "linux": {
-      "icon": "logo_prod_512.png"
+      "icon": "assets/icons/logo_prod_512.png"
     },
     "publish": null
   }

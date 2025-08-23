@@ -13,7 +13,7 @@ jest.mock('electron', () => ({
 }));
 
 // Mock database
-jest.mock('../database', () => {
+jest.mock('../src/infrastructure/database/database', () => {
     return jest.fn().mockImplementation(() => ({
         getAllTasks: jest.fn(() => [
             { id: 1, title: 'Task 1', status: 'pending', project: 'TestProject' },
@@ -60,7 +60,7 @@ jest.mock('../database', () => {
     }));
 });
 
-const Database = require('../database');
+const Database = require('../src/infrastructure/database/database');
 
 describe('Kanban Database Integration', () => {
     let mockDb;

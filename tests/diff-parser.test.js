@@ -2,7 +2,7 @@
  * Tests for diff-parser.js
  */
 
-const DiffParser = require('../diff-parser');
+const DiffParser = require('../src/shared/parsers/diff-parser');
 
 describe('DiffParser', () => {
     let parser;

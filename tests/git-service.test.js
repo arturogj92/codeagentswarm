@@ -2,7 +2,7 @@
  * Tests for git-service.js
  */
 
-const GitService = require('../git-service');
+const GitService = require('../src/infrastructure/services/git-service');
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');

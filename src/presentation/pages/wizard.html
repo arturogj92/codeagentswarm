@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to CodeAgentSwarm</title>
+    <link rel="stylesheet" href="wizard.css">
+    <link rel="stylesheet" href="wizard-icons.css">
+</head>
+<body>
+    <div class="wizard-container">
+        <!-- Progress Bar -->
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+            <div class="progress-dots">
+                <span class="dot active" data-screen="1"></span>
+                <span class="dot" data-screen="2"></span>
+                <span class="dot" data-screen="3"></span>
+                <span class="dot" data-screen="4"></span>
+                <span class="dot" data-screen="5"></span>
+            </div>
+        </div>
+
+        <!-- Screen 1: Welcome -->
+        <div class="wizard-screen active centered-screen" id="screen1">
+            <div class="screen-particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+            </div>
+            <div class="icon-container-large">
+                <div class="logo-glow"></div>
+                <img src="../../../assets/icons/logo_prod_512.png" alt="CodeAgentSwarm" class="logo-large animated-logo">
+            </div>
+            <div class="app-name">CodeAgentSwarm</div>
+            <h1 class="hero-title">Claude Code Without Limits</h1>
+            <p class="hero-subtitle">Command your swarm of Claude agents. Never miss a notification.<br>10x faster development. Finally.</p>
+            <button class="start-setup-button" onclick="nextScreen()">
+                <span class="button-text">Start Setup</span>
+                <span class="button-shine"></span>
+            </button>
+        </div>
+
+        <!-- Screen 2: Power Features -->
+        <div class="wizard-screen" id="screen2">
+            <div class="screen-particles">
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+                <span class="particle"></span>
+            </div>
+            <div class="feature-showcase">
+                <div class="showcase-header">
+                    <img src="../../../assets/icons/logo_prod_512.png" alt="CodeAgentSwarm" class="showcase-logo">
+                    <h2 class="showcase-title">Unleash The Swarm</h2>
+                </div>
+                <p class="showcase-subtitle">Four game-changing features that multiply your coding power</p>
+                
+                <div class="power-grid">
+                    <div class="power-card has-video" data-feature="terminals">
+                        <!-- Background terminal preview -->
+                        <div class="terminal-bg-preview">
+                            <div class="terminal-visual">
+                                <div class="terminal-grid-mock">
+                                    <!-- Terminal 1 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 1</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">npm run dev</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Running...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 2 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 2</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">npm test</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Tests passed</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 3 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 3</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">docker up</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Container up</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <!-- Terminal 4 -->
+                                    <div class="terminal-mock mini">
+                                        <div class="terminal-header">
+                                            <div class="terminal-controls">
+                                                <span class="terminal-dot red"></span>
+                                                <span class="terminal-dot yellow"></span>
+                                                <span class="terminal-dot green"></span>
+                                            </div>
+                                            <div class="terminal-title">Terminal 4</div>
+                                        </div>
+                                        <div class="terminal-body">
+                                            <div class="terminal-line">
+                                                <span class="terminal-prompt">$</span>
+                                                <span class="terminal-command">git status</span>
+                                            </div>
+                                            <div class="terminal-line">
+                                                <span class="terminal-output">✓ Clean</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-terminal-large"></div>
+                        </div>
+                        <h3>Parallel Terminals</h3>
+                        <p>Run up to 6 Claude Code instances simultaneously. Frontend, backend, tests - all at once.</p>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/terminals.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                                <button class="fullscreen-btn" data-video="assets/wizard/terminals.mp4" title="View fullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="notifications">
+                        <!-- Background notification preview -->
+                        <div class="notification-bg-preview">
+                            <div class="notification-visual">
+                                <div class="notification-mock">
+                                    <span class="notification-time">now</span>
+                                    <div class="notification-header">
+                                        <div class="notification-icon-bg">
+                                            <img src="../../../assets/icons/logo_prod_512.png" alt="">
+                                        </div>
+                                        <div class="notification-content">
+                                            <div class="notification-app-name">CodeAgentSwarm</div>
+                                            <div class="notification-title">Terminal finished!</div>
+                                            <div class="notification-body">Terminal 1 has completed</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-bell-large"></div>
+                        </div>
+                        <h3>Smart Notifications</h3>
+                        <p>Never miss when Claude needs you. Visual & audio alerts keep you in the loop.</p>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/notifications.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                                <button class="fullscreen-btn" data-video="assets/wizard/notifications.mp4" title="View fullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="tasks">
+                        <!-- Background kanban preview -->
+                        <div class="kanban-bg-preview">
+                            <div class="kanban-visual">
+                                <div class="kanban-mock">
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">Pending</span>
+                                            <span class="kanban-count">3</span>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">Fix auth bug</div>
+                                            <div class="kanban-card-tag">Terminal 1</div>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">Add dark mode</div>
+                                            <div class="kanban-card-tag">Terminal 2</div>
+                                        </div>
+                                    </div>
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">In Progress</span>
+                                            <span class="kanban-count">1</span>
+                                        </div>
+                                        <div class="kanban-card active">
+                                            <div class="kanban-card-title">Update API</div>
+                                            <div class="kanban-card-tag">Terminal 3</div>
+                                        </div>
+                                    </div>
+                                    <div class="kanban-column">
+                                        <div class="kanban-header">
+                                            <span class="kanban-title">Testing</span>
+                                            <span class="kanban-count">2</span>
+                                        </div>
+                                        <div class="kanban-card">
+                                            <div class="kanban-card-title">User login</div>
+                                            <div class="kanban-card-tag">Terminal 4</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-kanban-large"></div>
+                        </div>
+                        <h3>Auto Task Tracking</h3>
+                        <p>Claude creates, updates, and completes tasks automatically via MCP.</p>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/kanban.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                                <button class="fullscreen-btn" data-video="assets/wizard/kanban.mp4" title="View fullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="power-card has-video" data-feature="git">
+                        <!-- Background git commit preview -->
+                        <div class="git-bg-preview">
+                            <div class="git-visual">
+                                <div class="git-mock">
+                                    <div class="git-header">
+                                        <div class="git-icon">🔀</div>
+                                        <div class="git-title">AI-Generated Commit</div>
+                                    </div>
+                                    <div class="git-message">
+                                        <div class="git-type">feat:</div>
+                                        <div class="git-summary">Add authentication system with JWT tokens</div>
+                                    </div>
+                                    <div class="git-body">
+                                        • Implement user registration endpoint<br>
+                                        • Add login with email/password<br>
+                                        • Create JWT token generation<br>
+                                        • Add middleware for protected routes
+                                    </div>
+                                    <div class="git-footer">
+                                        <span class="git-files">📁 4 files changed</span>
+                                        <span class="git-stats">+238 -12</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="video-indicator">
+                            <div class="play-icon">▶</div>
+                        </div>
+                        
+                        <div class="power-icon">
+                            <div class="icon-git-large"></div>
+                        </div>
+                        <h3>AI Git Commits</h3>
+                        <p>Perfect commit messages generated from your changes. Never think about it again.</p>
+                        <div class="video-progress">
+                            <div class="video-progress-fill"></div>
+                        </div>
+                        <div class="hover-preview">
+                            <div class="video-container-small">
+                                <video muted loop playsinline preload="auto" class="hover-video">
+                                    <source src="assets/wizard/gitmanager.mp4" type="video/mp4">
+                                </video>
+                                <div class="video-controls">
+                                    <div class="video-controls-fill"></div>
+                                </div>
+                                <button class="fullscreen-btn" data-video="assets/wizard/gitmanager.mp4" title="View fullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="more-features">+ Unlimited possibilities await</p>
+            </div>
+        </div>
+
+        <!-- Screen 3: Task Management -->
+        <div class="wizard-screen" id="screen3">
+            <h2>Automated Task Management</h2>
+            <p class="screen-subtitle">Let Claude manage your tasks automatically via MCP</p>
+            <div class="demo-container">
+                <img src="assets/wizard/kanban-demo.gif" alt="Kanban board demo" class="demo-gif">
+            </div>
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="icon-ai emoji"></div>
+                    <h3>AI-Driven Automation</h3>
+                    <p>Claude creates, updates, and manages tasks automatically through MCP</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-tasks emoji"></div>
+                    <h3>Visual Kanban Board</h3>
+                    <p>See all your tasks organized in an intuitive board layout</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-shield emoji"></div>
+                    <h3>Smart Organization</h3>
+                    <p>Tasks grouped by project with automatic color coding</p>
+                </div>
+                <div class="feature-card">
+                    <div class="icon-chart emoji"></div>
+                    <h3>Progress Tracking</h3>
+                    <p>Real-time status updates as Claude works on your tasks</p>
+                </div>
+            </div>
+            <div class="mcp-highlight">
+                <div class="icon-link mcp-icon"></div>
+                <div class="mcp-text">
+                    <strong>Powered by MCP</strong>
+                    <p>Model Context Protocol enables seamless AI-task integration</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 4: AI Git Commits -->
+        <div class="wizard-screen" id="screen4">
+            <h2>AI-Powered Git Commits</h2>
+            <div class="video-container">
+                <video id="gitVideo" loop muted playsinline>
+                    <source src="assets/wizard/git-commit-demo.mp4" type="video/mp4">
+                    <img src="assets/wizard/git-commit-demo.gif" alt="Git commit demo">
+                </video>
+                <div class="video-overlay" onclick="playVideo('gitVideo')">
+                    <div class="play-button">▶</div>
+                </div>
+            </div>
+            <div class="commit-example">
+                <div class="commit-box">
+                    <p class="commit-label">AI-generated commit message:</p>
+                    <code>feat: Add multi-terminal support with persistent sessions
+
+- Implement terminal quadrant system (4 terminals)
+- Add session persistence across app restarts
+- Create keyboard shortcuts for quick switching (Cmd+1-4)
+- Update UI to display terminal indicators</code>
+                </div>
+            </div>
+        </div>
+
+        <!-- Screen 5: Get Started -->
+        <div class="wizard-screen" id="screen5">
+            <h2>You're All Set! 🎉</h2>
+            <div class="setup-options">
+                <div class="option-card">
+                    <h3>Quick Setup</h3>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="defaultDirectory" checked>
+                        <span class="checkmark"></span>
+                        Set default working directory
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="autoUpdates" checked>
+                        <span class="checkmark"></span>
+                        Enable automatic updates
+                    </label>
+                    <label class="checkbox-container">
+                        <input type="checkbox" id="analytics">
+                        <span class="checkmark"></span>
+                        Share anonymous usage data
+                    </label>
+                </div>
+                <div class="shortcuts-preview">
+                    <h3>Essential Shortcuts</h3>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>1-6</kbd>
+                        <span>Switch between terminals</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>K</kbd>
+                        <span>Open task Kanban board</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>G</kbd>
+                        <span>Generate AI commit</span>
+                    </div>
+                    <div class="shortcut">
+                        <kbd>Cmd</kbd> + <kbd>N</kbd>
+                        <span>New terminal window</span>
+                    </div>
+                </div>
+            </div>
+            <button class="finish-button" onclick="finishWizard()">
+                Start Using CodeAgentSwarm
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <div class="wizard-navigation">
+            <button class="nav-button" id="prevButton" onclick="previousScreen()">
+                ← Back
+            </button>
+            <button class="nav-button primary" id="nextButton" onclick="nextScreen()">
+                Next →
+            </button>
+        </div>
+    </div>
+
+    <script src="wizard.js"></script>
+</body>
+</html>

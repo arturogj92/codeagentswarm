@@ -2,8 +2,8 @@ const { ipcRenderer } = require('electron');
 const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
-const LogViewer = require('./log-viewer');
-const FeatureHighlight = require('./feature-highlight');
+const LogViewer = require('./src/presentation/components/log-viewer');
+const FeatureHighlight = require('./src/shared/utils/feature-highlight');
 
 // Expose ipcRenderer globally for other modules
 window.ipcRenderer = ipcRenderer;
@@ -8442,7 +8442,7 @@ class TerminalManager {
                     if (debugModeEnabled) {
                         // Create LogViewer if it doesn't exist
                         if (!window.logViewer) {
-                            const LogViewer = require('./log-viewer');
+                            const LogViewer = require('./src/presentation/components/log-viewer');
                             window.logViewer = new LogViewer();
                         }
                         window.logViewer.setDebugMode(true);
@@ -9114,7 +9114,7 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
             window.logViewer.setDebugMode(true);
         } else {
             // Create LogViewer if it doesn't exist
-            const LogViewer = require('./log-viewer');
+            const LogViewer = require('./src/presentation/components/log-viewer');
             window.logViewer = new LogViewer();
             window.logViewer.setDebugMode(true);
         }

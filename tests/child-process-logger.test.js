@@ -3,7 +3,7 @@
  * Testing console interception and event emission functionality
  */
 
-const ChildProcessLogger = require('../child-process-logger');
+const ChildProcessLogger = require('../src/shared/logger/child-process-logger');
 const EventEmitter = require('events');
 
 describe('ChildProcessLogger', () => {

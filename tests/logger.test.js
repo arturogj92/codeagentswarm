@@ -38,7 +38,7 @@ describe('Logger', () => {
         process.send = undefined;
         
         // Get fresh logger instance
-        logger = require('../logger');
+        logger = require('../src/shared/logger/logger');
         logger.logs = []; // Clear logs
         logger.listeners = []; // Clear listeners
         logger.enable(); // Enable logging for tests
