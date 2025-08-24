@@ -497,6 +497,31 @@ body .directory-selector-container .directory-selector-content .directory-select
   .directory-selector-buttons button {
     width: 100% !important;
     min-height: 36px !important;
+    padding: 8px 12px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  /* Adjust projects section for horizontal layout */
+  .recent-projects-section {
+    height: 100% !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.75rem !important;
+    margin-bottom: 8px !important;
+  }
+  
+  #create-new-project-btn {
+    margin-top: 8px !important;
+    min-height: 34px !important;
+    font-size: 0.8rem !important;
+  }
+  
+  /* Hide title in very narrow viewports to save space */
+  .directory-selector-title {
+    display: none !important;
   }
 }
 
