@@ -24,21 +24,22 @@
     right: 120px;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12);
     z-index: 10000;
-    min-width: 280px;
-    animation: slideDown 0.2s ease;
+    min-width: 300px;
+    animation: slideInFade 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    backdrop-filter: blur(10px);
 }
 
-@keyframes slideDown {
+@keyframes slideInFade {
     from {
         opacity: 0;
-        transform: translateY(-10px);
+        transform: translateY(-15px) scale(0.95);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: translateY(0) scale(1);
     }
 }
 
@@ -90,7 +91,8 @@
 .auth-menu-items {
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 8px;
+    padding: 4px 0;
 }
 
 .auth-menu-item {
@@ -98,53 +100,132 @@
     align-items: center;
     gap: 12px;
     width: 100%;
-    padding: 10px 12px;
-    background: transparent;
-    border: none;
-    border-radius: 6px;
+    padding: 12px 16px;
+    background: linear-gradient(135deg, var(--bg-secondary), var(--bg-secondary));
+    border: 1px solid transparent;
+    border-radius: 10px;
     color: var(--text-primary);
     font-size: 14px;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     text-align: left;
+    position: relative;
+    overflow: hidden;
+}
+
+.auth-menu-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.1));
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .auth-menu-item:hover {
-    background: var(--bg-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+}
+
+.auth-menu-item:hover::before {
+    opacity: 1;
 }
 
 .auth-menu-item:active {
-    transform: scale(0.98);
+    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .auth-menu-item i,
 .auth-menu-item svg {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
     flex-shrink: 0;
+    z-index: 1;
 }
 
-/* Provider specific colors on hover */
+/* Provider specific styles with brand colors */
+.auth-menu-item[data-provider="github"] {
+    background: linear-gradient(135deg, #24292e, #2f363d);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
 .auth-menu-item[data-provider="github"]:hover {
-    background: rgba(36, 41, 46, 0.1);
+    background: linear-gradient(135deg, #2f363d, #24292e);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 24px rgba(36, 41, 46, 0.4);
+}
+
+.auth-menu-item[data-provider="github"] i {
+    color: white;
+}
+
+.auth-menu-item[data-provider="google"] {
+    background: white;
+    color: #3c4043;
+    border: 1px solid #dadce0;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
 }
 
 .auth-menu-item[data-provider="google"]:hover {
-    background: rgba(66, 133, 244, 0.1);
+    background: #f8f9fa;
+    border-color: #dadce0;
+    box-shadow: 0 8px 24px rgba(66, 133, 244, 0.15);
+}
+
+.auth-menu-item[data-provider="discord"] {
+    background: linear-gradient(135deg, #5865F2, #7289da);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .auth-menu-item[data-provider="discord"]:hover {
-    background: rgba(88, 101, 242, 0.1);
+    background: linear-gradient(135deg, #7289da, #5865F2);
+    border-color: rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 24px rgba(88, 101, 242, 0.4);
 }
 
 /* Sign out button */
 #auth-logout {
-    color: var(--text-secondary);
+    background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+    color: #6b7280;
+    border: 1px solid #e5e7eb;
+    margin-top: 8px;
+    position: relative;
+}
+
+#auth-logout::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #fca5a5, #ef4444);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 0;
 }
 
 #auth-logout:hover {
-    background: rgba(239, 68, 68, 0.1);
-    color: #ef4444;
+    background: transparent;
+    color: white;
+    border-color: transparent;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(239, 68, 68, 0.25);
+}
+
+#auth-logout:hover::after {
+    opacity: 1;
+}
+
+#auth-logout i,
+#auth-logout span {
+    position: relative;
+    z-index: 1;
 }
 
 /* Dark theme adjustments */
@@ -154,8 +235,25 @@
         box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
     }
     
-    .auth-menu-item[data-provider="github"]:hover {
-        background: rgba(255, 255, 255, 0.05);
+    .auth-menu-item[data-provider="google"] {
+        background: #2a2a2a;
+        color: white;
+        border: 1px solid #3a3a3a;
+    }
+    
+    .auth-menu-item[data-provider="google"]:hover {
+        background: #3a3a3a;
+        border-color: #4a4a4a;
+    }
+    
+    #auth-logout {
+        background: linear-gradient(135deg, #2a2a2a, #1f1f1f);
+        color: #a0a0a0;
+        border: 1px solid #3a3a3a;
+    }
+    
+    #auth-logout:hover {
+        border-color: transparent;
     }
 }
 

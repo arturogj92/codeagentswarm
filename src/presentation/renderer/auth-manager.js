@@ -16,6 +16,7 @@ class AuthManager {
         this.userInfo = document.getElementById('auth-user-info');
         this.signedOutMenu = document.getElementById('auth-menu-signed-out');
         this.signedInMenu = document.getElementById('auth-menu-signed-in');
+        this.authHeader = document.getElementById('auth-header-signed-out');
         
         this.init();
     }
@@ -192,6 +193,7 @@ class AuthManager {
             this.userInfo.style.display = 'flex';
             this.signedOutMenu.style.display = 'none';
             this.signedInMenu.style.display = 'block';
+            if (this.authHeader) this.authHeader.style.display = 'none';
         } else {
             // Reset to signed out state
             this.authIcon.style.display = 'block';
@@ -202,6 +204,7 @@ class AuthManager {
             this.userInfo.style.display = 'none';
             this.signedOutMenu.style.display = 'block';
             this.signedInMenu.style.display = 'none';
+            if (this.authHeader) this.authHeader.style.display = 'block';
         }
     }
 

@@ -46,7 +46,7 @@
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
-  padding: 20px !important;
+  padding: clamp(10px, 2vw, 20px) !important;  /* Responsive padding */
   box-sizing: border-box !important;
   position: relative !important;
   z-index: 1 !important;
@@ -56,8 +56,8 @@
 .directory-selector-content h3,
 .directory-selector-title {
   flex: 0 0 auto !important;
-  margin: 0 0 20px 0 !important;
-  font-size: clamp(1.5rem, 4vw, 2.2rem) !important;
+  margin: 0 0 clamp(10px, 2vh, 20px) 0 !important;  /* Responsive margin */
+  font-size: clamp(1.2rem, 3vw, 2.2rem) !important;  /* Smaller minimum size */
   font-weight: 700 !important;
   background: linear-gradient(135deg, 
     rgba(127, 90, 240, 1) 0%, 
@@ -82,7 +82,7 @@
   flex-direction: column !important;  /* ALWAYS column, not row */
   flex: 1 1 auto !important;
   min-height: 0 !important;
-  gap: 15px !important;
+  gap: clamp(8px, 1.5vh, 15px) !important;  /* Responsive gap */
   overflow: hidden !important;
 }
 
@@ -107,7 +107,7 @@
     rgba(255, 255, 255, 0.02) 100%) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
   border-radius: 12px !important;
-  padding: 16px !important;
+  padding: clamp(8px, 1.5vw, 16px) !important;  /* Responsive padding */
   backdrop-filter: blur(10px) !important;
   -webkit-backdrop-filter: blur(10px) !important;
   box-shadow: 
@@ -117,8 +117,8 @@
 
 .recent-projects-section h4 {
   flex: 0 0 auto !important;
-  margin: 0 0 12px 0 !important;
-  font-size: 0.85rem !important;
+  margin: 0 0 clamp(6px, 1vh, 12px) 0 !important;  /* Responsive margin */
+  font-size: clamp(0.7rem, 1.5vw, 0.85rem) !important;  /* Responsive font */
   text-transform: uppercase !important;
   letter-spacing: 0.5px !important;
   color: rgba(255, 255, 255, 0.7) !important;
@@ -171,8 +171,8 @@
 /* Project Items */
 .recent-project-item {
   flex: 0 0 auto !important;
-  margin-bottom: 8px !important;
-  padding: 12px 16px !important;
+  margin-bottom: clamp(4px, 0.8vh, 8px) !important;  /* Responsive margin */
+  padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px) !important;  /* Responsive padding */
   background: linear-gradient(135deg, 
     rgba(255, 255, 255, 0.04) 0%, 
     rgba(255, 255, 255, 0.02) 100%) !important;
@@ -227,13 +227,13 @@
 .project-info {
   display: flex !important;
   align-items: center !important;
-  gap: 12px !important;
-  padding-right: 40px !important;
+  gap: clamp(6px, 1vw, 12px) !important;  /* Responsive gap */
+  padding-right: clamp(30px, 3vw, 40px) !important;  /* Responsive padding */
 }
 
 .project-color-indicator {
-  width: 14px !important;
-  height: 14px !important;
+  width: clamp(10px, 1.5vw, 14px) !important;  /* Responsive size */
+  height: clamp(10px, 1.5vw, 14px) !important;  /* Responsive size */
   border-radius: 50% !important;
   flex-shrink: 0 !important;
   box-shadow: 
@@ -244,13 +244,13 @@
 .project-name {
   font-weight: 500 !important;
   color: rgba(255, 255, 255, 0.95) !important;
-  font-size: 0.9rem !important;
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
   letter-spacing: 0.2px !important;
 }
 
 .project-path {
   color: rgba(255, 255, 255, 0.4) !important;
-  font-size: 0.75rem !important;
+  font-size: clamp(0.65rem, 1.2vw, 0.75rem) !important;  /* Responsive font */
   font-family: 'SF Mono', 'Menlo', 'Monaco', monospace !important;
   white-space: nowrap !important;
   overflow: hidden !important;
@@ -261,24 +261,24 @@
 /* Create New Project Button */
 #create-new-project-btn {
   flex: 0 0 auto !important;
-  margin-top: 12px !important;
+  margin-top: clamp(8px, 1.5vh, 12px) !important;  /* Responsive margin */
   width: 100% !important;
-  min-height: 44px !important;
+  min-height: clamp(36px, 5vh, 44px) !important;  /* Responsive height */
   background: linear-gradient(135deg, 
     rgba(46, 213, 115, 0.9) 0%, 
     rgba(0, 184, 148, 0.9) 100%) !important;
   border: 1px solid rgba(46, 213, 115, 0.3) !important;
   color: white !important;
   font-weight: 500 !important;
-  padding: 12px !important;
+  padding: clamp(8px, 1.5vh, 12px) !important;  /* Responsive padding */
   border-radius: 8px !important;
   cursor: pointer !important;
   transition: all 0.2s ease !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: 6px !important;
-  font-size: 0.9rem !important;
+  gap: clamp(4px, 0.8vw, 6px) !important;  /* Responsive gap */
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
   letter-spacing: 0.3px !important;
 }
 
@@ -295,8 +295,8 @@
   flex: 0 0 auto !important;  /* Fixed height for buttons */
   display: flex !important;
   flex-direction: column !important;
-  gap: 10px !important;
-  padding: 15px !important;
+  gap: clamp(6px, 1vh, 10px) !important;  /* Responsive gap */
+  padding: clamp(8px, 1.5vw, 15px) !important;  /* Responsive padding */
   background: linear-gradient(to top,
     rgba(20, 12, 30, 0.98) 0%,
     rgba(20, 12, 30, 0.9) 30%,
@@ -313,15 +313,15 @@
 /* Action Buttons */
 .directory-selector-buttons {
   display: flex !important;
-  gap: 10px !important;
+  gap: clamp(6px, 1vw, 10px) !important;  /* Responsive gap */
   width: 100% !important;
 }
 
 .directory-selector-buttons .btn,
 .directory-selector-buttons button {
   flex: 1 !important;
-  padding: 12px 16px !important;
-  font-size: 0.9rem !important;
+  padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px) !important;  /* Responsive padding */
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
   font-weight: 500 !important;
   letter-spacing: 0.2px !important;
   border-radius: 8px !important;
@@ -454,4 +454,116 @@ body .directory-selector-container .directory-selector-content .directory-select
 /* Fallback with maximum specificity */
 .directory-selector-container .recent-projects-list {
   max-height: 100% !important;
+}
+
+/* ==================== NARROW VIEWPORT - HORIZONTAL LAYOUT ==================== */
+/* When viewport is narrow (like in 4-quadrant mode), switch to horizontal layout */
+@media (max-width: 600px) {
+  .directory-selector-main {
+    flex-direction: row !important;  /* Switch to horizontal */
+    gap: 8px !important;
+    height: 100% !important;
+    align-items: stretch !important;
+  }
+  
+  /* Left side - Projects */
+  .directory-selector-left {
+    flex: 1 1 55% !important;  /* Take slightly more than half */
+    max-width: 55% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+  
+  /* Right side - Buttons */
+  .directory-selector-right {
+    flex: 0 0 45% !important;  /* Take slightly less than half */
+    max-width: 45% !important;
+    min-width: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-radius: 8px !important;
+    padding: 10px !important;
+  }
+  
+  .directory-selector-buttons {
+    flex-direction: column !important;  /* Stack buttons vertically */
+    width: 100% !important;
+  }
+  
+  .directory-selector-buttons .btn,
+  .directory-selector-buttons button {
+    width: 100% !important;
+    min-height: 36px !important;
+  }
+}
+
+/* ==================== 4-QUADRANT OPTIMIZATIONS ==================== */
+/* Additional optimizations for very small viewports */
+@media (max-width: 960px) and (max-height: 600px) {
+  .directory-selector-content {
+    padding: 8px !important;
+  }
+  
+  .directory-selector-content h3,
+  .directory-selector-title {
+    margin-bottom: 8px !important;
+    font-size: 1.1rem !important;
+  }
+  
+  .directory-selector-main {
+    gap: 8px !important;
+  }
+  
+  .recent-projects-section {
+    padding: 8px !important;
+  }
+  
+  .recent-projects-section h4 {
+    margin-bottom: 6px !important;
+    font-size: 0.7rem !important;
+  }
+  
+  .recent-project-item {
+    padding: 6px 10px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .project-name {
+    font-size: 0.75rem !important;
+  }
+  
+  .project-path {
+    font-size: 0.65rem !important;
+  }
+  
+  .project-color-indicator {
+    width: 10px !important;
+    height: 10px !important;
+  }
+  
+  #create-new-project-btn {
+    min-height: 32px !important;
+    padding: 6px !important;
+    margin-top: 6px !important;
+    font-size: 0.75rem !important;
+  }
+  
+  .directory-selector-right {
+    padding: 8px !important;
+    gap: 6px !important;
+  }
+  
+  .directory-selector-buttons {
+    gap: 6px !important;
+  }
+  
+  .directory-selector-buttons .btn,
+  .directory-selector-buttons button {
+    padding: 6px 10px !important;
+    font-size: 0.75rem !important;
+    min-height: 32px !important;
+  }
 }
