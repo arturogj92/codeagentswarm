@@ -861,6 +861,35 @@ class TerminalManager {
         
         wrapper.appendChild(selectorDiv);
         
+        // Force the projects list to expand to full height (fix CSS specificity issue)
+        // User confirmed this works: element.style { max-height: 100%; }
+        requestAnimationFrame(() => {
+            const projectsList = selectorDiv.querySelector('.recent-projects-list');
+            if (projectsList) {
+                projectsList.style.maxHeight = '100%';
+                projectsList.style.flex = '1 1 auto';
+                projectsList.style.minHeight = '0';
+                projectsList.style.overflow = 'auto';
+                
+                // Also ensure the container expands properly
+                const projectsContainer = selectorDiv.querySelector('.recent-projects-container');
+                if (projectsContainer) {
+                    projectsContainer.style.flex = '1 1 auto';
+                    projectsContainer.style.minHeight = '0';
+                    projectsContainer.style.display = 'flex';
+                    projectsContainer.style.flexDirection = 'column';
+                }
+                
+                // Ensure the content area expands
+                const contentArea = selectorDiv.querySelector('.directory-selector-content');
+                if (contentArea) {
+                    contentArea.style.display = 'flex';
+                    contentArea.style.flexDirection = 'column';
+                    contentArea.style.height = '100%';
+                }
+            }
+        });
+        
         // Function to restore placeholder if cancelled
         let restorePlaceholder = () => {
             if (wrapper.contains(selectorDiv)) {
@@ -1823,50 +1852,10 @@ class TerminalManager {
             }, 500);
             this.activityTimers.set(quadrant, timer);
             
-            // Auto-scroll on certain patterns - but NOT if user is manually scrolling
-            // dataStr already defined above
-            
-            // Don't auto-scroll if user is manually scrolling
-            if (!this.userScrolling.get(quadrant)) {
-                // Patterns that indicate important output requiring attention
-                const scrollPatterns = [
-                    'Welcome to Claude Code',
-                    'Do you want to',
-                    'Would you like to',
-                    'Continue?',
-                    'Press Enter',
-                    'Process exited',
-                    'Finished',
-                    'Complete',
-                    'Error:',
-                    'Failed',
-                    'Success',
-                    '✓',
-                    '✗',
-                    '⚠',
-                    '❌',
-                    '✅',
-                    '🎉',
-                    '🚀',
-                    'task completed',
-                    'task finished'
-                ];
-                
-                // Check if any pattern matches (case insensitive)
-                const shouldScroll = scrollPatterns.some(pattern => 
-                    dataStr.toLowerCase().includes(pattern.toLowerCase())
-                );
-                
-                if (shouldScroll) {
-                    // Small delay to ensure content is rendered
-                    setTimeout(() => {
-                        // Double-check user isn't scrolling before actually scrolling
-                        if (!this.userScrolling.get(quadrant)) {
-                            this.scrollTerminalToBottom(quadrant);
-                        }
-                    }, 50);
-                }
-            }
+            // DISABLED: Auto-scroll on patterns - this was too aggressive
+            // Users reported it was annoying and interrupted their workflow
+            // Now only auto-scrolls on explicit events (terminal exit, notifications, etc.)
+            // Users can manually scroll or click the scroll button when needed
         });
 
         // Handle terminal exit
@@ -3445,6 +3434,9 @@ class TerminalManager {
         scrollBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             scrollToBottom();
+            // Clear user scrolling flag when button is clicked
+            this.userScrolling.set(quadrant, false);
+            console.log(`📜 Scroll button clicked for terminal ${quadrant}, auto-scroll re-enabled`);
         });
         
         // Show/hide button based on scroll position
@@ -3466,30 +3458,17 @@ class TerminalManager {
                         clearTimeout(this.scrollTimeouts.get(quadrant));
                     }
                     
-                    // Reset user scrolling flag after 30 seconds of no scroll activity
-                    // Increased from 10 to 30 seconds for longer Claude outputs
-                    const timeoutId = setTimeout(() => {
-                        // Don't clear if Claude is still outputting
-                        if (!this.claudeOutputting.get(quadrant)) {
-                            this.userScrolling.set(quadrant, false);
-                            this.scrollTimeouts.delete(quadrant);
-                            console.log(`📜 Cleared user scrolling flag for terminal ${quadrant} after timeout`);
-                        } else {
-                            // Claude is still outputting, extend the timeout
-                            console.log(`📜 Claude still outputting to terminal ${quadrant}, extending scroll lock`);
-                            const newTimeoutId = setTimeout(() => {
-                                this.userScrolling.set(quadrant, false);
-                                this.scrollTimeouts.delete(quadrant);
-                            }, 30000);
-                            this.scrollTimeouts.set(quadrant, newTimeoutId);
-                        }
-                    }, 30000);
-                    
-                    this.scrollTimeouts.set(quadrant, timeoutId);
+                    // Don't auto-reset the user scrolling flag with a timeout
+                    // Instead, only reset when user scrolls back to bottom or clicks the scroll button
+                    // This prevents the annoying auto-scroll behavior
+                    console.log(`📜 User is scrolling terminal ${quadrant}, auto-scroll disabled`);
                 } else {
                     scrollBtn.classList.remove('show');
-                    // User is at bottom - clear user scrolling flag
-                    this.userScrolling.set(quadrant, false);
+                    // User has scrolled back to bottom - clear the user scrolling flag
+                    if (this.userScrolling.get(quadrant)) {
+                        this.userScrolling.set(quadrant, false);
+                        console.log(`📜 User scrolled back to bottom in terminal ${quadrant}, auto-scroll re-enabled`);
+                    }
                     
                     // Clear timeout if exists
                     if (this.scrollTimeouts.has(quadrant)) {

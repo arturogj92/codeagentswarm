@@ -154,14 +154,37 @@ class AuthManager {
         this.user = user;
         
         if (user) {
-            // Update button to show avatar
-            this.authIcon.style.display = 'none';
-            this.userAvatar.style.display = 'block';
-            this.userAvatar.src = user.avatar_url || this.getDefaultAvatar(user.email);
+            // Set up avatar with proper error handling
+            const avatarUrl = user.avatar_url || this.getDefaultAvatar(user.email);
+            
+            // Update button avatar
+            this.userAvatar.onerror = () => {
+                // If avatar fails to load, show icon instead
+                console.warn('Avatar failed to load, showing icon');
+                this.authIcon.style.display = 'block';
+                this.userAvatar.style.display = 'none';
+            };
+            
+            this.userAvatar.onload = () => {
+                // Avatar loaded successfully, show it
+                this.authIcon.style.display = 'none';
+                this.userAvatar.style.display = 'block';
+            };
+            
+            // Set the avatar source (this triggers onload or onerror)
+            this.userAvatar.src = avatarUrl;
             this.authButton.title = user.name || user.email;
             
-            // Update dropdown with user info
-            this.dropdownAvatar.src = user.avatar_url || this.getDefaultAvatar(user.email);
+            // Update dropdown avatar with same error handling
+            this.dropdownAvatar.onerror = () => {
+                this.dropdownAvatar.style.display = 'none';
+            };
+            
+            this.dropdownAvatar.onload = () => {
+                this.dropdownAvatar.style.display = 'block';
+            };
+            
+            this.dropdownAvatar.src = avatarUrl;
             this.userName.textContent = user.name || 'User';
             this.userEmail.textContent = user.email;
             

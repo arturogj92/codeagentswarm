@@ -11,6 +11,7 @@ const WebhookServer = require('./src/infrastructure/services/webhook-server');
 const GitService = require('./src/infrastructure/services/git-service');
 const UpdaterService = require('./src/infrastructure/services/updater-service');
 const WizardWindow = require('./src/presentation/windows/wizard-window');
+const authService = require('./src/infrastructure/services/auth-service');
 
 // Initialize the centralized logger
 const logger = require('./src/shared/logger/logger');
@@ -107,8 +108,7 @@ if (process.defaultApp) {
   app.setAsDefaultProtocolClient('codeagentswarm');
 }
 
-// Store for auth data
-let authData = null;
+// Auth data is now managed by the auth-service for persistence
 
 // Handle protocol on macOS
 app.on('open-url', (event, url) => {
@@ -133,7 +133,7 @@ app.on('second-instance', (event, commandLine, workingDirectory) => {
 });
 
 // Function to handle auth callback
-function handleAuthCallback(url) {
+async function handleAuthCallback(url) {
   try {
     const urlObj = new URL(url);
     
@@ -145,8 +145,9 @@ function handleAuthCallback(url) {
       if (token && refreshToken) {
         const user = userStr ? JSON.parse(decodeURIComponent(userStr)) : null;
         
-        // Store auth data
-        authData = { token, refreshToken, user };
+        // Store auth data using the service for persistence
+        const authData = { token, refreshToken, user };
+        await authService.saveAuthData(authData);
         
         // Send to all renderer windows
         BrowserWindow.getAllWindows().forEach(window => {
@@ -179,11 +180,19 @@ function handleAuthCallback(url) {
 
 // IPC handlers for auth
 ipcMain.handle('get-auth-data', () => {
-  return authData;
+  // Return auth data from the service
+  const user = authService.getUser();
+  const token = authService.getToken();
+  
+  if (user && token) {
+    return { user, token };
+  }
+  return null;
 });
 
-ipcMain.handle('clear-auth-data', () => {
-  authData = null;
+ipcMain.handle('clear-auth-data', async () => {
+  // Clear auth data using the service
+  await authService.logout();
   return { success: true };
 });
 
@@ -4071,6 +4080,16 @@ async function initializeApp() {
   // Start time measurement
   const startTime = Date.now();
   console.log('[Startup] Initializing app...');
+  
+  // Initialize auth service to restore saved credentials
+  try {
+    const isAuthenticated = await authService.initialize();
+    if (isAuthenticated) {
+      console.log('[Auth] Restored saved authentication');
+    }
+  } catch (error) {
+    console.error('[Auth] Failed to initialize auth service:', error);
+  }
   
   // Set PATH early (synchronous)
   if (!process.env.PATH.includes('/opt/homebrew/bin')) {

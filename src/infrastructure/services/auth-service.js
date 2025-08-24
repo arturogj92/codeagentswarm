@@ -1,18 +1,41 @@
 const { safeStorage } = require('electron');
-const Store = require('electron-store');
+
+// Try to load electron-store, fallback to null if it fails
+let Store;
+try {
+    Store = require('electron-store');
+} catch (err) {
+    console.warn('electron-store not available, using fallback storage');
+    Store = null;
+}
 
 class AuthService {
     constructor() {
-        // Create encrypted store for auth data
-        this.store = new Store({
-            name: 'auth-secure',
-            encryptionKey: 'codeagentswarm-auth-2024', // In production, use a more secure key
-            clearInvalidConfig: true
-        });
+        // Create store if available
+        if (Store) {
+            this.store = new Store({
+                name: 'auth-secure',
+                encryptionKey: 'codeagentswarm-auth-2024', // In production, use a more secure key
+                clearInvalidConfig: true
+            });
+        } else {
+            // Fallback to in-memory storage
+            const storageData = {};
+            this.store = {
+                get: (key) => storageData[key],
+                set: (key, value) => { storageData[key] = value; },
+                delete: (key) => { delete storageData[key]; }
+            };
+        }
         
         this.user = null;
         this.token = null;
         this.refreshToken = null;
+    }
+    
+    async ensureStore() {
+        // Store is always available now (either real or fallback)
+        return this.store;
     }
 
     /**
@@ -21,7 +44,7 @@ class AuthService {
     async initialize() {
         try {
             // Load saved auth data if available
-            const savedAuth = this.loadAuthData();
+            const savedAuth = await this.loadAuthData();
             if (savedAuth && savedAuth.token) {
                 this.user = savedAuth.user;
                 this.token = savedAuth.token;
@@ -46,14 +69,15 @@ class AuthService {
     /**
      * Save auth data securely
      */
-    saveAuthData(data) {
+    async saveAuthData(data) {
         try {
+            const store = await this.ensureStore();
             if (safeStorage.isEncryptionAvailable()) {
                 // Use native encryption if available (macOS Keychain)
                 const encryptedToken = safeStorage.encryptString(data.token);
                 const encryptedRefresh = safeStorage.encryptString(data.refreshToken);
                 
-                this.store.set('auth', {
+                store.set('auth', {
                     user: data.user,
                     token: encryptedToken.toString('base64'),
                     refreshToken: encryptedRefresh.toString('base64'),
@@ -61,7 +85,7 @@ class AuthService {
                 });
             } else {
                 // Fallback to store encryption
-                this.store.set('auth', {
+                store.set('auth', {
                     user: data.user,
                     token: data.token,
                     refreshToken: data.refreshToken,
@@ -83,16 +107,17 @@ class AuthService {
     /**
      * Load auth data from secure storage
      */
-    loadAuthData() {
+    async loadAuthData() {
         try {
-            const saved = this.store.get('auth');
+            const store = await this.ensureStore();
+            const saved = store.get('auth');
             
             if (!saved) return null;
             
             // Check if data is too old (30 days)
             const age = Date.now() - (saved.savedAt || 0);
             if (age > 30 * 24 * 60 * 60 * 1000) {
-                this.clearAuthData();
+                await this.clearAuthData();
                 return null;
             }
             
@@ -119,9 +144,10 @@ class AuthService {
     /**
      * Clear all auth data
      */
-    clearAuthData() {
+    async clearAuthData() {
         try {
-            this.store.delete('auth');
+            const store = await this.ensureStore();
+            store.delete('auth');
             this.user = null;
             this.token = null;
             this.refreshToken = null;
@@ -183,7 +209,7 @@ class AuthService {
                 
                 // Update stored tokens
                 this.token = data.accessToken;
-                this.saveAuthData({
+                await this.saveAuthData({
                     user: data.user || this.user,
                     token: data.accessToken,
                     refreshToken: this.refreshToken
