@@ -817,7 +817,6 @@ class TerminalManager {
                                 <div class="project-info">
                                     <span class="project-color-indicator" style="background-color: ${project.color}"></span>
                                     <span class="project-name">${project.display_name || project.name}</span>
-                                    <span class="project-path">${project.path}</span>
                                 </div>
                             </div>
                         `).join('')}
@@ -851,7 +850,7 @@ class TerminalManager {
                         </div>
                         <div class="directory-selector-buttons">
                             <button class="btn" id="choose-dir-btn" data-full-text="Browse..." data-short-text="Browse" data-tiny-text="📂">Browse...</button>
-                            ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄">Use Last</button>' : ''}
+                            ${this.lastSelectedDirectories[quadrant] ? `<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄"><span class="btn-main-text">Use Last</span><span class="last-project-name">${this.lastSelectedDirectories[quadrant].split('/').pop()}</span></button>` : ''}
                             <button class="btn" id="cancel-btn" data-full-text="Cancel" data-short-text="Cancel" data-tiny-text="❌">Cancel</button>
                         </div>
                     </div>
@@ -1188,15 +1187,27 @@ class TerminalManager {
             const buttons = content.querySelectorAll('.directory-selector-buttons .btn');
             
             buttons.forEach(btn => {
-                if (width < 400) {
-                    // Use icons for narrow terminals
-                    btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
-                } else if (width < 500) {
-                    // Use short text for medium terminals
-                    btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
+                // Special handling for use-last-btn to preserve project name
+                if (btn.id === 'use-last-btn') {
+                    const mainTextSpan = btn.querySelector('.btn-main-text');
+                    if (mainTextSpan) {
+                        if (width < 400) {
+                            mainTextSpan.textContent = btn.getAttribute('data-tiny-text') || '🔄';
+                        } else if (width < 500) {
+                            mainTextSpan.textContent = btn.getAttribute('data-short-text') || 'Last';
+                        } else {
+                            mainTextSpan.textContent = btn.getAttribute('data-full-text') || 'Use Last';
+                        }
+                    }
                 } else {
-                    // Use full text for wider terminals
-                    btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
+                    // Regular buttons
+                    if (width < 400) {
+                        btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
+                    } else if (width < 500) {
+                        btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
+                    } else {
+                        btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
+                    }
                 }
             });
         };
