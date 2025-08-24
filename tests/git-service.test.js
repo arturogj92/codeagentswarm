@@ -18,7 +18,7 @@ jest.mock('fs', () => ({
 }));
 
 // Mock commit service factory
-jest.mock('../infrastructure/commit/commit-service-factory', () => ({
+jest.mock('../src/infrastructure/adapters/commit/commit-service-factory', () => ({
     initialize: jest.fn(() => Promise.resolve()),
     getDefaultAdapterName: jest.fn(() => 'claude'),
     createCommitService: jest.fn(() => ({
@@ -300,7 +300,7 @@ describe('GitService', () => {
         const mockCwd = '/test/repo';
 
         test('should generate commit message', async () => {
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.createCommitService.mockReturnValue({
                 generateCommitMessage: jest.fn(() => Promise.resolve({
                     format: jest.fn(() => 'feat: Add new feature')
@@ -320,7 +320,7 @@ describe('GitService', () => {
         });
 
         test('should handle generation errors', async () => {
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.getDefaultAdapterName.mockReturnValue(null);
 
             execSync.mockImplementation((cmd) => {
@@ -335,7 +335,7 @@ describe('GitService', () => {
         });
 
         test('should handle no changes to generate message for', async () => {
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.getDefaultAdapterName.mockReturnValue('claude');
 
             execSync.mockImplementation((cmd) => {
@@ -351,7 +351,7 @@ describe('GitService', () => {
         });
 
         test('should handle exception during message generation', async () => {
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.getDefaultAdapterName.mockReturnValue('claude');
             commitServiceFactory.createCommitService.mockReturnValue({
                 generateCommitMessage: jest.fn(() => Promise.reject(new Error('Generation failed')))
@@ -372,7 +372,7 @@ describe('GitService', () => {
 
     describe('reinitializeCommitService', () => {
         test('should reinitialize commit service successfully', async () => {
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.initialize.mockResolvedValue();
 
             const result = await gitService.reinitializeCommitService();
@@ -390,7 +390,7 @@ describe('GitService', () => {
             console.log = jest.fn();
             console.warn = jest.fn();
             
-            const commitServiceFactory = require('../infrastructure/commit/commit-service-factory');
+            const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             
             // Make the initialize throw an error
             commitServiceFactory.initialize.mockImplementation(() => {

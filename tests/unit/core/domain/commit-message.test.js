@@ -1,4 +1,4 @@
-const CommitMessage = require('../../../../domain/entities/commit/commit-message');
+const CommitMessage = require('../../../../domain/commit/commit-message');
 
 describe('CommitMessage', () => {
     describe('constructor', () => {

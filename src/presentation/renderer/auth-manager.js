@@ -7,7 +7,7 @@ class AuthManager {
     constructor() {
         this.user = null;
         this.authButton = document.getElementById('auth-btn');
-        this.authDropdown = document.getElementById('auth-dropdown');
+        this.authModal = document.getElementById('auth-modal');
         this.authIcon = document.getElementById('auth-icon');
         this.userAvatar = document.getElementById('user-avatar');
         this.dropdownAvatar = document.getElementById('dropdown-user-avatar');
@@ -16,7 +16,7 @@ class AuthManager {
         this.userInfo = document.getElementById('auth-user-info');
         this.signedOutMenu = document.getElementById('auth-menu-signed-out');
         this.signedInMenu = document.getElementById('auth-menu-signed-in');
-        this.authHeader = document.getElementById('auth-header-signed-out');
+        this.closeModalBtn = document.getElementById('close-auth-modal');
         
         this.init();
     }
@@ -41,16 +41,28 @@ class AuthManager {
     }
 
     setupEventListeners() {
-        // Toggle dropdown on button click
+        // Open modal on button click
         this.authButton?.addEventListener('click', (e) => {
             e.stopPropagation();
-            this.toggleDropdown();
+            this.openModal();
         });
         
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!this.authDropdown?.contains(e.target) && e.target !== this.authButton) {
-                this.closeDropdown();
+        // Close modal on close button click
+        this.closeModalBtn?.addEventListener('click', () => {
+            this.closeModal();
+        });
+        
+        // Close modal when clicking outside the modal content
+        this.authModal?.addEventListener('click', (e) => {
+            if (e.target === this.authModal) {
+                this.closeModal();
+            }
+        });
+        
+        // Close modal on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && this.authModal?.classList.contains('show')) {
+                this.closeModal();
             }
         });
         
@@ -70,41 +82,65 @@ class AuthManager {
 
     async checkAuthStatus() {
         try {
+            console.log('Checking auth status...');
             // Check if we have saved auth data
             const authData = await window.ipcRenderer.invoke('get-auth-data');
+            console.log('Auth data received:', authData);
             
             if (authData && authData.user) {
                 this.setUser(authData.user);
+            } else {
+                console.log('No auth data found, user is not logged in');
+                this.setUser(null);
             }
         } catch (error) {
             console.error('Error checking auth status:', error);
         }
     }
 
-    toggleDropdown() {
-        if (this.authDropdown.style.display === 'none' || !this.authDropdown.style.display) {
-            this.openDropdown();
-        } else {
-            this.closeDropdown();
+    openModal() {
+        if (this.authModal) {
+            console.log('Opening modal, user state:', this.user);
+            
+            // Update modal header based on auth status
+            const modalHeader = this.authModal.querySelector('.auth-modal-header h2');
+            if (modalHeader) {
+                modalHeader.textContent = this.user ? 'Account' : 'Login';
+            }
+            
+            // Ensure correct menu is shown based on auth status
+            if (this.user) {
+                // User is logged in
+                if (this.signedOutMenu) this.signedOutMenu.style.display = 'none';
+                if (this.signedInMenu) this.signedInMenu.style.display = 'block';
+                if (this.userInfo) this.userInfo.style.display = 'flex';
+            } else {
+                // User is not logged in
+                if (this.signedOutMenu) this.signedOutMenu.style.display = 'block';
+                if (this.signedInMenu) this.signedInMenu.style.display = 'none';
+                if (this.userInfo) this.userInfo.style.display = 'none';
+            }
+            
+            this.authModal.classList.add('show');
+            // Update Lucide icons in the modal
+            if (window.lucide) {
+                setTimeout(() => {
+                    window.lucide.createIcons();
+                }, 50);
+            }
         }
     }
 
-    openDropdown() {
-        // Position dropdown relative to button
-        const buttonRect = this.authButton.getBoundingClientRect();
-        this.authDropdown.style.right = `${window.innerWidth - buttonRect.right}px`;
-        this.authDropdown.style.top = `${buttonRect.bottom + 5}px`;
-        this.authDropdown.style.display = 'block';
-    }
-
-    closeDropdown() {
-        this.authDropdown.style.display = 'none';
+    closeModal() {
+        if (this.authModal) {
+            this.authModal.classList.remove('show');
+        }
     }
 
     async loginWithProvider(provider) {
         try {
-            // Close dropdown
-            this.closeDropdown();
+            // Close modal
+            this.closeModal();
             
             // Show loading state
             this.showLoadingState();
@@ -134,9 +170,6 @@ class AuthManager {
         // Update UI with user info
         this.setUser(data.user);
         
-        // Close dropdown
-        this.closeDropdown();
-        
         // Show success notification
         this.showNotification('Login Successful', `Welcome back, ${data.user.name || data.user.email}!`);
     }
@@ -153,15 +186,22 @@ class AuthManager {
 
     setUser(user) {
         this.user = user;
+        console.log('Setting user:', user);
+        console.log('Avatar URL from user object:', user?.avatar_url);
         
         if (user) {
+            // Add visual feedback - green icon for logged in state
+            this.authButton.classList.add('logged-in');
+            
             // Set up avatar with proper error handling
             const avatarUrl = user.avatar_url || this.getDefaultAvatar(user.email);
+            console.log('Final avatar URL being used:', avatarUrl);
             
             // Update button avatar
-            this.userAvatar.onerror = () => {
+            this.userAvatar.onerror = (e) => {
                 // If avatar fails to load, show icon instead
-                console.warn('Avatar failed to load, showing icon');
+                console.warn('Avatar failed to load:', avatarUrl);
+                console.warn('Error event:', e);
                 this.authIcon.style.display = 'block';
                 this.userAvatar.style.display = 'none';
             };
@@ -177,14 +217,17 @@ class AuthManager {
             this.authButton.title = user.name || user.email;
             
             // Update dropdown avatar with same error handling
-            this.dropdownAvatar.onerror = () => {
+            this.dropdownAvatar.onerror = (e) => {
+                console.warn('Dropdown avatar failed to load:', avatarUrl);
                 this.dropdownAvatar.style.display = 'none';
             };
             
             this.dropdownAvatar.onload = () => {
+                console.log('Dropdown avatar loaded successfully');
                 this.dropdownAvatar.style.display = 'block';
             };
             
+            console.log('Setting dropdown avatar src to:', avatarUrl);
             this.dropdownAvatar.src = avatarUrl;
             this.userName.textContent = user.name || 'User';
             this.userEmail.textContent = user.email;
@@ -193,8 +236,10 @@ class AuthManager {
             this.userInfo.style.display = 'flex';
             this.signedOutMenu.style.display = 'none';
             this.signedInMenu.style.display = 'block';
-            if (this.authHeader) this.authHeader.style.display = 'none';
         } else {
+            // Remove visual feedback - no green border for logged out state
+            this.authButton.classList.remove('logged-in');
+            
             // Reset to signed out state
             this.authIcon.style.display = 'block';
             this.userAvatar.style.display = 'none';
@@ -204,14 +249,13 @@ class AuthManager {
             this.userInfo.style.display = 'none';
             this.signedOutMenu.style.display = 'block';
             this.signedInMenu.style.display = 'none';
-            if (this.authHeader) this.authHeader.style.display = 'block';
         }
     }
 
     async logout() {
         try {
-            // Close dropdown
-            this.closeDropdown();
+            // Close modal
+            this.closeModal();
             
             // Clear auth data
             const authService = require('../../infrastructure/services/auth-service');

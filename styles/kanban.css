@@ -89,15 +89,17 @@ body::before {
     position: relative;
 }
 
-/* Search container styles - smaller and more discrete */
+/* Search container styles - compact and minimal height */
 .search-container {
     position: relative;
     display: flex;
     align-items: center;
+    justify-content: center;
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.05);
     border-radius: 6px;
-    padding: 0.35rem 0.75rem;
+    padding: 0 0.75rem;
+    height: 36px;
     min-width: 200px;
     max-width: 250px;
     transition: all 0.2s ease;
@@ -119,6 +121,8 @@ body::before {
 .search-icon {
     position: absolute;
     left: 0.75rem;
+    top: 50%;
+    transform: translateY(-50%);
     color: var(--text-muted);
     width: 14px;
     height: 14px;
@@ -131,9 +135,11 @@ body::before {
     border: none;
     color: var(--text-primary);
     font-size: 0.8125rem;
-    padding-left: 1.25rem;
+    padding: 0 0 0 1.25rem;
+    height: 100%;
     width: 100%;
     outline: none;
+    display: block;
 }
 
 .search-input::placeholder {
@@ -179,39 +185,54 @@ body::before {
 .kanban-header h1 {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    font-size: 1.5rem;
-    color: var(--text-primary);
-    font-weight: 600;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.3));
+    gap: 0.6rem;
+    font-size: 1.1rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', sans-serif !important;
+    letter-spacing: -0.01em;
+    text-transform: uppercase;
+}
+
+/* CodeAgentSwarm logo in header - minimalist style */
+.kanban-logo {
+    width: 24px;
+    height: 24px;
+    object-fit: contain;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
+.kanban-header h1:hover .kanban-logo {
+    opacity: 1;
 }
 
 .header-controls {
     display: flex;
-    gap: 1rem;
+    gap: 0.5rem;
+    align-items: center;
 }
 
 /* Buttons with modern design */
 .btn {
-    padding: 0.5rem 1rem;
+    padding: 0.3rem 0.5rem;
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--surface);
     color: var(--text-primary);
     cursor: pointer;
-    font-size: 0.9rem;
-    display: flex;
+    font-size: 0.65rem;
+    display: inline-flex;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.25rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);
     position: relative;
     overflow: hidden;
+    white-space: nowrap;
+    line-height: 1;
+    height: 24px;
 }
 
 .btn::before {
@@ -269,8 +290,28 @@ body::before {
 }
 
 .btn-icon {
-    padding: 0.5rem;
+    padding: 0.3rem;
     min-width: auto;
+}
+
+/* Header button specific styles */
+.header-controls .btn {
+    font-size: 0.75rem !important;
+    padding: 0.35rem 0.6rem !important;
+    height: 28px !important;
+}
+
+.header-controls .btn svg {
+    width: 14px !important;
+    height: 14px !important;
+}
+
+/* All button icons */
+.btn svg,
+.btn i[data-lucide] {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
 }
 
 /* Kanban Board */
@@ -654,6 +695,7 @@ body::before {
     word-wrap: break-word;
     overflow-wrap: break-word;
     padding: 0.5rem 1rem 0.75rem 1rem;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .task-title-text {
@@ -1414,6 +1456,7 @@ body::before {
     margin: 0;
     font-size: 1.2rem;
     font-weight: 600;
+    font-family: 'SF Pro Display', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 .modal-close {

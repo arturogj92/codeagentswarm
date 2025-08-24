@@ -1,5 +1,5 @@
 const ClaudeCommitAdapter = require('./claude-commit-adapter');
-const GenerateCommitUseCase = require('../../../core/application/use-cases/commit/generate-commit-use-case');
+const GenerateCommitUseCase = require('../../application/commit/generate-commit-use-case');
 
 /**
  * Factory for creating commit service instances

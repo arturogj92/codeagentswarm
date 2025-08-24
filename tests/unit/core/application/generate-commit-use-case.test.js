@@ -1,5 +1,5 @@
 const GenerateCommitUseCase = require('../../../../application/commit/generate-commit-use-case');
-const CommitMessage = require('../../../../domain/entities/commit/commit-message');
+const CommitMessage = require('../../../../domain/commit/commit-message');
 const { execSync } = require('child_process');
 
 // Mock child_process

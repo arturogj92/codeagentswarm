@@ -2,7 +2,7 @@
  * Tests for CommitRepository abstract class
  */
 
-const CommitRepository = require('../../../../domain/entities/commit/commit-repository');
+const CommitRepository = require('../../../../domain/commit/commit-repository');
 
 describe('CommitRepository', () => {
     let repository;

@@ -1,7 +1,7 @@
 const { exec, spawn } = require('child_process');
 const { promisify } = require('util');
-const CommitRepository = require('../../domain/entities/commit/commit-repository');
-const CommitMessage = require('../../domain/entities/commit/commit-message');
+const CommitRepository = require('../../domain/commit/commit-repository');
+const CommitMessage = require('../../domain/commit/commit-message');
 
 // Create promisified version carefully
 const execAsync = (command, options) => {

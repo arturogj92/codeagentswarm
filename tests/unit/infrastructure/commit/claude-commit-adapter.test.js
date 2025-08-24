@@ -3,8 +3,8 @@
  */
 
 const ClaudeCommitAdapter = require('../../../../infrastructure/commit/claude-commit-adapter');
-const CommitRepository = require('../../../../domain/entities/commit/commit-repository');
-const CommitMessage = require('../../../../domain/entities/commit/commit-message');
+const CommitRepository = require('../../../../domain/commit/commit-repository');
+const CommitMessage = require('../../../../domain/commit/commit-message');
 const { spawn, exec } = require('child_process');
 const EventEmitter = require('events');
 

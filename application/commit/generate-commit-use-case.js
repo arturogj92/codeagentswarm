@@ -1,5 +1,5 @@
 const { execSync } = require('child_process');
-const CommitMessage = require('../../domain/entities/commit/commit-message');
+const CommitMessage = require('../../domain/commit/commit-message');
 
 /**
  * Use case for generating commit messages

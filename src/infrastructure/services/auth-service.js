@@ -72,7 +72,7 @@ class AuthService {
     async saveAuthData(data) {
         try {
             const store = await this.ensureStore();
-            if (safeStorage.isEncryptionAvailable()) {
+            if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
                 // Use native encryption if available (macOS Keychain)
                 const encryptedToken = safeStorage.encryptString(data.token);
                 const encryptedRefresh = safeStorage.encryptString(data.refreshToken);
@@ -84,13 +84,23 @@ class AuthService {
                     savedAt: Date.now()
                 });
             } else {
-                // Fallback to store encryption
-                store.set('auth', {
-                    user: data.user,
-                    token: data.token,
-                    refreshToken: data.refreshToken,
-                    savedAt: Date.now()
-                });
+                // Fallback to store encryption or localStorage
+                if (store && store.set) {
+                    store.set('auth', {
+                        user: data.user,
+                        token: data.token,
+                        refreshToken: data.refreshToken,
+                        savedAt: Date.now()
+                    });
+                } else {
+                    // Ultimate fallback to localStorage
+                    localStorage.setItem('auth', JSON.stringify({
+                        user: data.user,
+                        token: data.token,
+                        refreshToken: data.refreshToken,
+                        savedAt: Date.now()
+                    }));
+                }
             }
             
             this.user = data.user;
@@ -110,7 +120,15 @@ class AuthService {
     async loadAuthData() {
         try {
             const store = await this.ensureStore();
-            const saved = store.get('auth');
+            let saved;
+            
+            if (store && store.get) {
+                saved = store.get('auth');
+            } else {
+                // Fallback to localStorage
+                const savedStr = localStorage.getItem('auth');
+                saved = savedStr ? JSON.parse(savedStr) : null;
+            }
             
             if (!saved) return null;
             
@@ -121,7 +139,7 @@ class AuthService {
                 return null;
             }
             
-            if (safeStorage.isEncryptionAvailable() && saved.token.length > 100) {
+            if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable() && saved.token && saved.token.length > 100) {
                 // Decrypt if it was encrypted
                 const tokenBuffer = Buffer.from(saved.token, 'base64');
                 const refreshBuffer = Buffer.from(saved.refreshToken, 'base64');
@@ -147,7 +165,12 @@ class AuthService {
     async clearAuthData() {
         try {
             const store = await this.ensureStore();
-            store.delete('auth');
+            if (store && store.delete) {
+                store.delete('auth');
+            } else {
+                // Fallback to localStorage
+                localStorage.removeItem('auth');
+            }
             this.user = null;
             this.token = null;
             this.refreshToken = null;
