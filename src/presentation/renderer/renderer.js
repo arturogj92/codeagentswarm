@@ -861,31 +861,6 @@ class TerminalManager {
         
         wrapper.appendChild(selectorDiv);
         
-        // Force buttons to be visible after render
-        setTimeout(() => {
-            const buttonsContainer = selectorDiv.querySelector('.directory-selector-buttons');
-            const rightSection = selectorDiv.querySelector('.directory-selector-right');
-            
-            if (buttonsContainer) {
-                console.log('Forcing buttons visibility...');
-                buttonsContainer.style.display = 'flex';
-                buttonsContainer.style.visibility = 'visible';
-                buttonsContainer.style.opacity = '1';
-                buttonsContainer.style.position = 'relative';
-                buttonsContainer.style.zIndex = '9999';
-            }
-            
-            if (rightSection) {
-                console.log('Forcing right section visibility...');
-                rightSection.style.display = 'flex';
-                rightSection.style.visibility = 'visible';
-                rightSection.style.opacity = '1';
-            }
-            
-            // Force a reflow to ensure changes are applied
-            selectorDiv.offsetHeight;
-        }, 100);
-        
         // Function to restore placeholder if cancelled
         let restorePlaceholder = () => {
             if (wrapper.contains(selectorDiv)) {

@@ -1,0 +1,457 @@
+/* Directory Selector - Complete Styles with All Fixes */
+
+/* ==================== BASE CONTAINER ==================== */
+.directory-selector-container {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  background: linear-gradient(135deg, 
+    rgba(20, 12, 30, 0.98) 0%, 
+    rgba(30, 20, 45, 0.95) 50%, 
+    rgba(40, 30, 60, 0.98) 100%) !important;
+  overflow: hidden !important;
+  z-index: 9999 !important;
+}
+
+/* Animated background pattern */
+.directory-selector-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: 
+    radial-gradient(circle at 20% 50%, rgba(127, 90, 240, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 40% 20%, rgba(127, 90, 240, 0.05) 0%, transparent 50%);
+  animation: floatBackground 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes floatBackground {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  33% { transform: translate(-20px, -20px) rotate(120deg); }
+  66% { transform: translate(20px, -10px) rotate(240deg); }
+}
+
+/* ==================== CONTENT WRAPPER ==================== */
+.directory-selector-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  padding: 20px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* Title */
+.directory-selector-content h3,
+.directory-selector-title {
+  flex: 0 0 auto !important;
+  margin: 0 0 20px 0 !important;
+  font-size: clamp(1.5rem, 4vw, 2.2rem) !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 1) 0%, 
+    rgba(102, 126, 234, 1) 50%, 
+    rgba(127, 90, 240, 1) 100%) !important;
+  background-size: 200% auto !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  text-align: center !important;
+  animation: titleGradient 4s linear infinite !important;
+}
+
+@keyframes titleGradient {
+  0% { background-position: 0% center; }
+  100% { background-position: 200% center; }
+}
+
+/* ==================== MAIN LAYOUT ==================== */
+.directory-selector-main {
+  display: flex !important;
+  flex-direction: column !important;  /* ALWAYS column, not row */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  gap: 15px !important;
+  overflow: hidden !important;
+}
+
+/* ==================== LEFT SECTION - PROJECTS ==================== */
+.directory-selector-left {
+  flex: 1 1 auto !important;  /* Take all available space */
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.recent-projects-section {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+  overflow: hidden !important;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.06) 0%, 
+    rgba(255, 255, 255, 0.02) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 12px !important;
+  padding: 16px !important;
+  backdrop-filter: blur(10px) !important;
+  -webkit-backdrop-filter: blur(10px) !important;
+  box-shadow: 
+    0 4px 16px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+}
+
+.recent-projects-section h4 {
+  flex: 0 0 auto !important;
+  margin: 0 0 12px 0 !important;
+  font-size: 0.85rem !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.recent-projects-section h4::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-left: 5px solid rgba(127, 90, 240, 0.8);
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+}
+
+/* Projects List - CRITICAL FOR SCROLLING */
+.recent-projects-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  margin: 0 !important;
+  padding: 0 4px 0 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Custom Scrollbar */
+.recent-projects-list::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.recent-projects-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 4px !important;
+}
+
+.recent-projects-list::-webkit-scrollbar-thumb {
+  background: rgba(127, 90, 240, 0.5) !important;
+  border-radius: 4px !important;
+  min-height: 30px !important;
+}
+
+.recent-projects-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(127, 90, 240, 0.7) !important;
+}
+
+/* Project Items */
+.recent-project-item {
+  flex: 0 0 auto !important;
+  margin-bottom: 8px !important;
+  padding: 12px 16px !important;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.04) 0%, 
+    rgba(255, 255, 255, 0.02) 100%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.recent-project-item:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.15) 0%, 
+    rgba(102, 126, 234, 0.1) 100%) !important;
+  border-color: rgba(127, 90, 240, 0.4) !important;
+  transform: translateX(4px) !important;
+  box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2) !important;
+}
+
+.recent-project-item:last-child {
+  margin-bottom: 0 !important;
+}
+
+/* Delete button */
+.delete-project-btn {
+  position: absolute !important;
+  top: 50% !important;
+  right: 16px !important;
+  transform: translateY(-50%) !important;
+  width: 24px !important;
+  height: 24px !important;
+  border: 1px solid rgba(255, 59, 48, 0.3) !important;
+  background: rgba(255, 59, 48, 0.1) !important;
+  color: rgba(255, 59, 48, 0.8) !important;
+  border-radius: 6px !important;
+  cursor: pointer !important;
+  font-size: 18px !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  opacity: 0 !important;
+  transition: all 0.2s ease !important;
+}
+
+.recent-project-item:hover .delete-project-btn {
+  opacity: 1 !important;
+}
+
+/* Project info */
+.project-info {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  padding-right: 40px !important;
+}
+
+.project-color-indicator {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 50% !important;
+  flex-shrink: 0 !important;
+  box-shadow: 
+    0 0 20px currentColor,
+    inset 0 0 10px rgba(255, 255, 255, 0.3) !important;
+}
+
+.project-name {
+  font-weight: 500 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-size: 0.9rem !important;
+  letter-spacing: 0.2px !important;
+}
+
+.project-path {
+  color: rgba(255, 255, 255, 0.4) !important;
+  font-size: 0.75rem !important;
+  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 !important;
+}
+
+/* Create New Project Button */
+#create-new-project-btn {
+  flex: 0 0 auto !important;
+  margin-top: 12px !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  background: linear-gradient(135deg, 
+    rgba(46, 213, 115, 0.9) 0%, 
+    rgba(0, 184, 148, 0.9) 100%) !important;
+  border: 1px solid rgba(46, 213, 115, 0.3) !important;
+  color: white !important;
+  font-weight: 500 !important;
+  padding: 12px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  font-size: 0.9rem !important;
+  letter-spacing: 0.3px !important;
+}
+
+#create-new-project-btn:hover {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 24px rgba(46, 213, 115, 0.3) !important;
+  background: linear-gradient(135deg, 
+    rgba(46, 213, 115, 1) 0%, 
+    rgba(0, 184, 148, 1) 100%) !important;
+}
+
+/* ==================== RIGHT SECTION - BUTTONS ==================== */
+.directory-selector-right {
+  flex: 0 0 auto !important;  /* Fixed height for buttons */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 10px !important;
+  padding: 15px !important;
+  background: linear-gradient(to top,
+    rgba(20, 12, 30, 0.98) 0%,
+    rgba(20, 12, 30, 0.9) 30%,
+    transparent 100%) !important;
+  border-radius: 12px !important;
+}
+
+/* Hide directory displays - we don't need them in single column */
+.last-directory-section,
+.selected-directory-display {
+  display: none !important;
+}
+
+/* Action Buttons */
+.directory-selector-buttons {
+  display: flex !important;
+  gap: 10px !important;
+  width: 100% !important;
+}
+
+.directory-selector-buttons .btn,
+.directory-selector-buttons button {
+  flex: 1 !important;
+  padding: 12px 16px !important;
+  font-size: 0.9rem !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.2px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  background: linear-gradient(135deg, 
+    rgba(255, 255, 255, 0.08) 0%, 
+    rgba(255, 255, 255, 0.04) 100%) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.directory-selector-buttons .btn:hover,
+.directory-selector-buttons button:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.2) 0%, 
+    rgba(102, 126, 234, 0.15) 100%) !important;
+  border-color: rgba(127, 90, 240, 0.4) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(127, 90, 240, 0.3) !important;
+}
+
+.directory-selector-buttons .btn-primary,
+#use-last-btn {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.5) 0%, 
+    rgba(102, 126, 234, 0.4) 100%) !important;
+  border-color: rgba(127, 90, 240, 0.6) !important;
+  font-weight: 600 !important;
+}
+
+.directory-selector-buttons .btn-primary:hover,
+#use-last-btn:hover {
+  background: linear-gradient(135deg, 
+    rgba(127, 90, 240, 0.7) 0%, 
+    rgba(102, 126, 234, 0.6) 100%) !important;
+  border-color: rgba(127, 90, 240, 0.8) !important;
+}
+
+/* ==================== RESPONSIVE - SMALL SCREENS ==================== */
+/* Already single column, just adjust spacing for small screens */
+@media (max-width: 700px), (max-height: 650px) {
+  .directory-selector-content {
+    padding: 15px !important;
+  }
+  
+  .directory-selector-main {
+    gap: 10px !important;
+  }
+  
+  .directory-selector-left {
+    flex: 1 1 auto !important;
+    min-height: 150px !important;
+  }
+  
+  .directory-selector-right {
+    padding: 12px !important;
+  }
+  
+  .directory-selector-buttons .btn,
+  .directory-selector-buttons button {
+    padding: 10px 12px !important;
+    font-size: 0.85rem !important;
+  }
+  
+  .project-path {
+    display: none !important;
+  }
+  
+  .recent-project-item {
+    padding: 10px 14px !important;
+  }
+  
+  #create-new-project-btn {
+    min-height: 38px !important;
+    padding: 10px !important;
+    font-size: 0.85rem !important;
+  }
+}
+
+/* Ultra small screens */
+@media (max-height: 500px) {
+  .directory-selector-content {
+    padding: 10px !important;
+  }
+  
+  .directory-selector-content h3 {
+    font-size: 1.2rem !important;
+    margin-bottom: 10px !important;
+  }
+  
+  .recent-projects-section {
+    padding: 10px !important;
+  }
+  
+  .recent-projects-section h4 {
+    font-size: 0.75rem !important;
+    margin-bottom: 8px !important;
+  }
+}
+
+/* ==================== OVERRIDE STYLES.CSS MAX-HEIGHT ISSUES ==================== */
+/* ULTRA HIGH SPECIFICITY to override styles.css - Using 100% like you discovered works */
+body .directory-selector-container .directory-selector-content .directory-selector-main .directory-selector-left .recent-projects-section .recent-projects-list {
+  max-height: 100% !important;  /* Use 100% instead of calc - this is what works! */
+  height: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Override the specific problematic media query with EXACT match */
+@media (max-width: 1280px) and (min-width: 1000px) {
+  body .directory-selector-container .recent-projects-list {
+    max-height: 100% !important;  /* Override the 150px with 100% */
+    gap: 8px !important;
+  }
+}
+
+/* Override for ALL possible media queries */
+@media all and (max-width: 9999px) {
+  body .directory-selector-container .recent-projects-list {
+    max-height: 100% !important;
+  }
+}
+
+/* Fallback with maximum specificity */
+.directory-selector-container .recent-projects-list {
+  max-height: 100% !important;
+}

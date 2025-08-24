@@ -4089,7 +4089,6 @@ h3 i {
   }
   
   .recent-projects-list {
-    max-height: 150px;
     gap: 4px;
   }
   
@@ -4155,7 +4154,7 @@ h3 i {
   }
   
   .recent-projects-list {
-    max-height: 150px;
+    /* max-height removed to allow full expansion */
   }
   
   .recent-project-item {

@@ -87,6 +87,10 @@
       "notarize": false,
       "electronUpdaterCompatibility": ">=2.16"
     },
+    "protocols": {
+      "name": "CodeAgentSwarm Protocol",
+      "schemes": ["codeagentswarm"]
+    },
     "dmg": {
       "artifactName": "${productName}-${version}-darwin-${arch}.${ext}",
       "writeUpdateInfo": false,
