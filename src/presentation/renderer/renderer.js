@@ -861,6 +861,12 @@ class TerminalManager {
         
         wrapper.appendChild(selectorDiv);
         
+        // Pre-apply responsive classes based on terminal count for instant styling
+        const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
+        if (terminalCount === 4) {
+            selectorDiv.classList.add('small-quadrant');
+        }
+        
         // Force the projects list to expand to full height (fix CSS specificity issue)
         // User confirmed this works: element.style { max-height: 100%; }
         requestAnimationFrame(() => {
@@ -888,6 +894,144 @@ class TerminalManager {
                     contentArea.style.height = '100%';
                 }
             }
+            
+            // Apply responsive layout immediately based on initial detection
+            const applyResponsiveLayout = () => {
+                const quadrantWidth = wrapper.offsetWidth;
+                const quadrantHeight = wrapper.offsetHeight;
+                
+                // Check if we have 4 terminals active
+                const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
+                const hasFourQuadrants = terminalCount === 4 || document.querySelector('.terminals-container.count-4');
+                
+                // Detect different size constraints
+                const isSmallWidth = quadrantWidth < 500;
+                const isMediumWidth = quadrantWidth < 800;
+                const isShortHeight = quadrantHeight < 400;  // Very short vertically
+                const isVerticallyConstrained = quadrantHeight < 500;
+                
+                // Apply horizontal layout if:
+                // 1. We have 4 quadrants AND the individual quadrant is small
+                // 2. OR the quadrant is extremely small (less than 500px width)
+                // 3. OR the quadrant is very short (less than 400px height)
+                const shouldUseHorizontalLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
+                
+                console.log(`Directory selector size detection:
+                    - Quadrant size: ${quadrantWidth}x${quadrantHeight}
+                    - Terminal count: ${terminalCount}
+                    - Has 4 quadrants: ${hasFourQuadrants}
+                    - Is small width: ${isSmallWidth}
+                    - Is short height: ${isShortHeight}
+                    - Should use horizontal: ${shouldUseHorizontalLayout}`);
+                
+                // Remove all responsive classes first
+                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained');
+                
+                if (shouldUseHorizontalLayout) {
+                    selectorDiv.classList.add('small-quadrant');
+                    
+                    // Apply horizontal layout directly via JavaScript for immediate effect
+                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                    if (mainSection) {
+                        mainSection.style.flexDirection = 'row';
+                        mainSection.style.gap = '8px';
+                        mainSection.style.alignItems = 'stretch';
+                        
+                        const leftSection = mainSection.querySelector('.directory-selector-left');
+                        const rightSection = mainSection.querySelector('.directory-selector-right');
+                        
+                        if (leftSection) {
+                            leftSection.style.flex = '1 1 55%';
+                            leftSection.style.maxWidth = '55%';
+                            leftSection.style.minHeight = 'auto';
+                        }
+                        
+                        if (rightSection) {
+                            rightSection.style.setProperty('flex', '1 1 45%', 'important');
+                            rightSection.style.setProperty('max-width', '45%', 'important');
+                            rightSection.style.setProperty('border-left', '1px solid rgba(255, 255, 255, 0.1)', 'important');
+                            rightSection.style.setProperty('border-top', 'none', 'important');
+                            rightSection.style.setProperty('padding-left', '15px', 'important');
+                            rightSection.style.setProperty('display', 'flex', 'important');
+                            rightSection.style.setProperty('flex-direction', 'column', 'important');
+                            rightSection.style.setProperty('justify-content', 'center', 'important');
+                            rightSection.style.setProperty('align-items', 'stretch', 'important');
+                            rightSection.style.setProperty('padding-top', '0', 'important');
+                            rightSection.style.setProperty('padding-bottom', '0', 'important');
+                            
+                            // Also ensure the buttons container is centered
+                            const buttonsContainer = rightSection.querySelector('.directory-selector-buttons');
+                            if (buttonsContainer) {
+                                buttonsContainer.style.setProperty('margin', 'auto 0', 'important');
+                                buttonsContainer.style.setProperty('display', 'flex', 'important');
+                                buttonsContainer.style.setProperty('flex-direction', 'column', 'important');
+                                buttonsContainer.style.setProperty('gap', '10px', 'important');
+                                buttonsContainer.style.setProperty('width', '100%', 'important');
+                            }
+                        }
+                    }
+                } else {
+                    // Reset to vertical layout
+                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                    if (mainSection) {
+                        mainSection.style.flexDirection = '';
+                        mainSection.style.gap = '';
+                        mainSection.style.alignItems = '';
+                        
+                        const leftSection = mainSection.querySelector('.directory-selector-left');
+                        const rightSection = mainSection.querySelector('.directory-selector-right');
+                        
+                        if (leftSection) {
+                            leftSection.style.flex = '';
+                            leftSection.style.maxWidth = '';
+                            leftSection.style.minHeight = '';
+                        }
+                        
+                        if (rightSection) {
+                            rightSection.style.flex = '';
+                            rightSection.style.maxWidth = '';
+                            rightSection.style.borderLeft = '';
+                            rightSection.style.borderTop = '';
+                            rightSection.style.paddingLeft = '';
+                            rightSection.style.display = '';
+                            rightSection.style.flexDirection = '';
+                            rightSection.style.justifyContent = '';
+                            rightSection.style.alignItems = '';
+                        }
+                    }
+                }
+                
+                // Add class for vertically constrained layouts (even if not using horizontal)
+                if (isVerticallyConstrained) {
+                    selectorDiv.classList.add('vertically-constrained');
+                    
+                    // Apply compact vertical spacing
+                    const contentArea = selectorDiv.querySelector('.directory-selector-content');
+                    if (contentArea) {
+                        contentArea.style.padding = '6px';
+                    }
+                    
+                    const projectItems = selectorDiv.querySelectorAll('.recent-project-item');
+                    projectItems.forEach(item => {
+                        item.style.padding = '4px 8px';
+                        item.style.marginBottom = '2px';
+                    });
+                    
+                    const buttons = selectorDiv.querySelectorAll('.directory-selector-buttons button');
+                    buttons.forEach(btn => {
+                        btn.style.minHeight = '28px';
+                        btn.style.padding = '4px 8px';
+                    });
+                }
+            };
+            
+            // Apply layout immediately to avoid visual flash
+            applyResponsiveLayout();
+            
+            // Also check again after a small delay in case DOM measurements change
+            requestAnimationFrame(() => {
+                applyResponsiveLayout();
+            });
         });
         
         // Function to restore placeholder if cancelled

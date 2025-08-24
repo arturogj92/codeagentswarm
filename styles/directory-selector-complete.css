@@ -1,14 +1,14 @@
 /* Directory Selector - Complete Styles with All Fixes */
 
 /* ==================== BASE CONTAINER ==================== */
-.directory-selector-container {
-  position: fixed !important;
+.terminal-wrapper .directory-selector {
+  position: absolute !important;
   top: 0 !important;
   left: 0 !important;
   right: 0 !important;
   bottom: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
+  width: 100% !important;
+  height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
   background: linear-gradient(135deg, 
@@ -16,11 +16,11 @@
     rgba(30, 20, 45, 0.95) 50%, 
     rgba(40, 30, 60, 0.98) 100%) !important;
   overflow: hidden !important;
-  z-index: 9999 !important;
+  z-index: 10 !important;
 }
 
 /* Animated background pattern */
-.directory-selector-container::before {
+.terminal-wrapper .directory-selector::before {
   content: '';
   position: absolute;
   top: 0;
@@ -452,77 +452,219 @@ body .directory-selector-container .directory-selector-content .directory-select
 }
 
 /* Fallback with maximum specificity */
-.directory-selector-container .recent-projects-list {
+.terminal-wrapper .directory-selector .recent-projects-list {
   max-height: 100% !important;
 }
 
-/* ==================== NARROW VIEWPORT - HORIZONTAL LAYOUT ==================== */
-/* When viewport is narrow (like in 4-quadrant mode), switch to horizontal layout */
-@media (max-width: 600px) {
-  .directory-selector-main {
-    flex-direction: row !important;  /* Switch to horizontal */
-    gap: 8px !important;
-    height: 100% !important;
-    align-items: stretch !important;
-  }
-  
-  /* Left side - Projects */
-  .directory-selector-left {
-    flex: 1 1 55% !important;  /* Take slightly more than half */
-    max-width: 55% !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  
-  /* Right side - Buttons */
-  .directory-selector-right {
-    flex: 0 0 45% !important;  /* Take slightly less than half */
-    max-width: 45% !important;
-    min-width: 0 !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: center !important;
-    background: rgba(255, 255, 255, 0.02) !important;
-    border-radius: 8px !important;
-    padding: 10px !important;
-  }
-  
-  .directory-selector-buttons {
-    flex-direction: column !important;  /* Stack buttons vertically */
-    width: 100% !important;
-  }
-  
-  .directory-selector-buttons .btn,
-  .directory-selector-buttons button {
-    width: 100% !important;
-    min-height: 36px !important;
-    padding: 8px 12px !important;
-    font-size: 0.8rem !important;
-  }
-  
-  /* Adjust projects section for horizontal layout */
-  .recent-projects-section {
-    height: 100% !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-  
-  .recent-projects-section h4 {
-    font-size: 0.75rem !important;
-    margin-bottom: 8px !important;
-  }
-  
-  #create-new-project-btn {
-    margin-top: 8px !important;
-    min-height: 34px !important;
-    font-size: 0.8rem !important;
-  }
-  
-  /* Hide title in very narrow viewports to save space */
-  .directory-selector-title {
-    display: none !important;
-  }
+/* ==================== SMALL QUADRANT RESPONSIVE STYLES ==================== */
+/* Apply horizontal layout ONLY when JavaScript detects small quadrant */
+.directory-selector.small-quadrant .directory-selector-main {
+  flex-direction: row !important;  /* Switch to horizontal */
+  gap: 8px !important;
+  height: 100% !important;
+  align-items: stretch !important;
+}
+
+/* Also apply when we have 4 terminals to avoid flash */
+.terminals-container.count-4 .directory-selector .directory-selector-main {
+  flex-direction: row !important;
+  gap: 8px !important;
+  height: 100% !important;
+  align-items: stretch !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-left,
+.terminals-container.count-4 .directory-selector .directory-selector-left {
+  flex: 1 1 55% !important;  /* Take slightly more than half */
+  max-width: 55% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-right,
+.terminals-container.count-4 .directory-selector .directory-selector-right {
+  flex: 0 0 45% !important;  /* Take slightly less than half */
+  max-width: 45% !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;  /* Center buttons vertically */
+  align-items: stretch !important;  /* Stretch buttons horizontally */
+  align-content: center !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 8px !important;
+  padding: 15px !important;
+  padding-top: 0 !important;  /* Remove top padding to help centering */
+  padding-bottom: 0 !important;  /* Remove bottom padding to help centering */
+  gap: 0 !important;  /* Remove gap, let buttons handle spacing */
+}
+
+.directory-selector.small-quadrant .directory-selector-buttons,
+.terminals-container.count-4 .directory-selector .directory-selector-buttons {
+  flex-direction: column !important;  /* Stack buttons vertically */
+  width: 100% !important;
+  gap: 10px !important;  /* Space between buttons */
+  display: flex !important;
+  justify-content: center !important;  /* Center the button group */
+  align-items: stretch !important;
+  flex: 0 0 auto !important;  /* Don't grow/shrink */
+  margin: auto 0 !important;  /* Center vertically in parent */
+  padding: 0 !important;  /* Remove any padding */
+}
+
+.directory-selector.small-quadrant .directory-selector-buttons .btn,
+.directory-selector.small-quadrant .directory-selector-buttons button,
+.terminals-container.count-4 .directory-selector .directory-selector-buttons .btn,
+.terminals-container.count-4 .directory-selector .directory-selector-buttons button {
+  width: 100% !important;
+  min-height: 40px !important;  /* Slightly taller for better clickability */
+  padding: 10px 16px !important;
+  font-size: 0.85rem !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  white-space: nowrap !important;
+  margin: 0 !important;  /* Remove any margin that might interfere */
+}
+
+/* Extra specific rule to ensure centering works */
+/* Removed position/transform as they were interfering with proper centering */
+.terminal-wrapper .directory-selector.small-quadrant .directory-selector-right > .directory-selector-buttons {
+  margin: 0 !important;
+}
+
+/* Hide last directory section in small quadrants */
+.directory-selector.small-quadrant .last-directory-section,
+.directory-selector.small-quadrant .selected-directory-display:not(.directory-selector-buttons *) {
+  display: none !important;
+}
+
+/* Adjust projects section for horizontal layout */
+.directory-selector.small-quadrant .recent-projects-section {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 8px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-section h4 {
+  font-size: 1.2vw !important;  /* Responsive font with vw */
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.small-quadrant #create-new-project-btn {
+  margin-top: 8px !important;
+  min-height: 34px !important;
+  font-size: 1.3vw !important;  /* Responsive font with vw */
+}
+
+/* Hide title in small quadrants to save space */
+.directory-selector.small-quadrant h3,
+.directory-selector.small-quadrant .directory-selector-title {
+  display: none !important;
+}
+
+/* Compact styles for small quadrants */
+.directory-selector.small-quadrant .directory-selector-content {
+  padding: 8px !important;
+}
+
+.directory-selector.small-quadrant .recent-project-item {
+  padding: 6px 10px !important;
+  margin-bottom: 4px !important;
+}
+
+.directory-selector.small-quadrant .project-name {
+  font-size: 1.3vw !important;  /* Better scaling with viewport */
+}
+
+.directory-selector.small-quadrant .project-path {
+  font-size: 1.1vw !important;  /* Slightly smaller for path */
+}
+
+.directory-selector.small-quadrant .project-color-indicator {
+  width: 10px !important;
+  height: 10px !important;
+}
+
+/* ==================== VERTICALLY CONSTRAINED STYLES ==================== */
+/* When the selector is vertically short, make everything more compact */
+.directory-selector.vertically-constrained {
+  /* Reduce all vertical spacing */
+}
+
+.directory-selector.vertically-constrained .directory-selector-content {
+  padding: 6px !important;
+}
+
+.directory-selector.vertically-constrained .directory-selector-main {
+  gap: 6px !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-section {
+  padding: 6px !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-section h4 {
+  font-size: 0.75rem !important;
+  margin-bottom: 4px !important;
+  padding: 2px 0 !important;
+}
+
+.directory-selector.vertically-constrained .recent-project-item {
+  padding: 4px 8px !important;
+  margin-bottom: 2px !important;
+  min-height: 24px !important;
+}
+
+.directory-selector.vertically-constrained .project-name {
+  font-size: 0.8rem !important;
+  line-height: 1.2 !important;
+}
+
+.directory-selector.vertically-constrained .project-path {
+  font-size: 0.7rem !important;
+  line-height: 1.1 !important;
+  margin-top: 1px !important;
+}
+
+.directory-selector.vertically-constrained .directory-selector-buttons button,
+.directory-selector.vertically-constrained .directory-selector-buttons .btn {
+  min-height: 28px !important;
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+}
+
+.directory-selector.vertically-constrained #create-new-project-btn {
+  min-height: 28px !important;
+  padding: 4px 8px !important;
+  font-size: 0.75rem !important;
+  margin-top: 4px !important;
+}
+
+.directory-selector.vertically-constrained .directory-selector-left {
+  min-height: 100px !important;  /* Reduce minimum height */
+}
+
+.directory-selector.vertically-constrained .recent-projects-list {
+  gap: 2px !important;  /* Tighter spacing between items */
+}
+
+/* When BOTH vertically constrained AND small quadrant, extra compact */
+.directory-selector.vertically-constrained.small-quadrant .recent-project-item {
+  padding: 3px 6px !important;
+  margin-bottom: 1px !important;
+}
+
+.directory-selector.vertically-constrained.small-quadrant .project-name {
+  font-size: 0.75rem !important;
+}
+
+.directory-selector.vertically-constrained.small-quadrant .directory-selector-buttons button {
+  min-height: 26px !important;
+  padding: 3px 6px !important;
+  font-size: 0.7rem !important;
 }
 
 /* ==================== 4-QUADRANT OPTIMIZATIONS ==================== */
