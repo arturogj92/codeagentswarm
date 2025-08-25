@@ -564,12 +564,24 @@ describe('Database', () => {
         });
         
         it('should handle getUserShell', () => {
-            db.db.prepare = jest.fn(() => ({
-                get: jest.fn(() => ({ value: '/bin/zsh' }))
-            }));
+            // Mock getSetting to return a system shell preference
+            db.getSetting = jest.fn(() => ({ type: 'system' }));
             
-            const shell = db.getUserShell();
+            // Save original SHELL env variable
+            const originalShell = process.env.SHELL;
+            
+            // Test with custom SHELL env variable
+            process.env.SHELL = '/bin/zsh';
+            let shell = db.getUserShell();
             expect(shell).toBe('/bin/zsh');
+            
+            // Test fallback when SHELL is not set
+            delete process.env.SHELL;
+            shell = db.getUserShell();
+            expect(shell).toBe('/bin/zsh');
+            
+            // Restore original SHELL env variable
+            process.env.SHELL = originalShell;
         });
         
         it('should handle close', () => {
