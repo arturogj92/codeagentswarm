@@ -18,8 +18,13 @@ describe('Database Extra Tests', () => {
         jest.clearAllMocks();
         
         mockRun = jest.fn().mockReturnValue({ changes: 1, lastInsertRowid: 1 });
+        const mockAll = jest.fn().mockReturnValue([]);
+        const mockGet = jest.fn().mockReturnValue(null);
+        
         mockPrepare = jest.fn().mockReturnValue({
-            run: mockRun
+            run: mockRun,
+            all: mockAll,
+            get: mockGet
         });
         
         mockDb = {
