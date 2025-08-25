@@ -44,14 +44,28 @@ class MCPValidator {
     /**
      * Validates MCP server configuration structure
      * @param {object} config - Parsed configuration object
-     * @returns {{valid: boolean, servers?: object, error?: string}}
+     * @returns {{valid: boolean, servers?: object, error?: string, needsServerName?: boolean}}
      */
     validateMCPStructure(config) {
+        // Check if config has direct server configuration (without mcpServers wrapper)
+        if (config.command && typeof config.command === 'string') {
+            // This is a direct server configuration, needs a server name
+            const validation = this.validateServerConfig('temp-validation', config);
+            if (!validation.valid) {
+                return validation;
+            }
+            return {
+                valid: true,
+                servers: config,
+                needsServerName: true
+            };
+        }
+
         // Check if config has mcpServers key
         if (!config.mcpServers) {
             return {
                 valid: false,
-                error: 'Configuration must have "mcpServers" key'
+                error: 'Configuration must have "mcpServers" key or be a direct server configuration with "command" field'
             };
         }
 
@@ -262,7 +276,7 @@ class MCPValidator {
      * Full validation pipeline for adding a new MCP server
      * @param {string} jsonString - JSON configuration string
      * @param {object} existingServers - Current MCP servers
-     * @returns {{valid: boolean, servers?: object, error?: string}}
+     * @returns {{valid: boolean, servers?: object, error?: string, needsServerName?: boolean}}
      */
     validateNewMCPConfig(jsonString, existingServers = {}) {
         // Step 1: Validate JSON
@@ -277,7 +291,16 @@ class MCPValidator {
             return structureValidation;
         }
 
-        // Step 3: Check for duplicate names
+        // If it's a direct server config, pass through the needsServerName flag
+        if (structureValidation.needsServerName) {
+            return {
+                valid: true,
+                servers: structureValidation.servers,
+                needsServerName: true
+            };
+        }
+
+        // Step 3: Check for duplicate names (only for wrapped format)
         const newServers = structureValidation.servers;
         for (const serverName of Object.keys(newServers)) {
             const nameValidation = this.validateServerName(serverName, existingServers);

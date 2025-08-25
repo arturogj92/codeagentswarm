@@ -6477,6 +6477,17 @@ class TerminalManager {
                             <i data-lucide="chevron-down"></i>
                         </button>
                     </div>
+                    <div class="terminal-quick-actions">
+                        <button class="terminal-quick-btn" data-action="mcp" data-terminal="${terminalId}" title="View configured MCP servers">
+                            <i data-lucide="server"></i>
+                        </button>
+                        <button class="terminal-quick-btn" data-action="clear" data-terminal="${terminalId}" title="Clear context - Recommended between tasks">
+                            <i data-lucide="eraser"></i>
+                        </button>
+                        <button class="terminal-quick-btn" data-action="memory" data-terminal="${terminalId}" title="Add memory context - Use # to store important context">
+                            <i data-lucide="brain"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="terminal-controls">
                     <div class="terminal-reorder-controls" style="${this.fullscreenTerminal !== null ? 'display: none;' : ''}">
@@ -6614,12 +6625,53 @@ class TerminalManager {
                         // Only show color picker if clicking on the header itself (not controls)
                         if (!e.target.closest('.terminal-controls') && 
                             !e.target.closest('.git-branch-display') && 
-                            !e.target.closest('.current-task')) {
+                            !e.target.closest('.current-task') &&
+                            !e.target.closest('.terminal-quick-actions') &&
+                            !e.target.closest('.task-id-badge')) {
                             this.showColorPicker(quadrant, e);
                         }
                     });
                 }
             }
+        });
+
+        // Re-attach quick action button listeners
+        document.querySelectorAll('.terminal-quick-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const terminalId = parseInt(btn.dataset.terminal);
+                
+                if (!this.terminals.has(terminalId)) {
+                    console.log(`Terminal ${terminalId} not initialized`);
+                    return;
+                }
+                
+                const terminal = this.terminals.get(terminalId);
+                if (!terminal || !terminal.terminal) {
+                    console.log(`Terminal ${terminalId} not ready`);
+                    return;
+                }
+                
+                // Write the appropriate command to the terminal
+                switch(action) {
+                    case 'mcp':
+                        // Write /mcp command to terminal
+                        terminal.terminal.paste('/mcp');
+                        terminal.terminal.focus();
+                        break;
+                    case 'clear':
+                        // Write /clear command to terminal
+                        terminal.terminal.paste('/clear');
+                        terminal.terminal.focus();
+                        break;
+                    case 'memory':
+                        // Write # for memory context
+                        terminal.terminal.paste('#');
+                        terminal.terminal.focus();
+                        break;
+                }
+            });
         });
 
         // Re-attach control button listeners

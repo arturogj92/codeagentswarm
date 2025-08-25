@@ -369,6 +369,32 @@
   font-weight: 600;
 }
 
+.mcp-preview-item .form-group {
+  margin-bottom: var(--spacing-md, 12px);
+}
+
+.mcp-preview-item .form-control {
+  width: 100%;
+  padding: 8px 12px;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--input-border, rgba(255, 255, 255, 0.2));
+  border-radius: var(--radius-sm, 4px);
+  color: var(--color-text-primary, #fff);
+  font-size: var(--font-size-base, 14px);
+}
+
+.mcp-preview-item .form-control:focus {
+  outline: none;
+  border-color: var(--primary, #7F5AF0);
+  box-shadow: 0 0 0 2px rgba(127, 90, 240, 0.2);
+}
+
+.mcp-config-preview {
+  margin-top: var(--spacing-sm, 8px);
+  padding-top: var(--spacing-sm, 8px);
+  border-top: 1px solid var(--card-border, rgba(255, 255, 255, 0.1));
+}
+
 /* Empty State */
 .mcp-empty-state {
   text-align: center;

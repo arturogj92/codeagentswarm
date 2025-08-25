@@ -341,6 +341,15 @@ class MCPRenderer {
     hideAddModal() {
         if (this.elements.addModal) {
             this.elements.addModal.classList.remove('active');
+            // Clear any pending server config
+            this.pendingServerConfig = null;
+            // Clear the input
+            if (this.elements.jsonInput) {
+                this.elements.jsonInput.value = '';
+            }
+            // Hide preview and validation
+            this.hidePreview();
+            this.hideValidation();
         }
     }
 
@@ -389,12 +398,19 @@ class MCPRenderer {
         const validation = this.manager.validateConfiguration(jsonString);
         
         if (validation.valid) {
-            this.showValidation('Valid configuration', 'success');
-            this.showPreview(validation.servers);
-            this.elements.saveBtn.disabled = false;
+            if (validation.needsServerName) {
+                this.showValidation('Valid configuration - Enter a server name below', 'success');
+                this.showServerNameInput(validation.servers);
+                // Don't enable save button yet - wait for server name
+            } else {
+                this.showValidation('Valid configuration', 'success');
+                this.showPreview(validation.servers);
+                this.elements.saveBtn.disabled = false;
+            }
         } else {
             this.showValidation(validation.error, 'error');
             this.hidePreview();
+            this.hideServerNameInput();
             this.elements.saveBtn.disabled = true;
         }
     }
@@ -459,17 +475,90 @@ class MCPRenderer {
             return;
         }
 
-        const html = Object.entries(servers).map(([name, config]) => `
-            <div class="mcp-preview-item">
-                <span class="mcp-preview-label">Server:</span> ${this.escapeHtml(name)}<br>
-                <span class="mcp-preview-label">Command:</span> ${this.escapeHtml(config.command)}<br>
-                ${config.args ? `<span class="mcp-preview-label">Args:</span> ${config.args.map(a => this.escapeHtml(a)).join(', ')}<br>` : ''}
-                ${config.env ? `<span class="mcp-preview-label">Env vars:</span> ${Object.keys(config.env).join(', ')}` : ''}
-            </div>
-        `).join('');
+        // Handle both wrapped format and direct server config
+        let html;
+        if (servers.command) {
+            // Direct server config
+            html = `
+                <div class="mcp-preview-item">
+                    <span class="mcp-preview-label">Command:</span> ${this.escapeHtml(servers.command)}<br>
+                    ${servers.args ? `<span class="mcp-preview-label">Args:</span> ${servers.args.map(a => this.escapeHtml(a)).join(', ')}<br>` : ''}
+                    ${servers.env ? `<span class="mcp-preview-label">Env vars:</span> ${Object.keys(servers.env).join(', ')}` : ''}
+                </div>
+            `;
+        } else {
+            // Wrapped format with server names
+            html = Object.entries(servers).map(([name, config]) => `
+                <div class="mcp-preview-item">
+                    <span class="mcp-preview-label">Server:</span> ${this.escapeHtml(name)}<br>
+                    <span class="mcp-preview-label">Command:</span> ${this.escapeHtml(config.command)}<br>
+                    ${config.args ? `<span class="mcp-preview-label">Args:</span> ${config.args.map(a => this.escapeHtml(a)).join(', ')}<br>` : ''}
+                    ${config.env ? `<span class="mcp-preview-label">Env vars:</span> ${Object.keys(config.env).join(', ')}` : ''}
+                </div>
+            `).join('');
+        }
 
         this.elements.previewContent.innerHTML = html;
         this.elements.preview.style.display = 'block';
+    }
+
+    /**
+     * Show server name input for direct server config
+     */
+    showServerNameInput(serverConfig) {
+        if (!this.elements.preview || !this.elements.previewContent) {
+            return;
+        }
+
+        // Store the config for later use
+        this.pendingServerConfig = serverConfig;
+
+        const html = `
+            <div class="mcp-preview-item">
+                <div class="form-group">
+                    <label for="server-name-input">Server Name:</label>
+                    <input type="text" id="server-name-input" class="form-control" placeholder="e.g., supabase-mcp" />
+                </div>
+                <div class="mcp-config-preview">
+                    <span class="mcp-preview-label">Command:</span> ${this.escapeHtml(serverConfig.command)}<br>
+                    ${serverConfig.args ? `<span class="mcp-preview-label">Args:</span> ${serverConfig.args.map(a => this.escapeHtml(a)).join(', ')}<br>` : ''}
+                    ${serverConfig.env ? `<span class="mcp-preview-label">Env vars:</span> ${Object.keys(serverConfig.env).join(', ')}` : ''}
+                </div>
+            </div>
+        `;
+
+        this.elements.previewContent.innerHTML = html;
+        this.elements.preview.style.display = 'block';
+
+        // Add event listener for server name input
+        const serverNameInput = document.getElementById('server-name-input');
+        if (serverNameInput) {
+            serverNameInput.addEventListener('input', (e) => {
+                const serverName = e.target.value.trim();
+                if (serverName) {
+                    // Validate the server name
+                    const validation = this.manager.validator.validateServerName(serverName, this.manager.servers);
+                    if (validation.valid) {
+                        this.elements.saveBtn.disabled = false;
+                        this.showValidation('Valid configuration - Ready to save', 'success');
+                    } else {
+                        this.elements.saveBtn.disabled = true;
+                        this.showValidation(validation.error, 'error');
+                    }
+                } else {
+                    this.elements.saveBtn.disabled = true;
+                    this.showValidation('Please enter a server name', 'info');
+                }
+            });
+        }
+    }
+
+    /**
+     * Hide server name input
+     */
+    hideServerNameInput() {
+        this.pendingServerConfig = null;
+        this.hidePreview();
     }
 
     /**
@@ -485,14 +574,40 @@ class MCPRenderer {
      * Save new servers
      */
     async saveNewServers() {
-        const jsonString = this.elements.jsonInput.value;
-        
         try {
-            const result = await this.manager.addServers(jsonString);
+            let result;
+            
+            // Check if we have a pending server config (direct format)
+            if (this.pendingServerConfig) {
+                const serverNameInput = document.getElementById('server-name-input');
+                if (serverNameInput) {
+                    const serverName = serverNameInput.value.trim();
+                    if (serverName) {
+                        // Create wrapped format with the provided server name
+                        const wrappedConfig = {
+                            mcpServers: {
+                                [serverName]: this.pendingServerConfig
+                            }
+                        };
+                        result = await this.manager.addServers(JSON.stringify(wrappedConfig));
+                    } else {
+                        this.showError('Please enter a server name');
+                        return;
+                    }
+                } else {
+                    this.showError('Server name input not found');
+                    return;
+                }
+            } else {
+                // Use the original JSON string (already wrapped format)
+                const jsonString = this.elements.jsonInput.value;
+                result = await this.manager.addServers(jsonString);
+            }
             
             if (result.success) {
                 this.showSuccess('MCP servers added successfully');
                 this.hideAddModal();
+                this.pendingServerConfig = null; // Clear pending config
             } else {
                 this.showError(result.error);
             }

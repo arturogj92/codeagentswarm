@@ -64,7 +64,7 @@ describe('MCPValidator', () => {
             const result = validator.validateMCPStructure({});
             
             expect(result.valid).toBe(false);
-            expect(result.error).toBe('Configuration must have "mcpServers" key');
+            expect(result.error).toBe('Configuration must have "mcpServers" key or be a direct server configuration with "command" field');
         });
 
         test('should reject mcpServers as array', () => {

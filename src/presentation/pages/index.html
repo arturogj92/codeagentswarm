@@ -531,14 +531,10 @@
                             id="mcp-json-input" 
                             class="mcp-json-textarea" 
                             placeholder='{
-  "mcpServers": {
-    "server-name": {
-      "command": "npx",
-      "args": ["-y", "@package/name"],
-      "env": {
-        "API_KEY": "your-key"
-      }
-    }
+  "command": "npx",
+  "args": ["-y", "@supabase/mcp-server-supabase@latest"],
+  "env": {
+    "SUPABASE_ACCESS_TOKEN": "your-token"
   }
 }'
                             rows="12"></textarea>
