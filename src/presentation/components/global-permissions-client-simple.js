@@ -85,6 +85,8 @@ class GlobalPermissionsFileManager {
             { name: 'Bash(gradle:*)', category: 'command-package', description: 'Gradle build tool' },
             { name: 'Bash(gradlew:*)', category: 'command-package', description: 'Gradle wrapper' },
             { name: 'Bash(./gradlew:*)', category: 'command-package', description: 'Gradle wrapper script' },
+            { name: 'Bash(./mvnw:*)', category: 'command-package', description: 'Maven wrapper script' },
+            { name: 'Bash(mvnw:*)', category: 'command-package', description: 'Maven wrapper' },
             { name: 'Bash(cargo:*)', category: 'command-package', description: 'Rust cargo' },
             { name: 'Bash(go:*)', category: 'command-package', description: 'Go commands' },
             { name: 'Bash(dotnet:*)', category: 'command-package', description: '.NET CLI' },
@@ -153,9 +155,9 @@ class GlobalPermissionsFileManager {
             { name: 'Task', category: 'task', description: 'Launch specialized agents' },
             { name: 'ExitPlanMode', category: 'task', description: 'Exit planning mode' },
             
-            // General Commands - DISABLED to prevent conflicts with patterns
-            // DO NOT USE THESE - They override ALL specific patterns above!
-            // { name: 'Bash', category: 'general', description: '⚠️ ALL Bash commands (overrides patterns)' },
+            // General Commands - USE WITH CAUTION
+            // With the new priority system, specific patterns in DENY or ASK will override these
+            { name: 'Bash:*', category: 'command-dev', description: '⚠️ ALL Bash commands - Use specific DENY/ASK patterns for safety' },
             // { name: 'NPM', category: 'general', description: '⚠️ ALL NPM commands' },
             // { name: 'Git', category: 'general', description: '⚠️ ALL Git commands' },
             // { name: 'Pip', category: 'general', description: '⚠️ ALL Python pip commands' },
@@ -220,26 +222,38 @@ class GlobalPermissionsFileManager {
         this.allTools.forEach(tool => {
             let permissionType = 'ask'; // default
             
-            if (this.yoloMode || allow.has(tool.name) || allow.has(`${tool.name}:*`)) {
-                permissionType = 'allow';
-            } else if (deny.has(tool.name) || deny.has(`${tool.name}:*`)) {
+            // PRIORITY SYSTEM: More specific patterns override general ones
+            // 1. First check exact matches
+            if (deny.has(tool.name)) {
                 permissionType = 'deny';
             } else if (ask.has(tool.name)) {
                 permissionType = 'ask';
+            } else if (allow.has(tool.name)) {
+                permissionType = 'allow';
+            } else {
+                // 2. Check patterns from most specific to least specific
+                // Sort patterns by specificity (length as a proxy for specificity)
+                const allPatterns = [
+                    ...Array.from(deny).map(p => ({pattern: p, type: 'deny'})),
+                    ...Array.from(ask).map(p => ({pattern: p, type: 'ask'})),
+                    ...Array.from(allow).map(p => ({pattern: p, type: 'allow'}))
+                ];
+                
+                // Sort by pattern length (longer = more specific)
+                allPatterns.sort((a, b) => b.pattern.length - a.pattern.length);
+                
+                // Find the first matching pattern
+                for (const {pattern, type} of allPatterns) {
+                    if (this.matchesPattern(tool.name, pattern)) {
+                        permissionType = type;
+                        break;
+                    }
+                }
             }
             
-            // Check for wildcard patterns
-            for (const pattern of allow) {
-                if (this.matchesPattern(tool.name, pattern)) {
-                    permissionType = 'allow';
-                    break;
-                }
-            }
-            for (const pattern of deny) {
-                if (this.matchesPattern(tool.name, pattern)) {
-                    permissionType = 'deny';
-                    break;
-                }
+            // 3. YOLO mode as the most general fallback
+            if (permissionType === 'ask' && this.yoloMode) {
+                permissionType = 'allow';
             }
             
             this.permissions.push({
@@ -266,15 +280,6 @@ class GlobalPermissionsFileManager {
     setupEventListeners() {
         setTimeout(() => {
             console.log('[GlobalPermissions] Setting up event listeners');
-            
-            // YOLO mode toggle
-            const yoloToggle = document.getElementById('yolo-mode-toggle');
-            if (yoloToggle) {
-                console.log('[GlobalPermissions] Found YOLO toggle');
-                yoloToggle.addEventListener('change', (e) => {
-                    this.handleYoloModeToggle(e.target.checked);
-                });
-            }
             
             // Search input
             const searchInput = document.getElementById('permissions-search');
@@ -314,6 +319,22 @@ class GlobalPermissionsFileManager {
                 }
             });
             
+            // Security preset buttons
+            const presetAllowAll = document.getElementById('preset-allow-all');
+            if (presetAllowAll) {
+                presetAllowAll.addEventListener('click', () => this.applySecurityPreset('allow-all'));
+            }
+            
+            const presetDisableGit = document.getElementById('preset-disable-git-dangerous');
+            if (presetDisableGit) {
+                presetDisableGit.addEventListener('click', () => this.applySecurityPreset('disable-git-dangerous'));
+            }
+            
+            const presetDisableDelete = document.getElementById('preset-disable-delete');
+            if (presetDisableDelete) {
+                presetDisableDelete.addEventListener('click', () => this.applySecurityPreset('disable-delete'));
+            }
+            
             // Custom command button
             const addCustomBtn = document.getElementById('add-custom-command');
             if (addCustomBtn) {
@@ -341,22 +362,6 @@ class GlobalPermissionsFileManager {
                 console.log('[GlobalPermissions] ERROR: Apply button not found!');
             }
         }, 100);
-    }
-    
-    handleYoloModeToggle(enabled) {
-        this.yoloMode = enabled;
-        if (enabled) {
-            // Add wildcard to allow all
-            this.permissions.forEach(p => {
-                p.permission_type = 'allow';
-                this.changes.add(p.tool_name);
-            });
-        }
-        // Auto-save YOLO mode change (silent mode to avoid re-render)
-        this.applyChanges(true);
-        this.showNotification(enabled ? 'YOLO Mode Enabled - All permissions granted!' : 'YOLO Mode Disabled');
-        // Use renderWithExpandedGroups to preserve scroll position and expanded state
-        this.renderWithExpandedGroups();
     }
     
     async updatePermission(toolName, permissionType) {
@@ -417,6 +422,10 @@ class GlobalPermissionsFileManager {
         // Add YOLO mode wildcard if enabled
         if (this.yoloMode) {
             newPermissions.allow.push('*');
+            // Also ensure Bash(*:*) is in allow list when YOLO is on
+            if (!newPermissions.allow.includes('Bash(*:*)')) {
+                newPermissions.allow.push('Bash(*:*)');
+            }
         } else {
             // Group permissions by type (only non-MCP tools)
             // Filter out general commands that conflict with patterns
@@ -439,11 +448,21 @@ class GlobalPermissionsFileManager {
             });
         }
         
+        // Log what we're about to save
+        console.log('[GlobalPermissions] New permissions being built:');
+        console.log('  - Non-MCP Allow:', newPermissions.allow);
+        console.log('  - Non-MCP Deny:', newPermissions.deny);
+        console.log('  - Non-MCP Ask:', newPermissions.ask);
+        
         // Merge with existing MCP permissions
         newPermissions.allow = [...newPermissions.allow, ...existingMcpAllow];
         newPermissions.deny = [...newPermissions.deny, ...existingMcpDeny];
         newPermissions.ask = [...newPermissions.ask, ...existingMcpAsk];
         
+        console.log('[GlobalPermissions] Final merged permissions:');
+        console.log('  - Total Allow count:', newPermissions.allow.length);
+        console.log('  - Total Deny count:', newPermissions.deny.length);
+        console.log('  - Total Ask count:', newPermissions.ask.length);
         console.log('[GlobalPermissions] New permissions object:', JSON.stringify(newPermissions, null, 2));
         
         // Update settings
@@ -542,67 +561,37 @@ class GlobalPermissionsFileManager {
                     </div>
                 </div>
                 
-                <div class="yolo-mode-section" style="margin-top: 15px; padding: 16px; background: ${this.yoloMode ? 'linear-gradient(135deg, rgba(255, 195, 0, 0.15) 0%, rgba(255, 100, 0, 0.15) 100%)' : 'linear-gradient(135deg, rgba(40, 40, 40, 0.5) 0%, rgba(30, 30, 30, 0.5) 100%)'}; border: 2px solid ${this.yoloMode ? 'rgba(255, 195, 0, 0.5)' : 'rgba(80, 80, 80, 0.3)'}; border-radius: 12px; box-shadow: ${this.yoloMode ? '0 0 20px rgba(255, 195, 0, 0.2)' : 'none'}; transition: all 0.3s ease;">
-                    <div class="yolo-mode-toggle" style="display: flex; align-items: center; justify-content: space-between;">
-                        <div style="display: flex; align-items: center; gap: 15px;">
-                            <div style="font-size: 32px; line-height: 1; filter: ${this.yoloMode ? 'none' : 'grayscale(1) opacity(0.5)'}; transition: all 0.3s;">
-                                🚀
-                            </div>
-                            <div class="yolo-mode-label">
-                                <div style="display: flex; align-items: center; gap: 8px;">
-                                    <span class="yolo-text" style="font-weight: bold; font-size: 16px; color: ${this.yoloMode ? '#ffc300' : '#666'}; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s;">
-                                        YOLO MODE
-                                    </span>
-                                    ${this.yoloMode ? '<span style="background: #ffc300; color: #000; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; animation: pulse 2s infinite;">ACTIVE</span>' : '<span style="font-size: 11px; color: #666; font-weight: normal; text-transform: none; letter-spacing: 0;">("You Only Live Once")</span>'}
-                                </div>
-                                <span class="yolo-description" style="display: block; font-size: 12px; color: ${this.yoloMode ? '#ffa500' : '#888'}; margin-top: 4px; transition: all 0.3s;">
-                                    ${this.yoloMode ? '⚡ All tools are now in ALLOW mode - Claude executes everything instantly!' : '🔒 Activating this will automatically set ALL tools to ALLOW'}
-                                </span>
-                                <span style="display: block; font-size: 11px; color: ${this.yoloMode ? '#ff9966' : '#666'}; margin-top: 3px; font-style: italic;">
-                                    ${this.yoloMode ? 'All permissions are granted! (Except items you put in DENY or ASK)' : 'Perfect for trusted environments - moves everything to Allow list automatically'}
-                                </span>
-                            </div>
-                        </div>
-                        <label class="toggle-switch-large" style="transform: scale(1.2);">
-                            <input type="checkbox" id="yolo-mode-toggle" ${this.yoloMode ? 'checked' : ''}>
-                            <span class="slider" style="background: ${this.yoloMode ? 'linear-gradient(90deg, #ffc300, #ff8c00)' : '#444'}; box-shadow: ${this.yoloMode ? '0 0 10px rgba(255, 195, 0, 0.5)' : 'none'};"></span>
-                        </label>
+                <div class="security-presets-section" style="margin: 20px 12px; padding: 16px; background: linear-gradient(135deg, rgba(76, 175, 80, 0.05) 0%, rgba(33, 150, 243, 0.05) 100%); border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 10px;">
+                    <div style="font-size: 12px; color: #4caf50; font-weight: 600; margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px;">
+                        <i data-lucide="shield" style="width: 14px; height: 14px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                        Quick Security Presets
                     </div>
-                    ${this.yoloMode ? `
-                        <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 195, 0, 0.2);">
-                            <div style="display: flex; align-items: center; gap: 8px; color: #ffa500; font-size: 11px;">
-                                <i data-lucide="alert-triangle" style="width: 14px; height: 14px;"></i>
-                                <span><strong>Warning:</strong> Claude can execute any command without asking for permission</span>
-                            </div>
-                            
-                            <div style="margin-top: 12px; padding: 10px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 140, 0, 0.2); border-radius: 6px;">
-                                <div style="font-size: 11px; color: #ff8c00; font-weight: 600; margin-bottom: 6px; display: flex; align-items: center; gap: 6px;">
-                                    <span>🛡️</span>
-                                    RECOMMENDED SAFETY BLOCKS (Even with YOLO)
-                                </div>
-                                <div style="font-size: 10px; color: #ffa500; line-height: 1.5;">
-                                    <div style="margin-bottom: 6px;">
-                                        <strong style="color: #ff6b6b;">Put these in DENY to prevent disasters:</strong>
-                                        <div style="margin-left: 10px; margin-top: 4px;">
-                                            • <code style="background: rgba(255, 0, 0, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(rm -rf:*)</code> - Prevents accidental deletions<br/>
-                                            • <code style="background: rgba(255, 0, 0, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(git push --force:*)</code> - Protects git history<br/>
-                                            • <code style="background: rgba(255, 0, 0, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(sudo rm:*)</code> - Blocks system file deletion<br/>
-                                            • <code style="background: rgba(255, 0, 0, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(> /dev/sd:*)</code> - Prevents disk overwrites
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <strong style="color: #ffc107;">Consider putting in ASK for review:</strong>
-                                        <div style="margin-left: 10px; margin-top: 4px;">
-                                            • <code style="background: rgba(255, 193, 7, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(git push:*)</code> - Review before pushing<br/>
-                                            • <code style="background: rgba(255, 193, 7, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(git rebase:*)</code> - Complex history changes<br/>
-                                            • <code style="background: rgba(255, 193, 7, 0.15); padding: 1px 4px; border-radius: 2px;">Bash(npm publish:*)</code> - Package publishing<br/>
-                                            • <code style="background: rgba(255, 193, 7, 0.15); padding: 1px 4px; border-radius: 2px;">DeleteFile</code> - File deletion confirmation
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ` : ''}
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button id="preset-allow-all" 
+                                style="padding: 8px 14px; background: linear-gradient(135deg, #4caf50, #45a049); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;">
+                            <i data-lucide="check-circle" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                            1. Allow All Tools
+                        </button>
+                        <button id="preset-disable-git-dangerous" 
+                                style="padding: 8px 14px; background: linear-gradient(135deg, #ff9800, #f57c00); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;">
+                            <i data-lucide="git-branch" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                            2. Block Dangerous Git (merge, branch, push)
+                        </button>
+                        <button id="preset-disable-delete" 
+                                style="padding: 8px 14px; background: linear-gradient(135deg, #f44336, #d32f2f); color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s;">
+                            <i data-lucide="trash-2" style="width: 12px; height: 12px; display: inline-block; vertical-align: middle; margin-right: 4px;"></i>
+                            3. Block Delete Commands (rm, del, etc)
+                        </button>
+                    </div>
+                    <div style="margin-top: 10px; font-size: 10px; color: #888; line-height: 1.4;">
+                        <strong>Tip:</strong> Use these presets to quickly configure common security policies. You can still fine-tune individual permissions below.
+                    </div>
+                    <div style="margin-top: 8px; padding: 8px; background: rgba(255, 140, 0, 0.1); border: 1px solid rgba(255, 140, 0, 0.2); border-radius: 4px;">
+                        <span style="font-size: 10px; color: #ff8c00; display: flex; align-items: flex-start; gap: 6px;">
+                            <span style="flex-shrink: 0;">⚠️</span>
+                            <span><strong>Note:</strong> We've attempted to add most common tools to the allowed list, but Claude may still ask for confirmation on some commands due to a known bug with wildcard patterns. If this happens, you can manually add specific commands in the input field below to grant them permission.</span>
+                        </span>
+                    </div>
                 </div>
                 
                 <style>
@@ -1246,6 +1235,167 @@ class GlobalPermissionsFileManager {
                 setTimeout(restoreScroll, 50);
                 setTimeout(restoreScroll, 100);
             });
+        }
+    }
+    
+    async applySecurityPreset(preset) {
+        console.log('[GlobalPermissions] Applying security preset:', preset);
+        console.log('[GlobalPermissions] Current YOLO mode status:', this.yoloMode);
+        console.log('[GlobalPermissions] Current permissions count:', this.permissions.length);
+        
+        // Remove YOLO mode wildcard if applying specific denies
+        if (preset !== 'allow-all' && this.yoloMode) {
+            console.log('[GlobalPermissions] Removing YOLO mode wildcard to apply denies');
+            this.yoloMode = false;
+            // Remove the wildcard permission from permissions list
+            const wildcardIndex = this.permissions.findIndex(p => p.tool_name === '*');
+            if (wildcardIndex !== -1) {
+                console.log('[GlobalPermissions] Found and removing wildcard at index:', wildcardIndex);
+                this.permissions.splice(wildcardIndex, 1);
+            }
+        }
+        
+        switch (preset) {
+            case 'allow-all':
+                // 1. Allow all tools
+                this.permissions.forEach(p => {
+                    p.permission_type = 'allow';
+                    this.changes.add(p.tool_name);
+                });
+                
+                // Add Bash(*:*) for complete bash access
+                const bashWildcard = 'Bash(*:*)';
+                if (!this.allTools.some(t => t.name === bashWildcard)) {
+                    this.allTools.push({
+                        name: bashWildcard,
+                        category: 'command-dev',
+                        description: 'ALL Bash commands allowed'
+                    });
+                }
+                if (!this.permissions.some(p => p.tool_name === bashWildcard)) {
+                    this.permissions.push({
+                        tool_name: bashWildcard,
+                        permission_type: 'allow',
+                        description: 'ALL Bash commands allowed',
+                        category: 'command-dev'
+                    });
+                    this.changes.add(bashWildcard);
+                }
+                
+                this.yoloMode = true;
+                break;
+                
+            case 'disable-git-dangerous':
+                // 2. Block dangerous git commands (merge, branch, push)
+                console.log('[GlobalPermissions] Blocking dangerous git commands');
+                const dangerousGitCommands = [
+                    { name: 'Bash(git merge:*)', desc: 'Git merge operations' },
+                    { name: 'Bash(git branch:*)', desc: 'Git branch operations' },
+                    { name: 'Bash(git push:*)', desc: 'Git push to remote' },
+                    { name: 'Bash(git push --force:*)', desc: 'Git force push' },
+                    { name: 'Bash(git rebase:*)', desc: 'Git rebase operations' }
+                ];
+                
+                // First add these commands to tools if not present
+                dangerousGitCommands.forEach(cmd => {
+                    if (!this.allTools.some(t => t.name === cmd.name)) {
+                        console.log(`[GlobalPermissions] Adding tool: ${cmd.name}`);
+                        this.allTools.push({
+                            name: cmd.name,
+                            category: 'command-git',
+                            description: cmd.desc
+                        });
+                    }
+                    if (!this.permissions.some(p => p.tool_name === cmd.name)) {
+                        console.log(`[GlobalPermissions] Creating new deny permission for: ${cmd.name}`);
+                        this.permissions.push({
+                            tool_name: cmd.name,
+                            permission_type: 'deny',
+                            description: cmd.desc,
+                            category: 'command-git'
+                        });
+                    } else {
+                        // Update existing permission
+                        const perm = this.permissions.find(p => p.tool_name === cmd.name);
+                        if (perm) {
+                            console.log(`[GlobalPermissions] Updating existing permission to deny: ${cmd.name}`);
+                            perm.permission_type = 'deny';
+                        }
+                    }
+                    this.changes.add(cmd.name);
+                });
+                console.log('[GlobalPermissions] Added to changes:', Array.from(this.changes));
+                break;
+                
+            case 'disable-delete':
+                // 3. Block all delete commands
+                const deleteCommands = [
+                    { name: 'Bash(rm:*)', desc: 'Remove files' },
+                    { name: 'Bash(rm -rf:*)', desc: 'Force remove files' },
+                    { name: 'Bash(sudo rm:*)', desc: 'Remove with sudo' },
+                    { name: 'DeleteFile', desc: 'Delete files' },
+                    { name: 'Bash(del:*)', desc: 'Delete command' },
+                    { name: 'Bash(rmdir:*)', desc: 'Remove directories' }
+                ];
+                
+                // First add these commands to tools if not present
+                deleteCommands.forEach(cmd => {
+                    if (!this.allTools.some(t => t.name === cmd.name)) {
+                        this.allTools.push({
+                            name: cmd.name,
+                            category: cmd.name.startsWith('Bash') ? 'command-file' : 'file',
+                            description: cmd.desc
+                        });
+                    }
+                    if (!this.permissions.some(p => p.tool_name === cmd.name)) {
+                        this.permissions.push({
+                            tool_name: cmd.name,
+                            permission_type: 'deny',
+                            description: cmd.desc,
+                            category: cmd.name.startsWith('Bash') ? 'command-file' : 'file'
+                        });
+                    } else {
+                        // Update existing permission
+                        const perm = this.permissions.find(p => p.tool_name === cmd.name);
+                        if (perm) {
+                            perm.permission_type = 'deny';
+                        }
+                    }
+                    this.changes.add(cmd.name);
+                });
+                
+                // Also check for any permission that contains 'rm' or 'delete' in the name
+                this.permissions.forEach(p => {
+                    if (p.tool_name.toLowerCase().includes('delete') || 
+                        p.tool_name.toLowerCase().includes('rm ') ||
+                        p.tool_name.toLowerCase().includes('rm:')) {
+                        p.permission_type = 'deny';
+                        this.changes.add(p.tool_name);
+                    }
+                });
+                break;
+        }
+        
+        // Log final state before saving
+        console.log('[GlobalPermissions] After preset, permissions count:', this.permissions.length);
+        console.log('[GlobalPermissions] Changes to save:', Array.from(this.changes));
+        console.log('[GlobalPermissions] Sample of deny permissions:', 
+            this.permissions.filter(p => p.permission_type === 'deny').slice(0, 3));
+        
+        // Apply changes immediately
+        await this.applyChanges(false); // false = show notification
+        
+        // Custom notification messages
+        switch (preset) {
+            case 'allow-all':
+                this.showNotification('✅ All tools allowed - Maximum speed mode activated', 'success');
+                break;
+            case 'disable-git-dangerous':
+                this.showNotification('⚠️ Dangerous git commands blocked (merge, branch, push)', 'warning');
+                break;
+            case 'disable-delete':
+                this.showNotification('🛡️ Delete commands blocked for safety', 'error');
+                break;
         }
     }
     

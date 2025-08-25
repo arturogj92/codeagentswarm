@@ -58,7 +58,7 @@
         "command": "npx",
         "args": [
           "-y",
-          "@supabase-community/supabase-mcp@latest"
+          "@supabase/mcp-server-supabase@latest"
         ]
       },
       "features": [
@@ -73,28 +73,30 @@
     {
       "id": "playwright",
       "name": "Playwright",
-      "description": "Automate web browser interactions, take screenshots, and perform E2E testing",
+      "description": "Official Microsoft Playwright MCP for browser automation - fast, lightweight, and LLM-friendly",
       "category": "Automation",
       "icon": "./assets/mcp-icons/playwright.png",
-      "popularity": 4,
+      "popularity": 5,
       "requiresAuth": false,
       "config": {
         "type": "stdio",
         "command": "npx",
         "args": [
           "-y",
-          "@executeautomation/mcp-playwright@latest"
+          "@playwright/mcp@latest"
         ]
       },
       "features": [
         "Browser automation",
+        "Accessibility tree navigation",
         "Screenshot capture",
         "Web scraping",
-        "E2E testing",
-        "Multi-browser support"
+        "Multi-browser support (Chrome, Firefox, Safari)",
+        "Headless and headed modes",
+        "No vision models required"
       ],
-      "setupGuide": "https://github.com/executeautomation/mcp-playwright",
-      "documentation": "https://executeautomation.github.io/mcp-playwright/"
+      "setupGuide": "https://github.com/microsoft/playwright-mcp",
+      "documentation": "https://github.com/microsoft/playwright-mcp"
     },
     {
       "id": "puppeteer",
@@ -299,7 +301,7 @@
       "description": "Web search using Brave Search API for real-time information",
       "category": "Search",
       "icon": "./assets/mcp-icons/brave-search.png",
-      "popularity": 3,
+      "popularity": 5,
       "requiresAuth": true,
       "authFields": [
         {

@@ -141,8 +141,20 @@ class TerminalManager {
             console.log('Claude finished via webhook:', data);
             const { terminalId } = data;
             if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
-                this.highlightTerminal(terminalId);
+                // Don't show notification badge for completion, just scroll
+                // The system notification is already shown by webhook-server.js
                 this.scrollTerminalToBottom(terminalId);
+                
+                // In grid mode, add a subtle highlight that auto-removes
+                if (this.layoutMode === 'grid') {
+                    const terminalElement = document.querySelector(`[data-quadrant="${terminalId}"]`);
+                    if (terminalElement) {
+                        terminalElement.classList.add('completion-highlight');
+                        setTimeout(() => {
+                            terminalElement.classList.remove('completion-highlight');
+                        }, 2000);
+                    }
+                }
             }
         });
         
@@ -1264,6 +1276,18 @@ class TerminalManager {
                     <button class="btn" id="new-session-btn">
                         ✨ New
                     </button>
+                    <button class="btn btn-danger" id="skip-safety-btn" title="Hold for 3 seconds - Run in dangerous mode">
+                        <span class="btn-main-text">⚡ Dangerous Mode</span>
+                        <span class="btn-sub-text">(skip all confirmations)</span>
+                    </button>
+                </div>
+                <div class="session-danger-warning" id="danger-warning" style="display: none;">
+                    <span class="danger-icon">⚠️</span>
+                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+                </div>
+                <div class="session-danger-progress" id="danger-progress" style="display: none;">
+                    <div class="progress-bar"></div>
+                    <span class="progress-text">Keep holding... <span class="progress-countdown">3</span>s</span>
                 </div>
                 <div class="session-back-button">
                     <button class="btn btn-small" id="back-btn">← Back</button>
@@ -1290,6 +1314,91 @@ class TerminalManager {
             wrapper.removeChild(selectorDiv);
             this.startTerminal(quadrant, selectedDirectory, 'new');
         });
+
+        // Handle skip safety session (dangerous mode) - requires holding for 3 seconds
+        const skipBtn = selectorDiv.querySelector('#skip-safety-btn');
+        const warningDiv = selectorDiv.querySelector('#danger-warning');
+        const progressDiv = selectorDiv.querySelector('#danger-progress');
+        const progressBar = progressDiv?.querySelector('.progress-bar');
+        const progressCountdown = progressDiv?.querySelector('.progress-countdown');
+        
+        let holdTimer = null;
+        let holdStartTime = null;
+        let progressInterval = null;
+        const HOLD_DURATION = 3000; // 3 seconds
+        
+        const startHold = () => {
+            // Show warning and progress
+            warningDiv.style.display = 'block';
+            progressDiv.style.display = 'block';
+            skipBtn.classList.add('btn-danger-active');
+            
+            holdStartTime = Date.now();
+            
+            // Update progress bar
+            progressInterval = setInterval(() => {
+                const elapsed = Date.now() - holdStartTime;
+                const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+                const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+                
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+                if (progressCountdown) {
+                    progressCountdown.textContent = remaining;
+                }
+                
+                if (elapsed >= HOLD_DURATION) {
+                    clearInterval(progressInterval);
+                }
+            }, 50);
+            
+            // Set timer for 3 seconds
+            holdTimer = setTimeout(() => {
+                // Success! Launch dangerous mode
+                wrapper.removeChild(selectorDiv);
+                this.startTerminal(quadrant, selectedDirectory, 'dangerous');
+            }, HOLD_DURATION);
+        };
+        
+        const cancelHold = () => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            // Reset UI
+            warningDiv.style.display = 'none';
+            progressDiv.style.display = 'none';
+            skipBtn.classList.remove('btn-danger-active');
+            
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
+            if (progressCountdown) {
+                progressCountdown.textContent = '3';
+            }
+        };
+        
+        // Mouse events
+        skipBtn.addEventListener('mousedown', startHold);
+        skipBtn.addEventListener('mouseup', cancelHold);
+        skipBtn.addEventListener('mouseleave', cancelHold);
+        
+        // Touch events for mobile
+        skipBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startHold();
+        });
+        skipBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            cancelHold();
+        });
+        skipBtn.addEventListener('touchcancel', cancelHold);
 
         // Handle back button
         selectorDiv.querySelector('#back-btn').addEventListener('click', () => {

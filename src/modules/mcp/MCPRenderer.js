@@ -99,6 +99,20 @@ class MCPRenderer {
         if (this.elements.closeEditBtn) {
             this.elements.closeEditBtn.addEventListener('click', () => this.hideEditModal());
         }
+
+        // Add Escape key listener for modals
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                // Close add modal if it's active
+                if (this.elements.addModal && this.elements.addModal.classList.contains('active')) {
+                    this.hideAddModal();
+                }
+                // Close edit modal if it's active
+                if (this.elements.editModal && this.elements.editModal.classList.contains('active')) {
+                    this.hideEditModal();
+                }
+            }
+        });
     }
 
     /**

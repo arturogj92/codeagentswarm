@@ -72,8 +72,12 @@ class AuthService {
     async saveAuthData(data) {
         try {
             const store = await this.ensureStore();
+            console.log('Saving auth data, store available:', !!store);
+            console.log('User data to save:', data.user);
+            
             if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
                 // Use native encryption if available (macOS Keychain)
+                console.log('Using native encryption (safeStorage)');
                 const encryptedToken = safeStorage.encryptString(data.token);
                 const encryptedRefresh = safeStorage.encryptString(data.refreshToken);
                 
@@ -85,6 +89,7 @@ class AuthService {
                 });
             } else {
                 // Fallback to store encryption or localStorage
+                console.log('Using fallback storage (electron-store or memory)');
                 if (store && store.set) {
                     store.set('auth', {
                         user: data.user,
@@ -92,8 +97,10 @@ class AuthService {
                         refreshToken: data.refreshToken,
                         savedAt: Date.now()
                     });
+                    console.log('Data saved to electron-store');
                 } else {
                     // Ultimate fallback to localStorage
+                    console.log('Using localStorage fallback (this wont persist in main process)');
                     localStorage.setItem('auth', JSON.stringify({
                         user: data.user,
                         token: data.token,
@@ -107,6 +114,7 @@ class AuthService {
             this.token = data.token;
             this.refreshToken = data.refreshToken;
             
+            console.log('Auth data saved successfully');
             return true;
         } catch (error) {
             console.error('Error saving auth data:', error);
@@ -120,17 +128,23 @@ class AuthService {
     async loadAuthData() {
         try {
             const store = await this.ensureStore();
+            console.log('Loading auth data, store available:', !!store);
             let saved;
             
             if (store && store.get) {
                 saved = store.get('auth');
+                console.log('Loaded from electron-store:', !!saved);
             } else {
                 // Fallback to localStorage
                 const savedStr = localStorage.getItem('auth');
                 saved = savedStr ? JSON.parse(savedStr) : null;
+                console.log('Loaded from localStorage:', !!saved);
             }
             
-            if (!saved) return null;
+            if (!saved) {
+                console.log('No saved auth data found');
+                return null;
+            }
             
             // Check if data is too old (30 days)
             const age = Date.now() - (saved.savedAt || 0);
@@ -188,21 +202,29 @@ class AuthService {
         if (!this.token) return false;
         
         try {
-            const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-            const response = await fetch(`${backendUrl}/api/auth/validate`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${this.token}`,
-                    'Content-Type': 'application/json'
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                return data.valid;
+            // For Supabase JWTs, we can do basic validation locally
+            // Check if token is expired by decoding the JWT
+            const tokenParts = this.token.split('.');
+            if (tokenParts.length !== 3) {
+                return false;
             }
             
-            return false;
+            try {
+                const payload = JSON.parse(Buffer.from(tokenParts[1], 'base64').toString());
+                const now = Math.floor(Date.now() / 1000);
+                
+                // Check if token is expired
+                if (payload.exp && payload.exp < now) {
+                    console.log('Token is expired');
+                    return false;
+                }
+                
+                // Token appears valid
+                return true;
+            } catch (e) {
+                console.error('Error parsing token:', e);
+                return false;
+            }
         } catch (error) {
             console.error('Token validation error:', error);
             return false;
@@ -216,33 +238,15 @@ class AuthService {
         if (!this.refreshToken) return false;
         
         try {
-            const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-            const response = await fetch(`${backendUrl}/api/auth/refresh`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    refreshToken: this.refreshToken
-                })
-            });
+            // For Supabase auth, token refresh would typically be handled by the Supabase client
+            // Since we're not using the Supabase client directly here, we'll skip refresh
+            // The app should re-authenticate when the token expires
             
-            if (response.ok) {
-                const data = await response.json();
-                
-                // Update stored tokens
-                this.token = data.accessToken;
-                await this.saveAuthData({
-                    user: data.user || this.user,
-                    token: data.accessToken,
-                    refreshToken: this.refreshToken
-                });
-                
-                return true;
-            }
+            console.log('Token refresh not implemented for Supabase auth');
+            console.log('User will need to re-authenticate when token expires');
             
-            // If refresh fails, clear auth
-            this.clearAuthData();
+            // Clear auth data to force re-authentication
+            await this.clearAuthData();
             return false;
         } catch (error) {
             console.error('Token refresh error:', error);
@@ -255,21 +259,18 @@ class AuthService {
      */
     async logout() {
         try {
-            if (this.token) {
-                const backendUrl = process.env.BACKEND_URL || 'http://localhost:3001';
-                await fetch(`${backendUrl}/api/auth/logout`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${this.token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-            }
+            // For Supabase auth, we don't need to call a logout endpoint
+            // Just clear the local session data
+            // The token will be invalidated on the Supabase side when it expires
+            // If you need to revoke the token immediately, you would need to use Supabase client SDK
+            
+            // Log for debugging
+            console.log('Logging out user, clearing local auth data');
         } catch (error) {
             console.error('Logout error:', error);
         } finally {
             // Always clear local auth data
-            this.clearAuthData();
+            await this.clearAuthData();
         }
     }
 

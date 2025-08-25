@@ -179,7 +179,12 @@ async function handleAuthCallback(url) {
 }
 
 // IPC handlers for auth
-ipcMain.handle('get-auth-data', () => {
+ipcMain.handle('get-auth-data', async () => {
+  // First try to load from storage if not already loaded
+  if (!authService.getUser()) {
+    await authService.initialize();
+  }
+  
   // Return auth data from the service
   const user = authService.getUser();
   const token = authService.getToken();
@@ -1460,7 +1465,14 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
       console.log(`Checking if terminal ${quadrant} exists for auto-execute...`);
       if (terminals.has(quadrant)) {
         // Execute command based on session type
-        const command = sessionType === 'new' ? 'claude' : 'claude --resume';
+        let command;
+        if (sessionType === 'dangerous') {
+          command = 'claude --dangerously-skip-permissions';
+        } else if (sessionType === 'new') {
+          command = 'claude';
+        } else {
+          command = 'claude --resume';
+        }
         console.log(`Auto-executing command: ${command}`);
         shell.executeCommand(command, true);
         
@@ -2479,20 +2491,18 @@ function updateClaudeConfigFile() {
 
 // Helper function to get the correct Claude config path
 function getClaudeConfigPath() {
-  // Claude Code uses ~/.claude.json (NOT ~/.config/claude/claude_cli_config.json)
+  // Claude Code CLI uses ~/.claude.json as the primary config
   const claudeJsonPath = path.join(os.homedir(), '.claude.json');
-  
-  // Check if Claude Code config exists
   if (fs.existsSync(claudeJsonPath)) {
     console.log('[MCP] Using Claude Code config path:', claudeJsonPath);
     return claudeJsonPath;
   }
   
-  // Fallback to the old path if needed
-  const claudeCodePath = path.join(os.homedir(), '.config', 'claude', 'claude_cli_config.json');
-  if (fs.existsSync(claudeCodePath)) {
-    console.log('[MCP] Using old Claude Code config path:', claudeCodePath);
-    return claudeCodePath;
+  // Check secondary config at ~/.config/claude/claude_cli_config.json
+  const claudeCliPath = path.join(os.homedir(), '.config', 'claude', 'claude_cli_config.json');
+  if (fs.existsSync(claudeCliPath)) {
+    console.log('[MCP] Using Claude CLI secondary config path:', claudeCliPath);
+    return claudeCliPath;
   }
   
   // Fallback paths for other Claude apps
@@ -2505,12 +2515,14 @@ function getClaudeConfigPath() {
     return libraryPath;
   }
   
-  // Final fallback
-  console.log('[MCP] Using fallback config path:', dotClaudePath);
-  return dotClaudePath;
+  // Final fallback - create the CLI config path if nothing exists
+  console.log('[MCP] Creating new Claude CLI config at:', claudeCliPath);
+  return claudeCliPath;
 }
 
 // Load MCP configuration
+// OLD HANDLER - DEPRECATED - Use ipcMain.handle version instead
+/*
 ipcMain.on('mcp:load-config', (event) => {
   try {
     const configPath = getClaudeConfigPath();
@@ -2549,8 +2561,50 @@ ipcMain.on('mcp:load-config', (event) => {
     event.reply('mcp:load-config-response', { error: error.message });
   }
 });
+*/
 
-// Add MCP servers
+// Add new ipcMain.handle for mcp:load-config
+ipcMain.handle('mcp:load-config', async (event) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    let config = {};
+    
+    if (fs.existsSync(configPath)) {
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(configContent);
+      console.log('[MCP Debug] Loaded config with servers:', Object.keys(config.mcpServers || {}));
+    }
+    
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Load disabled servers from backup to show them as disabled in UI
+    const backupPath = path.join(path.dirname(configPath), '.mcp_disabled_servers.json');
+    if (fs.existsSync(backupPath)) {
+      try {
+        const disabledServers = JSON.parse(fs.readFileSync(backupPath, 'utf8'));
+        console.log('[MCP Debug] Found disabled servers:', Object.keys(disabledServers));
+        
+        // Add disabled servers with a special marker so UI knows they're disabled
+        // We'll add them with _disabled_ prefix for UI compatibility
+        for (const [name, serverConfig] of Object.entries(disabledServers)) {
+          config.mcpServers[`_disabled_${name}`] = serverConfig;
+        }
+      } catch (e) {
+        console.log('[MCP Debug] Could not read disabled servers backup:', e.message);
+      }
+    }
+    
+    return config;
+  } catch (error) {
+    console.error('Error loading MCP config:', error);
+    return { mcpServers: {} };
+  }
+});
+
+// Add MCP servers - OLD HANDLER - DEPRECATED
+/*
 ipcMain.on('mcp:add-servers', (event, servers) => {
   try {
     const configPath = getClaudeConfigPath();
@@ -2585,8 +2639,10 @@ ipcMain.on('mcp:add-servers', (event, servers) => {
     });
   }
 });
+*/
 
-// Update MCP server
+// Update MCP server - OLD HANDLER - DEPRECATED
+/*
 ipcMain.on('mcp:update-server', (event, { name, config: serverConfig }) => {
   try {
     const configPath = getClaudeConfigPath();
@@ -2621,8 +2677,10 @@ ipcMain.on('mcp:update-server', (event, { name, config: serverConfig }) => {
     });
   }
 });
+*/
 
-// Remove MCP server
+// Remove MCP server - OLD HANDLER - DEPRECATED
+/*
 ipcMain.on('mcp:remove-server', (event, name) => {
   try {
     const configPath = getClaudeConfigPath();
@@ -2697,9 +2755,10 @@ ipcMain.on('mcp:remove-server', (event, name) => {
     });
   }
 });
+*/
 
 // Toggle MCP server enabled state
-ipcMain.on('mcp:toggle-server', (event, { name, enabled }) => {
+ipcMain.handle('mcp:toggle-server', async (event, { name, enabled }) => {
   try {
     const configPath = getClaudeConfigPath();
     
@@ -2804,13 +2863,13 @@ ipcMain.on('mcp:toggle-server', (event, { name, enabled }) => {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
     console.log('[MCP Debug] Config file updated successfully');
     
-    event.reply('mcp:toggle-server-response', { success: true });
+    return { success: true };
   } catch (error) {
     console.error('[MCP Debug] Error toggling MCP server:', error);
-    event.reply('mcp:toggle-server-response', { 
+    return { 
       success: false, 
       error: error.message 
-    });
+    };
   }
 });
 
@@ -2848,6 +2907,200 @@ ipcMain.on('mcp:update-claude-instructions', async (event, { serverId }) => {
 });
 
 // ================== End MCP Settings IPC Handlers ==================
+
+// ================== Promise-based MCP IPC Handlers (for ipcCall) ==================
+
+// Add servers handler (promise-based for marketplace)
+ipcMain.handle('mcp:add-servers', async (event, servers) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    let config = {};
+    
+    // Create backup
+    if (fs.existsSync(configPath)) {
+      const backupPath = configPath + '.backup';
+      fs.copyFileSync(configPath, backupPath);
+      
+      const configContent = fs.readFileSync(configPath, 'utf8');
+      config = JSON.parse(configContent);
+    }
+    
+    // Ensure mcpServers exists
+    if (!config.mcpServers) {
+      config.mcpServers = {};
+    }
+    
+    // Add new servers
+    Object.assign(config.mcpServers, servers);
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error adding MCP servers:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+});
+
+// Update server handler (promise-based)
+ipcMain.handle('mcp:update-server', async (event, { name, config: serverConfig }) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error('Configuration file not found');
+    }
+    
+    // Create backup
+    const backupPath = configPath + '.backup';
+    fs.copyFileSync(configPath, backupPath);
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    if (!config.mcpServers || !config.mcpServers[name]) {
+      throw new Error(`Server "${name}" not found`);
+    }
+    
+    // Update server configuration
+    config.mcpServers[name] = serverConfig;
+    
+    // Write updated config
+    fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating MCP server:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+});
+
+// Remove server handler (promise-based)
+ipcMain.handle('mcp:remove-server', async (event, name) => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error('Configuration file not found');
+    }
+    
+    // Create backup
+    const backupPath = configPath + '.backup';
+    fs.copyFileSync(configPath, backupPath);
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    // Don't allow removing protected servers
+    const protectedServers = ['codeagentswarm-tasks', 'codeagentswarm'];
+    if (protectedServers.includes(name.toLowerCase())) {
+      throw new Error(`Cannot remove protected server "${name}"`);
+    }
+    
+    // Check if server exists
+    if (config.mcpServers && config.mcpServers[name]) {
+      delete config.mcpServers[name];
+      
+      // Write updated config
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2));
+      
+      return { success: true };
+    } else {
+      // Check in disabled backup
+      const disabledBackupPath = configPath.replace('claude_desktop_config.json', 'mcp_disabled_servers.json');
+      if (fs.existsSync(disabledBackupPath)) {
+        const disabledServers = JSON.parse(fs.readFileSync(disabledBackupPath, 'utf8'));
+        if (disabledServers[name]) {
+          delete disabledServers[name];
+          
+          if (Object.keys(disabledServers).length > 0) {
+            fs.writeFileSync(disabledBackupPath, JSON.stringify(disabledServers, null, 2));
+          } else {
+            fs.unlinkSync(disabledBackupPath);
+          }
+          
+          return { success: true };
+        }
+      }
+      
+      throw new Error(`Server "${name}" not found`);
+    }
+  } catch (error) {
+    console.error('Error removing MCP server:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+});
+
+// Load servers handler (promise-based)
+ipcMain.handle('mcp:load-servers', async () => {
+  try {
+    const configPath = getClaudeConfigPath();
+    
+    if (!fs.existsSync(configPath)) {
+      return { success: true, servers: {} };
+    }
+    
+    const configContent = fs.readFileSync(configPath, 'utf8');
+    const config = JSON.parse(configContent);
+    
+    return { 
+      success: true, 
+      servers: config.mcpServers || {} 
+    };
+  } catch (error) {
+    console.error('Error loading MCP servers:', error);
+    return { 
+      success: false, 
+      error: error.message,
+      servers: {}
+    };
+  }
+});
+
+// Update CLAUDE.md instructions (promise-based)
+ipcMain.handle('mcp:update-claude-instructions', async (event, { serverId }) => {
+  try {
+    console.log(`[MCP] Updating global CLAUDE.md instructions for: ${serverId}`);
+    
+    // Import the instructions manager
+    const MCPInstructionsManager = require('./src/infrastructure/mcp/mcp-instructions-manager');
+    const manager = new MCPInstructionsManager();
+    
+    // Update the global CLAUDE.md
+    const result = await manager.updateClaudeMd(true); // true = use global
+    
+    if (result) {
+      console.log(`[MCP] Successfully updated global CLAUDE.md at ~/.claude/CLAUDE.md`);
+      return { 
+        success: true,
+        message: `Updated global CLAUDE.md with ${serverId} instructions`
+      };
+    } else {
+      return { 
+        success: false,
+        error: 'Failed to update global CLAUDE.md'
+      };
+    }
+  } catch (error) {
+    console.error('[MCP] Error updating CLAUDE.md instructions:', error);
+    return { 
+      success: false, 
+      error: error.message 
+    };
+  }
+});
+
+// ================== End Promise-based MCP IPC Handlers ==================
 
 // New function to just check Claude installation without auto-installing
 function checkClaudeInstallation() {
@@ -3331,6 +3584,253 @@ ipcMain.handle('task-delete', async (event, taskId) => {
     return result;
   } catch (error) {
     return { success: false, error: error.message };
+  }
+});
+
+// Handle opening terminal in project path
+ipcMain.handle('open-terminal-in-path', async (event, terminalId) => {
+  try {
+    const { shell, app } = require('electron');
+    const { exec } = require('child_process');
+    const path = require('path');
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    const platform = process.platform;
+    
+    if (platform === 'darwin') {
+      // macOS - Open Terminal.app in the specific directory
+      exec(`open -a Terminal "${cwd}"`, (error) => {
+        if (error) {
+          console.error('Error opening Terminal:', error);
+        }
+      });
+    } else if (platform === 'win32') {
+      // Windows - Open Command Prompt or PowerShell
+      exec(`start cmd /K "cd /d ${cwd}"`, (error) => {
+        if (error) {
+          console.error('Error opening Command Prompt:', error);
+        }
+      });
+    } else {
+      // Linux - Try to open common terminal emulators
+      const terminals = ['gnome-terminal', 'konsole', 'xterm', 'terminator'];
+      let opened = false;
+      
+      for (const term of terminals) {
+        try {
+          exec(`${term} --working-directory="${cwd}"`, (error) => {
+            if (!error) {
+              opened = true;
+            }
+          });
+          if (opened) break;
+        } catch (e) {
+          // Try next terminal
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening terminal:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle opening folder in file explorer
+ipcMain.handle('open-folder', async (event, terminalId) => {
+  try {
+    const { shell } = require('electron');
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    // Open the folder in the system's file explorer
+    await shell.openPath(cwd);
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening folder:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Handle opening in IDE
+ipcMain.handle('open-in-ide', async (event, terminalId, ideKey) => {
+  try {
+    const { exec } = require('child_process');
+    const path = require('path');
+    
+    // Get the working directory for this terminal
+    let cwd = process.cwd();
+    if (terminals.has(terminalId)) {
+      const terminal = terminals.get(terminalId);
+      if (terminal && terminal.cwd) {
+        cwd = terminal.cwd;
+      }
+    }
+    
+    const platform = process.platform;
+    let command;
+    
+    switch (ideKey) {
+      case 'cursor':
+        if (platform === 'darwin') {
+          command = `open -a "Cursor" "${cwd}"`;
+        } else if (platform === 'win32') {
+          command = `cursor "${cwd}"`;
+        } else {
+          command = `cursor "${cwd}"`;
+        }
+        break;
+        
+      case 'vscode':
+        command = `code "${cwd}"`;
+        break;
+        
+      case 'sublime':
+        if (platform === 'darwin') {
+          command = `open -a "Sublime Text" "${cwd}"`;
+        } else {
+          command = `subl "${cwd}"`;
+        }
+        break;
+        
+      case 'atom':
+        command = `atom "${cwd}"`;
+        break;
+        
+      case 'intellij':
+        if (platform === 'darwin') {
+          command = `open -a "IntelliJ IDEA" "${cwd}"`;
+        } else if (platform === 'win32') {
+          command = `idea "${cwd}"`;
+        } else {
+          command = `idea "${cwd}"`;
+        }
+        break;
+        
+      case 'webstorm':
+        if (platform === 'darwin') {
+          command = `open -a "WebStorm" "${cwd}"`;
+        } else {
+          command = `webstorm "${cwd}"`;
+        }
+        break;
+        
+      case 'pycharm':
+        if (platform === 'darwin') {
+          command = `open -a "PyCharm" "${cwd}"`;
+        } else {
+          command = `pycharm "${cwd}"`;
+        }
+        break;
+        
+      default:
+        return { success: false, error: `Unknown IDE: ${ideKey}` };
+    }
+    
+    exec(command, (error) => {
+      if (error) {
+        console.error(`Error opening ${ideKey}:`, error);
+      }
+    });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error opening IDE:', error);
+    return { success: false, error: error.message };
+  }
+});
+
+// Check for installed IDEs
+ipcMain.handle('check-installed-ides', async () => {
+  try {
+    const { exec } = require('child_process');
+    const platform = process.platform;
+    const installedIDEs = [];
+    
+    // List of IDEs to check
+    const idesToCheck = [
+      { key: 'cursor', name: 'Cursor', icon: 'code', commands: ['cursor'] },
+      { key: 'vscode', name: 'VS Code', icon: 'code', commands: ['code'] },
+      { key: 'sublime', name: 'Sublime Text', icon: 'file-text', commands: ['subl'] },
+      { key: 'atom', name: 'Atom', icon: 'edit', commands: ['atom'] },
+      { key: 'intellij', name: 'IntelliJ IDEA', icon: 'cpu', commands: ['idea'] },
+      { key: 'webstorm', name: 'WebStorm', icon: 'globe', commands: ['webstorm'] },
+      { key: 'pycharm', name: 'PyCharm', icon: 'code-2', commands: ['pycharm'] }
+    ];
+    
+    // Check each IDE
+    for (const ide of idesToCheck) {
+      let isInstalled = false;
+      
+      if (platform === 'darwin') {
+        // macOS - check in Applications folder
+        const appNames = {
+          'cursor': 'Cursor.app',
+          'vscode': 'Visual Studio Code.app',
+          'sublime': 'Sublime Text.app',
+          'atom': 'Atom.app',
+          'intellij': 'IntelliJ IDEA.app',
+          'webstorm': 'WebStorm.app',
+          'pycharm': 'PyCharm.app'
+        };
+        
+        const appName = appNames[ide.key];
+        if (appName) {
+          const fs = require('fs');
+          const appPath = `/Applications/${appName}`;
+          if (fs.existsSync(appPath)) {
+            isInstalled = true;
+          }
+        }
+      }
+      
+      // Also check if command is available
+      if (!isInstalled) {
+        for (const cmd of ide.commands) {
+          try {
+            await new Promise((resolve, reject) => {
+              exec(`which ${cmd}`, (error) => {
+                if (!error) {
+                  isInstalled = true;
+                  resolve();
+                } else {
+                  reject();
+                }
+              });
+            });
+            if (isInstalled) break;
+          } catch (e) {
+            // Command not found, try next
+          }
+        }
+      }
+      
+      if (isInstalled) {
+        installedIDEs.push(ide);
+      }
+    }
+    
+    return { success: true, ides: installedIDEs };
+  } catch (error) {
+    console.error('Error checking IDEs:', error);
+    return { success: false, error: error.message, ides: [] };
   }
 });
 

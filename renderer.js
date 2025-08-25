@@ -141,8 +141,20 @@ class TerminalManager {
             console.log('Claude finished via webhook:', data);
             const { terminalId } = data;
             if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
-                this.highlightTerminal(terminalId);
+                // Don't show notification badge for completion, just scroll
+                // The system notification is already shown by webhook-server.js
                 this.scrollTerminalToBottom(terminalId);
+                
+                // In grid mode, add a subtle highlight that auto-removes
+                if (this.layoutMode === 'grid') {
+                    const terminalElement = document.querySelector(`[data-quadrant="${terminalId}"]`);
+                    if (terminalElement) {
+                        terminalElement.classList.add('completion-highlight');
+                        setTimeout(() => {
+                            terminalElement.classList.remove('completion-highlight');
+                        }, 2000);
+                    }
+                }
             }
         });
         

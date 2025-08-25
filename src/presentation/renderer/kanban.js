@@ -1835,32 +1835,11 @@ class KanbanManager {
                     
                     if (subtasks.length > 0) {
                         subtasksList.innerHTML = subtasks.map(subtask => {
-                            // Get project info for the subtask
-                            let projectBadge = '';
-                            if (subtask.project) {
-                                // Wait for projects to be loaded
-                                if (this.projects && this.projects.length > 0) {
-                                    const project = this.projects.find(p => p.name === subtask.project);
-                                    if (project) {
-                                        const displayName = project.display_name || project.name;
-                                        const gradient = this.getProjectGradient(project.color);
-                                        projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
-                                    } else {
-                                        // Project not found in list, show with default color
-                                        projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
-                                    }
-                                } else {
-                                    // Projects not loaded yet, show with default color
-                                    projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
-                                }
-                            }
-                            
                             return `
                             <div class="subtask-item">
                                 <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                     <div class="subtask-header">
                                         <span class="task-id-badge">#${subtask.id}</span>
-                                        ${projectBadge}
                                         <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
                                         <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${task.id}); return false;" title="Delete subtask">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -2412,22 +2391,11 @@ class KanbanManager {
                     if (subtasksList) {
                         if (subtasks.length > 0) {
                             subtasksList.innerHTML = subtasks.map(subtask => {
-                                // Get project info for the subtask
-                                let projectBadge = '';
-                                if (subtask.project) {
-                                    const project = this.projects.find(p => p.name === subtask.project) || 
-                                                   { name: subtask.project, display_name: subtask.project, color: '#007ACC' };
-                                    const displayName = project.display_name || project.name;
-                                    const gradient = this.getProjectGradient(project.color);
-                                    projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
-                                }
-                                
                                 return `
                                 <div class="subtask-item">
                                     <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                         <div class="subtask-header">
                                             <span class="task-id-badge">#${subtask.id}</span>
-                                            ${projectBadge}
                                             <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
                                             <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Delete subtask">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

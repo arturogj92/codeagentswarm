@@ -160,7 +160,7 @@ class MCPPermissionsModal {
         const knownMCPMetadata = {
             'supabase': {
                 displayName: 'Supabase',
-                logo: 'assets/mcp-icons/supabase.png',
+                logo: '../../../assets/mcp-icons/supabase.png',
                 tools: [
                     'list_projects', 'get_project', 'create_project', 'execute_sql',
                     'apply_migration', 'get_logs', 'search_docs', 'list_tables',
@@ -169,7 +169,7 @@ class MCPPermissionsModal {
             },
             'notion': {
                 displayName: 'Notion',
-                logo: 'assets/mcp-icons/notion.png',
+                logo: '../../../assets/mcp-icons/notion.png',
                 tools: [
                     'query-database', 'create-page', 'update-page', 'search',
                     'append-block-children', 'list-databases', 'get-page', 'get-block'
@@ -182,7 +182,7 @@ class MCPPermissionsModal {
             },
             'filesystem': {
                 displayName: 'Filesystem',
-                logo: 'assets/mcp-icons/filesystem.png',
+                logo: '../../../assets/mcp-icons/filesystem.png',
                 tools: [
                     'read_text_file', 'read_media_file', 'read_multiple_files',
                     'write_file', 'edit_file', 'create_directory', 'list_directory',
@@ -191,12 +191,12 @@ class MCPPermissionsModal {
             },
             'brave-search': {
                 displayName: 'Brave Search',
-                logo: 'assets/mcp-icons/brave-search.png',
+                logo: '../../../assets/mcp-icons/brave-search.png',
                 tools: ['brave_web_search', 'brave_local_search']
             },
             'postgres': {
                 displayName: 'PostgreSQL',
-                logo: 'assets/mcp-icons/postgres.png',
+                logo: '../../../assets/mcp-icons/postgres.png',
                 tools: ['query']
             },
             'codeagentswarm-tasks': {

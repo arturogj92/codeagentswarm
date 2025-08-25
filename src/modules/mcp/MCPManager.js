@@ -374,18 +374,33 @@ class MCPManager {
             throw new Error('IPC renderer not available');
         }
 
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                reject(new Error('IPC call timeout'));
-            }, 10000);
+        try {
+            // Use invoke for handlers that support it (newer pattern)
+            if (channel === 'mcp:toggle-server' || 
+                channel === 'mcp:load-config' ||
+                channel === 'mcp:add-servers' ||
+                channel === 'mcp:update-server' ||
+                channel === 'mcp:remove-server') {
+                return await this.ipcRenderer.invoke(channel, data);
+            }
+            
+            // Fallback to send/reply pattern for older handlers
+            return new Promise((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                    reject(new Error('IPC call timeout'));
+                }, 10000);
 
-            this.ipcRenderer.once(`${channel}-response`, (event, response) => {
-                clearTimeout(timeout);
-                resolve(response);
+                this.ipcRenderer.once(`${channel}-response`, (event, response) => {
+                    clearTimeout(timeout);
+                    resolve(response);
+                });
+
+                this.ipcRenderer.send(channel, data);
             });
-
-            this.ipcRenderer.send(channel, data);
-        });
+        } catch (error) {
+            console.error(`IPC call error for ${channel}:`, error);
+            throw error;
+        }
     }
 
     /**

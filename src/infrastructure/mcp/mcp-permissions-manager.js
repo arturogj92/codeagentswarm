@@ -163,11 +163,11 @@ class MCPPermissionsManager {
     getMCPLogo(serverName) {
         // Map of known MCP logos
         const logoMap = {
-            'supabase': 'assets/mcp-icons/supabase.png',
-            'notion': 'assets/mcp-icons/notion.png',
-            'filesystem': 'assets/mcp-icons/filesystem.png',
-            'brave-search': 'assets/mcp-icons/brave-search.png',
-            'postgres': 'assets/mcp-icons/postgres.png',
+            'supabase': '../../../assets/mcp-icons/supabase.png',
+            'notion': '../../../assets/mcp-icons/notion.png',
+            'filesystem': '../../../assets/mcp-icons/filesystem.png',
+            'brave-search': '../../../assets/mcp-icons/brave-search.png',
+            'postgres': '../../../assets/mcp-icons/postgres.png',
             'context7': null, // No logo, will use default icon
             'codeagentswarm-tasks': null // No logo, will use default icon
         };

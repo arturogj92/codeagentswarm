@@ -2280,6 +2280,160 @@ body::before {
   font-weight: 600;
 }
 
+/* Danger button styles for Dangerous Mode */
+.session-selector-buttons .btn-danger {
+  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: white;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 8px;
+  line-height: 1.2;
+}
+
+.session-selector-buttons .btn-danger .btn-main-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: block;
+}
+
+.session-selector-buttons .btn-danger .btn-sub-text {
+  font-size: 0.7rem;
+  font-weight: 400;
+  opacity: 0.9;
+  display: block;
+  margin-top: 2px;
+}
+
+.session-selector-buttons .btn-danger:hover {
+  background: linear-gradient(135deg, #e74c3c 0%, #d32f2f 100%);
+  border-color: rgba(220, 53, 69, 0.5);
+  box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
+  transform: translateY(-2px);
+}
+
+.session-selector-buttons .btn-danger-active {
+  animation: pulse-danger 1.5s ease-in-out infinite;
+  box-shadow: 0 0 30px rgba(220, 53, 69, 0.6);
+}
+
+@keyframes pulse-danger {
+  0% {
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(220, 53, 69, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
+  }
+}
+
+/* Danger warning message */
+.session-danger-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin: 12px 0;
+  background: linear-gradient(135deg, 
+    rgba(220, 53, 69, 0.1) 0%, 
+    rgba(200, 35, 51, 0.05) 100%);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 8px;
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-danger-warning .danger-icon {
+  font-size: 1.2rem;
+  animation: bounce 1s ease-in-out infinite;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.session-danger-warning .danger-text {
+  color: #f8d7da;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Progress bar for hold-to-activate */
+.session-danger-progress {
+  position: relative;
+  margin: 12px 0;
+  padding: 12px 16px;
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.session-danger-progress .progress-bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, 
+    rgba(220, 53, 69, 0.3) 0%, 
+    rgba(220, 53, 69, 0.5) 50%,
+    rgba(220, 53, 69, 0.3) 100%);
+  transition: width 0.05s linear;
+  animation: shimmer 1.5s infinite linear;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.session-danger-progress .progress-text {
+  position: relative;
+  z-index: 1;
+  color: #f8d7da;
+  font-size: 0.875rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.session-danger-progress .progress-countdown {
+  color: #ff6b6b;
+  font-size: 1.1rem;
+  font-weight: bold;
+  min-width: 12px;
+  text-align: center;
+}
+
 .session-back-button {
   display: flex;
   justify-content: center;
@@ -2384,6 +2538,15 @@ body::before {
     var(--shadow-card), 
     0 0 40px rgba(255, 137, 6, 0.6),
     inset 0 0 20px rgba(255, 137, 6, 0.1);
+}
+
+/* Completion highlight (subtle, temporary) */
+.completion-highlight {
+  border-color: var(--success) !important;
+  transition: all 0.3s ease;
+  box-shadow: 
+    var(--shadow-card),
+    0 0 10px rgba(46, 160, 67, 0.3);
 }
 
 /* Git Project Selection Modal */

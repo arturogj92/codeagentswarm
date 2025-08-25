@@ -18,7 +18,54 @@ class AuthManager {
         this.signedInMenu = document.getElementById('auth-menu-signed-in');
         this.closeModalBtn = document.getElementById('close-auth-modal');
         
+        // Override lucide.createIcons to maintain our styles
+        this.setupLucideOverride();
+        
         this.init();
+    }
+
+    setupLucideOverride() {
+        // Store original createIcons function
+        if (window.lucide && window.lucide.createIcons) {
+            const originalCreateIcons = window.lucide.createIcons.bind(window.lucide);
+            
+            // Override with our version that maintains auth icon state
+            window.lucide.createIcons = (...args) => {
+                // Call original function
+                const result = originalCreateIcons(...args);
+                
+                // Reapply our auth icon visibility state after icons are created
+                setTimeout(() => {
+                    this.updateAuthIconVisibility();
+                }, 0);
+                
+                return result;
+            };
+        }
+    }
+    
+    updateAuthIconVisibility() {
+        // Get fresh references to the icon elements (they might have been recreated by Lucide)
+        const authIcon = document.querySelector('#auth-btn svg[data-lucide="user"], #auth-btn i[data-lucide="user"]');
+        const userAvatar = document.getElementById('user-avatar');
+        
+        if (this.user) {
+            // User is logged in - hide icon, show avatar
+            if (authIcon) {
+                authIcon.style.display = 'none';
+            }
+            if (userAvatar) {
+                userAvatar.style.display = 'block';
+            }
+        } else {
+            // User is not logged in - show icon, hide avatar
+            if (authIcon) {
+                authIcon.style.display = 'block';
+            }
+            if (userAvatar) {
+                userAvatar.style.display = 'none';
+            }
+        }
     }
 
     async init() {
@@ -38,14 +85,56 @@ class AuthManager {
                 this.handleAuthError(data);
             });
         }
+        
+        // Re-initialize when DOM might change (e.g., after Lucide icons are created)
+        this.observeForDOMChanges();
+    }
+    
+    observeForDOMChanges() {
+        // Watch for changes that might affect the auth button
+        const observer = new MutationObserver(() => {
+            // Check if auth button still exists and has listener
+            const currentAuthBtn = document.getElementById('auth-btn');
+            if (currentAuthBtn && currentAuthBtn !== this.authButton) {
+                console.log('Auth button was recreated, re-attaching listener');
+                this.authButton = currentAuthBtn;
+                this.setupEventListeners();
+            }
+        });
+        
+        // Observe the header area for changes
+        const header = document.querySelector('.header');
+        if (header) {
+            observer.observe(header, { 
+                childList: true, 
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['id']
+            });
+        }
     }
 
     setupEventListeners() {
-        // Open modal on button click
-        this.authButton?.addEventListener('click', (e) => {
+        // Remove any existing listeners first to prevent duplicates
+        if (this.authButtonClickHandler) {
+            this.authButton?.removeEventListener('click', this.authButtonClickHandler);
+        }
+        
+        // Create the click handler
+        this.authButtonClickHandler = (e) => {
             e.stopPropagation();
+            e.preventDefault();
+            console.log('Auth button clicked');
             this.openModal();
-        });
+        };
+        
+        // Open modal on button click
+        if (this.authButton) {
+            this.authButton.addEventListener('click', this.authButtonClickHandler);
+            console.log('Auth button event listener attached');
+        } else {
+            console.error('Auth button not found during setupEventListeners');
+        }
         
         // Close modal on close button click
         this.closeModalBtn?.addEventListener('click', () => {
@@ -102,6 +191,9 @@ class AuthManager {
         if (this.authModal) {
             console.log('Opening modal, user state:', this.user);
             
+            // Force display block first to ensure modal is visible
+            this.authModal.style.display = 'flex';
+            
             // Update modal header based on auth status
             const modalHeader = this.authModal.querySelector('.auth-modal-header h2');
             if (modalHeader) {
@@ -121,19 +213,29 @@ class AuthManager {
                 if (this.userInfo) this.userInfo.style.display = 'none';
             }
             
-            this.authModal.classList.add('show');
+            // Add show class after a brief delay to trigger animation
+            requestAnimationFrame(() => {
+                this.authModal.classList.add('show');
+            });
+            
             // Update Lucide icons in the modal
             if (window.lucide) {
                 setTimeout(() => {
                     window.lucide.createIcons();
                 }, 50);
             }
+        } else {
+            console.error('Auth modal element not found');
         }
     }
 
     closeModal() {
         if (this.authModal) {
             this.authModal.classList.remove('show');
+            // Also remove inline display style after animation
+            setTimeout(() => {
+                this.authModal.style.display = '';
+            }, 300); // Match animation duration
         }
     }
 
@@ -163,9 +265,8 @@ class AuthManager {
         // Hide loading state
         this.hideLoadingState();
         
-        // Save auth data to secure storage
-        const authService = require('../../infrastructure/services/auth-service');
-        await authService.saveAuthData(data);
+        // Auth data is already saved by the main process when it receives the callback
+        // We just need to update the UI
         
         // Update UI with user info
         this.setUser(data.user);
@@ -187,7 +288,6 @@ class AuthManager {
     setUser(user) {
         this.user = user;
         console.log('Setting user:', user);
-        console.log('Avatar URL from user object:', user?.avatar_url);
         
         if (user) {
             // Add visual feedback - green icon for logged in state
@@ -195,21 +295,29 @@ class AuthManager {
             
             // Set up avatar with proper error handling
             const avatarUrl = user.avatar_url || this.getDefaultAvatar(user.email);
-            console.log('Final avatar URL being used:', avatarUrl);
             
-            // Update button avatar
-            this.userAvatar.onerror = (e) => {
-                // If avatar fails to load, show icon instead
-                console.warn('Avatar failed to load:', avatarUrl);
-                console.warn('Error event:', e);
-                this.authIcon.style.display = 'block';
-                this.userAvatar.style.display = 'none';
+            // Update icon visibility using our centralized function
+            this.updateAuthIconVisibility();
+            
+            // Clear any existing handlers first
+            this.userAvatar.onerror = null;
+            this.userAvatar.onload = null;
+            
+            // Set up new handlers
+            this.userAvatar.onerror = () => {
+                // If avatar fails to load, use default avatar instead
+                console.warn('Avatar failed to load, using default avatar');
+                // Still keep avatar visible, just change source
+                if (this.userAvatar.src !== this.getDefaultAvatar(user.email)) {
+                    this.userAvatar.src = this.getDefaultAvatar(user.email);
+                }
+                // Ensure visibility is correct
+                this.updateAuthIconVisibility();
             };
             
             this.userAvatar.onload = () => {
-                // Avatar loaded successfully, show it
-                this.authIcon.style.display = 'none';
-                this.userAvatar.style.display = 'block';
+                // Avatar loaded successfully, ensure visibility is correct
+                this.updateAuthIconVisibility();
             };
             
             // Set the avatar source (this triggers onload or onerror)
@@ -217,18 +325,32 @@ class AuthManager {
             this.authButton.title = user.name || user.email;
             
             // Update dropdown avatar with same error handling
-            this.dropdownAvatar.onerror = (e) => {
-                console.warn('Dropdown avatar failed to load:', avatarUrl);
-                this.dropdownAvatar.style.display = 'none';
-            };
-            
-            this.dropdownAvatar.onload = () => {
-                console.log('Dropdown avatar loaded successfully');
+            if (this.dropdownAvatar) {
+                // Ensure dropdown avatar is visible immediately
                 this.dropdownAvatar.style.display = 'block';
-            };
-            
-            console.log('Setting dropdown avatar src to:', avatarUrl);
-            this.dropdownAvatar.src = avatarUrl;
+                
+                // Clear existing handlers
+                this.dropdownAvatar.onerror = null;
+                this.dropdownAvatar.onload = null;
+                
+                // Set up new handlers
+                this.dropdownAvatar.onerror = () => {
+                    // If avatar fails to load, use default avatar instead
+                    if (this.dropdownAvatar.src !== this.getDefaultAvatar(user.email)) {
+                        this.dropdownAvatar.src = this.getDefaultAvatar(user.email);
+                    }
+                    // Keep dropdown avatar visible
+                    this.dropdownAvatar.style.display = 'block';
+                };
+                
+                this.dropdownAvatar.onload = () => {
+                    // Keep dropdown avatar visible
+                    this.dropdownAvatar.style.display = 'block';
+                };
+                
+                // Set the source
+                this.dropdownAvatar.src = avatarUrl;
+            }
             this.userName.textContent = user.name || 'User';
             this.userEmail.textContent = user.email;
             
@@ -240,9 +362,8 @@ class AuthManager {
             // Remove visual feedback - no green border for logged out state
             this.authButton.classList.remove('logged-in');
             
-            // Reset to signed out state
-            this.authIcon.style.display = 'block';
-            this.userAvatar.style.display = 'none';
+            // Reset to signed out state using centralized function
+            this.updateAuthIconVisibility();
             this.authButton.title = 'Sign In';
             
             // Show/hide appropriate menu sections
@@ -257,11 +378,7 @@ class AuthManager {
             // Close modal
             this.closeModal();
             
-            // Clear auth data
-            const authService = require('../../infrastructure/services/auth-service');
-            await authService.logout();
-            
-            // Clear from main process
+            // Clear auth data from main process (which will also clear from auth service)
             await window.ipcRenderer.invoke('clear-auth-data');
             
             // Reset UI

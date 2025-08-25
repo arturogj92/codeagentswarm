@@ -482,17 +482,17 @@
 }
 
 /* Auth Modal */
-.mcp-auth-modal {
+.mcp-marketplace-auth-modal {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.8);
-  display: flex;
+  display: flex !important; /* Force display with !important */
   align-items: center;
   justify-content: center;
-  z-index: 10000;
+  z-index: 200000; /* Very high z-index to ensure visibility above all other modals */
   /* Remove animation for performance */
 }
 
@@ -767,6 +767,14 @@
   border-left: 4px solid #ef4444;
 }
 
+.mcp-toast.warning {
+  border-left: 4px solid #f59e0b;
+}
+
+.mcp-toast.info {
+  border-left: 4px solid #3b82f6;
+}
+
 .mcp-toast i {
   width: 18px;
   height: 18px;
@@ -778,6 +786,14 @@
 
 .mcp-toast.error i {
   color: #ef4444;
+}
+
+.mcp-toast.warning i {
+  color: #f59e0b;
+}
+
+.mcp-toast.info i {
+  color: #3b82f6;
 }
 
 /* Animations */
