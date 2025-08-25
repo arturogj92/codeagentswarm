@@ -12,7 +12,8 @@ describe('MCPManager', () => {
             send: jest.fn(),
             once: jest.fn(),
             on: jest.fn(),
-            off: jest.fn()
+            off: jest.fn(),
+            invoke: jest.fn()
         };
 
         // Mock validator
@@ -37,9 +38,10 @@ describe('MCPManager', () => {
                 'codeagentswarm-tasks': { command: 'protected' }
             };
 
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                if (channel === 'mcp:load-config-response') {
-                    callback(null, { mcpServers: mockServers });
+            // Mock the invoke method for mcp:load-config
+            mockIpcRenderer.invoke.mockImplementation(async (channel) => {
+                if (channel === 'mcp:load-config') {
+                    return { mcpServers: mockServers };
                 }
             });
 
@@ -55,22 +57,20 @@ describe('MCPManager', () => {
         });
 
         test('should not initialize twice', async () => {
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { mcpServers: {} });
-            });
+            // Mock the invoke method for mcp:load-config
+            mockIpcRenderer.invoke.mockResolvedValue({ mcpServers: {} });
 
             await manager.initialize();
-            const sendCallCount = mockIpcRenderer.send.mock.calls.length;
+            const invokeCallCount = mockIpcRenderer.invoke.mock.calls.length;
             
             await manager.initialize();
             
-            expect(mockIpcRenderer.send.mock.calls.length).toBe(sendCallCount);
+            expect(mockIpcRenderer.invoke.mock.calls.length).toBe(invokeCallCount);
         });
 
         test('should handle initialization errors', async () => {
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                throw new Error('IPC error');
-            });
+            // Mock the invoke method to throw an error
+            mockIpcRenderer.invoke.mockRejectedValue(new Error('IPC error'));
 
             const errorListener = jest.fn();
             manager.on('error', errorListener);
@@ -88,9 +88,8 @@ describe('MCPManager', () => {
                 'codeagentswarm': { command: 'protected' }
             };
 
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { mcpServers: mockServers });
-            });
+            // Mock the invoke method for mcp:load-config
+            mockIpcRenderer.invoke.mockResolvedValue({ mcpServers: mockServers });
 
             mockValidator.isProtectedServer.mockImplementation(name => 
                 name === 'codeagentswarm'
@@ -108,9 +107,8 @@ describe('MCPManager', () => {
         });
 
         test('should handle empty configuration', async () => {
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, {});
-            });
+            // Mock the invoke method for mcp:load-config
+            mockIpcRenderer.invoke.mockResolvedValue({});
 
             const servers = await manager.loadServers();
             
@@ -131,9 +129,8 @@ describe('MCPManager', () => {
                 servers: newServers
             });
 
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: true });
-            });
+            // Mock the invoke method for mcp:add-servers
+            mockIpcRenderer.invoke.mockResolvedValue({ success: true });
 
             const addListener = jest.fn();
             manager.on('servers-added', addListener);
@@ -156,7 +153,7 @@ describe('MCPManager', () => {
 
             expect(result.success).toBe(false);
             expect(result.error).toBe('Invalid config');
-            expect(mockIpcRenderer.send).not.toHaveBeenCalled();
+            expect(mockIpcRenderer.invoke).not.toHaveBeenCalled();
         });
 
         test('should handle IPC errors', async () => {
@@ -165,9 +162,8 @@ describe('MCPManager', () => {
                 servers: {}
             });
 
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: false, error: 'IPC failed' });
-            });
+            // Mock the invoke method for mcp:add-servers
+            mockIpcRenderer.invoke.mockResolvedValue({ success: false, error: 'IPC failed' });
 
             const result = await manager.addServers('{}');
 
@@ -187,9 +183,8 @@ describe('MCPManager', () => {
             const newConfig = { command: 'new' };
 
             mockValidator.validateServerConfig.mockReturnValue({ valid: true });
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: true });
-            });
+            // Mock the invoke method for mcp:update-server
+            mockIpcRenderer.invoke.mockResolvedValue({ success: true });
 
             const updateListener = jest.fn();
             manager.on('server-updated', updateListener);
@@ -234,15 +229,14 @@ describe('MCPManager', () => {
 
         test('should remove existing server', async () => {
             mockValidator.isProtectedServer.mockReturnValue(false);
-            let loadCallCount = 0;
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                loadCallCount++;
-                if (loadCallCount === 1) {
-                    // First call is the remove request
-                    callback(null, { success: true });
-                } else {
-                    // Second call is the loadServers after removal
-                    callback(null, { mcpServers: {} });
+            // Mock the invoke method for mcp:remove-server and mcp:load-config
+            let callCount = 0;
+            mockIpcRenderer.invoke.mockImplementation(async (channel) => {
+                callCount++;
+                if (channel === 'mcp:remove-server') {
+                    return { success: true };
+                } else if (channel === 'mcp:load-config') {
+                    return { mcpServers: {} };
                 }
             });
 
@@ -261,15 +255,12 @@ describe('MCPManager', () => {
             delete manager.servers['removable'];
             
             mockValidator.isProtectedServer.mockReturnValue(false);
-            let loadCallCount = 0;
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                loadCallCount++;
-                if (loadCallCount === 1) {
-                    // First call is the remove request - backend handles it
-                    callback(null, { success: true });
-                } else {
-                    // Second call is the loadServers after removal
-                    callback(null, { mcpServers: {} });
+            // Mock the invoke method for mcp:remove-server and mcp:load-config
+            mockIpcRenderer.invoke.mockImplementation(async (channel) => {
+                if (channel === 'mcp:remove-server') {
+                    return { success: true };
+                } else if (channel === 'mcp:load-config') {
+                    return { mcpServers: {} };
                 }
             });
 
@@ -280,7 +271,7 @@ describe('MCPManager', () => {
 
             expect(result.success).toBe(true);
             expect(removeListener).toHaveBeenCalledWith({ name: 'removable' });
-            expect(mockIpcRenderer.send).toHaveBeenCalledWith('mcp:remove-server', 'removable');
+            expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('mcp:remove-server', 'removable');
         });
 
         test('should handle backend rejection for non-existent server', async () => {
@@ -288,9 +279,8 @@ describe('MCPManager', () => {
             delete manager.servers['non-existent'];
             
             mockValidator.isProtectedServer.mockReturnValue(false);
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
-                callback(null, { success: false, error: 'Server "non-existent" not found' });
-            });
+            // Mock the invoke method for mcp:remove-server
+            mockIpcRenderer.invoke.mockResolvedValue({ success: false, error: 'Server "non-existent" not found' });
 
             const result = await manager.removeServer('non-existent');
 
@@ -310,28 +300,27 @@ describe('MCPManager', () => {
         test('should reload servers after successful removal', async () => {
             mockValidator.isProtectedServer.mockReturnValue(false);
             
+            // Mock the invoke method for both mcp:remove-server and mcp:load-config
             let callCount = 0;
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
+            mockIpcRenderer.invoke.mockImplementation(async (channel) => {
                 callCount++;
-                if (callCount === 1) {
-                    // Remove request
-                    callback(null, { success: true });
-                } else if (callCount === 2) {
-                    // loadServers call after removal
-                    callback(null, { 
+                if (channel === 'mcp:remove-server') {
+                    return { success: true };
+                } else if (channel === 'mcp:load-config') {
+                    return { 
                         mcpServers: {
                             'other-server': { command: 'npx' }
                         }
-                    });
+                    };
                 }
             });
 
             await manager.removeServer('removable');
 
             // Check that loadServers was called (2 IPC calls total)
-            expect(mockIpcRenderer.send).toHaveBeenCalledTimes(2);
-            expect(mockIpcRenderer.send).toHaveBeenNthCalledWith(1, 'mcp:remove-server', 'removable');
-            expect(mockIpcRenderer.send).toHaveBeenNthCalledWith(2, 'mcp:load-config', undefined);
+            expect(mockIpcRenderer.invoke).toHaveBeenCalledTimes(2);
+            expect(mockIpcRenderer.invoke).toHaveBeenNthCalledWith(1, 'mcp:remove-server', 'removable');
+            expect(mockIpcRenderer.invoke).toHaveBeenNthCalledWith(2, 'mcp:load-config', undefined);
         });
     });
 
@@ -343,19 +332,18 @@ describe('MCPManager', () => {
         });
 
         test('should toggle server state', async () => {
+            // Mock the invoke method for both toggle and load-config
             let callCount = 0;
-            mockIpcRenderer.once.mockImplementation((channel, callback) => {
+            mockIpcRenderer.invoke.mockImplementation(async (channel) => {
                 callCount++;
-                if (callCount === 1) {
-                    // First call is the toggle request
-                    callback(null, { success: true });
-                } else {
-                    // Second call is the loadServers after toggle
-                    callback(null, { 
+                if (channel === 'mcp:toggle-server') {
+                    return { success: true };
+                } else if (channel === 'mcp:load-config') {
+                    return { 
                         mcpServers: {
                             '_disabled_toggleable': { command: 'node' }
                         }
-                    });
+                    };
                 }
             });
 
