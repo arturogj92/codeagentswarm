@@ -14,7 +14,6 @@ const MCPInstructionsManager = require('../src/infrastructure/mcp/mcp-instructio
 // Define the paths to update with project-specific configs
 const projectPaths = [
     { path: './CLAUDE.md', projectName: 'CodeAgentSwarm' },
-    { path: '../CLAUDE.md', projectName: 'Art0xDev' },
     { path: '../codeagentswarm/CLAUDE.md', projectName: 'CodeAgentSwarm' },
     { path: '../codeagentswarm-backend/CLAUDE.md', projectName: 'CodeAgentSwarm-Backend' },
     { path: '../codeagentswarm-landing/CLAUDE.md', projectName: 'CodeAgentSwarm-Landing' }

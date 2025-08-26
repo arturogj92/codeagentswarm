@@ -93,12 +93,22 @@ class GitService {
                 return { file, status: statusText, staged, isDirectory };
             });
 
-            // Get commits
-            const commitsOutput = execSync('git log --oneline -20', { cwd, encoding: 'utf8' });
-            const commits = commitsOutput.split('\n').filter(line => line.trim()).map(line => {
-                const [hash, ...messageParts] = line.split(' ');
-                return { hash, message: messageParts.join(' ') };
-            });
+            // Get commits - handle repositories with no commits
+            let commits = [];
+            try {
+                const commitsOutput = execSync('git log --oneline -20', { 
+                    cwd, 
+                    encoding: 'utf8',
+                    stdio: ['pipe', 'pipe', 'ignore']
+                });
+                commits = commitsOutput.split('\n').filter(line => line.trim()).map(line => {
+                    const [hash, ...messageParts] = line.split(' ');
+                    return { hash, message: messageParts.join(' ') };
+                });
+            } catch (error) {
+                // No commits yet - this is fine for new repositories
+                commits = [];
+            }
 
             // Check for unpushed commits
             let unpushedCount = 0;
@@ -414,14 +424,18 @@ class GitService {
             if (this.isGitRepository(dir)) {
                 try {
                     const status = await this.getStatus(dir);
-                    if (status.success && status.files.length > 0) {
-                        projects.push({
-                            path: dir,
-                            name: path.basename(dir),
-                            branch: status.branch,
-                            changeCount: status.files.length,
-                            unpushedCount: status.unpushedCount
-                        });
+                    if (status.success) {
+                        // Include projects with changes OR with no commits yet (new repos)
+                        if (status.files.length > 0 || status.commits.length === 0) {
+                            projects.push({
+                                path: dir,
+                                name: path.basename(dir),
+                                branch: status.branch || 'master',
+                                changeCount: status.files.length,
+                                unpushedCount: status.unpushedCount,
+                                hasNoCommits: status.commits.length === 0
+                            });
+                        }
                     }
                 } catch (error) {
                     console.error(`Error scanning ${dir}:`, error);

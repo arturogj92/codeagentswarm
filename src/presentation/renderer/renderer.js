@@ -3244,7 +3244,7 @@ class TerminalManager {
         });
         
         document.querySelectorAll('.terminal-dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+            item.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const action = item.dataset.action;
                 const terminal = parseInt(item.dataset.terminal);
@@ -3257,13 +3257,14 @@ class TerminalManager {
                     dropdown.style.display = 'none';
                 }
                 
+                // Call methods on the class instance
                 if (action === 'open-terminal-here') {
-                    this.openTerminalInProjectPath(terminal);
+                    await this.handleOpenTerminalInPath(terminal);
                 } else if (action === 'open-folder') {
-                    this.openProjectFolder(terminal);
+                    await this.handleOpenFolder(terminal);
                 } else if (action === 'open-in-ide') {
                     const ideKey = item.dataset.ide;
-                    this.openInIDE(terminal, ideKey);
+                    await this.openInIDE(terminal, ideKey);
                 }
             });
         });
@@ -4103,19 +4104,26 @@ class TerminalManager {
                                     <div class="project-name">
                                         <i data-lucide="folder-git-2"></i>
                                         <span class="name">${project.name}</span>
+                                        ${project.hasNoCommits ? '<span class="badge-new">NEW</span>' : ''}
                                     </div>
                                     <div class="project-details">
-                                        <span class="project-branch">
-                                            <i data-lucide="git-branch"></i> ${project.branch}
-                                        </span>
-                                        <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
-                                            <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
-                                        </span>
-                                        ${project.unpushedCount > 0 ? `
-                                            <span class="project-unpushed">
-                                                <i data-lucide="upload"></i> ${project.unpushedCount} unpushed
+                                        ${project.hasNoCommits ? `
+                                            <span class="project-no-commits">
+                                                <i data-lucide="alert-circle"></i> No commits yet - ${project.changeCount} untracked files
                                             </span>
-                                        ` : ''}
+                                        ` : `
+                                            <span class="project-branch">
+                                                <i data-lucide="git-branch"></i> ${project.branch}
+                                            </span>
+                                            <span class="project-changes ${project.changeCount === 0 ? 'no-changes' : ''}">
+                                                <i data-lucide="file-diff"></i> ${project.changeCount} ${project.changeCount === 1 ? 'change' : 'changes'}
+                                            </span>
+                                            ${project.unpushedCount > 0 ? `
+                                                <span class="project-unpushed">
+                                                    <i data-lucide="upload"></i> ${project.unpushedCount} unpushed
+                                                </span>
+                                            ` : ''}
+                                        `}
                                     </div>
                                 </div>
                                 <button class="btn btn-primary btn-small open-project">
@@ -6863,6 +6871,12 @@ class TerminalManager {
         console.log('Switching from grid to tabbed mode...');
         this.layoutMode = 'tabbed';
         
+        // Clean up any open directory selectors before switching modes
+        document.querySelectorAll('.directory-selector').forEach(selector => {
+            console.log('Removing orphaned directory selector before mode switch');
+            selector.remove();
+        });
+        
         // Save current terminal titles before switching (without terminal number prefix)
         const savedTitles = new Map();
         this.terminals.forEach((terminal, quadrant) => {
@@ -6945,6 +6959,12 @@ class TerminalManager {
 
     switchToGridMode() {
         console.log('Switching from tabbed to grid mode...');
+        
+        // Clean up any open directory selectors before switching modes
+        document.querySelectorAll('.directory-selector').forEach(selector => {
+            console.log('Removing orphaned directory selector before mode switch');
+            selector.remove();
+        });
         
         // Save current terminal titles before switching (clean titles without numbers)
         const savedTitles = new Map();

@@ -1,4 +1,4 @@
-const { safeStorage } = require('electron');
+// Removed safeStorage to avoid keychain prompts - using electron-store encryption instead
 
 // Try to load electron-store, fallback to null if it fails
 let Store;
@@ -43,25 +43,44 @@ class AuthService {
      */
     async initialize() {
         try {
+            console.log('[AuthService] Starting initialization...');
+            
             // Load saved auth data if available
             const savedAuth = await this.loadAuthData();
+            console.log('[AuthService] Saved auth data loaded:', !!savedAuth);
+            
             if (savedAuth && savedAuth.token) {
                 this.user = savedAuth.user;
                 this.token = savedAuth.token;
                 this.refreshToken = savedAuth.refreshToken;
                 
+                console.log('[AuthService] User loaded:', this.user?.email);
+                
                 // Validate token with backend
                 const isValid = await this.validateToken();
+                console.log('[AuthService] Token validation result:', isValid);
+                
                 if (!isValid) {
+                    console.log('[AuthService] Token invalid, attempting refresh...');
                     // Try to refresh if invalid
-                    await this.refreshAccessToken();
+                    const refreshed = await this.refreshAccessToken();
+                    if (!refreshed) {
+                        console.log('[AuthService] Token refresh failed, clearing auth data');
+                        this.user = null;
+                        this.token = null;
+                        this.refreshToken = null;
+                        return false;
+                    }
                 }
                 
+                console.log('[AuthService] Initialization successful, user authenticated');
                 return true;
             }
+            
+            console.log('[AuthService] No valid saved auth data found');
             return false;
         } catch (error) {
-            console.error('Auth initialization error:', error);
+            console.error('[AuthService] Initialization error:', error);
             return false;
         }
     }
@@ -75,39 +94,26 @@ class AuthService {
             console.log('Saving auth data, store available:', !!store);
             console.log('User data to save:', data.user);
             
-            if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable()) {
-                // Use native encryption if available (macOS Keychain)
-                console.log('Using native encryption (safeStorage)');
-                const encryptedToken = safeStorage.encryptString(data.token);
-                const encryptedRefresh = safeStorage.encryptString(data.refreshToken);
-                
+            // Always use electron-store to avoid keychain prompts
+            // The store already has its own encryption with encryptionKey
+            console.log('Using electron-store with built-in encryption');
+            if (store && store.set) {
                 store.set('auth', {
                     user: data.user,
-                    token: encryptedToken.toString('base64'),
-                    refreshToken: encryptedRefresh.toString('base64'),
+                    token: data.token,
+                    refreshToken: data.refreshToken,
                     savedAt: Date.now()
                 });
+                console.log('Data saved to electron-store');
             } else {
-                // Fallback to store encryption or localStorage
-                console.log('Using fallback storage (electron-store or memory)');
-                if (store && store.set) {
-                    store.set('auth', {
-                        user: data.user,
-                        token: data.token,
-                        refreshToken: data.refreshToken,
-                        savedAt: Date.now()
-                    });
-                    console.log('Data saved to electron-store');
-                } else {
-                    // Ultimate fallback to localStorage
-                    console.log('Using localStorage fallback (this wont persist in main process)');
-                    localStorage.setItem('auth', JSON.stringify({
-                        user: data.user,
-                        token: data.token,
-                        refreshToken: data.refreshToken,
-                        savedAt: Date.now()
-                    }));
-                }
+                // Ultimate fallback to localStorage
+                console.log('Using localStorage fallback (this wont persist in main process)');
+                localStorage.setItem('auth', JSON.stringify({
+                    user: data.user,
+                    token: data.token,
+                    refreshToken: data.refreshToken,
+                    savedAt: Date.now()
+                }));
             }
             
             this.user = data.user;
@@ -128,47 +134,44 @@ class AuthService {
     async loadAuthData() {
         try {
             const store = await this.ensureStore();
-            console.log('Loading auth data, store available:', !!store);
+            console.log('[AuthService.loadAuthData] Store available:', !!store);
             let saved;
             
             if (store && store.get) {
                 saved = store.get('auth');
-                console.log('Loaded from electron-store:', !!saved);
+                console.log('[AuthService.loadAuthData] Data loaded from electron-store:', !!saved);
+                if (saved) {
+                    console.log('[AuthService.loadAuthData] Auth data found with user:', saved.user?.email);
+                }
             } else {
                 // Fallback to localStorage
                 const savedStr = localStorage.getItem('auth');
                 saved = savedStr ? JSON.parse(savedStr) : null;
-                console.log('Loaded from localStorage:', !!saved);
+                console.log('[AuthService.loadAuthData] Loaded from localStorage fallback:', !!saved);
             }
             
             if (!saved) {
-                console.log('No saved auth data found');
+                console.log('[AuthService.loadAuthData] No saved auth data found in storage');
                 return null;
             }
             
             // Check if data is too old (30 days)
             const age = Date.now() - (saved.savedAt || 0);
+            const daysOld = Math.floor(age / (24 * 60 * 60 * 1000));
+            console.log(`[AuthService.loadAuthData] Auth data is ${daysOld} days old`);
+            
             if (age > 30 * 24 * 60 * 60 * 1000) {
+                console.log('[AuthService.loadAuthData] Auth data expired (>30 days), clearing...');
                 await this.clearAuthData();
                 return null;
             }
             
-            if (safeStorage && safeStorage.isEncryptionAvailable && safeStorage.isEncryptionAvailable() && saved.token && saved.token.length > 100) {
-                // Decrypt if it was encrypted
-                const tokenBuffer = Buffer.from(saved.token, 'base64');
-                const refreshBuffer = Buffer.from(saved.refreshToken, 'base64');
-                
-                return {
-                    user: saved.user,
-                    token: safeStorage.decryptString(tokenBuffer),
-                    refreshToken: safeStorage.decryptString(refreshBuffer)
-                };
-            } else {
-                // Return as is if not encrypted
-                return saved;
-            }
+            // Always return data as-is since we're not using safeStorage anymore
+            // electron-store handles encryption/decryption internally
+            console.log('[AuthService.loadAuthData] Returning valid auth data');
+            return saved;
         } catch (error) {
-            console.error('Error loading auth data:', error);
+            console.error('[AuthService.loadAuthData] Error loading auth data:', error);
             return null;
         }
     }

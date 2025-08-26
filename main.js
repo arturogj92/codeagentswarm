@@ -180,14 +180,13 @@ async function handleAuthCallback(url) {
 
 // IPC handlers for auth
 ipcMain.handle('get-auth-data', async () => {
-  // First try to load from storage if not already loaded
-  if (!authService.getUser()) {
-    await authService.initialize();
-  }
+  console.log('[IPC] get-auth-data called');
   
-  // Return auth data from the service
+  // Return current auth state (already initialized during app startup)
   const user = authService.getUser();
   const token = authService.getToken();
+  
+  console.log('[IPC] Returning auth data, user:', user?.email || 'none');
   
   if (user && token) {
     return { user, token };
@@ -4581,16 +4580,6 @@ async function initializeApp() {
   const startTime = Date.now();
   console.log('[Startup] Initializing app...');
   
-  // Initialize auth service to restore saved credentials
-  try {
-    const isAuthenticated = await authService.initialize();
-    if (isAuthenticated) {
-      console.log('[Auth] Restored saved authentication');
-    }
-  } catch (error) {
-    console.error('[Auth] Failed to initialize auth service:', error);
-  }
-  
   // Set PATH early (synchronous)
   if (!process.env.PATH.includes('/opt/homebrew/bin')) {
     process.env.PATH = `/opt/homebrew/bin:${process.env.PATH}`;
@@ -4606,7 +4595,20 @@ async function initializeApp() {
   // Update splash status
   global.updateSplashStatus('Initializing...', 10);
   
-  // Create main window (hidden)
+  // Initialize auth service BEFORE creating main window to restore saved credentials
+  try {
+    console.log('[Auth] Initializing auth service...');
+    const isAuthenticated = await authService.initialize();
+    if (isAuthenticated) {
+      console.log('[Auth] Successfully restored saved authentication for user:', authService.getUser()?.email);
+    } else {
+      console.log('[Auth] No saved authentication found or session expired');
+    }
+  } catch (error) {
+    console.error('[Auth] Failed to initialize auth service:', error);
+  }
+  
+  // Create main window (hidden) - AFTER auth is initialized
   createWindow();
   console.log(`[Startup] Main window created in ${Date.now() - startTime}ms`);
   
@@ -5862,6 +5864,9 @@ ipcMain.handle('scan-git-projects', async () => {
     const projects = [];
     const terminalDirs = new Set();
     
+    // Track all discovered repository paths to prevent duplicates
+    const discoveredRepoPaths = new Set();
+    
     // Get current working directory from each active terminal
     const terminalMap = new Map();
     console.log('[Git Scan] Getting current directories from terminals:');
@@ -5913,6 +5918,9 @@ ipcMain.handle('scan-git-projects', async () => {
       return { success: true, projects: [] };
     }
     
+    // Track scanned subdirectories to prevent duplicates
+    const scannedSubdirs = new Set();
+    
     // Check each terminal directory for git repos
     for (const terminalDir of terminalDirs) {
       try {
@@ -5930,6 +5938,18 @@ ipcMain.handle('scan-git-projects', async () => {
         }
         
         if (isGitRepo) {
+          // Normalize the path to prevent duplicates
+          const normalizedPath = path.resolve(terminalDir);
+          
+          // Check if we've already discovered this repository
+          if (discoveredRepoPaths.has(normalizedPath)) {
+            console.log(`[Git Scan] Skipping duplicate repository: ${normalizedPath}`);
+            continue;
+          }
+          
+          // Mark this repository as discovered
+          discoveredRepoPaths.add(normalizedPath);
+          
           // Get status
           const statusOutput = execSync('git status --porcelain', {
             cwd: terminalDir,
@@ -5975,6 +5995,12 @@ ipcMain.handle('scan-git-projects', async () => {
             if (dirent.isDirectory() && !dirent.name.startsWith('.')) {
               const subdirPath = path.join(terminalDir, dirent.name);
               
+              // Skip if already scanned this subdirectory
+              if (scannedSubdirs.has(subdirPath)) {
+                console.log(`[Git Scan] Skipping ${subdirPath} - already scanned`);
+                continue;
+              }
+              
               try {
                 // Check if subdirectory has a .git folder
                 const gitPath = path.join(subdirPath, '.git');
@@ -5991,7 +6017,23 @@ ipcMain.handle('scan-git-projects', async () => {
                   stdio: ['pipe', 'pipe', 'ignore']
                 });
                 
+                // Normalize the path to prevent duplicates
+                const normalizedSubdirPath = path.resolve(subdirPath);
+                
+                // Check if we've already discovered this repository
+                if (discoveredRepoPaths.has(normalizedSubdirPath)) {
+                  console.log(`[Git Scan] Skipping duplicate repository (subdirectory): ${normalizedSubdirPath}`);
+                  continue;
+                }
+                
                 console.log(`[Git Scan] Found git repo at ${subdirPath}`);
+                
+                // Mark this repository as discovered
+                discoveredRepoPaths.add(normalizedSubdirPath);
+                
+                // Mark as scanned to prevent duplicates in subdirectory scanning
+                scannedSubdirs.add(subdirPath);
+                
                 // Subdirectory is a git repo, check status
                 const statusOutput = execSync('git status --porcelain', {
                   cwd: subdirPath,
@@ -6015,9 +6057,8 @@ ipcMain.handle('scan-git-projects', async () => {
                   return true;
                 });
                 
-                // Check if we already have this project
-                const exists = projects.some(p => p.path === subdirPath);
-                if (!exists) {
+                // No need to check if exists since we're using discoveredRepoPaths Set now
+                if (true) {
                   // Count unpushed commits
                   let unpushedCount = 0;
                   try {
@@ -6069,7 +6110,12 @@ ipcMain.handle('scan-git-projects', async () => {
     // Sort by change count
     projects.sort((a, b) => b.changeCount - a.changeCount);
     
-    console.log(`[Git Scan] Found ${projects.length} projects with changes:`, projects.map(p => p.name));
+    console.log(`[Git Scan] Found ${projects.length} unique projects (prevented ${discoveredRepoPaths.size - projects.length} duplicates)`);
+    console.log('[Git Scan] Projects found:', projects.map(p => ({
+      name: p.name,
+      path: p.path,
+      changeCount: p.changeCount
+    })));
     
     return { success: true, projects };
   } catch (error) {
@@ -6160,18 +6206,29 @@ ipcMain.handle('get-project-git-status', async (event, projectPath) => {
       stdio: ['pipe', 'pipe', 'ignore']
     }).trim();
     
-    // Get recent commits
-    const commits = execSync('git log --oneline -10', { 
-      cwd: projectPath, 
-      encoding: 'utf8',
-      stdio: ['pipe', 'pipe', 'ignore']
-    }).trim().split('\n').filter(line => line.length > 0).map(line => {
-      const [hash, ...messageParts] = line.split(' ');
-      return {
-        hash: hash,
-        message: messageParts.join(' ')
-      };
-    });
+    // Get recent commits - handle repositories with no commits
+    let commits = [];
+    try {
+      const commitsOutput = execSync('git log --oneline -10', { 
+        cwd: projectPath, 
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'ignore']
+      }).trim();
+      
+      if (commitsOutput) {
+        commits = commitsOutput.split('\n').filter(line => line.length > 0).map(line => {
+          const [hash, ...messageParts] = line.split(' ');
+          return {
+            hash: hash,
+            message: messageParts.join(' ')
+          };
+        });
+      }
+    } catch (error) {
+      // No commits yet - this is fine for new repositories
+      console.log('[Git Status] No commits yet in repository:', projectPath);
+      commits = [];
+    }
     
     // Check for unpushed commits
     let unpushedCount = 0;
@@ -6194,7 +6251,7 @@ ipcMain.handle('get-project-git-status', async (event, projectPath) => {
     } catch (e) {
       // No upstream branch configured
       hasUpstream = false;
-      // Count all commits if no upstream
+      // Count all commits if no upstream (handle repos with no commits)
       try {
         const allCommitsCount = execSync('git rev-list --count HEAD', {
           cwd: projectPath,

@@ -8,6 +8,7 @@
 const readline = require('readline');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
   
 // Initialize child process logger
 const ChildProcessLogger = require('../../shared/logger/child-process-logger');
@@ -19,6 +20,9 @@ let DatabaseManagerMCP;
 console.log('[MCP Server] Using standalone database module');
 DatabaseManagerMCP = require('../database/database-mcp-standalone');
 
+// PID lock file path
+const PID_FILE = path.join(os.homedir(), '.codeagentswarm', 'mcp-server.pid');
+
 class MCPStdioServer {
     constructor() {
         this.db = null;
@@ -26,6 +30,13 @@ class MCPStdioServer {
         this.startTime = Date.now();
         this.requestCount = 0;
         this.lastError = null;
+        this.pidFile = PID_FILE;
+        
+        // Check for existing instance before starting
+        if (!this.acquireLock()) {
+            this.logError('⚠️ Another MCP server instance is already running. Exiting...');
+            process.exit(0);
+        }
         
         this.logError('🚀 Starting MCP STDIO Server at', new Date().toISOString());
         
@@ -97,6 +108,62 @@ class MCPStdioServer {
         } catch (error) {
             this.logError('Failed to initialize database:', error.message);
             process.exit(1);
+        }
+    }
+
+    acquireLock() {
+        try {
+            // Ensure the directory exists
+            const lockDir = path.dirname(this.pidFile);
+            if (!fs.existsSync(lockDir)) {
+                fs.mkdirSync(lockDir, { recursive: true });
+            }
+
+            // Check if PID file exists
+            if (fs.existsSync(this.pidFile)) {
+                const existingPid = parseInt(fs.readFileSync(this.pidFile, 'utf8'));
+                
+                // Check if process is still running
+                if (this.isProcessRunning(existingPid)) {
+                    this.logError(`Process ${existingPid} is already running`);
+                    return false;
+                } else {
+                    this.logError(`Removing stale PID file for process ${existingPid}`);
+                    fs.unlinkSync(this.pidFile);
+                }
+            }
+
+            // Write our PID to the file
+            fs.writeFileSync(this.pidFile, process.pid.toString());
+            this.logError(`Lock acquired with PID ${process.pid}`);
+            return true;
+        } catch (error) {
+            this.logError('Failed to acquire lock:', error.message);
+            return false;
+        }
+    }
+
+    isProcessRunning(pid) {
+        try {
+            // Send signal 0 to check if process exists
+            process.kill(pid, 0);
+            return true;
+        } catch (error) {
+            return false;
+        }
+    }
+
+    releaseLock() {
+        try {
+            if (fs.existsSync(this.pidFile)) {
+                const storedPid = parseInt(fs.readFileSync(this.pidFile, 'utf8'));
+                if (storedPid === process.pid) {
+                    fs.unlinkSync(this.pidFile);
+                    this.logError(`Lock released for PID ${process.pid}`);
+                }
+            }
+        } catch (error) {
+            this.logError('Failed to release lock:', error.message);
         }
     }
 
@@ -1723,6 +1790,9 @@ class MCPStdioServer {
                 this.logError('❌ Error closing database:', error.message);
             }
         }
+        
+        // Release the PID lock
+        this.releaseLock();
         
         this.logError('👋 MCP server shutdown complete');
         process.exit(0);

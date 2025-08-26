@@ -2,8 +2,8 @@ const { ipcRenderer } = require('electron');
 const { Terminal } = require('xterm');
 const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
-const LogViewer = require('./src/presentation/components/log-viewer');
-const FeatureHighlight = require('./src/shared/utils/feature-highlight');
+const LogViewer = require('../components/log-viewer');
+const FeatureHighlight = require('../../shared/utils/feature-highlight');
 
 // Expose ipcRenderer globally for other modules
 window.ipcRenderer = ipcRenderer;
@@ -829,7 +829,6 @@ class TerminalManager {
                                 <div class="project-info">
                                     <span class="project-color-indicator" style="background-color: ${project.color}"></span>
                                     <span class="project-name">${project.display_name || project.name}</span>
-                                    <span class="project-path">${project.path}</span>
                                 </div>
                             </div>
                         `).join('')}
@@ -863,7 +862,7 @@ class TerminalManager {
                         </div>
                         <div class="directory-selector-buttons">
                             <button class="btn" id="choose-dir-btn" data-full-text="Browse..." data-short-text="Browse" data-tiny-text="📂">Browse...</button>
-                            ${this.lastSelectedDirectories[quadrant] ? '<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄">Use Last</button>' : ''}
+                            ${this.lastSelectedDirectories[quadrant] ? `<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄"><span class="btn-main-text">Use Last</span><span class="last-project-name">${this.lastSelectedDirectories[quadrant].split('/').pop()}</span></button>` : ''}
                             <button class="btn" id="cancel-btn" data-full-text="Cancel" data-short-text="Cancel" data-tiny-text="❌">Cancel</button>
                         </div>
                     </div>
@@ -872,6 +871,179 @@ class TerminalManager {
         `;
         
         wrapper.appendChild(selectorDiv);
+        
+        // Pre-apply responsive classes based on terminal count for instant styling
+        const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
+        if (terminalCount === 4) {
+            selectorDiv.classList.add('small-quadrant');
+        }
+        
+        // Force the projects list to expand to full height (fix CSS specificity issue)
+        // User confirmed this works: element.style { max-height: 100%; }
+        requestAnimationFrame(() => {
+            const projectsList = selectorDiv.querySelector('.recent-projects-list');
+            if (projectsList) {
+                projectsList.style.maxHeight = '100%';
+                projectsList.style.flex = '1 1 auto';
+                projectsList.style.minHeight = '0';
+                projectsList.style.overflow = 'auto';
+                
+                // Also ensure the container expands properly
+                const projectsContainer = selectorDiv.querySelector('.recent-projects-container');
+                if (projectsContainer) {
+                    projectsContainer.style.flex = '1 1 auto';
+                    projectsContainer.style.minHeight = '0';
+                    projectsContainer.style.display = 'flex';
+                    projectsContainer.style.flexDirection = 'column';
+                }
+                
+                // Ensure the content area expands
+                const contentArea = selectorDiv.querySelector('.directory-selector-content');
+                if (contentArea) {
+                    contentArea.style.display = 'flex';
+                    contentArea.style.flexDirection = 'column';
+                    contentArea.style.height = '100%';
+                }
+            }
+            
+            // Apply responsive layout immediately based on initial detection
+            const applyResponsiveLayout = () => {
+                const quadrantWidth = wrapper.offsetWidth;
+                const quadrantHeight = wrapper.offsetHeight;
+                
+                // Check if we have 4 terminals active
+                const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
+                const hasFourQuadrants = terminalCount === 4 || document.querySelector('.terminals-container.count-4');
+                
+                // Detect different size constraints
+                const isSmallWidth = quadrantWidth < 500;
+                const isMediumWidth = quadrantWidth < 800;
+                const isShortHeight = quadrantHeight < 400;  // Very short vertically
+                const isVerticallyConstrained = quadrantHeight < 500;
+                
+                // Apply horizontal layout if:
+                // 1. We have 4 quadrants AND the individual quadrant is small
+                // 2. OR the quadrant is extremely small (less than 500px width)
+                // 3. OR the quadrant is very short (less than 400px height)
+                const shouldUseHorizontalLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
+                
+                console.log(`Directory selector size detection:
+                    - Quadrant size: ${quadrantWidth}x${quadrantHeight}
+                    - Terminal count: ${terminalCount}
+                    - Has 4 quadrants: ${hasFourQuadrants}
+                    - Is small width: ${isSmallWidth}
+                    - Is short height: ${isShortHeight}
+                    - Should use horizontal: ${shouldUseHorizontalLayout}`);
+                
+                // Remove all responsive classes first
+                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained');
+                
+                if (shouldUseHorizontalLayout) {
+                    selectorDiv.classList.add('small-quadrant');
+                    
+                    // Apply horizontal layout directly via JavaScript for immediate effect
+                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                    if (mainSection) {
+                        mainSection.style.flexDirection = 'row';
+                        mainSection.style.gap = '8px';
+                        mainSection.style.alignItems = 'stretch';
+                        
+                        const leftSection = mainSection.querySelector('.directory-selector-left');
+                        const rightSection = mainSection.querySelector('.directory-selector-right');
+                        
+                        if (leftSection) {
+                            leftSection.style.flex = '1 1 55%';
+                            leftSection.style.maxWidth = '55%';
+                            leftSection.style.minHeight = 'auto';
+                        }
+                        
+                        if (rightSection) {
+                            rightSection.style.setProperty('flex', '1 1 45%', 'important');
+                            rightSection.style.setProperty('max-width', '45%', 'important');
+                            rightSection.style.setProperty('border-left', '1px solid rgba(255, 255, 255, 0.1)', 'important');
+                            rightSection.style.setProperty('border-top', 'none', 'important');
+                            rightSection.style.setProperty('padding-left', '15px', 'important');
+                            rightSection.style.setProperty('display', 'flex', 'important');
+                            rightSection.style.setProperty('flex-direction', 'column', 'important');
+                            rightSection.style.setProperty('justify-content', 'center', 'important');
+                            rightSection.style.setProperty('align-items', 'stretch', 'important');
+                            rightSection.style.setProperty('padding-top', '0', 'important');
+                            rightSection.style.setProperty('padding-bottom', '0', 'important');
+                            
+                            // Also ensure the buttons container is centered
+                            const buttonsContainer = rightSection.querySelector('.directory-selector-buttons');
+                            if (buttonsContainer) {
+                                buttonsContainer.style.setProperty('margin', 'auto 0', 'important');
+                                buttonsContainer.style.setProperty('display', 'flex', 'important');
+                                buttonsContainer.style.setProperty('flex-direction', 'column', 'important');
+                                buttonsContainer.style.setProperty('gap', '10px', 'important');
+                                buttonsContainer.style.setProperty('width', '100%', 'important');
+                            }
+                        }
+                    }
+                } else {
+                    // Reset to vertical layout
+                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                    if (mainSection) {
+                        mainSection.style.flexDirection = '';
+                        mainSection.style.gap = '';
+                        mainSection.style.alignItems = '';
+                        
+                        const leftSection = mainSection.querySelector('.directory-selector-left');
+                        const rightSection = mainSection.querySelector('.directory-selector-right');
+                        
+                        if (leftSection) {
+                            leftSection.style.flex = '';
+                            leftSection.style.maxWidth = '';
+                            leftSection.style.minHeight = '';
+                        }
+                        
+                        if (rightSection) {
+                            rightSection.style.flex = '';
+                            rightSection.style.maxWidth = '';
+                            rightSection.style.borderLeft = '';
+                            rightSection.style.borderTop = '';
+                            rightSection.style.paddingLeft = '';
+                            rightSection.style.display = '';
+                            rightSection.style.flexDirection = '';
+                            rightSection.style.justifyContent = '';
+                            rightSection.style.alignItems = '';
+                        }
+                    }
+                }
+                
+                // Add class for vertically constrained layouts (even if not using horizontal)
+                if (isVerticallyConstrained) {
+                    selectorDiv.classList.add('vertically-constrained');
+                    
+                    // Apply compact vertical spacing
+                    const contentArea = selectorDiv.querySelector('.directory-selector-content');
+                    if (contentArea) {
+                        contentArea.style.padding = '6px';
+                    }
+                    
+                    const projectItems = selectorDiv.querySelectorAll('.recent-project-item');
+                    projectItems.forEach(item => {
+                        item.style.padding = '4px 8px';
+                        item.style.marginBottom = '2px';
+                    });
+                    
+                    const buttons = selectorDiv.querySelectorAll('.directory-selector-buttons button');
+                    buttons.forEach(btn => {
+                        btn.style.minHeight = '28px';
+                        btn.style.padding = '4px 8px';
+                    });
+                }
+            };
+            
+            // Apply layout immediately to avoid visual flash
+            applyResponsiveLayout();
+            
+            // Also check again after a small delay in case DOM measurements change
+            requestAnimationFrame(() => {
+                applyResponsiveLayout();
+            });
+        });
         
         // Function to restore placeholder if cancelled
         let restorePlaceholder = () => {
@@ -883,7 +1055,7 @@ class TerminalManager {
                     <div class="terminal-placeholder" data-quadrant="${quadrant}">
                         <div class="terminal-placeholder-content">
                             <div class="terminal-placeholder-icon">
-                                <img src="assets/claude_terminal.png" alt="Claude">
+                                <img src="../assets/claude_terminal.png" alt="Claude">
                             </div>
                             <div class="terminal-placeholder-text">Start Claude Code</div>
                             <div class="terminal-placeholder-subtext">Click to launch terminal</div>
@@ -1027,15 +1199,27 @@ class TerminalManager {
             const buttons = content.querySelectorAll('.directory-selector-buttons .btn');
             
             buttons.forEach(btn => {
-                if (width < 400) {
-                    // Use icons for narrow terminals
-                    btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
-                } else if (width < 500) {
-                    // Use short text for medium terminals
-                    btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
+                // Special handling for use-last-btn to preserve project name
+                if (btn.id === 'use-last-btn') {
+                    const mainTextSpan = btn.querySelector('.btn-main-text');
+                    if (mainTextSpan) {
+                        if (width < 400) {
+                            mainTextSpan.textContent = btn.getAttribute('data-tiny-text') || '🔄';
+                        } else if (width < 500) {
+                            mainTextSpan.textContent = btn.getAttribute('data-short-text') || 'Last';
+                        } else {
+                            mainTextSpan.textContent = btn.getAttribute('data-full-text') || 'Use Last';
+                        }
+                    }
                 } else {
-                    // Use full text for wider terminals
-                    btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
+                    // Regular buttons
+                    if (width < 400) {
+                        btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
+                    } else if (width < 500) {
+                        btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
+                    } else {
+                        btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
+                    }
                 }
             });
         };
@@ -1092,6 +1276,18 @@ class TerminalManager {
                     <button class="btn" id="new-session-btn">
                         ✨ New
                     </button>
+                    <button class="btn btn-danger" id="skip-safety-btn" title="Hold for 3 seconds - Run in dangerous mode">
+                        <span class="btn-main-text">⚡ Dangerous Mode</span>
+                        <span class="btn-sub-text">(skip all confirmations)</span>
+                    </button>
+                </div>
+                <div class="session-danger-warning" id="danger-warning" style="display: none;">
+                    <span class="danger-icon">⚠️</span>
+                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+                </div>
+                <div class="session-danger-progress" id="danger-progress" style="display: none;">
+                    <div class="progress-bar"></div>
+                    <span class="progress-text">Keep holding... <span class="progress-countdown">3</span>s</span>
                 </div>
                 <div class="session-back-button">
                     <button class="btn btn-small" id="back-btn">← Back</button>
@@ -1118,6 +1314,91 @@ class TerminalManager {
             wrapper.removeChild(selectorDiv);
             this.startTerminal(quadrant, selectedDirectory, 'new');
         });
+
+        // Handle skip safety session (dangerous mode) - requires holding for 3 seconds
+        const skipBtn = selectorDiv.querySelector('#skip-safety-btn');
+        const warningDiv = selectorDiv.querySelector('#danger-warning');
+        const progressDiv = selectorDiv.querySelector('#danger-progress');
+        const progressBar = progressDiv?.querySelector('.progress-bar');
+        const progressCountdown = progressDiv?.querySelector('.progress-countdown');
+        
+        let holdTimer = null;
+        let holdStartTime = null;
+        let progressInterval = null;
+        const HOLD_DURATION = 3000; // 3 seconds
+        
+        const startHold = () => {
+            // Show warning and progress
+            warningDiv.style.display = 'block';
+            progressDiv.style.display = 'block';
+            skipBtn.classList.add('btn-danger-active');
+            
+            holdStartTime = Date.now();
+            
+            // Update progress bar
+            progressInterval = setInterval(() => {
+                const elapsed = Date.now() - holdStartTime;
+                const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+                const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+                
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+                if (progressCountdown) {
+                    progressCountdown.textContent = remaining;
+                }
+                
+                if (elapsed >= HOLD_DURATION) {
+                    clearInterval(progressInterval);
+                }
+            }, 50);
+            
+            // Set timer for 3 seconds
+            holdTimer = setTimeout(() => {
+                // Success! Launch dangerous mode
+                wrapper.removeChild(selectorDiv);
+                this.startTerminal(quadrant, selectedDirectory, 'dangerous');
+            }, HOLD_DURATION);
+        };
+        
+        const cancelHold = () => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            // Reset UI
+            warningDiv.style.display = 'none';
+            progressDiv.style.display = 'none';
+            skipBtn.classList.remove('btn-danger-active');
+            
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
+            if (progressCountdown) {
+                progressCountdown.textContent = '3';
+            }
+        };
+        
+        // Mouse events
+        skipBtn.addEventListener('mousedown', startHold);
+        skipBtn.addEventListener('mouseup', cancelHold);
+        skipBtn.addEventListener('mouseleave', cancelHold);
+        
+        // Touch events for mobile
+        skipBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startHold();
+        });
+        skipBtn.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            cancelHold();
+        });
+        skipBtn.addEventListener('touchcancel', cancelHold);
 
         // Handle back button
         selectorDiv.querySelector('#back-btn').addEventListener('click', () => {
@@ -1835,50 +2116,10 @@ class TerminalManager {
             }, 500);
             this.activityTimers.set(quadrant, timer);
             
-            // Auto-scroll on certain patterns - but NOT if user is manually scrolling
-            // dataStr already defined above
-            
-            // Don't auto-scroll if user is manually scrolling
-            if (!this.userScrolling.get(quadrant)) {
-                // Patterns that indicate important output requiring attention
-                const scrollPatterns = [
-                    'Welcome to Claude Code',
-                    'Do you want to',
-                    'Would you like to',
-                    'Continue?',
-                    'Press Enter',
-                    'Process exited',
-                    'Finished',
-                    'Complete',
-                    'Error:',
-                    'Failed',
-                    'Success',
-                    '✓',
-                    '✗',
-                    '⚠',
-                    '❌',
-                    '✅',
-                    '🎉',
-                    '🚀',
-                    'task completed',
-                    'task finished'
-                ];
-                
-                // Check if any pattern matches (case insensitive)
-                const shouldScroll = scrollPatterns.some(pattern => 
-                    dataStr.toLowerCase().includes(pattern.toLowerCase())
-                );
-                
-                if (shouldScroll) {
-                    // Small delay to ensure content is rendered
-                    setTimeout(() => {
-                        // Double-check user isn't scrolling before actually scrolling
-                        if (!this.userScrolling.get(quadrant)) {
-                            this.scrollTerminalToBottom(quadrant);
-                        }
-                    }, 50);
-                }
-            }
+            // DISABLED: Auto-scroll on patterns - this was too aggressive
+            // Users reported it was annoying and interrupted their workflow
+            // Now only auto-scrolls on explicit events (terminal exit, notifications, etc.)
+            // Users can manually scroll or click the scroll button when needed
         });
 
         // Handle terminal exit
@@ -2931,11 +3172,11 @@ class TerminalManager {
                 // Use custom icons for specific IDEs
                 let iconHtml;
                 if (ide.key === 'cursor') {
-                    iconHtml = '<img src="assets/cursor-icon.png" class="ide-icon" alt="Cursor">';
+                    iconHtml = '<img src="../assets/cursor-icon.png" class="ide-icon" alt="Cursor">';
                 } else if (ide.key === 'vscode') {
-                    iconHtml = '<img src="assets/vscode-icon.png" class="ide-icon" alt="VSCode">';
+                    iconHtml = '<img src="../assets/vscode-icon.png" class="ide-icon" alt="VSCode">';
                 } else if (ide.key === 'intellij') {
-                    iconHtml = '<img src="assets/intellij-icon.png" class="ide-icon" alt="IntelliJ">';
+                    iconHtml = '<img src="../assets/intellij-icon.png" class="ide-icon" alt="IntelliJ">';
                 } else {
                     // Fallback to Lucide icon
                     iconHtml = `<i data-lucide="${ide.icon}"></i>`;
@@ -3003,7 +3244,7 @@ class TerminalManager {
         });
         
         document.querySelectorAll('.terminal-dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => {
+            item.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 const action = item.dataset.action;
                 const terminal = parseInt(item.dataset.terminal);
@@ -3016,13 +3257,14 @@ class TerminalManager {
                     dropdown.style.display = 'none';
                 }
                 
+                // Call methods on the class instance
                 if (action === 'open-terminal-here') {
-                    this.openTerminalInProjectPath(terminal);
+                    await this.handleOpenTerminalInPath(terminal);
                 } else if (action === 'open-folder') {
-                    this.openProjectFolder(terminal);
+                    await this.handleOpenFolder(terminal);
                 } else if (action === 'open-in-ide') {
                     const ideKey = item.dataset.ide;
-                    this.openInIDE(terminal, ideKey);
+                    await this.openInIDE(terminal, ideKey);
                 }
             });
         });
@@ -3457,6 +3699,9 @@ class TerminalManager {
         scrollBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             scrollToBottom();
+            // Clear user scrolling flag when button is clicked
+            this.userScrolling.set(quadrant, false);
+            console.log(`📜 Scroll button clicked for terminal ${quadrant}, auto-scroll re-enabled`);
         });
         
         // Show/hide button based on scroll position
@@ -3478,30 +3723,17 @@ class TerminalManager {
                         clearTimeout(this.scrollTimeouts.get(quadrant));
                     }
                     
-                    // Reset user scrolling flag after 30 seconds of no scroll activity
-                    // Increased from 10 to 30 seconds for longer Claude outputs
-                    const timeoutId = setTimeout(() => {
-                        // Don't clear if Claude is still outputting
-                        if (!this.claudeOutputting.get(quadrant)) {
-                            this.userScrolling.set(quadrant, false);
-                            this.scrollTimeouts.delete(quadrant);
-                            console.log(`📜 Cleared user scrolling flag for terminal ${quadrant} after timeout`);
-                        } else {
-                            // Claude is still outputting, extend the timeout
-                            console.log(`📜 Claude still outputting to terminal ${quadrant}, extending scroll lock`);
-                            const newTimeoutId = setTimeout(() => {
-                                this.userScrolling.set(quadrant, false);
-                                this.scrollTimeouts.delete(quadrant);
-                            }, 30000);
-                            this.scrollTimeouts.set(quadrant, newTimeoutId);
-                        }
-                    }, 30000);
-                    
-                    this.scrollTimeouts.set(quadrant, timeoutId);
+                    // Don't auto-reset the user scrolling flag with a timeout
+                    // Instead, only reset when user scrolls back to bottom or clicks the scroll button
+                    // This prevents the annoying auto-scroll behavior
+                    console.log(`📜 User is scrolling terminal ${quadrant}, auto-scroll disabled`);
                 } else {
                     scrollBtn.classList.remove('show');
-                    // User is at bottom - clear user scrolling flag
-                    this.userScrolling.set(quadrant, false);
+                    // User has scrolled back to bottom - clear the user scrolling flag
+                    if (this.userScrolling.get(quadrant)) {
+                        this.userScrolling.set(quadrant, false);
+                        console.log(`📜 User scrolled back to bottom in terminal ${quadrant}, auto-scroll re-enabled`);
+                    }
                     
                     // Clear timeout if exists
                     if (this.scrollTimeouts.has(quadrant)) {
@@ -3679,15 +3911,54 @@ class TerminalManager {
             createTaskBtn.blur();
         }
         
+        // Check if TaskModal is available or load it
+        const loadAndShowModal = () => {
+            console.log('Attempting to show task modal...');
+            console.log('TaskModal available:', typeof window.TaskModal);
+            
+            // Check if TaskModal class exists
+            if (typeof window.TaskModal !== 'undefined') {
+                console.log('Using TaskModal component');
+                const modal = new window.TaskModal({
+                    terminals: this.terminals,
+                    activeTerminalId: this.activeTerminal,
+                    onSave: (taskData) => {
+                        // Send task creation request
+                        ipcRenderer.send('create-task', {
+                            title: taskData.title,
+                            description: taskData.description || undefined,
+                            plan: taskData.plan || undefined,
+                            implementation: taskData.implementation || undefined,
+                            project: taskData.project || undefined,
+                            terminal_id: taskData.terminal_id ? parseInt(taskData.terminal_id) : undefined,
+                            parent_task_id: taskData.parent_task_id ? parseInt(taskData.parent_task_id) : undefined,
+                            status: taskData.status || 'pending'
+                        });
+                    },
+                    onCancel: () => {
+                        // Modal closed
+                    }
+                });
+                
+                modal.show();
+            } else {
+                console.log('TaskModal not found, falling back to simple modal');
+                this.createSimpleTaskModal(); // Fallback to simple modal
+            }
+        };
+        
+        loadAndShowModal();
+    }
+
+    createSimpleTaskModal() {
+        // Fallback to simple modal if TaskModal component fails to load
+        const activeTerminalId = this.activeTerminal;
+        
         // Remove existing modal if present
         const existingModal = document.querySelector('.create-task-modal');
         if (existingModal) {
             existingModal.remove();
         }
-
-        // Get active terminal
-        const activeTerminalId = this.activeTerminal;
-        const terminalId = activeTerminalId !== null ? activeTerminalId + 1 : null;
 
         // Create modal
         const modal = document.createElement('div');
@@ -3737,7 +4008,6 @@ class TerminalManager {
                 </div>
             </div>
         `;
-
         document.body.appendChild(modal);
         
         // Add show class for animation
@@ -3749,50 +4019,36 @@ class TerminalManager {
         if (window.lucide) {
             window.lucide.createIcons();
         }
-
+        
         // Load projects for the dropdown
         this.loadProjectsForModal();
-
+        
         // Focus on title input
         const titleInput = document.getElementById('task-title');
         titleInput.focus();
-
+        
         // Event listeners
         const closeModal = () => {
             modal.classList.remove('show');
             setTimeout(() => modal.remove(), 200);
-            document.removeEventListener('keydown', handleEscKey);
         };
-
-        // Handle Escape key
-        const handleEscKey = (e) => {
-            if (e.key === 'Escape') {
-                closeModal();
-            }
-        };
-        document.addEventListener('keydown', handleEscKey);
-
+        
         document.getElementById('close-create-task-modal').addEventListener('click', closeModal);
         document.getElementById('cancel-create-task').addEventListener('click', closeModal);
-
+        
         const self = this;
         document.getElementById('confirm-create-task').addEventListener('click', async () => {
             const title = document.getElementById('task-title').value.trim();
             const description = document.getElementById('task-description').value.trim();
             const project = document.getElementById('task-project').value;
             const terminalId = document.getElementById('task-terminal').value;
-
+            
             if (!title) {
-                // Use notification for now while we debug the alert
                 self.showNotification('Please enter a task title', 'warning');
                 document.getElementById('task-title').focus();
-                document.getElementById('task-title').classList.add('error');
-                setTimeout(() => {
-                    document.getElementById('task-title').classList.remove('error');
-                }, 2000);
                 return;
             }
-
+            
             // Send task creation request
             ipcRenderer.send('create-task', {
                 title,
@@ -3800,24 +4056,17 @@ class TerminalManager {
                 project: project || undefined,
                 terminal_id: terminalId ? parseInt(terminalId) : undefined
             });
-
+            
             closeModal();
         });
-
-        // Allow Enter key to create task
-        titleInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                document.getElementById('confirm-create-task').click();
-            }
-        });
-
-        // Click outside to close
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
+        
+        // Handle Escape key
+        const handleEscKey = (e) => {
+            if (e.key === 'Escape') {
                 closeModal();
             }
-        });
+        };
+        document.addEventListener('keydown', handleEscKey);
     }
 
     displayProjectSelectionModal(projects) {
@@ -6229,6 +6478,17 @@ class TerminalManager {
                             <i data-lucide="chevron-down"></i>
                         </button>
                     </div>
+                    <div class="terminal-quick-actions">
+                        <button class="terminal-quick-btn" data-action="mcp" data-terminal="${terminalId}" title="View configured MCP servers">
+                            <i data-lucide="server"></i>
+                        </button>
+                        <button class="terminal-quick-btn" data-action="clear" data-terminal="${terminalId}" title="Clear context - Recommended between tasks">
+                            <i data-lucide="eraser"></i>
+                        </button>
+                        <button class="terminal-quick-btn" data-action="memory" data-terminal="${terminalId}" title="Add memory context - Use # to store important context">
+                            <i data-lucide="brain"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="terminal-controls">
                     <div class="terminal-reorder-controls" style="${this.fullscreenTerminal !== null ? 'display: none;' : ''}">
@@ -6265,7 +6525,7 @@ class TerminalManager {
                     `<div class="terminal-placeholder" data-quadrant="${terminalId}">
                         <div class="terminal-placeholder-content">
                             <div class="terminal-placeholder-icon">
-                                <img src="assets/claude_terminal.png" alt="Claude">
+                                <img src="../assets/claude_terminal.png" alt="Claude">
                             </div>
                             <div class="terminal-placeholder-text">Start Claude Code</div>
                             <div class="terminal-placeholder-subtext">Click to launch terminal</div>
@@ -6366,12 +6626,53 @@ class TerminalManager {
                         // Only show color picker if clicking on the header itself (not controls)
                         if (!e.target.closest('.terminal-controls') && 
                             !e.target.closest('.git-branch-display') && 
-                            !e.target.closest('.current-task')) {
+                            !e.target.closest('.current-task') &&
+                            !e.target.closest('.terminal-quick-actions') &&
+                            !e.target.closest('.task-id-badge')) {
                             this.showColorPicker(quadrant, e);
                         }
                     });
                 }
             }
+        });
+
+        // Re-attach quick action button listeners
+        document.querySelectorAll('.terminal-quick-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const terminalId = parseInt(btn.dataset.terminal);
+                
+                if (!this.terminals.has(terminalId)) {
+                    console.log(`Terminal ${terminalId} not initialized`);
+                    return;
+                }
+                
+                const terminal = this.terminals.get(terminalId);
+                if (!terminal || !terminal.terminal) {
+                    console.log(`Terminal ${terminalId} not ready`);
+                    return;
+                }
+                
+                // Write the appropriate command to the terminal
+                switch(action) {
+                    case 'mcp':
+                        // Write /mcp command to terminal
+                        terminal.terminal.paste('/mcp');
+                        terminal.terminal.focus();
+                        break;
+                    case 'clear':
+                        // Write /clear command to terminal
+                        terminal.terminal.paste('/clear');
+                        terminal.terminal.focus();
+                        break;
+                    case 'memory':
+                        // Write # for memory context
+                        terminal.terminal.paste('#');
+                        terminal.terminal.focus();
+                        break;
+                }
+            });
         });
 
         // Re-attach control button listeners
@@ -6563,6 +6864,12 @@ class TerminalManager {
         console.log('Switching from grid to tabbed mode...');
         this.layoutMode = 'tabbed';
         
+        // Clean up any open directory selectors before switching modes
+        document.querySelectorAll('.directory-selector').forEach(selector => {
+            console.log('Removing orphaned directory selector before mode switch');
+            selector.remove();
+        });
+        
         // Save current terminal titles before switching (without terminal number prefix)
         const savedTitles = new Map();
         this.terminals.forEach((terminal, quadrant) => {
@@ -6645,6 +6952,12 @@ class TerminalManager {
 
     switchToGridMode() {
         console.log('Switching from tabbed to grid mode...');
+        
+        // Clean up any open directory selectors before switching modes
+        document.querySelectorAll('.directory-selector').forEach(selector => {
+            console.log('Removing orphaned directory selector before mode switch');
+            selector.remove();
+        });
         
         // Save current terminal titles before switching (clean titles without numbers)
         const savedTitles = new Map();
@@ -8276,7 +8589,7 @@ class TerminalManager {
         if (!this.settingsOptimizer) {
             try {
                 // Try to load settings optimizer if available
-                const SettingsOptimizer = require('./settings-optimizer');
+                const SettingsOptimizer = require('../../shared/utils/settings-optimizer');
                 this.settingsOptimizer = new SettingsOptimizer();
             } catch (e) {
                 // Fallback if settings-optimizer is not available in production
@@ -8443,7 +8756,7 @@ class TerminalManager {
                 
                 if (result.success) {
                     // Update logger state
-                    const logger = require('./logger');
+                    const logger = require('../../shared/logger/logger');
                     if (debugModeEnabled) {
                         logger.enable();
                     } else {
@@ -8454,7 +8767,7 @@ class TerminalManager {
                     if (debugModeEnabled) {
                         // Create LogViewer if it doesn't exist
                         if (!window.logViewer) {
-                            const LogViewer = require('./src/presentation/components/log-viewer');
+                            const LogViewer = require('../components/log-viewer');
                             window.logViewer = new LogViewer();
                         }
                         window.logViewer.setDebugMode(true);
@@ -9117,7 +9430,7 @@ class TerminalManager {
 ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
     if (isDevMode) {
         // Enable logger
-        const logger = require('./logger');
+        const logger = require('../../shared/logger/logger');
         logger.enable();
         
         // Initialize LogViewer if not already initialized
@@ -9126,7 +9439,7 @@ ipcRenderer.on('dev-mode-status', (event, isDevMode) => {
             window.logViewer.setDebugMode(true);
         } else {
             // Create LogViewer if it doesn't exist
-            const LogViewer = require('./src/presentation/components/log-viewer');
+            const LogViewer = require('../components/log-viewer');
             window.logViewer = new LogViewer();
             window.logViewer.setDebugMode(true);
         }
@@ -9301,7 +9614,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         const debugModeResult = await ipcRenderer.invoke('get-debug-mode');
         if (debugModeResult.success) {
             debugEnabled = debugModeResult.enabled;
-            const logger = require('./logger');
+            const logger = require('../../shared/logger/logger');
             if (debugEnabled) {
                 logger.enable();
             } else {
@@ -9558,10 +9871,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 function initializeMCPSettings() {
     try {
         // Load the MCP modules
-        const MCPValidator = require('./modules/mcp/MCPValidator');
-        const MCPManager = require('./modules/mcp/MCPManager');
-        const MCPRenderer = require('./modules/mcp/MCPRenderer');
-        const MCPMarketplace = require('./modules/mcp/MCPMarketplace');
+        const MCPValidator = require('../../modules/mcp/MCPValidator');
+        const MCPManager = require('../../modules/mcp/MCPManager');
+        const MCPRenderer = require('../../modules/mcp/MCPRenderer');
+        const MCPMarketplace = require('../../modules/mcp/MCPMarketplace');
         
         // Create instances
         const validator = new MCPValidator();
