@@ -173,6 +173,10 @@ class AuthManager {
         try {
             console.log('Checking auth status...');
             // Check if we have saved auth data
+            if (!window.ipcRenderer) {
+                console.warn('ipcRenderer not available, skipping auth check');
+                return;
+            }
             const authData = await window.ipcRenderer.invoke('get-auth-data');
             console.log('Auth data received:', authData);
             
@@ -435,13 +439,25 @@ class AuthManager {
     }
 }
 
-// Initialize when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => {
+// Initialize when DOM is ready and ipcRenderer is available
+function initAuthManager() {
+    // Check if ipcRenderer is available, if not wait a bit
+    if (!window.ipcRenderer) {
+        console.log('Waiting for ipcRenderer to be available...');
+        setTimeout(initAuthManager, 100);
+        return;
+    }
+    
+    // Only create if not already created
+    if (!window.authManager) {
         window.authManager = new AuthManager();
-    });
+    }
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthManager);
 } else {
-    window.authManager = new AuthManager();
+    initAuthManager();
 }
 
 module.exports = AuthManager;

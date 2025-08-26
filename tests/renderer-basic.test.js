@@ -43,7 +43,7 @@ describe('renderer.js basic tests', () => {
         }));
 
         // The renderer.js file exists
-        const rendererPath = require.resolve('../renderer.js');
+        const rendererPath = require.resolve('../src/presentation/renderer/renderer.js');
         expect(rendererPath).toBeTruthy();
     });
 
@@ -52,7 +52,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -65,7 +65,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -79,7 +79,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -93,7 +93,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -109,7 +109,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -125,7 +125,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -139,7 +139,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -154,7 +154,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -170,7 +170,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -185,7 +185,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -202,7 +202,7 @@ describe('renderer.js basic tests', () => {
         const fs = require('fs');
         const path = require('path');
         const rendererContent = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         

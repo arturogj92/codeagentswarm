@@ -1358,6 +1358,17 @@ body::before {
   color: var(--text-secondary);
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  transition: all 0.2s ease;
+  padding: 2px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.terminal-title:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  transform: translateX(2px);
 }
 
 .current-task {

@@ -7,7 +7,7 @@ describe('renderer.js integration tests', () => {
     test('renderer.js file exists and has valid syntax', () => {
         const fs = require('fs');
         const path = require('path');
-        const rendererPath = path.join(__dirname, '..', 'renderer.js');
+        const rendererPath = path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js');
         
         // Check file exists
         expect(fs.existsSync(rendererPath)).toBe(true);
@@ -26,7 +26,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -44,7 +44,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -66,7 +66,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -90,7 +90,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -111,7 +111,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -135,7 +135,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -151,7 +151,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -176,7 +176,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -192,7 +192,7 @@ describe('renderer.js integration tests', () => {
         const fs = require('fs');
         const path = require('path');
         const content = fs.readFileSync(
-            path.join(__dirname, '..', 'renderer.js'),
+            path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js'),
             'utf8'
         );
         
@@ -202,8 +202,8 @@ describe('renderer.js integration tests', () => {
             'xterm',
             'xterm-addon-fit',
             'xterm-addon-web-links',
-            './src/presentation/components/log-viewer',
-            './src/shared/utils/feature-highlight'
+            '../components/log-viewer',
+            '../../shared/utils/feature-highlight'
         ];
         
         modules.forEach(module => {

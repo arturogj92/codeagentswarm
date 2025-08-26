@@ -2172,16 +2172,14 @@ class TerminalManager {
             }
         }
         
-        // Add click event to terminal header for color selection
-        const terminalHeader = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-header`);
-        if (terminalHeader) {
-            terminalHeader.addEventListener('click', (e) => {
-                // Only show color picker if clicking on the header itself (not controls)
-                if (!e.target.closest('.terminal-controls') && 
-                    !e.target.closest('.git-branch-display') && 
-                    !e.target.closest('.current-task')) {
-                    this.showColorPicker(quadrant, e);
-                }
+        // Add click event to terminal title for color selection
+        const terminalTitleElement = document.querySelector(`[data-quadrant="${quadrant}"] .terminal-title`);
+        if (terminalTitleElement) {
+            terminalTitleElement.style.cursor = 'pointer'; // Show it's clickable
+            terminalTitleElement.title = 'Click to change project color'; // Add tooltip
+            terminalTitleElement.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent event bubbling
+                this.showColorPicker(quadrant, e);
             });
         }
         
@@ -3268,6 +3266,61 @@ class TerminalManager {
                 }
             });
         });
+    }
+
+    attachQuickActionListeners() {
+        console.log('Attaching quick action listeners...');
+        
+        // Remove existing listeners to avoid duplicates
+        document.querySelectorAll('.terminal-quick-btn').forEach(btn => {
+            const newBtn = btn.cloneNode(true);
+            btn.replaceWith(newBtn);
+        });
+        
+        // Re-attach quick action button listeners
+        document.querySelectorAll('.terminal-quick-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const action = btn.dataset.action;
+                const terminalId = parseInt(btn.dataset.terminal);
+                
+                console.log(`Quick action: ${action} for terminal ${terminalId}`);
+                
+                if (!this.terminals.has(terminalId)) {
+                    console.log(`Terminal ${terminalId} not initialized`);
+                    return;
+                }
+                
+                const terminal = this.terminals.get(terminalId);
+                if (!terminal || !terminal.terminal) {
+                    console.log(`Terminal ${terminalId} not ready`);
+                    return;
+                }
+                
+                // Write the appropriate command to the terminal
+                switch(action) {
+                    case 'mcp':
+                        // Write /mcp command to terminal
+                        terminal.terminal.paste('/mcp');
+                        terminal.terminal.focus();
+                        break;
+                    case 'clear':
+                        // Write /clear command to terminal
+                        terminal.terminal.paste('/clear');
+                        terminal.terminal.focus();
+                        break;
+                    case 'memory':
+                        // Write # for memory context
+                        terminal.terminal.paste('#');
+                        terminal.terminal.focus();
+                        break;
+                    default:
+                        console.log(`Unknown quick action: ${action}`);
+                }
+            });
+        });
+        
+        console.log(`Attached listeners to ${document.querySelectorAll('.terminal-quick-btn').length} quick action buttons`);
     }
 
     toggleDropdownMenu(quadrant) {
@@ -6622,22 +6675,18 @@ class TerminalManager {
             console.log(`Added delegated click listener to ${container.id}`);
         });
 
-        // Re-attach color picker event listeners to terminal headers
-        document.querySelectorAll('.terminal-header').forEach(terminalHeader => {
-            const quadrantElement = terminalHeader.closest('.terminal-quadrant');
+        // Re-attach color picker event listeners to terminal titles
+        document.querySelectorAll('.terminal-title').forEach(terminalTitleEl => {
+            const quadrantElement = terminalTitleEl.closest('.terminal-quadrant');
             if (quadrantElement) {
                 const quadrant = parseInt(quadrantElement.dataset.quadrant);
                 // Only add listener if terminal is active (has a terminal instance)
                 if (this.terminals.has(quadrant)) {
-                    terminalHeader.addEventListener('click', (e) => {
-                        // Only show color picker if clicking on the header itself (not controls)
-                        if (!e.target.closest('.terminal-controls') && 
-                            !e.target.closest('.git-branch-display') && 
-                            !e.target.closest('.current-task') &&
-                            !e.target.closest('.terminal-quick-actions') &&
-                            !e.target.closest('.task-id-badge')) {
-                            this.showColorPicker(quadrant, e);
-                        }
+                    terminalTitleEl.style.cursor = 'pointer'; // Show it's clickable
+                    terminalTitleEl.title = 'Click to change project color'; // Add tooltip
+                    terminalTitleEl.addEventListener('click', (e) => {
+                        e.stopPropagation(); // Prevent event bubbling
+                        this.showColorPicker(quadrant, e);
                     });
                 }
             }
@@ -7039,6 +7088,8 @@ class TerminalManager {
             this.attachTerminalEventListeners();
             // Also re-attach control button listeners specifically
             this.attachTerminalControlListeners();
+            // Re-attach quick action button listeners
+            this.attachQuickActionListeners();
             console.log('Grid mode switch complete, all event listeners re-attached');
         });
     }
@@ -7184,6 +7235,9 @@ class TerminalManager {
         
         // Re-attach terminal control button event listeners
         this.attachTerminalControlListeners();
+        
+        // Re-attach quick action button listeners for tabbed mode
+        this.attachQuickActionListeners();
         
         console.log('Tabbed layout rendered, event listeners attached');
         

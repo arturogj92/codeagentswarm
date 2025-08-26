@@ -141,7 +141,7 @@ describe('renderer.js - Mini Functional Tests', () => {
         // We need to load the module in a way that extracts the class
         const fs = require('fs');
         const path = require('path');
-        const rendererPath = path.join(__dirname, '..', 'renderer.js');
+        const rendererPath = path.join(__dirname, '..', 'src', 'presentation', 'renderer', 'renderer.js');
         const rendererContent = fs.readFileSync(rendererPath, 'utf8');
         
         // Extract the TerminalManager class definition

@@ -223,7 +223,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can trigger IPC events after loading', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         
         // Wait for async initialization
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -245,7 +245,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can simulate terminal switching', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Simulate switching terminals via IPC
@@ -258,7 +258,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle layout changes', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Trigger layout change - this event might not exist or work differently
@@ -273,7 +273,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle dev mode status', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Trigger dev mode status update in a try-catch
@@ -293,7 +293,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle confirmation needed', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Trigger confirmation needed
@@ -308,7 +308,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle clear waiting states', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Clear waiting states
@@ -320,7 +320,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle claude finished', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Claude finished event
@@ -332,7 +332,7 @@ describe('renderer.js - Method Execution Tests', () => {
     });
 
     test('Can handle window resize', async () => {
-        const renderer = require('../renderer.js');
+        const renderer = require('../src/presentation/renderer/renderer.js');
         await new Promise(resolve => setTimeout(resolve, 100));
         
         // Trigger resize

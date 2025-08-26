@@ -180,7 +180,7 @@ describe('renderer.js - Real Execution Tests', () => {
     test('renderer.js loads and initializes', () => {
         // This will actually execute the renderer.js code
         expect(() => {
-            renderer = require('../renderer.js');
+            renderer = require('../src/presentation/renderer/renderer.js');
         }).not.toThrow();
 
         // Check that it logged the loading message
@@ -195,14 +195,14 @@ describe('renderer.js - Real Execution Tests', () => {
         });
 
         // Require renderer which will try to load performance monitor
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // The function should handle the error gracefully
         expect(consoleLogSpy).toHaveBeenCalled();
     });
 
     test('TerminalManager initialization is attempted', async () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // The init happens asynchronously, so we wait a bit
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -222,7 +222,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Window exposes ipcRenderer', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // Check that ipcRenderer is exposed on window
         expect(window.ipcRenderer).toBeDefined();
@@ -234,7 +234,7 @@ describe('renderer.js - Real Execution Tests', () => {
     test('Can handle keyboard events setup', () => {
         // Since renderer.js is already loaded, we can't test addEventListener
         // But we can verify the module was loaded successfully
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // Instead, verify that the renderer loaded without errors
         // and that it would be ready to handle keyboard events
@@ -244,7 +244,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Terminal creation helper functions work', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // Test the visual order calculation
         const getVisualIndex = (index, visualOrder) => {
@@ -261,7 +261,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Layout configurations are valid', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         const validLayouts = [
             'horizontal', 'vertical', 'grid', 'tabbed',
@@ -278,7 +278,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Terminal activity tracking works', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         // Simulate activity tracking
         const terminalActivity = new Map();
@@ -309,7 +309,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Notification blocking mechanism', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         const notificationBlocked = new Map();
         const waitingForUserInteraction = new Map();
@@ -342,7 +342,7 @@ describe('renderer.js - Real Execution Tests', () => {
 
     test('User interaction timers', () => {
         jest.useFakeTimers();
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         const userTypingTimers = new Map();
         
@@ -384,7 +384,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Directory path validation', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         const isValidDirectory = (path) => {
             if (!path || typeof path !== 'string') return false;
@@ -400,7 +400,7 @@ describe('renderer.js - Real Execution Tests', () => {
     });
 
     test('Terminal focus management', () => {
-        renderer = require('../renderer.js');
+        renderer = require('../src/presentation/renderer/renderer.js');
         
         const terminalFocused = new Map();
         let activeTerminal = null;
