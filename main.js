@@ -1488,6 +1488,8 @@ ipcMain.handle('create-terminal', async (event, quadrant, customWorkingDir, sess
         let command;
         if (sessionType === 'dangerous') {
           command = 'claude --dangerously-skip-permissions';
+        } else if (sessionType === 'dangerous-resume') {
+          command = 'claude --resume --dangerously-skip-permissions';
         } else if (sessionType === 'new') {
           command = 'claude';
         } else {

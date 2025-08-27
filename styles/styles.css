@@ -2345,6 +2345,162 @@ body::before {
   }
 }
 
+/* Session danger toggle section */
+.session-danger-toggle {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(100, 100, 100, 0.2);
+}
+
+.btn-danger-toggle {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.1) 0%, rgba(200, 35, 51, 0.05) 100%);
+  border: 1px solid rgba(220, 53, 69, 0.3);
+  color: #ff8a8a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-danger-toggle:hover {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.2) 0%, rgba(200, 35, 51, 0.1) 100%);
+  border-color: rgba(220, 53, 69, 0.5);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(220, 53, 69, 0.2);
+}
+
+.btn-danger-toggle .toggle-icon {
+  font-size: 1rem;
+}
+
+/* Danger mode indicator when active */
+.danger-mode-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.2) 0%, rgba(200, 35, 51, 0.15) 100%);
+  border: 2px solid rgba(220, 53, 69, 0.5);
+  border-radius: 6px;
+  animation: dangerPulse 2s ease-in-out infinite;
+}
+
+@keyframes dangerPulse {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(220, 53, 69, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(220, 53, 69, 0.6);
+  }
+}
+
+.danger-active-icon {
+  font-size: 1.2rem;
+  animation: bounce 1.5s ease-in-out infinite;
+}
+
+.danger-active-text {
+  color: #ff8a8a;
+  font-weight: 700;
+  font-size: 0.875rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.btn-exit-danger {
+  padding: 6px 12px;
+  background: rgba(100, 100, 100, 0.1);
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  color: #aaa;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-exit-danger:hover {
+  background: rgba(100, 100, 100, 0.2);
+  border-color: rgba(100, 100, 100, 0.5);
+  color: #ccc;
+}
+
+/* Updated button styles when in danger mode */
+.btn-danger-mode {
+  background: linear-gradient(135deg, rgba(220, 53, 69, 0.8) 0%, rgba(200, 35, 51, 0.7) 100%);
+  border: 2px solid rgba(220, 53, 69, 0.8);
+  color: white;
+  box-shadow: 0 0 20px rgba(220, 53, 69, 0.4);
+  position: relative;
+}
+
+.btn-danger-mode::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  right: -2px;
+  bottom: -2px;
+  background: linear-gradient(135deg, #ff6b6b, #dc3545);
+  border-radius: 6px;
+  opacity: 0;
+  z-index: -1;
+  animation: dangerGlow 2s ease-in-out infinite;
+}
+
+@keyframes dangerGlow {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.btn-danger-mode:hover {
+  transform: translateY(-2px) scale(1.02);
+  box-shadow: 0 0 30px rgba(220, 53, 69, 0.6);
+}
+
+.btn-danger-mode .btn-icon {
+  animation: electricPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes electricPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  25% {
+    transform: scale(1.1) rotate(-5deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(5deg);
+  }
+}
+
+/* Session selector button text structure */
+.session-selector-buttons .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.session-selector-buttons .btn .btn-icon {
+  font-size: 1rem;
+}
+
+.session-selector-buttons .btn .btn-text {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
 /* Danger warning message */
 .session-danger-warning {
   display: flex;

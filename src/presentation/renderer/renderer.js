@@ -1277,19 +1277,28 @@ class TerminalManager {
                 </div>
                 <div class="session-selector-buttons">
                     <button class="btn btn-primary" id="resume-session-btn">
-                        🔄 Resume
+                        <span class="btn-icon">🔄</span>
+                        <span class="btn-text">Resume</span>
                     </button>
                     <button class="btn" id="new-session-btn">
-                        ✨ New
+                        <span class="btn-icon">✨</span>
+                        <span class="btn-text">New</span>
                     </button>
-                    <button class="btn btn-danger" id="skip-safety-btn" title="Hold for 3 seconds - Run in dangerous mode">
-                        <span class="btn-main-text">⚡ Dangerous Mode</span>
-                        <span class="btn-sub-text">(skip all confirmations)</span>
+                </div>
+                <div class="session-danger-toggle">
+                    <button class="btn btn-danger-toggle" id="danger-mode-toggle" title="Hold for 3 seconds to enable dangerous mode">
+                        <span class="toggle-icon">⚡</span>
+                        <span class="toggle-text">Enable Danger Mode</span>
                     </button>
+                    <div class="danger-mode-indicator" id="danger-mode-indicator" style="display: none;">
+                        <span class="danger-active-icon">⚠️</span>
+                        <span class="danger-active-text">DANGER MODE ACTIVE</span>
+                        <button class="btn btn-small btn-exit-danger" id="exit-danger-btn">Exit</button>
+                    </div>
                 </div>
                 <div class="session-danger-warning" id="danger-warning" style="display: none;">
                     <span class="danger-icon">⚠️</span>
-                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+                    <span class="danger-text">Hold button for 3 seconds to enable dangerous mode - skips ALL confirmations!</span>
                 </div>
                 <div class="session-danger-progress" id="danger-progress" style="display: none;">
                     <div class="progress-bar"></div>
@@ -1309,20 +1318,68 @@ class TerminalManager {
             this.showDirectorySelector(quadrant);
         };
 
+        // Track danger mode state
+        let isDangerMode = false;
+
+        const resumeBtn = selectorDiv.querySelector('#resume-session-btn');
+        const newBtn = selectorDiv.querySelector('#new-session-btn');
+        const dangerToggle = selectorDiv.querySelector('#danger-mode-toggle');
+        const dangerIndicator = selectorDiv.querySelector('#danger-mode-indicator');
+        const exitDangerBtn = selectorDiv.querySelector('#exit-danger-btn');
+
+        // Function to update button states based on danger mode
+        const updateButtonStates = () => {
+            if (isDangerMode) {
+                resumeBtn.classList.add('btn-danger-mode');
+                newBtn.classList.add('btn-danger-mode');
+                resumeBtn.querySelector('.btn-icon').textContent = '⚡';
+                newBtn.querySelector('.btn-icon').textContent = '⚡';
+                resumeBtn.querySelector('.btn-text').textContent = 'Resume (Danger)';
+                newBtn.querySelector('.btn-text').textContent = 'New (Danger)';
+                dangerToggle.style.display = 'none';
+                dangerIndicator.style.display = 'flex';
+            } else {
+                resumeBtn.classList.remove('btn-danger-mode');
+                newBtn.classList.remove('btn-danger-mode');
+                resumeBtn.querySelector('.btn-icon').textContent = '🔄';
+                newBtn.querySelector('.btn-icon').textContent = '✨';
+                resumeBtn.querySelector('.btn-text').textContent = 'Resume';
+                newBtn.querySelector('.btn-text').textContent = 'New';
+                dangerToggle.style.display = 'block';
+                dangerIndicator.style.display = 'none';
+            }
+        };
+
         // Handle resume session
-        selectorDiv.querySelector('#resume-session-btn').addEventListener('click', () => {
+        resumeBtn.addEventListener('click', () => {
             wrapper.removeChild(selectorDiv);
-            this.startTerminal(quadrant, selectedDirectory, 'resume');
+            if (isDangerMode) {
+                this.startTerminal(quadrant, selectedDirectory, 'dangerous-resume');
+            } else {
+                this.startTerminal(quadrant, selectedDirectory, 'resume');
+            }
         });
 
         // Handle new session
-        selectorDiv.querySelector('#new-session-btn').addEventListener('click', () => {
+        newBtn.addEventListener('click', () => {
             wrapper.removeChild(selectorDiv);
-            this.startTerminal(quadrant, selectedDirectory, 'new');
+            if (isDangerMode) {
+                this.startTerminal(quadrant, selectedDirectory, 'dangerous');
+            } else {
+                this.startTerminal(quadrant, selectedDirectory, 'new');
+            }
         });
 
-        // Handle skip safety session (dangerous mode) - requires holding for 3 seconds
-        const skipBtn = selectorDiv.querySelector('#skip-safety-btn');
+        // Handle exit danger mode
+        if (exitDangerBtn) {
+            exitDangerBtn.addEventListener('click', () => {
+                isDangerMode = false;
+                updateButtonStates();
+            });
+        }
+
+        // Handle danger mode toggle - requires holding for 3 seconds
+        const skipBtn = dangerToggle;
         const warningDiv = selectorDiv.querySelector('#danger-warning');
         const progressDiv = selectorDiv.querySelector('#danger-progress');
         const progressBar = progressDiv?.querySelector('.progress-bar');
@@ -1403,11 +1460,28 @@ class TerminalManager {
             
             // Set timer for 3 seconds
             holdTimer = setTimeout(() => {
-                // Success! Launch dangerous mode
-                wrapper.removeChild(selectorDiv);
-                this.startTerminal(quadrant, selectedDirectory, 'dangerous');
-                // Show persistent danger notification
-                // this.showDangerNotification(quadrant); // Disabled danger mode notification
+                // Success! Enable dangerous mode
+                isDangerMode = true;
+                updateButtonStates();
+                
+                // Reset UI
+                warningDiv.style.display = 'none';
+                progressDiv.style.display = 'none';
+                skipBtn.classList.remove('btn-danger-active');
+                
+                // Reset progress
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                }
+                if (progressCountdown) {
+                    progressCountdown.textContent = '3';
+                }
+                
+                // Clear intervals
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
             }, HOLD_DURATION);
         };
         
