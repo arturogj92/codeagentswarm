@@ -421,13 +421,12 @@ if (require.main === module) {
     case 'detect':
       // Solo detectar MCPs instalados
       manager.detectInstalledMCPs().then(mcps => {
-
+        console.log('Detected MCPs:', mcps);
       });
       break;
       
     default:
-
-      `);
+      console.log(`Unknown command: ${command}`);
   }
 }
 

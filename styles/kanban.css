@@ -1261,6 +1261,53 @@ body::before {
     background: rgba(74, 144, 226, 0.2);
 }
 
+/* Danger mode terminal option */
+.send-terminal-option.danger-terminal {
+    position: relative;
+    background: rgba(255, 59, 48, 0.05);
+    border-left: 2px solid rgba(255, 59, 48, 0.3);
+    transition: all 0.2s ease;
+}
+
+.send-terminal-option.danger-terminal:hover {
+    background: rgba(255, 59, 48, 0.1);
+}
+
+.send-terminal-option.danger-terminal .danger-text {
+    color: rgba(255, 100, 100, 0.9);
+    font-weight: 500;
+}
+
+.send-terminal-option.danger-terminal i {
+    color: #ff6b6b;
+}
+
+.send-terminal-option.danger-terminal.danger-active {
+    background: rgba(255, 59, 48, 0.15);
+    border-left-color: rgba(255, 59, 48, 0.6);
+}
+
+.send-terminal-option.danger-terminal .danger-status {
+    color: rgba(255, 100, 100, 0.7);
+    font-size: 0.75rem;
+    margin-left: auto;
+}
+
+.send-terminal-option.danger-terminal .danger-progress-bar {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    height: 2px;
+    width: 0%;
+    background: linear-gradient(90deg, rgba(255, 59, 48, 0.3), rgba(255, 59, 48, 0.8));
+    transition: width 0.05s linear;
+    z-index: 1;
+}
+
+.send-terminal-option.danger-terminal.danger-active .danger-progress-bar {
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.5);
+}
+
 .terminal-status {
     font-size: 0.75rem;
     color: var(--text-muted);

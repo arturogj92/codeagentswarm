@@ -754,8 +754,10 @@ class TerminalManager {
                 this.saveDirectoryToStorage(quadrant, selectedDir);
                 await ipcRenderer.invoke('project-update-last-opened', selectedDir);
                 
-                // Start terminal with "new" session for tasks
-                this.startTerminal(quadrant, selectedDir, 'new');
+                // Start terminal with appropriate mode for tasks
+                // Use 'dangerous' mode if specified in taskData, otherwise 'new'
+                const mode = taskData.mode === 'danger' ? 'dangerous' : 'new';
+                this.startTerminal(quadrant, selectedDir, mode);
                 return;
             } else {
                 // No existing directory, show selector but with project context
@@ -9803,8 +9805,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (selectedDir) {
                 // Directly start the terminal with the project directory
-
-                window.terminalManager.startTerminal(uninitializedTerminal, selectedDir, 'new');
+                // Use 'dangerous' mode if specified in taskData, otherwise 'new'
+                const mode = taskData.mode === 'danger' ? 'dangerous' : 'new';
+                window.terminalManager.startTerminal(uninitializedTerminal, selectedDir, mode);
             } else {
                 // Show directory selector if no directory found
 
@@ -9841,7 +9844,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
                     // Small delay to ensure DOM is ready
                     setTimeout(() => {
-                        window.terminalManager.startTerminal(newTerminalId, selectedDir, 'new');
+                        // Use 'dangerous' mode if specified in taskData, otherwise 'new'
+                        const mode = taskData.mode === 'danger' ? 'dangerous' : 'new';
+                        window.terminalManager.startTerminal(newTerminalId, selectedDir, mode);
                     }, 200);
                 } else {
                     // The placeholder will be shown and user can select directory

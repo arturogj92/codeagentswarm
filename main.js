@@ -3607,65 +3607,11 @@ ipcMain.handle('task-delete', async (event, taskId) => {
   }
 });
 
-// Handle opening terminal in project path
-ipcMain.handle('open-terminal-in-path', async (event, terminalId) => {
-  try {
-    const { shell, app } = require('electron');
-    const { exec } = require('child_process');
-    const path = require('path');
-    
-    // Get the working directory for this terminal
-    let cwd = process.cwd();
-    if (terminals.has(terminalId)) {
-      const terminal = terminals.get(terminalId);
-      if (terminal && terminal.cwd) {
-        cwd = terminal.cwd;
-      }
-    }
-    
-    const platform = process.platform;
-    
-    if (platform === 'darwin') {
-      // macOS - Open Terminal.app in the specific directory
-      exec(`open -a Terminal "${cwd}"`, (error) => {
-        if (error) {
-          console.error('Error opening Terminal:', error);
-        }
-      });
-    } else if (platform === 'win32') {
-      // Windows - Open Command Prompt or PowerShell
-      exec(`start cmd /K "cd /d ${cwd}"`, (error) => {
-        if (error) {
-          console.error('Error opening Command Prompt:', error);
-        }
-      });
-    } else {
-      // Linux - Try to open common terminal emulators
-      const terminals = ['gnome-terminal', 'konsole', 'xterm', 'terminator'];
-      let opened = false;
-      
-      for (const term of terminals) {
-        try {
-          exec(`${term} --working-directory="${cwd}"`, (error) => {
-            if (!error) {
-              opened = true;
-            }
-          });
-          if (opened) break;
-        } catch (e) {
-          // Try next terminal
-        }
-      }
-    }
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Error opening terminal:', error);
-    return { success: false, error: error.message };
-  }
-});
+// (Removed duplicate handler - kept the better one at line 6677)
 
 // Handle opening folder in file explorer
+// (Removed duplicate handler - kept the better one at line 6695)
+/* Commented out to avoid duplicate handler
 ipcMain.handle('open-folder', async (event, terminalId) => {
   try {
     const { shell } = require('electron');
@@ -3688,8 +3634,11 @@ ipcMain.handle('open-folder', async (event, terminalId) => {
     return { success: false, error: error.message };
   }
 });
+*/
 
 // Handle opening in IDE
+// (Removed duplicate handler - kept the better one at line 6911)
+/* Commented out to avoid duplicate handler
 ipcMain.handle('open-in-ide', async (event, terminalId, ideKey) => {
   try {
     const { exec } = require('child_process');
@@ -3776,8 +3725,11 @@ ipcMain.handle('open-in-ide', async (event, terminalId, ideKey) => {
     return { success: false, error: error.message };
   }
 });
+*/
 
 // Check for installed IDEs
+// (Removed duplicate handler - kept the better one at line 6906)
+/* Commented out to avoid duplicate handler
 ipcMain.handle('check-installed-ides', async () => {
   try {
     const { exec } = require('child_process');
@@ -3853,6 +3805,7 @@ ipcMain.handle('check-installed-ides', async () => {
     return { success: false, error: error.message, ides: [] };
   }
 });
+*/
 
 ipcMain.handle('task-create-subtask', async (event, subtaskData) => {
   try {

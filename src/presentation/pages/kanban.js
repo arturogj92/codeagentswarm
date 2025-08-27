@@ -4032,36 +4032,49 @@ class KanbanManager {
                     // Add "Open New Terminal" option only if:
                     // 1. We have less than 6 terminals AND
                     // 2. The task has a project assigned
-                    if (terminals.length < 6 && task.project && task.project !== 'Unknown') {
+                    if (terminals.length < 6) {
                         dropdownHTML += `
+                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 4px 0;"></div>
                             <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
                                 <i data-lucide="plus-circle"></i>
                                 Open New Terminal
                                 <span class="terminal-status">Create & send</span>
                             </div>
+                            <div class="send-terminal-option danger-terminal" 
+                                onmousedown="kanban.startDangerHold(event, ${taskId})" 
+                                onmouseup="kanban.cancelDangerHold(event, ${taskId})" 
+                                onmouseleave="kanban.cancelDangerHold(event, ${taskId})"
+                                ontouchstart="kanban.startDangerHold(event, ${taskId})" 
+                                ontouchend="kanban.cancelDangerHold(event, ${taskId})" 
+                                ontouchcancel="kanban.cancelDangerHold(event, ${taskId})">
+                                <i data-lucide="zap"></i>
+                                <span class="danger-text">Open in Danger Mode</span>
+                                <span class="terminal-status danger-status">Hold 3s</span>
+                                <div class="danger-progress-bar"></div>
+                            </div>
                         `;
                     }
                 } else {
-                    // No terminals open
-                    // Only show "Open New Terminal" if task has a project
-                    if (task.project && task.project !== 'Unknown') {
-                        dropdownHTML = `
-                            <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
-                                <i data-lucide="plus-circle"></i>
-                                Open New Terminal
-                                <span class="terminal-status">No terminals active</span>
-                            </div>
-                        `;
-                    } else {
-                        // No project assigned, show informative message
-                        dropdownHTML = `
-                            <div class="send-terminal-option no-terminals">
-                                <i data-lucide="alert-circle"></i>
-                                No terminals available
-                                <span class="terminal-status">Task needs project</span>
-                            </div>
-                        `;
-                    }
+                    // No terminals open - always show both options
+                    dropdownHTML = `
+                        <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
+                            <i data-lucide="plus-circle"></i>
+                            Open New Terminal
+                            <span class="terminal-status">No terminals active</span>
+                        </div>
+                        <div class="send-terminal-option danger-terminal" 
+                            onmousedown="kanban.startDangerHold(event, ${taskId})" 
+                            onmouseup="kanban.cancelDangerHold(event, ${taskId})" 
+                            onmouseleave="kanban.cancelDangerHold(event, ${taskId})"
+                            ontouchstart="kanban.startDangerHold(event, ${taskId})" 
+                            ontouchend="kanban.cancelDangerHold(event, ${taskId})" 
+                            ontouchcancel="kanban.cancelDangerHold(event, ${taskId})">
+                            <i data-lucide="zap"></i>
+                            <span class="danger-text">Open in Danger Mode</span>
+                            <span class="terminal-status danger-status">Hold 3s</span>
+                            <div class="danger-progress-bar"></div>
+                        </div>
+                    `;
                 }
                 
                 // Always add copy option
@@ -4158,7 +4171,7 @@ class KanbanManager {
         window.close();
     }
 
-    async sendTaskToNewTerminal(taskId) {
+    async sendTaskToNewTerminal(taskId, mode = 'normal') {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) {
             console.error('Task not found');
@@ -4185,7 +4198,8 @@ class KanbanManager {
                 description: task.description,
                 implementation: task.implementation,
                 plan: task.plan,
-                project: task.project
+                project: task.project,
+                mode: mode // Pass the mode (normal or danger)
             });
 
             if (result.success) {
@@ -4212,6 +4226,97 @@ class KanbanManager {
             console.error('Error opening new terminal:', error);
             ipcRenderer.send('show-badge-notification', 'Error opening terminal');
         }
+    }
+
+    // Danger mode hold functionality
+    startDangerHold(event, taskId) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const element = event.currentTarget;
+        
+        // Add active class
+        element.classList.add('danger-active');
+        
+        const progressBar = element.querySelector('.danger-progress-bar');
+        const statusText = element.querySelector('.danger-status');
+        
+        const HOLD_DURATION = 3000; // 3 seconds
+        const holdStartTime = Date.now();
+        
+        // Clear any existing timer
+        if (this.dangerHoldTimer) {
+            clearTimeout(this.dangerHoldTimer);
+        }
+        if (this.dangerProgressInterval) {
+            clearInterval(this.dangerProgressInterval);
+        }
+        
+        // Update progress bar
+        this.dangerProgressInterval = setInterval(() => {
+            const elapsed = Date.now() - holdStartTime;
+            const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+            const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+            
+            if (progressBar) {
+                progressBar.style.width = `${progress}%`;
+            }
+            if (statusText) {
+                statusText.textContent = remaining > 0 ? `Hold ${remaining}s` : 'Ready!';
+            }
+            
+            if (elapsed >= HOLD_DURATION) {
+                clearInterval(this.dangerProgressInterval);
+            }
+        }, 50);
+        
+        // Set timer for 3 seconds
+        this.dangerHoldTimer = setTimeout(() => {
+            // Success! Launch in danger mode
+            this.sendTaskToNewTerminal(taskId, 'danger');
+            this.resetDangerHold(element, statusText, progressBar);
+        }, HOLD_DURATION);
+        
+        // Store references for cleanup
+        element.dangerCleanup = {
+            timer: this.dangerHoldTimer,
+            interval: this.dangerProgressInterval,
+            statusText: statusText,
+            progressBar: progressBar
+        };
+    }
+    
+    cancelDangerHold(event, taskId) {
+        event.preventDefault();
+        event.stopPropagation();
+        
+        const element = event.currentTarget;
+        
+        if (element.dangerCleanup) {
+            clearTimeout(element.dangerCleanup.timer);
+            clearInterval(element.dangerCleanup.interval);
+            this.resetDangerHold(element, element.dangerCleanup.statusText, element.dangerCleanup.progressBar);
+        }
+    }
+    
+    resetDangerHold(element, statusText, progressBar) {
+        element.classList.remove('danger-active');
+        
+        if (progressBar) {
+            progressBar.style.width = '0%';
+        }
+        if (statusText) {
+            statusText.textContent = 'Hold 3s';
+        }
+        
+        // Clear references
+        if (element.dangerCleanup) {
+            delete element.dangerCleanup;
+        }
+        
+        // Clear class timers
+        this.dangerHoldTimer = null;
+        this.dangerProgressInterval = null;
     }
 
     setupModalSendIcon(taskId) {
