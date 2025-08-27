@@ -1175,7 +1175,7 @@ body::before {
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
     overflow: hidden;
     z-index: 10000;
-    max-height: 200px;
+    max-height: 400px;  /* Increased from 200px to accommodate more items without scroll */
     overflow-y: auto;
     backdrop-filter: blur(10px);
     -webkit-backdrop-filter: blur(10px);

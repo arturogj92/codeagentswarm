@@ -450,6 +450,7 @@ class FeatureHighlight {
 
     // Dev helper to test highlights
     testHighlight(featureName) {
+        console.log(`[FeatureHighlight] Testing feature: ${featureName}`);
         // Reset the feature first
         this.reset(featureName);
 

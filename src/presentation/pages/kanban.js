@@ -140,6 +140,157 @@ class KanbanManager {
         });
     }
 
+    // Shared function to generate send-to-terminal dropdown HTML
+    generateSendToTerminalDropdownHTML(task, terminals, cssPrefix = '') {
+        let dropdownHTML = '';
+        
+        if (terminals && terminals.length > 0) {
+            dropdownHTML = terminals.map(terminal => `
+                <div class="send-terminal-option ${cssPrefix}terminal-option" data-task-id="${task.id}" data-terminal-id="${terminal.id}" data-action="send">
+                    <i data-lucide="terminal"></i>
+                    Terminal ${terminal.id + 1} (${terminal.project})
+                    <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
+                </div>
+            `).join('');
+            
+            // Add "Open New Terminal" options if conditions are met
+            if (terminals.length < 6 && task.project && task.project !== 'Unknown') {
+                dropdownHTML += `
+                    <div class="send-terminal-option new-terminal ${cssPrefix}new-terminal" data-task-id="${task.id}" data-action="new-terminal">
+                        <i data-lucide="plus-circle"></i>
+                        Open New Terminal
+                        <span class="terminal-status">Create & send</span>
+                    </div>
+                    <div class="send-terminal-option danger-terminal ${cssPrefix}danger-terminal" data-task-id="${task.id}" data-action="danger-terminal">
+                        <i data-lucide="alert-triangle"></i>
+                        Open Terminal (Danger Mode)
+                        <span class="terminal-status">Hold 3s - No confirmations</span>
+                        <div class="danger-progress-bar"></div>
+                    </div>
+                `;
+            }
+        } else {
+            // No terminals open - show create options if task has project
+            if (task.project && task.project !== 'Unknown') {
+                dropdownHTML = `
+                    <div class="send-terminal-option new-terminal ${cssPrefix}new-terminal" data-task-id="${task.id}" data-action="new-terminal">
+                        <i data-lucide="plus-circle"></i>
+                        Open New Terminal
+                        <span class="terminal-status">No terminals active</span>
+                    </div>
+                    <div class="send-terminal-option danger-terminal ${cssPrefix}danger-terminal" data-task-id="${task.id}" data-action="danger-terminal">
+                        <i data-lucide="alert-triangle"></i>
+                        Open Terminal (Danger Mode)
+                        <span class="terminal-status">Hold 3s - No confirmations</span>
+                        <div class="danger-progress-bar"></div>
+                    </div>
+                `;
+            } else {
+                dropdownHTML = `
+                    <div class="send-terminal-option no-terminals">
+                        <i data-lucide="alert-circle"></i>
+                        No active terminals available
+                        <span class="terminal-status">Task needs a project to open terminal</span>
+                    </div>
+                `;
+            }
+        }
+        
+        // Add copy option for modal dropdown
+        if (cssPrefix === 'modal-') {
+            dropdownHTML += `
+                <div class="send-terminal-option copy-option ${cssPrefix}copy-option" data-task-id="${task.id}" data-action="copy">
+                    <i data-lucide="copy"></i>
+                    Copy Task Summary
+                    <span class="terminal-status">Copy to clipboard</span>
+                </div>
+            `;
+        }
+        
+        return dropdownHTML;
+    }
+
+    // Shared function to attach event handlers to dropdown options
+    attachSendToTerminalHandlers(dropdown, cssPrefix = '') {
+        const options = dropdown.querySelectorAll(`.${cssPrefix}terminal-option, .${cssPrefix}copy-option, .${cssPrefix}new-terminal, .${cssPrefix}danger-terminal`);
+        
+        options.forEach(option => {
+            // Handle danger mode with hold-to-confirm
+            if (option.classList.contains(`${cssPrefix}danger-terminal`)) {
+                this.attachDangerModeHandler(option, dropdown);
+            } else {
+                // Normal click handler for other options
+                option.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    const action = option.dataset.action;
+                    const taskId = parseInt(option.dataset.taskId);
+                    
+                    if (action === 'send') {
+                        const terminalId = parseInt(option.dataset.terminalId);
+                        await this.sendTaskToSpecificTerminal(taskId, terminalId);
+                    } else if (action === 'copy') {
+                        await this.copyTaskSummary(taskId);
+                    } else if (action === 'new-terminal') {
+                        await this.sendTaskToNewTerminal(taskId);
+                    }
+                    
+                    // Close dropdown after action
+                    dropdown.style.display = 'none';
+                });
+            }
+        });
+    }
+
+    // Shared function to attach danger mode handlers
+    attachDangerModeHandler(option, dropdown) {
+        let holdTimer = null;
+        let isHolding = false;
+        
+        const startHold = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            
+            if (isHolding) return;
+            isHolding = true;
+            
+            const progressBar = option.querySelector('.danger-progress-bar');
+            progressBar.style.transition = 'width 3s linear';
+            progressBar.style.width = '100%';
+            
+            holdTimer = setTimeout(async () => {
+                // Action confirmed after 3 seconds
+                const taskId = parseInt(option.dataset.taskId);
+                await this.sendTaskToNewTerminal(taskId, 'danger');
+                dropdown.style.display = 'none';
+                resetHold();
+            }, 3000);
+        };
+        
+        const cancelHold = () => {
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            resetHold();
+        };
+        
+        const resetHold = () => {
+            isHolding = false;
+            const progressBar = option.querySelector('.danger-progress-bar');
+            progressBar.style.transition = 'none';
+            progressBar.style.width = '0%';
+        };
+        
+        option.addEventListener('mousedown', startHold);
+        option.addEventListener('touchstart', startHold);
+        option.addEventListener('mouseup', cancelHold);
+        option.addEventListener('mouseleave', cancelHold);
+        option.addEventListener('touchend', cancelHold);
+        option.addEventListener('touchcancel', cancelHold);
+    }
+
     setupEventListeners() {
         // Search functionality
         const searchInput = document.getElementById('search-input');
@@ -4017,69 +4168,12 @@ class KanbanManager {
             
             // Request available terminals from main process asynchronously
             ipcRenderer.invoke('get-terminals-for-project', task.project).then(terminals => {
-                // Build dropdown content
-                let dropdownHTML = '';
+                // Use shared function to generate dropdown HTML
+                let dropdownHTML = this.generateSendToTerminalDropdownHTML(task, terminals);
                 
-                if (terminals && terminals.length > 0) {
-                    dropdownHTML = terminals.map(terminal => `
-                        <div class="send-terminal-option" onclick="kanban.sendTaskToSpecificTerminal(${taskId}, ${terminal.id})">
-                            <i data-lucide="terminal"></i>
-                            Terminal ${terminal.id + 1} (${terminal.project})
-                            <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
-                        </div>
-                    `).join('');
-                    
-                    // Add "Open New Terminal" option only if:
-                    // 1. We have less than 6 terminals AND
-                    // 2. The task has a project assigned
-                    if (terminals.length < 6) {
-                        dropdownHTML += `
-                            <div style="border-top: 1px solid rgba(255, 255, 255, 0.1); margin: 4px 0;"></div>
-                            <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
-                                <i data-lucide="plus-circle"></i>
-                                Open New Terminal
-                                <span class="terminal-status">Create & send</span>
-                            </div>
-                            <div class="send-terminal-option danger-terminal" 
-                                onmousedown="kanban.startDangerHold(event, ${taskId})" 
-                                onmouseup="kanban.cancelDangerHold(event, ${taskId})" 
-                                onmouseleave="kanban.cancelDangerHold(event, ${taskId})"
-                                ontouchstart="kanban.startDangerHold(event, ${taskId})" 
-                                ontouchend="kanban.cancelDangerHold(event, ${taskId})" 
-                                ontouchcancel="kanban.cancelDangerHold(event, ${taskId})">
-                                <i data-lucide="zap"></i>
-                                <span class="danger-text">Open in Danger Mode</span>
-                                <span class="terminal-status danger-status">Hold 3s</span>
-                                <div class="danger-progress-bar"></div>
-                            </div>
-                        `;
-                    }
-                } else {
-                    // No terminals open - always show both options
-                    dropdownHTML = `
-                        <div class="send-terminal-option new-terminal" onclick="kanban.sendTaskToNewTerminal(${taskId})">
-                            <i data-lucide="plus-circle"></i>
-                            Open New Terminal
-                            <span class="terminal-status">No terminals active</span>
-                        </div>
-                        <div class="send-terminal-option danger-terminal" 
-                            onmousedown="kanban.startDangerHold(event, ${taskId})" 
-                            onmouseup="kanban.cancelDangerHold(event, ${taskId})" 
-                            onmouseleave="kanban.cancelDangerHold(event, ${taskId})"
-                            ontouchstart="kanban.startDangerHold(event, ${taskId})" 
-                            ontouchend="kanban.cancelDangerHold(event, ${taskId})" 
-                            ontouchcancel="kanban.cancelDangerHold(event, ${taskId})">
-                            <i data-lucide="zap"></i>
-                            <span class="danger-text">Open in Danger Mode</span>
-                            <span class="terminal-status danger-status">Hold 3s</span>
-                            <div class="danger-progress-bar"></div>
-                        </div>
-                    `;
-                }
-                
-                // Always add copy option
+                // Add copy option for card dropdown
                 dropdownHTML += `
-                    <div class="send-terminal-option copy-option" onclick="kanban.copyTaskSummary(${taskId})">
+                    <div class="send-terminal-option copy-option" data-task-id="${taskId}" data-action="copy">
                         <i data-lucide="clipboard-copy"></i>
                         Copy Task Summary
                     </div>
@@ -4090,6 +4184,8 @@ class KanbanManager {
                     dropdown.innerHTML = dropdownHTML;
                     // Re-initialize icons for the new content
                     this.initializeLucideIcons();
+                    // Attach event handlers using shared function
+                    this.attachSendToTerminalHandlers(dropdown);
                 }
             }).catch(error => {
                 console.error('Error loading terminals:', error);
@@ -4355,58 +4451,8 @@ class KanbanManager {
             // Request available terminals from main process
             const terminals = await ipcRenderer.invoke('get-terminals-for-project', task.project);
             
-            // Build dropdown content with data attributes instead of onclick
-            let dropdownHTML = '';
-            
-            if (terminals && terminals.length > 0) {
-                dropdownHTML = terminals.map(terminal => `
-                    <div class="send-terminal-option modal-terminal-option" data-task-id="${taskId}" data-terminal-id="${terminal.id}" data-action="send">
-                        <i data-lucide="terminal"></i>
-                        Terminal ${terminal.id + 1} (${terminal.project})
-                        <span class="terminal-status">${terminal.currentDir ? path.basename(terminal.currentDir) : ''}</span>
-                    </div>
-                `).join('');
-                
-                // Add "Open New Terminal" option only if:
-                // 1. We have less than 6 terminals AND
-                // 2. The task has a project assigned
-                if (terminals.length < 6 && task.project && task.project !== 'Unknown') {
-                    dropdownHTML += `
-                        <div class="send-terminal-option new-terminal modal-new-terminal" data-task-id="${taskId}" data-action="new-terminal">
-                            <i data-lucide="plus-circle"></i>
-                            Open New Terminal
-                            <span class="terminal-status">Create & send</span>
-                        </div>
-                    `;
-                }
-            } else {
-                // No terminals open
-                // Only show "Open New Terminal" if task has a project
-                if (task.project && task.project !== 'Unknown') {
-                    dropdownHTML = `
-                        <div class="send-terminal-option new-terminal modal-new-terminal" data-task-id="${taskId}" data-action="new-terminal">
-                            <i data-lucide="plus-circle"></i>
-                            Open New Terminal
-                            <span class="terminal-status">No terminals active</span>
-                        </div>
-                    `;
-                } else {
-                    dropdownHTML = `
-                        <div class="send-terminal-option no-terminals">
-                            <i data-lucide="alert-circle"></i>
-                            No active terminals available
-                        </div>
-                    `;
-                }
-            }
-            
-            // Always add copy option
-            dropdownHTML += `
-                <div class="send-terminal-option copy-option modal-copy-option" data-task-id="${taskId}" data-action="copy">
-                    <i data-lucide="clipboard-copy"></i>
-                    Copy Task Summary
-                </div>
-            `;
+            // Use shared function to generate dropdown HTML with modal prefix
+            const dropdownHTML = this.generateSendToTerminalDropdownHTML(task, terminals, 'modal-');
             
             dropdown.innerHTML = dropdownHTML;
             dropdown.style.display = 'block';
@@ -4414,29 +4460,8 @@ class KanbanManager {
             // Re-initialize icons
             this.initializeLucideIcons();
             
-            // Add click handlers to all options using event delegation
-            const options = dropdown.querySelectorAll('.modal-terminal-option, .modal-copy-option, .modal-new-terminal');
-            options.forEach(option => {
-                option.addEventListener('click', async (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    
-                    const action = option.dataset.action;
-                    const taskId = parseInt(option.dataset.taskId);
-                    
-                    if (action === 'send') {
-                        const terminalId = parseInt(option.dataset.terminalId);
-                        await this.sendTaskToSpecificTerminal(taskId, terminalId);
-                    } else if (action === 'copy') {
-                        await this.copyTaskSummary(taskId);
-                    } else if (action === 'new-terminal') {
-                        await this.sendTaskToNewTerminal(taskId);
-                    }
-                    
-                    // Close dropdown after action
-                    dropdown.style.display = 'none';
-                });
-            });
+            // Attach event handlers using shared function with modal prefix
+            this.attachSendToTerminalHandlers(dropdown, 'modal-');
             
             // Add click handler to close dropdown when clicking outside
             setTimeout(() => {

@@ -25,7 +25,7 @@ class GitService {
     async reinitializeCommitService() {
         try {
             await this.initializeCommitService();
-
+            console.log('[GitService] Commit service reinitialized');
             return true;
         } catch (error) {
             console.error('[GitService] Failed to reinitialize commit service:', error);

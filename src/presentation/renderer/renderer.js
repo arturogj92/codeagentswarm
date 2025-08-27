@@ -6,6 +6,9 @@ const LogViewer = require('../components/log-viewer');
 const FeatureHighlight = require('../../shared/utils/feature-highlight');
 const UpdateNotificationManager = require('../../shared/utils/update-notification-manager');
 
+// Log renderer initialization
+console.log('🔧 [RENDERER] renderer.js loaded');
+
 // Expose ipcRenderer globally for other modules
 window.ipcRenderer = ipcRenderer;
 
@@ -14,7 +17,7 @@ function loadPerformanceMonitor() {
     try {
         return require('./performance-monitor');
     } catch (e) {
-
+        console.log('[RENDERER] Performance monitor not available:', e.message);
         return null;
     }
 }

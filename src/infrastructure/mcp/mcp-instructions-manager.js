@@ -196,7 +196,7 @@ class MCPInstructionsManager {
     }
     
     if (!configFound) {
-
+      console.log('⚠️  No Claude config found with MCP servers');
       return [];
     }
     
@@ -318,12 +318,13 @@ class MCPInstructionsManager {
       }
       // Crear archivo con contenido mínimo
       fs.writeFileSync(claudeMdPath, '# Global Claude Instructions\n\n');
+      console.log(`📝 Created global CLAUDE.md at ${claudeMdPath}`);
 
     }
     
     // Verificar si existe CLAUDE.md
     if (!fs.existsSync(claudeMdPath)) {
-
+      console.log(`⚠️  CLAUDE.md not found at ${claudeMdPath}`);
       return false;
     }
     
@@ -347,10 +348,10 @@ class MCPInstructionsManager {
       
       // Guardar nuevo contenido
       fs.writeFileSync(claudeMdPath, newContent);
-
+      console.log(`✅ ${useGlobal ? 'Global' : 'Local'} CLAUDE.md updated with MCP instructions`);
       return true;
     } else {
-
+      console.log(`ℹ️  No changes needed ${useGlobal ? 'in global' : 'for local'} CLAUDE.md`);
       return false;
     }
   }
@@ -359,14 +360,14 @@ class MCPInstructionsManager {
    * Añadir instrucciones para un MCP específico
    */
   async addMCPInstructions(mcpName) {
-
+    console.log(`📦 Adding instructions for MCP: ${mcpName}`);
     // Normalizar nombre
     const normalized = mcpName.toLowerCase()
       .replace('mcp-', '')
       .replace('@modelcontextprotocol/', '');
     
     if (!this.mcpTemplates[normalized]) {
-
+      console.log(`⚠️  No instructions template found for MCP: ${mcpName}`);
       return false;
     }
     
@@ -378,11 +379,11 @@ class MCPInstructionsManager {
    * Listar MCPs con plantillas disponibles
    */
   listAvailableTemplates() {
-
+    console.log('Available MCP instruction templates:');
     for (const [key, value] of Object.entries(this.mcpTemplates)) {
-
+      console.log(`  - ${key}: ${value.name}`);
     }
-
+    console.log('\nTotal templates:', Object.keys(this.mcpTemplates).length);
   }
 }
 

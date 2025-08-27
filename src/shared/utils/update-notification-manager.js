@@ -155,7 +155,6 @@ class UpdateNotificationManager {
         this.highlightBadge = document.createElement('span');
         this.highlightBadge.className = 'update-notification-badge';
         this.highlightBadge.innerHTML = `
-            <span class="update-badge-dot"></span>
             <span class="update-badge-text">Update!</span>
         `;
         
@@ -322,29 +321,22 @@ class UpdateNotificationManager {
                 display: flex;
                 align-items: center;
                 gap: 4px;
-                background: linear-gradient(135deg, #ff6b6b 0%, #ff4444 100%);
+                background: linear-gradient(135deg, rgba(34, 197, 94, 0.95) 0%, rgba(16, 185, 129, 0.95) 100%);
                 color: white;
                 font-size: 10px;
                 font-weight: bold;
-                padding: 3px 8px;
+                padding: 4px 10px;
                 border-radius: 12px;
                 text-transform: uppercase;
                 letter-spacing: 0.5px;
-                box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+                box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4), 0 0 12px rgba(16, 185, 129, 0.2);
+                border: 1px solid rgba(134, 239, 172, 0.3);
                 z-index: 9999;
                 pointer-events: none;
             }
             
             .update-notification-badge.pulse {
                 animation: update-badge-pulse 2s infinite;
-            }
-            
-            .update-badge-dot {
-                width: 6px;
-                height: 6px;
-                background: white;
-                border-radius: 50%;
-                /* animation: update-dot-blink 1.5s infinite; -- DISABLED */
             }
             
             .update-badge-text {
@@ -354,15 +346,15 @@ class UpdateNotificationManager {
             @keyframes update-badge-pulse {
                 0% {
                     transform: translateX(-50%) scale(1);
-                    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+                    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4), 0 0 12px rgba(16, 185, 129, 0.2);
                 }
                 50% {
-                    transform: translateX(-50%) scale(1.1);
-                    box-shadow: 0 4px 12px rgba(255, 68, 68, 0.6);
+                    transform: translateX(-50%) scale(1.05);
+                    box-shadow: 0 4px 12px rgba(34, 197, 94, 0.6), 0 0 20px rgba(16, 185, 129, 0.3);
                 }
                 100% {
                     transform: translateX(-50%) scale(1);
-                    box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
+                    box-shadow: 0 2px 8px rgba(34, 197, 94, 0.4), 0 0 12px rgba(16, 185, 129, 0.2);
                 }
             }
             
