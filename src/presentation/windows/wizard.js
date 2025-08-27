@@ -38,7 +38,7 @@ function nextScreen() {
         if (currentScreen === 2) {
             setTimeout(() => {
                 const buttons = document.querySelectorAll('.fullscreen-btn');
-                console.log('Screen 2 loaded, fullscreen buttons found:', buttons.length);
+
             }, 100);
         }
         
@@ -262,7 +262,7 @@ document.querySelectorAll('.power-card').forEach(card => {
         });
         
         card.addEventListener('mouseenter', () => {
-            video.play().catch(err => console.log('Video play failed:', err));
+            video.play().catch(err => {});
         });
         
         card.addEventListener('mouseleave', () => {
@@ -276,8 +276,7 @@ document.querySelectorAll('.power-card').forEach(card => {
 
 // Setup fullscreen button listeners
 function setupFullscreenButtons() {
-    console.log('Setting up fullscreen buttons...');
-    
+
     // Try a different approach - add the function to window object
     window.openFullscreenVideo = openFullscreenVideo;
     
@@ -286,11 +285,11 @@ function setupFullscreenButtons() {
         // Check if clicked element is fullscreen button or its child
         const button = e.target.closest('.fullscreen-btn');
         if (button) {
-            console.log('Fullscreen button clicked via delegation!');
+
             e.preventDefault();
             e.stopPropagation();
             const videoSrc = button.getAttribute('data-video');
-            console.log('Video source:', videoSrc);
+
             if (videoSrc) {
                 openFullscreenVideo(videoSrc);
             }
@@ -304,7 +303,7 @@ function setupFullscreenButtons() {
         buttons.forEach(btn => {
             btn.setAttribute('data-listener', 'true');
             btn.addEventListener('click', (e) => {
-                console.log('Direct button click!');
+
                 e.preventDefault();
                 e.stopPropagation();
                 const videoSrc = btn.getAttribute('data-video');
@@ -320,8 +319,7 @@ function setupFullscreenButtons() {
 
 // Fullscreen video functionality
 function openFullscreenVideo(videoSrc) {
-    console.log('Opening fullscreen video with source:', videoSrc);
-    
+
     // Create fullscreen container
     const fullscreenContainer = document.createElement('div');
     fullscreenContainer.className = 'fullscreen-video-container';
@@ -388,18 +386,3 @@ function closeFullscreenVideo() {
 }
 
 // Create placeholder assets notice
-console.log(`
-🎬 Wizard Assets Needed:
-------------------------
-1. /assets/wizard/terminals-demo.mp4 - Show multiple terminals in action
-2. /assets/wizard/terminals-demo.gif - Fallback GIF for terminals
-3. /assets/wizard/kanban-demo.gif - Animated Kanban board demo
-4. /assets/wizard/git-commit-demo.mp4 - AI commit generation demo
-5. /assets/wizard/git-commit-demo.gif - Fallback GIF for git demo
-
-💡 Tips for creating assets:
-- Use QuickTime Player or OBS to record demos
-- Convert to GIF using gifski or online tools
-- Keep videos under 5MB, GIFs under 3MB
-- Recommended resolution: 1280x720 or 1920x1080
-`);

@@ -129,7 +129,7 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Failed to add sort_order column:', err);
                     } else {
-                        console.log('Added sort_order column to tasks table');
+
                         // Initialize sort_order values for existing tasks
                         this.initializeSortOrder();
                     }
@@ -170,7 +170,7 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Failed to add plan column:', err);
                     } else {
-                        console.log('Added plan column to tasks table');
+
                     }
                 });
             }
@@ -191,7 +191,7 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Failed to add implementation column:', err);
                     } else {
-                        console.log('Added implementation column to tasks table');
+
                     }
                 });
             }
@@ -202,7 +202,7 @@ class DatabaseManagerMCP {
         // SQLite doesn't allow modifying CHECK constraints directly
         // But since database-mcp.js doesn't have CHECK constraints, this is mainly informational
         // The main database.js already has the constraint updated
-        console.log('Status constraint includes in_testing support');
+
     }
     
     addProjectColumnIfNeeded() {
@@ -219,7 +219,7 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Error adding project column:', err);
                     } else {
-                        console.log('Added project column to tasks table');
+
                         // Tasks without projects remain NULL - will be assigned based on directory
                     }
                 });
@@ -243,13 +243,13 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Failed to add display_name column:', err);
                     } else {
-                        console.log('Added display_name column to projects table');
+
                         // Update existing projects with display_name = name
                         this.db.run("UPDATE projects SET display_name = name WHERE display_name IS NULL", (err) => {
                             if (err) {
                                 console.error('Failed to update display names:', err);
                             } else {
-                                console.log('Updated existing projects with display_name');
+
                             }
                         });
                     }
@@ -272,7 +272,7 @@ class DatabaseManagerMCP {
                     if (err) {
                         console.error('Failed to add path column:', err);
                     } else {
-                        console.log('Added path column to projects table');
+
                         // Update existing projects with a path based on their name
                         this.db.all("SELECT id, name FROM projects WHERE path IS NULL", (err, projects) => {
                             if (err) {

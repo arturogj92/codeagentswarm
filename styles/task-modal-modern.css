@@ -440,15 +440,24 @@
   border: 1px solid transparent;
 }
 
-.btn-modern i {
+.btn-modern i,
+.btn-modern svg {
   width: 14px;
   height: 14px;
+  display: inline-block;
+  vertical-align: middle;
+  margin-right: 4px;
 }
 
 .btn-primary-modern {
   background: var(--task-accent-primary);
   color: white;
   border-color: var(--task-accent-primary);
+}
+
+.btn-primary-modern svg {
+  stroke: white;
+  fill: none;
 }
 
 .btn-primary-modern:hover {
@@ -463,10 +472,19 @@
   border-color: var(--task-border);
 }
 
+.btn-secondary-modern svg {
+  stroke: var(--task-text-secondary);
+  fill: none;
+}
+
 .btn-secondary-modern:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--task-text-primary);
   border-color: var(--task-border-hover);
+}
+
+.btn-secondary-modern:hover svg {
+  stroke: var(--task-text-primary);
 }
 
 .btn-danger-modern {
@@ -773,6 +791,12 @@
     width: 100%;
 }
 
+/* Link task search wrapper (similar to parent task search) */
+.link-task-search-wrapper {
+    position: relative;
+    width: 100%;
+}
+
 .parent-task-dropdown {
     position: absolute;
     top: 100%;
@@ -891,4 +915,341 @@
     color: rgba(255, 255, 255, 0.4);
     font-style: italic;
     justify-content: center;
+}/* Link task dropdown styles */
+/* Link task dropdown (similar to parent task dropdown) */
+.link-task-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 400px;
+    overflow-y: auto;
+    background: linear-gradient(145deg, #1e1e2e, #2a2a3e);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin-top: 8px;
+    z-index: 100000;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7),
+                0 1px 0 rgba(255, 255, 255, 0.05) inset;
+    backdrop-filter: blur(20px);
+}
+
+.link-task-dropdown::-webkit-scrollbar {
+    width: 8px;
+}
+
+.link-task-dropdown::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 4px;
+}
+
+.link-task-dropdown::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+}
+
+.link-task-dropdown::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.link-task-item {
+    padding: 12px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s ease;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    position: relative;
+}
+
+.link-task-item:last-child {
+    border-bottom: none;
+}
+
+.link-task-item:hover {
+    background: linear-gradient(90deg, rgba(100, 150, 255, 0.1), rgba(100, 150, 255, 0.05));
+    padding-left: 20px;
+}
+
+.link-task-item.selected {
+    background: linear-gradient(90deg, rgba(100, 150, 255, 0.2), rgba(100, 150, 255, 0.1));
+    border-left: 3px solid #6495ff;
+}
+
+.link-task-item .task-id {
+    color: #6495ff;
+    font-weight: 600;
+    font-size: 0.9em;
+    min-width: 50px;
+    background: rgba(100, 150, 255, 0.1);
+    padding: 4px 10px;
+    border-radius: 6px;
+    text-align: center;
+}
+
+.link-task-item .task-title {
+    color: #e8e8ef;
+    flex: 1;
+    font-size: 0.95em;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.link-task-item .task-status {
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.link-task-item .task-status.status-pending {
+    background: linear-gradient(135deg, rgba(255, 193, 7, 0.2), rgba(255, 193, 7, 0.1));
+    color: #ffc107;
+}
+
+.link-task-item .task-status.status-in_progress {
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2), rgba(33, 150, 243, 0.1));
+    color: #2196f3;
+}
+
+.link-task-item .task-status.status-completed {
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2), rgba(76, 175, 80, 0.1));
+    color: #4caf50;
+}
+
+.link-task-item .task-status.status-in_testing {
+    background: linear-gradient(135deg, rgba(156, 39, 176, 0.2), rgba(156, 39, 176, 0.1));
+    color: #9c27b0;
+}
+
+.link-task-item.no-results {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+    cursor: default;
+    text-align: center;
+    padding: 20px;
+}
+
+.link-task-item.no-results:hover {
+    background: none;
+    padding-left: 12px;
+}
+
+.link-task-item .task-project {
+    font-size: 0.75em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* Subtasks header with multiple buttons */
+.subtasks-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Selected task preview */
+.selected-task-preview {
+    background: linear-gradient(145deg, #1a1a2a, #252538);
+    border: 1px solid rgba(100, 150, 255, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.selected-task-preview h4 {
+    color: #6495ff;
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.selected-task-preview .preview-content {
+    color: #e8e8ef;
+}
+
+.selected-task-preview .preview-id {
+    color: #6495ff;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.selected-task-preview .preview-title {
+    font-size: 1.1em;
+    margin-bottom: 8px;
+}
+
+.selected-task-preview .preview-description {
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 0.95em;
+    margin-top: 8px;
+}
+
+.selected-task-preview .preview-status {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 600;
+    text-transform: uppercase;
+}
+
+.dropdown-loading {
+    text-align: center;
+    padding: 20px;
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
+.form-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px;
+    background: rgba(100, 150, 255, 0.05);
+    border: 1px solid rgba(100, 150, 255, 0.1);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.9em;
+    margin-top: 12px;
+}
+
+.form-info svg {
+    width: 16px;
+    height: 16px;
+    color: #6495ff;
+}/* Unlink parent button */
+.btn-unlink-parent {
+    position: absolute;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: #f87171;
+    padding: 6px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 0.85em;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.btn-unlink-parent:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.3);
+    transform: translateY(-50%) scale(1.05);
+}
+
+.btn-unlink-parent svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Parent task card adjustment */
+.parent-task-card {
+    position: relative;
+    padding-right: 100px; /* Make space for unlink button */
+}
+
+/* Subtask unlink button */
+.subtask-unlink-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 137, 6, 0.7);
+    padding: 4px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.subtask-unlink-btn:hover {
+    background: rgba(255, 137, 6, 0.1);
+    color: #ff8906;
+    transform: scale(1.1);
+}
+
+.subtask-unlink-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
+/* Adjust subtask header for multiple buttons */
+.subtask-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+}
+
+.subtask-header .task-id-badge {
+    margin-right: auto;
+}
+
+.subtask-delete-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 0.25rem;
+}
+
+.subtask-delete-btn:hover {
+    color: #ff4444;
+    background: rgba(255, 68, 68, 0.1);
+}
+
+/* Parent task section styles */
+.parent-task-section {
+    background: rgba(251, 146, 60, 0.05);
+    border: 1px solid rgba(251, 146, 60, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+}
+
+.parent-task-section h5 {
+    color: #fdba74;
+    margin: 0 0 12px 0;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.parent-task-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #fdba74;
+    text-decoration: none;
+    transition: all 0.2s ease;
+}
+
+.parent-task-link:hover {
+    color: #fb923c;
+    transform: translateX(2px);
+}
+
+.parent-task-link .parent-task-title {
+    font-size: 1em;
 }

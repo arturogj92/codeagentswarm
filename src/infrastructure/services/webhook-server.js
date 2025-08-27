@@ -49,7 +49,7 @@ class WebhookServer {
                 
                 // Temporary debug log to see what's coming in
                 if (type === 'claude_finished' && tool) {
-                    console.log('[Webhook Debug] Stop hook received unexpected tool parameter:', tool);
+
                 }
                 
                 // Create event key for deduplication
@@ -83,7 +83,7 @@ class WebhookServer {
                         this.handleClaudeFinished(terminalId);
                         break;
                     default:
-                        console.log('[Webhook] Unknown event type:', type);
+
                 }
                 
                 res.json({ success: true });
@@ -143,7 +143,7 @@ class WebhookServer {
         
         // Skip notification if we just showed a "completed" notification
         if (hadRecentCompleted) {
-            console.log(`[Webhook] Suppressed 'confirmation' notification for Terminal ${terminalNum} (just showed 'completed' ${Math.round((now - lastCompletedTime) / 1000)}s ago)`);
+
             return;
         }
         
@@ -179,7 +179,7 @@ class WebhookServer {
                 }
             }
         } else {
-            console.log(`[Webhook] Suppressing duplicate notification for terminal ${terminalNum} (cooldown active)`);
+
         }
     }
 
@@ -205,7 +205,7 @@ class WebhookServer {
         
         // Skip notification if we had a recent confirmation
         if (hadRecentConfirmation) {
-            console.log(`[Webhook] Suppressed 'finished' notification for Terminal ${terminalNum} (had confirmation ${Math.round((now - lastConfirmationTime) / 1000)}s ago)`);
+
             return;
         }
         
@@ -251,7 +251,7 @@ class WebhookServer {
                 }
             }
         } else {
-            console.log(`[Webhook] Suppressing duplicate notification for terminal ${terminalNum} finished (cooldown active)`);
+
         }
     }
 
@@ -264,7 +264,7 @@ class WebhookServer {
             try {
                 this.server = this.app.listen(this.port, () => {
                     this.isRunning = true;
-                    console.log(`[Webhook] Server started on port ${this.port}`);
+
                     resolve({ success: true, port: this.port });
                 });
                 
@@ -296,7 +296,7 @@ class WebhookServer {
                     resolve({ success: false, error: error.message });
                 } else {
                     this.isRunning = false;
-                    console.log('[Webhook] Server stopped');
+
                     resolve({ success: true });
                 }
             });

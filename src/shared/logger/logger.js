@@ -52,7 +52,14 @@ class Logger {
 
     console.log = (...args) => {
       this.addLog('log', args);
-      originalLog.apply(console, args);
+      // Allow temporary debug logs that start with [DEBUG] or [TEMP]
+      const firstArg = args[0];
+      const isDebugLog = firstArg && typeof firstArg === 'string' && 
+                        (firstArg.startsWith('[DEBUG]') || firstArg.startsWith('[TEMP]'));
+      
+      if (isDebugLog || process.env.SHOW_ALL_LOGS === 'true') {
+        originalLog.apply(console, args);
+      }
     };
 
     console.error = (...args) => {
@@ -62,17 +69,26 @@ class Logger {
 
     console.warn = (...args) => {
       this.addLog('warn', args);
-      originalWarn.apply(console, args);
+      // Suppress warnings unless explicitly enabled
+      if (process.env.SHOW_ALL_LOGS === 'true') {
+        originalWarn.apply(console, args);
+      }
     };
 
     console.info = (...args) => {
       this.addLog('info', args);
-      originalInfo.apply(console, args);
+      // Suppress info logs unless explicitly enabled
+      if (process.env.SHOW_ALL_LOGS === 'true') {
+        originalInfo.apply(console, args);
+      }
     };
 
     console.debug = (...args) => {
       this.addLog('debug', args);
-      originalDebug.apply(console, args);
+      // Suppress debug logs unless explicitly enabled
+      if (process.env.SHOW_ALL_LOGS === 'true') {
+        originalDebug.apply(console, args);
+      }
     };
   }
 

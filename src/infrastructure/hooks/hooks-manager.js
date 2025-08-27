@@ -217,7 +217,7 @@ class HooksManager {
             const success = await this.writeSettings(settings);
             
             if (success) {
-                console.log('MCP permissions configured successfully');
+
                 return { success: true, permissionsAdded: this.codeAgentSwarmMCPPermissions.length };
             } else {
                 return { success: false, error: 'Failed to write settings' };

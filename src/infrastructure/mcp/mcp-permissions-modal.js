@@ -346,10 +346,7 @@ class MCPPermissionsModal {
             if (!settings.permissions) {
                 settings.permissions = { allow: [], deny: [] };
             }
-            
-            console.log('Pending changes:', this.pendingChanges);
-            console.log('Current allow before changes:', settings.permissions.allow);
-            
+
             // Apply pending changes
             for (const [tool, permission] of Object.entries(this.pendingChanges)) {
                 // Remove from both arrays first (including wildcards)
@@ -359,12 +356,10 @@ class MCPPermissionsModal {
                 // Also remove server wildcards if we're setting individual tools
                 // Extract server name from tool (e.g., mcp__brave-search__tool -> mcp__brave-search__*)
                 const serverWildcard = tool.substring(0, tool.lastIndexOf('__')) + '__*';
-                
-                console.log(`Processing tool: ${tool}, permission: ${permission}, wildcard: ${serverWildcard}`);
-                
+
                 // If we're modifying an individual tool, remove the wildcard for that server
                 if (tool !== serverWildcard) {
-                    console.log(`Removing wildcard: ${serverWildcard}`);
+
                     settings.permissions.allow = settings.permissions.allow.filter(t => t !== serverWildcard);
                     settings.permissions.deny = (settings.permissions.deny || []).filter(t => t !== serverWildcard);
                 }
@@ -378,10 +373,7 @@ class MCPPermissionsModal {
                 }
                 // 'ask' means remove from both arrays (default behavior)
             }
-            
-            console.log('Final allow list:', settings.permissions.allow);
-            console.log('Final deny list:', settings.permissions.deny);
-            
+
             // Save settings
             const settingsDir = path.dirname(settingsPath);
             if (!fs.existsSync(settingsDir)) {
@@ -441,7 +433,7 @@ class MCPPermissionsModal {
             window.terminalManager.showInlineNotification(message, type);
         } else {
             // Fallback to console
-            console.log(`[${type.toUpperCase()}] ${message}`);
+
         }
     }
 }

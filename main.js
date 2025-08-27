@@ -343,6 +343,22 @@ ipcMain.handle('fetch-version-history', async () => {
   }
 });
 
+// Fetch changelog for a specific version
+ipcMain.handle('fetch-changelog-for-version', async (event, toVersion) => {
+  try {
+    if (global.updaterService) {
+      const currentVersion = global.updaterService.getCurrentVersion();
+      const changelog = await global.updaterService.fetchChangelog(currentVersion, toVersion);
+      return changelog;
+    } else {
+      throw new Error('Updater service not initialized');
+    }
+  } catch (error) {
+    logger.addLog('error', ['Failed to fetch changelog:', error.message]);
+    return null;
+  }
+});
+
 // get-shell-preference handler is now in registerDatabaseHandlers()
 
 // Handle MCP diagnostic request
@@ -1020,6 +1036,11 @@ fi
         if (require('fs').existsSync(fullPath)) {
           this.cwd = fullPath;
           this.sendOutput(`Changed directory to: ${this.cwd}\r\n`);
+          
+          // Notify renderer about directory change to update project badge
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('terminal-directory-changed', this.quadrant, this.cwd);
+          }
         } else {
           this.sendOutput(`cd: no such file or directory: ${newDir}\r\n`);
         }
@@ -3902,9 +3923,12 @@ ipcMain.handle('task-update-implementation', async (event, taskId, implementatio
 });
 
 // Subtask/Parent task handlers
-ipcMain.handle('task-link-to-parent', async (event, taskId, parentTaskId) => {
+ipcMain.handle('task-link-to-parent', async (event, data) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
+    // Support both object and separate parameters
+    const taskId = typeof data === 'object' ? data.taskId : data;
+    const parentTaskId = typeof data === 'object' ? data.parentTaskId : arguments[2];
     const result = db.linkTaskToParent(taskId, parentTaskId);
     return result;
   } catch (error) {

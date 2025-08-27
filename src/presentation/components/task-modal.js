@@ -16,34 +16,51 @@ class TaskModal {
 
     async show() {
         try {
-            console.log('TaskModal.show() called');
-            
+
             // Load projects first
             await this.loadProjects();
-            console.log('Projects loaded:', this.projects);
-            
+
             // Create and show modal
             this.createModal();
-            console.log('Modal created');
-            
+
             this.attachEventListeners();
-            console.log('Event listeners attached');
-            
+
             this.initializeMarkdownEditors();
-            console.log('Markdown editors initialized');
+
+            // Initialize Lucide icons with retry
+            const initializeLucideIcons = () => {
+                if (window.lucide) {
+
+                    // Force re-initialization of all icons
+                    window.lucide.createIcons();
+                    
+                    // Check if save button icon exists
+                    const saveBtn = document.getElementById('save-task-btn');
+                    if (saveBtn) {
+                        const iconElement = saveBtn.querySelector('[data-lucide="check"]');
+                        if (iconElement) {
+
+                            window.lucide.createIcons({
+                                icons: {
+                                    'check': window.lucide.icons['check']
+                                }
+                            });
+                        }
+                    }
+                } else {
+                    console.warn('Lucide not loaded yet, retrying...');
+                    setTimeout(initializeLucideIcons, 100);
+                }
+            };
             
-            // Initialize Lucide icons
-            if (window.lucide) {
-                window.lucide.createIcons();
-            }
+            initializeLucideIcons();
             
             // Focus on title input
             setTimeout(() => {
                 const titleInput = document.getElementById('task-title');
                 if (titleInput) titleInput.focus();
             }, 100);
-            
-            console.log('TaskModal shown successfully');
+
         } catch (error) {
             console.error('Error showing TaskModal:', error);
         }
@@ -77,8 +94,7 @@ class TaskModal {
     }
 
     createModal() {
-        console.log('Creating modal...');
-        
+
         // Remove any existing modal
         this.destroy();
         
@@ -87,22 +103,25 @@ class TaskModal {
         
         try {
             const modalHTML = this.getModalHTML();
-            console.log('Modal HTML generated, length:', modalHTML.length);
+
             this.modal.innerHTML = modalHTML;
         } catch (error) {
             console.error('Error generating modal HTML:', error);
             return;
         }
-        
-        console.log('Appending modal to body...');
+
         document.body.appendChild(this.modal);
-        console.log('Modal appended, modal element:', this.modal);
-        
+
         // Add show class for animation
         setTimeout(() => {
-            console.log('Adding show class to modal');
+
             this.modal.classList.add('show');
-            console.log('Modal classes:', this.modal.className);
+
+            // Re-initialize icons after modal is shown
+            if (window.lucide) {
+
+                window.lucide.createIcons();
+            }
         }, 10);
     }
 
@@ -180,7 +199,12 @@ class TaskModal {
                 </div>
                 <div class="modal-footer modal-actions">
                     <button type="button" class="btn-modern btn-secondary-modern" id="cancel-btn"><i data-lucide="x"></i> Cancel</button>
-                    <button type="submit" class="btn-modern btn-primary-modern" id="save-task-btn"><i data-lucide="check"></i> Create Task</button>
+                    <button type="submit" class="btn-modern btn-primary-modern" id="save-task-btn">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-check">
+                            <polyline points="20 6 9 17 4 12"></polyline>
+                        </svg>
+                        Save Task
+                    </button>
                 </div>
             </div>
         `;

@@ -6,8 +6,7 @@ class PerformanceMonitor {
     }
 
     startMonitoring() {
-        console.log('🔍 Performance Monitor Started');
-        
+
         // Monitor CPU usage every second
         this.intervalId = setInterval(() => {
             this.collectMetrics();
@@ -26,7 +25,7 @@ class PerformanceMonitor {
             try {
                 observer.observe({ entryTypes: ['longtask'] });
             } catch (e) {
-                console.log('Long task monitoring not supported');
+
             }
         }
 
@@ -46,9 +45,7 @@ class PerformanceMonitor {
             const memoryMB = performance.memory.usedJSHeapSize / 1048576;
             const limitMB = performance.memory.jsHeapSizeLimit / 1048576;
             const percentage = (memoryMB / limitMB) * 100;
-            
-            console.log(`📊 Memory: ${memoryMB.toFixed(2)}MB / ${limitMB.toFixed(2)}MB (${percentage.toFixed(1)}%)`);
-            
+
             if (percentage > 80) {
                 console.error('⚠️ HIGH MEMORY USAGE!');
             }
@@ -56,8 +53,7 @@ class PerformanceMonitor {
 
         // Count DOM nodes
         const nodeCount = document.getElementsByTagName('*').length;
-        console.log(`📋 DOM Nodes: ${nodeCount}`);
-        
+
         if (nodeCount > 1500) {
             console.warn('⚠️ High DOM node count!');
         }
@@ -114,8 +110,7 @@ class PerformanceMonitor {
         const terminalCount = document.querySelectorAll('.terminal').length;
         const loaderCount = document.querySelectorAll('.terminal-loader').length;
         const placeholderCount = document.querySelectorAll('.terminal-placeholder').length;
-        
-        console.log(`🔍 Components: Terminals=${terminalCount}, Loaders=${loaderCount}, Placeholders=${placeholderCount}`);
+
     }
 
     measureFunction(name, fn) {
@@ -125,7 +120,7 @@ class PerformanceMonitor {
             const duration = performance.now() - start;
             
             if (duration > 10) {
-                console.log(`⏱️ ${name} took ${duration.toFixed(2)}ms`);
+
             }
             
             return result;
@@ -135,7 +130,7 @@ class PerformanceMonitor {
     stop() {
         if (this.intervalId) {
             clearInterval(this.intervalId);
-            console.log('🛑 Performance Monitor Stopped');
+
         }
     }
 }

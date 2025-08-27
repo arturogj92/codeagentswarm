@@ -96,7 +96,7 @@ class AuthManager {
             // Check if auth button still exists and has listener
             const currentAuthBtn = document.getElementById('auth-btn');
             if (currentAuthBtn && currentAuthBtn !== this.authButton) {
-                console.log('Auth button was recreated, re-attaching listener');
+
                 this.authButton = currentAuthBtn;
                 this.setupEventListeners();
             }
@@ -124,14 +124,14 @@ class AuthManager {
         this.authButtonClickHandler = (e) => {
             e.stopPropagation();
             e.preventDefault();
-            console.log('Auth button clicked');
+
             this.openModal();
         };
         
         // Open modal on button click
         if (this.authButton) {
             this.authButton.addEventListener('click', this.authButtonClickHandler);
-            console.log('Auth button event listener attached');
+
         } else {
             console.error('Auth button not found during setupEventListeners');
         }
@@ -171,19 +171,18 @@ class AuthManager {
 
     async checkAuthStatus() {
         try {
-            console.log('Checking auth status...');
+
             // Check if we have saved auth data
             if (!window.ipcRenderer) {
                 console.warn('ipcRenderer not available, skipping auth check');
                 return;
             }
             const authData = await window.ipcRenderer.invoke('get-auth-data');
-            console.log('Auth data received:', authData);
-            
+
             if (authData && authData.user) {
                 this.setUser(authData.user);
             } else {
-                console.log('No auth data found, user is not logged in');
+
                 this.setUser(null);
             }
         } catch (error) {
@@ -193,8 +192,7 @@ class AuthManager {
 
     openModal() {
         if (this.authModal) {
-            console.log('Opening modal, user state:', this.user);
-            
+
             // Force display block first to ensure modal is visible
             this.authModal.style.display = 'flex';
             
@@ -264,8 +262,7 @@ class AuthManager {
     }
 
     async handleAuthSuccess(data) {
-        console.log('Authentication successful:', data.user);
-        
+
         // Hide loading state
         this.hideLoadingState();
         
@@ -291,8 +288,7 @@ class AuthManager {
 
     setUser(user) {
         this.user = user;
-        console.log('Setting user:', user);
-        
+
         if (user) {
             // Add visual feedback - green icon for logged in state
             this.authButton.classList.add('logged-in');
@@ -429,7 +425,7 @@ class AuthManager {
             new Notification(title, { body: message });
         } else {
             // Fallback to console log
-            console.log(`${title}: ${message}`);
+
         }
     }
 
@@ -443,7 +439,7 @@ class AuthManager {
 function initAuthManager() {
     // Check if ipcRenderer is available, if not wait a bit
     if (!window.ipcRenderer) {
-        console.log('Waiting for ipcRenderer to be available...');
+
         setTimeout(initAuthManager, 100);
         return;
     }

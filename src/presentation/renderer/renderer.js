@@ -4,18 +4,17 @@ const { FitAddon } = require('xterm-addon-fit');
 const { WebLinksAddon } = require('xterm-addon-web-links');
 const LogViewer = require('../components/log-viewer');
 const FeatureHighlight = require('../../shared/utils/feature-highlight');
+const UpdateNotificationManager = require('../../shared/utils/update-notification-manager');
 
 // Expose ipcRenderer globally for other modules
 window.ipcRenderer = ipcRenderer;
-
-console.log('🔧 [RENDERER] renderer.js loaded');
 
 // Performance monitor function - lazy loaded
 function loadPerformanceMonitor() {
     try {
         return require('./performance-monitor');
     } catch (e) {
-        console.log('Performance monitor not available (production build)');
+
         return null;
     }
 }
@@ -92,7 +91,7 @@ class TerminalManager {
     init() {
         // Notify main process that renderer is ready (clears notification tracking)
         ipcRenderer.invoke('renderer-ready').then(() => {
-            console.log('Renderer initialized - notification tracking reset');
+
         }).catch(err => {
             console.error('Failed to notify main process:', err);
         });
@@ -122,23 +121,23 @@ class TerminalManager {
         
         // Listen for webhook events
         ipcRenderer.on('confirmation-needed', (event, data) => {
-            console.log('🔔 NOTIFICATION RECEIVED - Confirmation needed via webhook:', data);
+
             const { terminalId, tool } = data;
-            console.log(`🔔 Terminal ID: ${terminalId}, Type: ${typeof terminalId}`);
+
             if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
-                console.log(`🔔 Adding terminal ${terminalId} to attention set`);
+
                 this.terminalsNeedingAttention.add(terminalId);
-                console.log(`🔔 Current attention set:`, Array.from(this.terminalsNeedingAttention));
+
                 this.updateNotificationBadge();
                 this.highlightTerminalForConfirmation(terminalId);
                 this.scrollTerminalToBottom(terminalId);
             } else {
-                console.log(`🔔 Invalid terminal ID ${terminalId}, ignoring notification`);
+
             }
         });
         
         ipcRenderer.on('claude-finished', (event, data) => {
-            console.log('Claude finished via webhook:', data);
+
             const { terminalId } = data;
             if (terminalId !== null && terminalId >= 0 && terminalId < 4) {
                 // Don't show notification badge for completion, just scroll
@@ -192,13 +191,13 @@ class TerminalManager {
         
         // Listen for scroll to bottom events
         ipcRenderer.on('scroll-terminal-to-bottom', (event, quadrant) => {
-            console.log(`📨 Received scroll-to-bottom event for terminal ${quadrant}`);
+
             this.scrollTerminalToBottom(quadrant);
         });
         
         // Listen for focus terminal tab events (when notification is clicked in tabbed mode)
         ipcRenderer.on('focus-terminal-tab', (event, quadrant) => {
-            console.log(`📨 Received focus-terminal-tab event for terminal ${quadrant}`);
+
             if (this.layoutMode === 'tabbed' && this.terminals.has(quadrant)) {
                 // Switch to the tab when notification is clicked
                 this.switchToTab(quadrant);
@@ -216,7 +215,7 @@ class TerminalManager {
         // Setup terminal-closed listeners for all possible terminals
         for (let i = 0; i < 6; i++) {
             ipcRenderer.on(`terminal-closed-${i}`, async () => {
-                console.log(`📨 Received terminal-closed event for terminal ${i}`);
+
                 // Clean up and remove the terminal from UI
                 if (this.terminals.has(i)) {
                     const terminal = this.terminals.get(i);
@@ -236,10 +235,10 @@ class TerminalManager {
                     if (activeResult.success && activeResult.terminals.length > 0) {
                         // Switch to the first available terminal
                         this.activeTabTerminal = activeResult.terminals[0];
-                        console.log(`🔄 Switched active tab to terminal ${this.activeTabTerminal} after closing terminal ${i}`);
+
                     } else {
                         this.activeTabTerminal = null;
-                        console.log(`🔄 No terminals left, clearing active tab`);
+
                     }
                 }
                 
@@ -247,9 +246,28 @@ class TerminalManager {
                 await this.renderTerminals();
                 await this.updateTerminalManagementButtons();
                 this.updateGitButtonVisibility();
-                console.log(`✅ Terminal ${i} UI updated after backend close`);
+
             });
         }
+        
+        // Listen for directory changes from terminals
+        ipcRenderer.on('terminal-directory-changed', (event, quadrant, newDirectory) => {
+            // Update the lastSelectedDirectories
+            this.lastSelectedDirectories[quadrant] = newDirectory;
+            
+            // Save to database
+            this.saveDirectoryToStorage(quadrant, newDirectory).catch(err => {
+                console.warn('Failed to save directory to database:', err);
+            });
+            
+            // Update the terminal tab to reflect the new project
+            if (this.layoutMode === 'tabbed') {
+                this.updateTerminalTab(quadrant);
+            }
+            
+            // Update terminal header color
+            this.updateTerminalHeaderColor(quadrant);
+        });
 
         document.getElementById('add-terminal-btn').addEventListener('click', () => {
             this.addTerminal();
@@ -290,7 +308,6 @@ class TerminalManager {
         document.getElementById('layout-3-right2-btn').addEventListener('click', () => {
             this.setLayout('3-right2');
         });
-
 
         document.getElementById('git-status-btn').addEventListener('click', () => {
             this.showGitStatus();
@@ -485,7 +502,7 @@ class TerminalManager {
                     
                     // Only update if this isn't already the active terminal to avoid unnecessary updates
                     if (this.activeTerminal !== quadrantId) {
-                        console.log(`🎯 Setting active terminal to ${quadrantId} from mousedown on:`, e.target);
+
                         this.setActiveTerminal(quadrantId);
                     }
                 }
@@ -661,15 +678,13 @@ class TerminalManager {
         try {
             const activeResult = await ipcRenderer.invoke('get-active-terminals');
             if (!activeResult.success) return null;
-            
-            console.log('🔍 Looking for uninitialized terminals among:', activeResult.terminals);
-            
+
             for (const terminalId of activeResult.terminals) {
                 // Check if terminal has a placeholder element (not initialized)
                 const placeholder = document.querySelector(`[data-quadrant="${terminalId}"] .terminal-placeholder`);
                 
                 if (placeholder) {
-                    console.log(`✅ Found uninitialized terminal ${terminalId} with placeholder`);
+
                     return terminalId;
                 }
                 
@@ -677,13 +692,12 @@ class TerminalManager {
                 if (!this.lastSelectedDirectories[terminalId]) {
                     const hasShell = await ipcRenderer.invoke('terminal-has-shell', terminalId);
                     if (!hasShell) {
-                        console.log(`✅ Found uninitialized terminal ${terminalId} (no directory/shell)`);
+
                         return terminalId;
                     }
                 }
             }
-            
-            console.log('❌ No uninitialized terminals found');
+
             return null;
         } catch (error) {
             console.error('Error finding uninitialized terminal:', error);
@@ -722,13 +736,11 @@ class TerminalManager {
     }
 
     async showDirectorySelector(quadrant) {
-        console.log(`showDirectorySelector called for quadrant ${quadrant}, mode: ${this.layoutMode}`);
-        
+
         // Check if there's a pending task for this terminal
         if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
             const taskData = window.pendingTerminalTasks[quadrant];
-            console.log(`📋 Found pending task for terminal ${quadrant}:`, taskData);
-            
+
             // Try to find a directory for the project
             // First check if we have existing directories for this project
             const projectDirs = await this.findProjectDirectories(taskData.project);
@@ -736,8 +748,7 @@ class TerminalManager {
             if (projectDirs && projectDirs.length > 0) {
                 // Use the first matching directory
                 const selectedDir = projectDirs[0];
-                console.log(`📁 Auto-selecting directory for project ${taskData.project}: ${selectedDir}`);
-                
+
                 // Start terminal directly with this directory
                 this.lastSelectedDirectories[quadrant] = selectedDir;
                 this.saveDirectoryToStorage(quadrant, selectedDir);
@@ -748,15 +759,15 @@ class TerminalManager {
                 return;
             } else {
                 // No existing directory, show selector but with project context
-                console.log(`📁 No existing directory found for project ${taskData.project}, showing selector`);
+
             }
         }
         
         // Debug: log all terminal-quadrant elements (not placeholders)
         const allQuadrants = document.querySelectorAll('.terminal-quadrant');
-        console.log(`Found ${allQuadrants.length} terminal-quadrant elements in DOM`);
+
         allQuadrants.forEach(el => {
-            console.log(`  Quadrant ${el.dataset.quadrant}: parent=${el.parentElement?.id || el.parentElement?.className}, hasWrapper=${!!el.querySelector('.terminal-wrapper')}`);
+
         });
         
         // Find wrapper with more robust search
@@ -774,19 +785,19 @@ class TerminalManager {
             const gridContainer = document.getElementById('terminals-container');
             if (gridContainer) {
                 quadrantElement = gridContainer.querySelector(`[data-quadrant="${quadrant}"]`);
-                console.log(`Grid mode: found quadrantElement=${!!quadrantElement} in terminals-container`);
+
             }
         }
         
         // Fallback to document-wide search
         if (!quadrantElement) {
             quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
-            console.log(`Fallback: found quadrantElement=${!!quadrantElement} in document`);
+
         }
         
         if (quadrantElement) {
             wrapper = quadrantElement.querySelector('.terminal-wrapper');
-            console.log(`Found wrapper=${!!wrapper} in quadrantElement`);
+
         }
         
         if (!wrapper) {
@@ -797,9 +808,7 @@ class TerminalManager {
             }
             return;
         }
-        
-        console.log(`Wrapper found for quadrant ${quadrant}`);
-        
+
         // Remove placeholder if it exists
         const placeholder = wrapper.querySelector('.terminal-placeholder');
         if (placeholder) {
@@ -926,15 +935,7 @@ class TerminalManager {
                 // 2. OR the quadrant is extremely small (less than 500px width)
                 // 3. OR the quadrant is very short (less than 400px height)
                 const shouldUseHorizontalLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
-                
-                console.log(`Directory selector size detection:
-                    - Quadrant size: ${quadrantWidth}x${quadrantHeight}
-                    - Terminal count: ${terminalCount}
-                    - Has 4 quadrants: ${hasFourQuadrants}
-                    - Is small width: ${isSmallWidth}
-                    - Is short height: ${isShortHeight}
-                    - Should use horizontal: ${shouldUseHorizontalLayout}`);
-                
+
                 // Remove all responsive classes first
                 selectorDiv.classList.remove('small-quadrant', 'vertically-constrained');
                 
@@ -1325,10 +1326,52 @@ class TerminalManager {
         let holdTimer = null;
         let holdStartTime = null;
         let progressInterval = null;
+        let clickHintTimer = null;
         const HOLD_DURATION = 3000; // 3 seconds
+        const CLICK_THRESHOLD = 300; // milliseconds to detect a simple click
+        
+        const showClickHint = () => {
+            // Clear any existing hint timer
+            if (clickHintTimer) {
+                clearTimeout(clickHintTimer);
+            }
+            
+            // Hide the progress bar immediately
+            progressDiv.style.display = 'none';
+            
+            // Update the warning message for click hint - emphasize the HOLD action
+            warningDiv.innerHTML = `
+                <span class="danger-icon">⏱️</span>
+                <span class="danger-text"><strong>HOLD BUTTON!</strong> You must hold the button for 3 seconds to activate danger mode</span>
+            `;
+            warningDiv.style.display = 'block';
+            warningDiv.classList.add('click-hint');
+            
+            // Keep the message visible for 4 seconds (more time to read)
+            clickHintTimer = setTimeout(() => {
+                warningDiv.style.display = 'none';
+                warningDiv.classList.remove('click-hint');
+                // Restore original warning message
+                warningDiv.innerHTML = `
+                    <span class="danger-icon">⚠️</span>
+                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+                `;
+            }, 4000);
+        };
         
         const startHold = () => {
+            // Clear any click hint timer
+            if (clickHintTimer) {
+                clearTimeout(clickHintTimer);
+                clickHintTimer = null;
+            }
+            
             // Show warning and progress
+            warningDiv.innerHTML = `
+                <span class="danger-icon">⚠️</span>
+                <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+            `;
+            warningDiv.classList.remove('click-hint');
             warningDiv.style.display = 'block';
             progressDiv.style.display = 'block';
             skipBtn.classList.add('btn-danger-active');
@@ -1358,10 +1401,15 @@ class TerminalManager {
                 // Success! Launch dangerous mode
                 wrapper.removeChild(selectorDiv);
                 this.startTerminal(quadrant, selectedDirectory, 'dangerous');
+                // Show persistent danger notification
+                this.showDangerNotification(quadrant);
             }, HOLD_DURATION);
         };
         
         const cancelHold = () => {
+            // Check if it was a click (any duration less than full hold time)
+            const wasIncompleteHold = holdStartTime && (Date.now() - holdStartTime < HOLD_DURATION);
+            
             if (holdTimer) {
                 clearTimeout(holdTimer);
                 holdTimer = null;
@@ -1372,7 +1420,6 @@ class TerminalManager {
             }
             
             // Reset UI
-            warningDiv.style.display = 'none';
             progressDiv.style.display = 'none';
             skipBtn.classList.remove('btn-danger-active');
             
@@ -1382,6 +1429,16 @@ class TerminalManager {
             if (progressCountdown) {
                 progressCountdown.textContent = '3';
             }
+            
+            // If the user released before completing the hold, show the hint
+            if (wasIncompleteHold) {
+                showClickHint();
+            } else {
+                warningDiv.style.display = 'none';
+                warningDiv.classList.remove('click-hint');
+            }
+            
+            holdStartTime = null;
         };
         
         // Mouse events
@@ -1592,8 +1649,7 @@ class TerminalManager {
     }
 
     async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
-        console.log(`Starting terminal ${quadrant} in ${this.layoutMode} mode, directory: ${selectedDirectory}`);
-        
+
         // Find the terminal element based on current layout mode with more robust search
         let quadrantElement;
         
@@ -1603,7 +1659,7 @@ class TerminalManager {
             const tabbedContent = document.getElementById('tabbed-terminal-content');
             if (tabbedContent) {
                 quadrantElement = tabbedContent.querySelector(`[data-quadrant="${quadrant}"]`);
-                console.log(`Looking for terminal in tabbed mode, found:`, quadrantElement);
+
             }
         } else {
             // In grid mode, look in the terminals container
@@ -1611,14 +1667,14 @@ class TerminalManager {
             if (gridContainer) {
                 // Try to find in any nested structure (could be in rows/columns)
                 quadrantElement = gridContainer.querySelector(`[data-quadrant="${quadrant}"]`);
-                console.log(`Looking for terminal in grid mode, found:`, quadrantElement);
+
             }
         }
         
         // Fallback to document-wide search if not found
         if (!quadrantElement) {
             quadrantElement = document.querySelector(`[data-quadrant="${quadrant}"]`);
-            console.log(`Using fallback search, found:`, quadrantElement);
+
         }
         
         if (!quadrantElement) {
@@ -1640,18 +1696,16 @@ class TerminalManager {
             console.error(`Wrapper found but not in DOM for quadrant ${quadrant}`);
             return;
         }
-        
-        console.log(`Wrapper found and verified in DOM for quadrant ${quadrant}`);
-        
+
         const placeholder = wrapper.querySelector('.terminal-placeholder');
         
         if (placeholder) {
-            console.log(`Removing placeholder for terminal ${quadrant}`);
+
             placeholder.remove();
         }
 
         // Clean wrapper content before adding new elements
-        console.log(`Cleaning wrapper content for quadrant ${quadrant}, current content length: ${wrapper.innerHTML.length}`);
+
         wrapper.innerHTML = '';
         
         // Create loader
@@ -1664,7 +1718,6 @@ class TerminalManager {
             <div class="loader-status">Initializing terminal</div>
         `;
         wrapper.appendChild(loader);
-        console.log(`Loader added for terminal ${quadrant}`);
 
         // Track Claude Code readiness
         if (!this.claudeCodeReady) {
@@ -1728,7 +1781,6 @@ class TerminalManager {
             console.error(`Wrapper content after append:`, wrapper.innerHTML.substring(0, 500));
             return;
         }
-        console.log(`TerminalDiv successfully added to wrapper for quadrant ${quadrant}`);
 
         // Initialize xterm.js terminal with better config
         const terminal = new Terminal({
@@ -1788,7 +1840,7 @@ class TerminalManager {
             
             // Ignore if this is a rapid subsequent click
             if (currentTime - lastClickTime < DOUBLE_CLICK_DELAY) {
-                console.log('Ignoring rapid link click');
+
                 return;
             }
             
@@ -1799,7 +1851,7 @@ class TerminalManager {
             
             // Set a timeout to handle the click
             linkClickTimeout = setTimeout(() => {
-                console.log('Opening link:', uri);
+
                 require('electron').shell.openExternal(uri).catch(err => {
                     console.error('Failed to open link:', err);
                     this.showNotification('Failed to open link', 'error');
@@ -1818,7 +1870,7 @@ class TerminalManager {
             // Try to re-add it
             const currentWrapper = quadrantElement.querySelector('.terminal-wrapper');
             if (currentWrapper) {
-                console.log(`Re-adding terminalDiv to wrapper for quadrant ${quadrant}`);
+
                 currentWrapper.appendChild(terminalDiv);
             } else {
                 console.error(`Cannot find wrapper to re-add terminalDiv for quadrant ${quadrant}`);
@@ -1828,7 +1880,7 @@ class TerminalManager {
         
         try {
             terminal.open(terminalDiv);
-            console.log(`Terminal opened successfully for quadrant ${quadrant}`);
+
         } catch (error) {
             console.error(`Failed to open terminal for quadrant ${quadrant}:`, error);
             console.error(`TerminalDiv state:`, terminalDiv);
@@ -1850,10 +1902,9 @@ class TerminalManager {
 
         // Create PTY terminal process with selected directory
         try {
-            console.log(`Creating terminal process for quadrant ${quadrant}, directory: ${selectedDirectory}, session: ${sessionType}`);
+
             const result = await ipcRenderer.invoke('create-terminal', quadrant, selectedDirectory, sessionType);
-            console.log(`Terminal creation result:`, result);
-            
+
             // Update only the terminal header to show the "More Options" button
             setTimeout(async () => {
                 await this.updateTerminalHeader(quadrant);
@@ -1868,8 +1919,7 @@ class TerminalManager {
         terminal.focus();
         
         // DEBUG: Confirm no custom key handler
-        console.log(`[DEBUG] Terminal ${quadrant}: No custom arrow key handler - letting xterm.js handle naturally`);
-        
+
         // Handle terminal input - let xterm.js handle everything naturally
         terminal.onData(data => {
             // Filter out bracketed paste sequences from input
@@ -1988,7 +2038,7 @@ class TerminalManager {
             }
             this.claudeOutputting.timeout = setTimeout(() => {
                 this.claudeOutputting.set(quadrant, false);
-                console.log(`📜 Claude stopped outputting to terminal ${quadrant}`);
+
             }, 1000);
             
             // Check if Claude is ready and we have a pending task
@@ -2016,23 +2066,13 @@ class TerminalManager {
             
             // Debug logging for terminal output
             if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
-                console.log(`📝 Terminal ${quadrant} output (has pending task):`, dataStr.substring(0, 100));
-                
-                // Also check if we see Claude's visual prompt
-                if (dataStr.includes('╭─') || dataStr.includes('Try "how does')) {
-                    console.log(`🎯 Claude visual prompt detected in terminal ${quadrant}`);
-                }
-            }
-            
-            if (!this.claudeCodeReady[quadrant] && isClaudeReady) {
-                console.log(`🎉 Claude is ready in terminal ${quadrant} (detected pattern in output)`);
+
                 this.claudeCodeReady[quadrant] = true;
                 
                 // Check for pending task for this terminal
                 if (window.pendingTerminalTasks && window.pendingTerminalTasks[quadrant]) {
                     const taskData = window.pendingTerminalTasks[quadrant];
-                    console.log(`📬 Preparing to send pending task to terminal ${quadrant}:`, taskData);
-                    
+
                     // Update loader status to show we're sending the task
                     const loader = document.getElementById(`loader-${quadrant}`);
                     if (loader) {
@@ -2061,13 +2101,13 @@ class TerminalManager {
                     
                     // Send the task info to Claude with a delay to ensure it's ready
                     setTimeout(() => {
-                        console.log(`📤 Sending task message to terminal ${quadrant}`);
+
                         ipcRenderer.send('send-to-terminal', quadrant, message);
                         
                         // Then send the command to start the task
                         setTimeout(() => {
                             const startCommand = `mcp__codeagentswarm-tasks__start_task --task_id ${taskData.taskId}\n`;
-                            console.log(`📤 Sending start command to terminal ${quadrant}: ${startCommand}`);
+
                             ipcRenderer.send('send-to-terminal', quadrant, startCommand);
                             
                             // NOW hide the loader and show the terminal after everything is sent
@@ -2223,7 +2263,6 @@ class TerminalManager {
 
     }
 
-
     highlightTerminal(quadrant) {
         // In tabbed mode, show notification on tab
         if (this.layoutMode === 'tabbed') {
@@ -2251,7 +2290,7 @@ class TerminalManager {
     scrollTerminalToBottom(quadrant) {
         // Don't force scroll if user is manually scrolling
         if (this.userScrolling.get(quadrant)) {
-            console.log(`📜 User is manually scrolling terminal ${quadrant}, skipping auto-scroll`);
+
             return;
         }
         
@@ -2261,7 +2300,7 @@ class TerminalManager {
             setTimeout(() => {
                 // Double-check user isn't scrolling before actually scrolling
                 if (this.userScrolling.get(quadrant)) {
-                    console.log(`📜 User still scrolling terminal ${quadrant}, aborting auto-scroll`);
+
                     return;
                 }
                 
@@ -2286,8 +2325,7 @@ class TerminalManager {
                             if (terminal.terminal.scrollToBottomFn) {
                                 terminal.terminal.scrollToBottomFn();
                             }
-                            
-                            console.log(`📜 Auto-scrolled terminal ${quadrant} to bottom`);
+
                         }
                     }
                     
@@ -2352,7 +2390,7 @@ class TerminalManager {
         audio.volume = 0.3;
         audio.play().catch(e => {
             // Ignore errors - sound is optional
-            console.log('Could not play notification sound:', e);
+
         });
     }
 
@@ -2683,9 +2721,7 @@ class TerminalManager {
                 return;
             }
         }
-        
-        console.log(`Updating header color for terminal ${quadrant} in ${this.layoutMode} mode`);
-        
+
         // Get the project name and color for this terminal (moved outside to be available for tabs)
         const projectName = this.getTerminalProjectName(quadrant);
         let projectColor = null;
@@ -3113,7 +3149,7 @@ class TerminalManager {
                 const moreBtn = moreOptionsContainer.querySelector('.terminal-more-btn');
                 moreBtn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    console.log('More button clicked for terminal:', quadrant);
+
                     this.toggleDropdownMenu(quadrant);
                 });
                 
@@ -3143,13 +3179,12 @@ class TerminalManager {
                 if (typeof lucide !== 'undefined') {
                     lucide.createIcons();
                 }
-                
-                console.log(`Added More Options button to terminal ${quadrant}`);
+
             }
         } else if (!hasActiveTerminal && existingMoreOptions) {
             // Terminal is not active but button exists - remove it
             existingMoreOptions.remove();
-            console.log(`Removed More Options button from terminal ${quadrant}`);
+
         }
     }
 
@@ -3223,9 +3258,7 @@ class TerminalManager {
                     console.error('Could not determine quadrant for action:', action);
                     return;
                 }
-                
-                console.log('Terminal control action:', action, 'for quadrant:', quadrant);
-                
+
                 if (action === 'fullscreen') {
                     this.toggleFullscreen(quadrant);
                 } else if (action === 'close') {
@@ -3246,9 +3279,7 @@ class TerminalManager {
                 e.stopPropagation();
                 const action = item.dataset.action;
                 const terminal = parseInt(item.dataset.terminal);
-                
-                console.log('Dropdown item action:', action, 'for terminal:', terminal);
-                
+
                 // Close the dropdown
                 const dropdown = item.closest('.terminal-dropdown-menu');
                 if (dropdown) {
@@ -3269,8 +3300,7 @@ class TerminalManager {
     }
 
     attachQuickActionListeners() {
-        console.log('Attaching quick action listeners...');
-        
+
         // Remove existing listeners to avoid duplicates
         document.querySelectorAll('.terminal-quick-btn').forEach(btn => {
             const newBtn = btn.cloneNode(true);
@@ -3283,17 +3313,15 @@ class TerminalManager {
                 e.stopPropagation();
                 const action = btn.dataset.action;
                 const terminalId = parseInt(btn.dataset.terminal);
-                
-                console.log(`Quick action: ${action} for terminal ${terminalId}`);
-                
+
                 if (!this.terminals.has(terminalId)) {
-                    console.log(`Terminal ${terminalId} not initialized`);
+
                     return;
                 }
                 
                 const terminal = this.terminals.get(terminalId);
                 if (!terminal || !terminal.terminal) {
-                    console.log(`Terminal ${terminalId} not ready`);
+
                     return;
                 }
                 
@@ -3315,18 +3343,17 @@ class TerminalManager {
                         terminal.terminal.focus();
                         break;
                     default:
-                        console.log(`Unknown quick action: ${action}`);
+
                 }
             });
         });
-        
-        console.log(`Attached listeners to ${document.querySelectorAll('.terminal-quick-btn').length} quick action buttons`);
+
     }
 
     toggleDropdownMenu(quadrant) {
-        console.log('toggleDropdownMenu called for quadrant:', quadrant);
+
         const dropdown = document.querySelector(`.terminal-dropdown-menu[data-terminal="${quadrant}"]`);
-        console.log('Dropdown found:', dropdown);
+
         if (!dropdown) {
             console.error('No dropdown found for terminal:', quadrant);
             return;
@@ -3342,11 +3369,9 @@ class TerminalManager {
         // Toggle this dropdown - check both inline style and computed style
         const currentDisplay = window.getComputedStyle(dropdown).display;
         const isCurrentlyHidden = currentDisplay === 'none' || dropdown.style.display === 'none' || dropdown.style.display === '';
-        console.log('Current display:', currentDisplay, 'Inline style:', dropdown.style.display, 'Is hidden:', isCurrentlyHidden);
-        
+
         dropdown.style.display = isCurrentlyHidden ? 'block' : 'none';
-        console.log('New display:', dropdown.style.display);
-        
+
         // Ensure dropdown has proper z-index
         if (dropdown.style.display === 'block') {
             dropdown.style.zIndex = '99999';
@@ -3451,9 +3476,7 @@ class TerminalManager {
                 return; // User cancelled
             }
         }
-        
-        console.log(`🗑️ Closing terminal ${quadrant}...`);
-        
+
         // Clean up Claude Code state
         if (this.claudeCodeReady) {
             this.claudeCodeReady[quadrant] = false;
@@ -3463,14 +3486,13 @@ class TerminalManager {
         const terminalId = quadrant + 1;
         localStorage.removeItem(`terminal_title_${terminalId}`);
         localStorage.removeItem(`terminal_task_${terminalId}`);
-        console.log(`🧹 Cleaned up localStorage for terminal ${terminalId}`);
-        
+
         // Just send kill signal - the terminal-closed event handler will do the cleanup
-        console.log(`🗑️ Sending kill signal for terminal ${quadrant}`);
+
         ipcRenderer.send('kill-terminal', quadrant, true);
         
         // The UI cleanup will be handled by the terminal-closed event listener
-        console.log(`⏳ Waiting for terminal-closed event to update UI...`);
+
     }
 
     async showCloseTerminalConfirmation(quadrant, isClaudeActive) {
@@ -3539,9 +3561,7 @@ class TerminalManager {
                 // Then notify the backend about the resize so Claude Code can adjust
                 const cols = terminal.terminal.cols;
                 const rows = terminal.terminal.rows;
-                
-                console.log(`Terminal ${quadrant} resized to: ${cols}x${rows}`);
-                
+
                 // Debounce resize signals to avoid spam
                 if (terminal.resizeTimeout) {
                     clearTimeout(terminal.resizeTimeout);
@@ -3603,9 +3623,7 @@ class TerminalManager {
                 const cols = terminal.terminal.cols;
                 const rows = terminal.terminal.rows;
                 ipcRenderer.send('terminal-resize', quadrant, cols, rows);
-                
-                console.log(`Force resized terminal ${quadrant} to: ${cols}x${rows}`);
-                
+
                 // Re-check scroll button visibility after resize
                 const terminalDiv = terminal.element;
                 const scrollBtn = terminalDiv.querySelector('.scroll-to-bottom-btn');
@@ -3649,7 +3667,6 @@ class TerminalManager {
             }
         }
     }
-
 
     repairTerminalControls() {
         // Función para reparar terminales que hayan perdido sus controles
@@ -3721,7 +3738,7 @@ class TerminalManager {
         // Check if button already exists
         let scrollBtn = terminalDiv.querySelector('.scroll-to-bottom-btn');
         if (scrollBtn) {
-            console.log(`Scroll button already exists for terminal ${quadrant}, skipping creation`);
+
             return; // Button already exists, don't create duplicate
         }
         
@@ -3754,7 +3771,7 @@ class TerminalManager {
             scrollToBottom();
             // Clear user scrolling flag when button is clicked
             this.userScrolling.set(quadrant, false);
-            console.log(`📜 Scroll button clicked for terminal ${quadrant}, auto-scroll re-enabled`);
+
         });
         
         // Show/hide button based on scroll position
@@ -3779,13 +3796,13 @@ class TerminalManager {
                     // Don't auto-reset the user scrolling flag with a timeout
                     // Instead, only reset when user scrolls back to bottom or clicks the scroll button
                     // This prevents the annoying auto-scroll behavior
-                    console.log(`📜 User is scrolling terminal ${quadrant}, auto-scroll disabled`);
+
                 } else {
                     scrollBtn.classList.remove('show');
                     // User has scrolled back to bottom - clear the user scrolling flag
                     if (this.userScrolling.get(quadrant)) {
                         this.userScrolling.set(quadrant, false);
-                        console.log(`📜 User scrolled back to bottom in terminal ${quadrant}, auto-scroll re-enabled`);
+
                     }
                     
                     // Clear timeout if exists
@@ -3829,8 +3846,7 @@ class TerminalManager {
                     const isAtBottom = (viewport.scrollTop + viewport.clientHeight) >= (viewport.scrollHeight - 5);
                     if (!isAtBottom) {
                         this.userScrolling.set(quadrant, true);
-                        console.log(`📜 User manually scrolled terminal ${quadrant}`);
-                        
+
                         // Clear and reset timeout
                         if (this.scrollTimeouts.has(quadrant)) {
                             clearTimeout(this.scrollTimeouts.get(quadrant));
@@ -3841,10 +3857,10 @@ class TerminalManager {
                             if (!this.claudeOutputting.get(quadrant)) {
                                 this.userScrolling.set(quadrant, false);
                                 this.scrollTimeouts.delete(quadrant);
-                                console.log(`📜 Cleared user scrolling flag for terminal ${quadrant} after timeout`);
+
                             } else {
                                 // Claude is still outputting, extend the timeout
-                                console.log(`📜 Claude still outputting to terminal ${quadrant}, extending scroll lock`);
+
                                 const newTimeoutId = setTimeout(() => {
                                     this.userScrolling.set(quadrant, false);
                                     this.scrollTimeouts.delete(quadrant);
@@ -3894,7 +3910,6 @@ class TerminalManager {
             this.showNotification('❌ Claude Code not found. Install from claude.ai/code', 'warning');
         }
     }
-
 
     async showGitStatus() {
         // Blur the git status button to prevent Enter key from reopening it
@@ -3955,8 +3970,6 @@ class TerminalManager {
         }
     }
 
-
-
     showCreateTaskDialog() {
         // Blur the create task button to prevent Enter key from reopening it
         const createTaskBtn = document.getElementById('create-task-btn');
@@ -3966,12 +3979,10 @@ class TerminalManager {
         
         // Check if TaskModal is available or load it
         const loadAndShowModal = () => {
-            console.log('Attempting to show task modal...');
-            console.log('TaskModal available:', typeof window.TaskModal);
-            
+
             // Check if TaskModal class exists
             if (typeof window.TaskModal !== 'undefined') {
-                console.log('Using TaskModal component');
+
                 const modal = new window.TaskModal({
                     terminals: this.terminals,
                     activeTerminalId: this.activeTerminal,
@@ -3995,7 +4006,7 @@ class TerminalManager {
                 
                 modal.show();
             } else {
-                console.log('TaskModal not found, falling back to simple modal');
+
                 this.createSimpleTaskModal(); // Fallback to simple modal
             }
         };
@@ -4267,11 +4278,9 @@ class TerminalManager {
 
     displayGitStatusModal(gitData) {
         // Debug log
-        console.log('Git data in modal:', gitData);
-        console.log('Files:', gitData.files);
+
         const directories = gitData.files?.filter(f => f.isDirectory) || [];
-        console.log('Directories found:', directories);
-        
+
         // Remove existing modal if present
         const existingModal = document.querySelector('.git-status-modal');
         if (existingModal) {
@@ -4832,7 +4841,7 @@ class TerminalManager {
         const parser = new DiffParser();
         
         // Parse the diff
-        console.log('File contents available:', !!fileContents, fileContents ? Object.keys(fileContents) : 'none');
+
         const parsedDiff = parser.parseDiff(diff, fileName, fileContents);
         const { leftLines, rightLines } = parser.createSideBySideView(parsedDiff.chunks);
         
@@ -5194,15 +5203,7 @@ class TerminalManager {
         const chunkIndex = parseInt(button.dataset.chunk);
         const direction = button.dataset.direction;
         const side = button.dataset.side;
-        
-        console.log('Expanding diff:', {
-            hasParser: !!modal.parser,
-            hasParsedDiff: !!modal.parsedDiff,
-            hasFileContents: !!(modal.parsedDiff && modal.parsedDiff.fileContents),
-            chunkIndex,
-            direction
-        });
-        
+
         // Disable button during expansion
         button.disabled = true;
         button.textContent = 'Loading...';
@@ -6062,8 +6063,7 @@ class TerminalManager {
             
             // Update UI indicator
             this.updateHooksStatusIndicator();
-            
-            console.log('Hooks status:', this.hooksStatus);
+
         } catch (error) {
             console.error('Error checking hooks status:', error);
             this.hooksStatus = { installed: false, webhookRunning: false };
@@ -6148,18 +6148,17 @@ class TerminalManager {
     }
 
     async checkForTaskCompletionNotifications() {
-        console.log('🔍 Checking for task notifications...');
+
         try {
             const result = await ipcRenderer.invoke('check-task-notifications');
             
             // Debug logging
             if (result.notifications && result.notifications.length > 0) {
-                console.log(`📬 Found ${result.notifications.length} unprocessed notifications`);
-                console.log('Notification types:', result.notifications.map(n => n.type));
+
                 // Log terminal title notifications specifically
                 const titleNotifications = result.notifications.filter(n => n.type === 'terminal_title_update');
                 if (titleNotifications.length > 0) {
-                    console.log('🏷️ Terminal title notifications found:', titleNotifications);
+
                 }
             }
             
@@ -6172,14 +6171,7 @@ class TerminalManager {
                     } else if (notification.type === 'terminal_title_update') {
                         // Process terminal title update
                         const { terminal_id, title, task_id } = notification;
-                        
-                        console.log(`🏷️ Processing terminal title update:`, {
-                            terminal_id,
-                            title,
-                            task_id,
-                            timestamp: notification.timestamp
-                        });
-                        
+
                         // Save to localStorage
                         localStorage.setItem(`terminal_title_${terminal_id}`, title);
                         if (task_id) {
@@ -6188,8 +6180,7 @@ class TerminalManager {
                         
                         // Verify localStorage was updated
                         const storedTitle = localStorage.getItem(`terminal_title_${terminal_id}`);
-                        console.log(`✅ localStorage verification - stored title: "${storedTitle}"`);
-                        
+
                         // Update UI immediately - convert terminal_id (1-based) to quadrant (0-based)
                         const quadrant = terminal_id - 1;
                         this.updateTerminalTitle(quadrant, title);
@@ -6198,8 +6189,7 @@ class TerminalManager {
                         if (task_id) {
                             this.updateTerminalTaskIndicator(terminal_id);
                         }
-                        
-                        console.log(`✨ Terminal ${terminal_id} title updated to: "${title}"`);
+
                     }
                 });
                 
@@ -6208,12 +6198,12 @@ class TerminalManager {
                 if (hasTerminalTitleUpdates) {
                     // Mark terminal title notifications as processed in the file
                     await ipcRenderer.invoke('mark-terminal-titles-processed');
-                    console.log('✅ Terminal title notifications marked as processed');
+
                 }
             }
         } catch (error) {
             // Silently fail - this is just for notifications
-            console.log('Notification check failed:', error);
+
         }
     }
 
@@ -6325,6 +6315,15 @@ class TerminalManager {
                 // Remove from local terminals map
                 this.terminals.delete(terminalId);
                 
+                // Remove danger notification if this was a danger terminal
+                const dangerNotification = document.querySelector(`#danger-notification-${terminalId}`);
+                if (dangerNotification) {
+                    dangerNotification.remove();
+                }
+                if (this.dangerTerminals) {
+                    this.dangerTerminals.delete(terminalId);
+                }
+                
                 // In tabbed mode, switch to another tab if removing the active one
                 if (this.layoutMode === 'tabbed' && this.activeTabTerminal === terminalId) {
                     const activeResult = await ipcRenderer.invoke('get-active-terminals');
@@ -6363,22 +6362,20 @@ class TerminalManager {
     async forceRenderUpdate() {
         // Force a complete re-render of all terminals
         await this.renderTerminals();
-        console.log('Terminals re-rendered with updated UI');
+
     }
 
     async renderTerminals() {
         try {
-            console.log('🔄 Rendering terminals...');
+
             const activeResult = await ipcRenderer.invoke('get-active-terminals');
-            console.log('📊 Active terminals result:', activeResult);
-            
+
             if (!activeResult.success) {
                 console.error('Failed to get active terminals');
                 return;
             }
 
             const activeTerminals = activeResult.terminals;
-            console.log(`📋 Found ${activeTerminals.length} active terminals:`, activeTerminals);
 
             // If in tabbed mode, render tabbed layout instead
             if (this.layoutMode === 'tabbed') {
@@ -6413,7 +6410,6 @@ class TerminalManager {
                     };
                 }
             });
-            console.log('💾 Preserved terminal info:', preservedInfo);
 
             // Update container class for layout while preserving existing layout classes
             container.className = `terminals-container count-${activeTerminals.length}`;
@@ -6439,7 +6435,7 @@ class TerminalManager {
             container.innerHTML = '';
 
             if (activeTerminals.length === 0) {
-                console.log('📭 No terminals - showing empty state');
+
                 // Show empty state
                 container.innerHTML = `
                     <div class="empty-state">
@@ -6450,12 +6446,11 @@ class TerminalManager {
                 return;
             }
 
-            console.log('🏗️ Creating terminal elements with resizers...');
             // Create terminal elements with resizers
             await this.createTerminalLayoutWithResizers(container, activeTerminals);
 
             // Restore preserved terminal information and colors
-            console.log('🔄 Restoring terminal information and colors...');
+
             activeTerminals.forEach(terminalId => {
                 const info = preservedInfo[terminalId];
                 if (info) {
@@ -6471,13 +6466,11 @@ class TerminalManager {
                 }
             });
 
-            console.log('🎨 Re-initializing Lucide icons...');
             // Re-initialize Lucide icons
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
 
-            console.log('🔗 Re-attaching event listeners after rendering...');
             this.attachTerminalEventListeners();
             
             // Restore task indicators and git branch displays
@@ -6488,8 +6481,6 @@ class TerminalManager {
             setTimeout(() => {
                 this.resizeAllTerminals();
             }, 100);
-
-            console.log('✅ Terminal rendering completed');
 
         } catch (error) {
             console.error('❌ Error rendering terminals:', error);
@@ -6503,7 +6494,7 @@ class TerminalManager {
         element.dataset.terminalId = terminalId;
         
         // Check if terminal already exists and is initialized
-        console.log(`Terminals in Map:`, Array.from(this.terminals.keys()));
+
         const existingTerminal = this.terminals.get(terminalId);
         const hasActiveTerminal = existingTerminal && existingTerminal.terminal;
         
@@ -6522,8 +6513,7 @@ class TerminalManager {
         }
         
         // Log for debugging
-        console.log(`Creating element for terminal ${terminalId}, initialized: ${hasActiveTerminal}, title: ${terminalTitle}, existingTerminal:`, existingTerminal);
-        
+
         element.innerHTML = `
             <div class="terminal-header">
                 <div style="display: flex; align-items: center; flex: 1;">
@@ -6641,8 +6631,7 @@ class TerminalManager {
     }
 
     attachTerminalEventListeners() {
-        console.log('Attaching terminal event listeners...');
-        
+
         // Use event delegation for placeholders instead of attaching to each one
         // This ensures they work even after DOM changes
         const containers = [
@@ -6664,7 +6653,7 @@ class TerminalManager {
                 if (placeholder) {
                     e.stopPropagation();
                     const quadrant = parseInt(placeholder.dataset.quadrant);
-                    console.log(`Placeholder clicked for terminal ${quadrant} via delegation`);
+
                     // Always show directory selector - remove reconnect functionality
                     this.showDirectorySelector(quadrant);
                 }
@@ -6672,7 +6661,7 @@ class TerminalManager {
             
             // Attach the delegated listener
             container.addEventListener('click', container._placeholderClickHandler);
-            console.log(`Added delegated click listener to ${container.id}`);
+
         });
 
         // Re-attach color picker event listeners to terminal titles
@@ -6700,13 +6689,13 @@ class TerminalManager {
                 const terminalId = parseInt(btn.dataset.terminal);
                 
                 if (!this.terminals.has(terminalId)) {
-                    console.log(`Terminal ${terminalId} not initialized`);
+
                     return;
                 }
                 
                 const terminal = this.terminals.get(terminalId);
                 if (!terminal || !terminal.terminal) {
-                    console.log(`Terminal ${terminalId} not ready`);
+
                     return;
                 }
                 
@@ -6801,7 +6790,6 @@ class TerminalManager {
             });
         });
 
-
         // Update reorder button states
         this.updateReorderButtonStates();
     }
@@ -6862,8 +6850,7 @@ class TerminalManager {
     }
 
     async setLayout(layout) {
-        console.log('setLayout called with:', layout);
-        
+
         const validLayouts = ['horizontal', 'vertical', '3-top1', '3-top2-horiz', '3-left2', '3-right2'];
         if (!validLayouts.includes(layout)) return;
         
@@ -6872,8 +6859,7 @@ class TerminalManager {
         
         this.currentLayout = layout;
         const container = document.getElementById('terminals-container');
-        console.log('Container found:', container);
-        
+
         // Remove all layout classes first
         container.classList.remove('layout-vertical', 'layout-3-top1', 'layout-3-top2-horiz', 'layout-3-left2', 'layout-3-right2');
         
@@ -6886,10 +6872,10 @@ class TerminalManager {
         // Update container classes based on layout
         if (layout === 'vertical') {
             container.classList.add('layout-vertical');
-            console.log('Added layout-vertical class');
+
         } else if (layout.startsWith('3-')) {
             container.classList.add(`layout-${layout}`);
-            console.log(`Added layout-${layout} class`);
+
         }
         
         // Update button states
@@ -6907,8 +6893,7 @@ class TerminalManager {
     }
 
     toggleLayoutMode() {
-        console.log('Toggling layout mode from:', this.layoutMode);
-        
+
         if (this.layoutMode === 'grid') {
             this.switchToTabbedMode();
         } else {
@@ -6917,12 +6902,12 @@ class TerminalManager {
     }
 
     switchToTabbedMode() {
-        console.log('Switching from grid to tabbed mode...');
+
         this.layoutMode = 'tabbed';
         
         // Clean up any open directory selectors before switching modes
         document.querySelectorAll('.directory-selector').forEach(selector => {
-            console.log('Removing orphaned directory selector before mode switch');
+
             selector.remove();
         });
         
@@ -6968,13 +6953,12 @@ class TerminalManager {
                 setTimeout(() => {
                     // First restore general terminal states (colors, etc)
                     this.restoreAllTerminalStates();
-                    console.log('Tabbed mode switch complete, restoring states');
-                    
+
                     // Then restore custom titles (with higher priority) after a small delay
                     setTimeout(() => {
                         // Restore saved titles from before the switch
                         savedTitles.forEach((title, quadrant) => {
-                            console.log(`Restoring saved title for terminal ${quadrant}: "${title}"`);
+
                             this.updateTerminalTitle(quadrant, title);
                         });
                         
@@ -6984,13 +6968,13 @@ class TerminalManager {
                                 if (!savedTitles.has(i)) {
                                     const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
                                     if (storedTitle) {
-                                        console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+
                                         this.updateTerminalTitle(i, storedTitle);
                                     }
                                 }
                             }
                         } else {
-                            console.log('Fresh app start - skipping localStorage title restoration');
+
                         }
                     }, 50); // Small delay to ensure restoreAllTerminalStates doesn't override
                     
@@ -7001,17 +6985,16 @@ class TerminalManager {
                 }, 100);
                 
                 // Event delegation is already set up, no need to re-attach
-                console.log('Tabbed mode rendering complete, event delegation active');
+
             }
         });
     }
 
     switchToGridMode() {
-        console.log('Switching from tabbed to grid mode...');
-        
+
         // Clean up any open directory selectors before switching modes
         document.querySelectorAll('.directory-selector').forEach(selector => {
-            console.log('Removing orphaned directory selector before mode switch');
+
             selector.remove();
         });
         
@@ -7044,7 +7027,7 @@ class TerminalManager {
         // Clean up tabbed mode content to avoid duplicate elements
         const tabbedContent = document.getElementById('tabbed-terminal-content');
         if (tabbedContent) {
-            console.log('Cleaning up tabbed content to avoid duplicates');
+
             tabbedContent.innerHTML = '';
         }
         
@@ -7064,7 +7047,7 @@ class TerminalManager {
             setTimeout(() => {
                 // Restore saved titles from tabs
                 savedTitles.forEach((title, terminalId) => {
-                    console.log(`Restoring saved title for terminal ${terminalId}: "${title}"`);
+
                     this.updateTerminalTitle(terminalId, title);
                 });
                 
@@ -7074,13 +7057,13 @@ class TerminalManager {
                         if (!savedTitles.has(i)) {
                             const storedTitle = localStorage.getItem(`terminal_title_${i + 1}`);
                             if (storedTitle) {
-                                console.log(`Restoring localStorage title for terminal ${i}: "${storedTitle}"`);
+
                                 this.updateTerminalTitle(i, storedTitle);
                             }
                         }
                     }
                 } else {
-                    console.log('Fresh app start - skipping localStorage title restoration');
+
                 }
             }, 200); // Slightly longer delay for grid mode to ensure DOM is ready
             
@@ -7090,13 +7073,12 @@ class TerminalManager {
             this.attachTerminalControlListeners();
             // Re-attach quick action button listeners
             this.attachQuickActionListeners();
-            console.log('Grid mode switch complete, all event listeners re-attached');
+
         });
     }
 
     restoreAllTerminalStates() {
-        console.log('Restoring all terminal states after mode switch...');
-        
+
         // Get all active terminals
         ipcRenderer.invoke('get-active-terminals').then(result => {
             if (result.success && result.terminals) {
@@ -7111,7 +7093,7 @@ class TerminalManager {
                             const projectPath = this.lastSelectedDirectories[terminalId];
                             if (projectPath) {
                                 const projectName = projectPath.split('/').pop() || projectPath;
-                                console.log(`Restoring title for terminal ${terminalId}: ${projectName}`);
+
                                 this.updateTerminalTitle(terminalId, projectName);
                             }
                         }
@@ -7119,7 +7101,7 @@ class TerminalManager {
                         
                         // Restore header color
                         if (this.lastSelectedDirectories[terminalId]) {
-                            console.log(`Restoring color for terminal ${terminalId} with path ${this.lastSelectedDirectories[terminalId]}`);
+
                             this.updateTerminalHeaderColor(terminalId);
                         }
                         
@@ -7142,8 +7124,7 @@ class TerminalManager {
     }
 
     async renderTabbedLayout(activeTerminals) {
-        console.log('Rendering tabbed layout with terminals:', activeTerminals);
-        
+
         const tabsContainer = document.getElementById('terminal-tabs');
         const contentContainer = document.getElementById('tabbed-terminal-content');
         
@@ -7160,7 +7141,7 @@ class TerminalManager {
         // If no active tab or invalid, set to first available
         if (!this.activeTabTerminal && activeTerminals.length > 0) {
             this.activeTabTerminal = activeTerminals[0];
-            console.log(`🔄 Set active tab to terminal ${this.activeTabTerminal}`);
+
         }
         
         // Create tabs and terminal elements
@@ -7213,16 +7194,16 @@ class TerminalManager {
                         }, 100);
                         
                         // Add scroll to bottom button for tabbed mode
-                        console.log(`Adding scroll button for terminal ${terminalId} in tabbed mode`);
+
                         this.addScrollToBottomButton(terminalDiv, existingTerminal.terminal, terminalId);
                         
                         // Debug: check if button was added and viewport exists
                         setTimeout(() => {
                             const btn = terminalDiv.querySelector('.scroll-to-bottom-btn');
                             const viewport = terminalDiv.querySelector('.xterm-viewport');
-                            console.log(`Terminal ${terminalId} - Button exists: ${!!btn}, Viewport exists: ${!!viewport}`);
+
                             if (viewport) {
-                                console.log(`Terminal ${terminalId} - Viewport scroll height: ${viewport.scrollHeight}, client height: ${viewport.clientHeight}`);
+
                             }
                         }, 500);
                     }
@@ -7238,9 +7219,7 @@ class TerminalManager {
         
         // Re-attach quick action button listeners for tabbed mode
         this.attachQuickActionListeners();
-        
-        console.log('Tabbed layout rendered, event listeners attached');
-        
+
         // Re-initialize icons
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -7251,11 +7230,11 @@ class TerminalManager {
         
         // Apply colors and other styling after everything is rendered
         setTimeout(() => {
-            console.log('Applying terminal styling in tabbed mode...');
+
             activeTerminals.forEach(terminalId => {
                 // Apply header colors if terminal has a project
                 if (this.lastSelectedDirectories[terminalId]) {
-                    console.log(`Applying color for terminal ${terminalId} with project ${this.lastSelectedDirectories[terminalId]}`);
+
                     this.updateTerminalHeaderColor(terminalId);
                 }
                 
@@ -7332,14 +7311,13 @@ class TerminalManager {
                     title = projectName;
                 }
             }
-            
-            console.log(`Tab ${terminalId}: title="${title}", projectInitials="${projectInitials}", projectColor="${projectColor}`);
+
         } else {
             // No directory selected yet, check if terminal is active
             const terminal = this.terminals.get(terminalId);
             if (terminal && terminal.terminal) {
                 // Terminal is active but no directory - shouldn't happen normally
-                console.log(`Tab ${terminalId}: Terminal active but no directory selected`);
+
             }
         }
         
@@ -7357,7 +7335,7 @@ class TerminalManager {
         
         // Apply color styles directly to the tab button
         if (projectColor) {
-            console.log(`Applying color ${projectColor} to tab ${terminalId}`);
+
             const tabNumber = tab.querySelector('.tab-terminal-number');
             
             // Apply gradient directly to the tab button
@@ -7384,23 +7362,19 @@ class TerminalManager {
                 }
                 
                 const terminalId = parseInt(tab.dataset.terminalId);
-                console.log(`🖱️ TAB CLICKED - Terminal ${terminalId}`);
-                console.log(`🖱️ Tab dataset.terminalId: ${tab.dataset.terminalId}, parsed: ${terminalId}`);
-                console.log(`🖱️ Current attention set:`, Array.from(this.terminalsNeedingAttention));
-                console.log(`🖱️ Tab has notification class:`, tab.classList.contains('tab-has-notification'));
-                
+
                 // Always clear notification when clicking a tab, even if it's already active
                 if (this.terminalsNeedingAttention.has(terminalId)) {
-                    console.log(`🖱️ ✅ Terminal ${terminalId} IS in attention set, clearing notification`);
+
                     this.terminalsNeedingAttention.delete(terminalId);
                     tab.classList.remove('tab-has-notification');
-                    console.log(`🖱️ Removed notification class, new classes:`, tab.className);
+
                     this.updateNotificationBadge();
                 } else {
-                    console.log(`🖱️ ❌ Terminal ${terminalId} NOT in attention set`);
+
                     // Still try to remove the class if it exists
                     if (tab.classList.contains('tab-has-notification')) {
-                        console.log(`🖱️ But tab HAS notification class, removing it anyway`);
+
                         tab.classList.remove('tab-has-notification');
                     }
                 }
@@ -7428,7 +7402,7 @@ class TerminalManager {
                     
                     // Clear notification if this terminal has one
                     if (this.terminalsNeedingAttention.has(terminalId)) {
-                        console.log(`Clearing notification for terminal ${terminalId} via content click`);
+
                         this.terminalsNeedingAttention.delete(terminalId);
                         
                         // Remove notification class from the tab
@@ -7446,17 +7420,16 @@ class TerminalManager {
     }
 
     switchToTab(terminalId) {
-        console.log(`switchToTab called for terminal ${terminalId}, active terminal is ${this.activeTabTerminal}`);
-        
+
         // Always clear notification state for this terminal, regardless of whether it's active
         if (this.terminalsNeedingAttention.has(terminalId)) {
-            console.log(`Clearing notification for terminal ${terminalId} in switchToTab`);
+
             this.terminalsNeedingAttention.delete(terminalId);
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
-            console.log(`Found tab for terminal ${terminalId}:`, tab);
+
             if (tab) {
                 tab.classList.remove('tab-has-notification');
-                console.log(`Removed notification class from terminal ${terminalId}`);
+
             }
             // Update the notification badge count
             this.updateNotificationBadge();
@@ -7465,19 +7438,18 @@ class TerminalManager {
         // Also check and clear notification class even if not in attention set (defensive programming)
         const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
         if (tab && tab.classList.contains('tab-has-notification')) {
-            console.log(`Found orphaned notification class on terminal ${terminalId}, removing it`);
+
             tab.classList.remove('tab-has-notification');
         }
         
         // If already on this tab, we need to still show the terminal (in case of notification clear)
         if (this.activeTabTerminal === terminalId) {
-            console.log(`Already on terminal ${terminalId}, but ensuring it's visible`);
+
             // Make sure the terminal is visible
             this.showTerminal(terminalId);
             return;
         }
-        
-        console.log('Switching to tab:', terminalId);
+
         this.activeTabTerminal = terminalId;
         
         // Update tab states
@@ -7572,25 +7544,19 @@ class TerminalManager {
     }
 
     showTerminalNotification(terminalId) {
-        console.log(`📍 showTerminalNotification called for terminal ${terminalId}`);
-        console.log(`📍 Current layout mode: ${this.layoutMode}`);
-        console.log(`📍 Active tab terminal: ${this.activeTabTerminal}`);
-        
+
         this.terminalsNeedingAttention.add(terminalId);
-        console.log(`📍 Added to attention set. Current set:`, Array.from(this.terminalsNeedingAttention));
-        
+
         // Update tab if in tabbed mode
         if (this.layoutMode === 'tabbed') {
             const tab = document.querySelector(`.terminal-tab[data-terminal-id="${terminalId}"]`);
-            console.log(`📍 Found tab element:`, tab);
-            console.log(`📍 Tab data-terminal-id:`, tab ? tab.dataset.terminalId : 'null');
-            
+
             if (tab && terminalId !== this.activeTabTerminal) {
-                console.log(`📍 Adding notification class to tab for terminal ${terminalId}`);
+
                 tab.classList.add('tab-has-notification');
-                console.log(`📍 Tab classes after adding:`, tab.className);
+
             } else if (terminalId === this.activeTabTerminal) {
-                console.log(`📍 Terminal ${terminalId} is already active, not adding notification badge`);
+
             }
         }
     }
@@ -7680,8 +7646,7 @@ class TerminalManager {
     }
 
     moveTerminalByPosition(position, direction) {
-        console.log(`🔄 moveTerminalByPosition: position ${position} direction ${direction}`);
-        
+
         const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
         const totalTerminals = allTerminals.length;
         
@@ -7713,21 +7678,18 @@ class TerminalManager {
     }
 
     swapTerminalElements(element1, element2) {
-        console.log('🔄 Swapping elements');
-        
+
         // Check if we're in a 3-terminal layout
         const allTerminals = Array.from(document.querySelectorAll('.terminal-quadrant'));
         const terminalCount = allTerminals.length;
-        console.log('🔄 Detected terminal count:', terminalCount);
-        
+
         // Use content swap for all terminal counts - it works universally
-        console.log('🔄 Using content swap for', terminalCount, 'terminals');
+
         this.swapTerminalContent(element1, element2);
     }
 
     swapTerminalPositions(element1, element2) {
-        console.log('🔄 Swapping DOM positions for 2 terminals');
-        
+
         // Get parent container (should be the same for both in 2-terminal layout)
         const container = element1.parentNode;
         
@@ -7752,9 +7714,7 @@ class TerminalManager {
             
             // Remove temporary placeholder
             container.removeChild(temp);
-            
-            console.log('🔄 DOM positions swapped successfully');
-            
+
             // Update terminal data and fit
             setTimeout(() => {
                 this.reattachTerminalsAfterSwap();
@@ -7768,8 +7728,7 @@ class TerminalManager {
     }
 
     swapTerminalContent(element1, element2) {
-        console.log('🔄 Swapping terminals by physically moving DOM elements');
-        
+
         // Create temporary placeholders
         const placeholder1 = document.createElement('div');
         const placeholder2 = document.createElement('div');
@@ -7793,8 +7752,7 @@ class TerminalManager {
         // Remove placeholders
         placeholder1.remove();
         placeholder2.remove();
-        
-        console.log('🔄 Terminals physically swapped - everything preserved');
+
     }
 
     async swapTerminals(terminalId1, terminalId2) {
@@ -7847,12 +7805,11 @@ class TerminalManager {
                 if (match) {
                     const terminalId = parseInt(match[1]) - 1; // Convert to 0-based
                     currentOrder.push(terminalId);
-                    console.log(`🔄 Position ${index}: Terminal ${terminalId} (${titleText})`);
+
                 }
             }
         });
-        
-        console.log('🔄 Current DOM order:', currentOrder);
+
         return currentOrder;
     }
 
@@ -7887,7 +7844,6 @@ class TerminalManager {
             }, 50);
         }
     }
-
 
     async updateReorderButtonStatesAfterSwap() {
         // Wait a bit for the DOM to update, then update button states
@@ -7980,7 +7936,6 @@ class TerminalManager {
         this.attachTerminalEventListeners();
     }
 
-
     adaptTerminalSizesToNewPositions() {
         // Force re-render to make terminals adapt to their new positions
         const container = document.getElementById('terminals-container');
@@ -7994,8 +7949,7 @@ class TerminalManager {
 
     async create3TerminalLayout(container, activeTerminals) {
         const layout = this.currentLayout;
-        console.log('Creating 3-terminal layout:', layout);
-        
+
         switch (layout) {
             case '3-top1':
                 await this.create3TerminalTop1Layout(container, activeTerminals);
@@ -8307,8 +8261,7 @@ class TerminalManager {
 
     // Highlight the terminals that will be swapped
     highlightSwapPreview(currentElement, targetElement) {
-        console.log('🎨 Highlighting swap preview');
-        
+
         // Add preview class to both terminals
         currentElement.classList.add('swap-preview-current');
         targetElement.classList.add('swap-preview-target');
@@ -8319,8 +8272,7 @@ class TerminalManager {
 
     // Clear the swap preview highlighting
     clearSwapPreview() {
-        console.log('🎨 Clearing swap preview');
-        
+
         // Remove preview classes from all terminals
         document.querySelectorAll('.terminal-quadrant').forEach(terminal => {
             terminal.classList.remove('swap-preview-current', 'swap-preview-target');
@@ -8329,7 +8281,6 @@ class TerminalManager {
         // Clear stored reference
         this.previewElements = null;
     }
-
 
     // Update activity and check for completion marker
 
@@ -8496,7 +8447,7 @@ class TerminalManager {
         const targetVersions = ['0.0.41', '0.0.42', '0.0.43', '0.0.44', '0.0.45', '0.0.46', '0.0.47', '0.0.48'];
         
         if (!window.appVersion || !targetVersions.includes(window.appVersion)) {
-            console.log(`MCP highlight skipped - version ${window.appVersion} not in target range`);
+
             return;
         }
         
@@ -8504,14 +8455,14 @@ class TerminalManager {
         // Using standardized format: featureHighlight_[featureName]
         const storageKey = `featureHighlight_mcpSettingsHighlight`;
         if (localStorage.getItem(storageKey) === 'true') {
-            console.log('MCP settings highlight already shown');
+
             return;
         }
         
         // Show highlight inside the modal for MCP features
         const mcpPanel = document.querySelector('.tab-panel[data-panel="mcp-servers"].active');
         if (!mcpPanel) {
-            console.log('MCP panel not active, skipping highlight');
+
             return;
         }
         
@@ -8614,8 +8565,7 @@ class TerminalManager {
         
         // Mark as shown
         localStorage.setItem(storageKey, 'true');
-        console.log('MCP settings highlight marked as shown');
-        
+
         // Auto-dismiss after 30 seconds
         setTimeout(() => {
             const element = document.getElementById('mcp-modal-highlight');
@@ -9050,7 +9000,7 @@ class TerminalManager {
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
     
-    showUpdateAvailable(info) {
+    async showUpdateAvailable(info) {
         this.hideAllUpdateSections();
         
         const section = document.getElementById('update-available-section');
@@ -9068,6 +9018,18 @@ class TerminalManager {
         // Show changelog if available
         const notesEl = document.getElementById('release-notes');
         const fullscreenBtn = document.getElementById('view-changelog-fullscreen');
+        
+        // If changelog is missing, try to fetch it
+        if (!info.changelog && !info.releaseNotes) {
+            try {
+                const changelog = await ipcRenderer.invoke('fetch-changelog-for-version', info.version);
+                if (changelog) {
+                    info.changelog = changelog;
+                }
+            } catch (error) {
+                console.error('Failed to fetch changelog:', error);
+            }
+        }
         
         if (info.changelog || info.releaseNotes) {
             // Store changelog for fullscreen view
@@ -9087,7 +9049,9 @@ class TerminalManager {
             fullscreenBtn.style.display = 'inline-flex';
             fullscreenBtn.onclick = () => this.showFullscreenChangelog();
         } else {
-            notesEl.style.display = 'none';
+            // If still no changelog, show a placeholder message
+            notesEl.innerHTML = '<p style="color: #999; font-style: italic;">Changelog information not available</p>';
+            notesEl.style.display = 'block';
             fullscreenBtn.style.display = 'none';
         }
         
@@ -9421,6 +9385,67 @@ class TerminalManager {
         }
     }
     
+    showDangerNotification(quadrant) {
+        // Remove any existing danger notification for this quadrant
+        const existingNotification = document.querySelector(`#danger-notification-${quadrant}`);
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Create persistent danger notification
+        const notification = document.createElement('div');
+        notification.id = `danger-notification-${quadrant}`;
+        notification.className = 'app-notification notification-warning danger-mode-notification';
+        notification.innerHTML = `
+            <div class="notification-content">
+                <span class="danger-icon">⚡</span>
+                <strong>DANGER MODE ACTIVE</strong>
+                <span class="notification-message">Terminal ${quadrant} is running in danger mode - ALL safety confirmations are disabled!</span>
+                <button class="notification-close" onclick="window.terminalManager.exitDangerMode(${quadrant})">
+                    Exit Danger Mode
+                </button>
+            </div>
+        `;
+        
+        // Add to notification container or create one
+        let container = document.querySelector('.notification-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.className = 'notification-container';
+            document.body.appendChild(container);
+        }
+        
+        container.appendChild(notification);
+        
+        // Animate in
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 10);
+        
+        // Track active danger terminals
+        if (!this.dangerTerminals) {
+            this.dangerTerminals = new Set();
+        }
+        this.dangerTerminals.add(quadrant);
+    }
+    
+    exitDangerMode(quadrant) {
+        // Remove danger notification
+        const notification = document.querySelector(`#danger-notification-${quadrant}`);
+        if (notification) {
+            notification.classList.remove('show');
+            setTimeout(() => notification.remove(), 300);
+        }
+        
+        // Remove from tracking
+        if (this.dangerTerminals) {
+            this.dangerTerminals.delete(quadrant);
+        }
+        
+        // TODO: Actually exit danger mode in the terminal
+        this.showNotification('Danger mode disabled for Terminal ' + quadrant, 'success');
+    }
+    
     showNotification(title, message, type = 'info') {
         // Handle both 2-parameter and 3-parameter calls
         if (typeof message === 'undefined' || (typeof message === 'string' && ['info', 'error', 'warning', 'success'].includes(message))) {
@@ -9548,8 +9573,7 @@ async function initializeFeatureHighlights() {
     try {
         const appVersion = await ipcRenderer.invoke('get-app-version');
         window.appVersion = appVersion; // Make it available globally
-        console.log('App version:', appVersion);
-        
+
         // Badges are now configured in FEATURE_HIGHLIGHTS_CONFIG
     } catch (error) {
         console.warn('Could not get app version:', error);
@@ -9558,6 +9582,9 @@ async function initializeFeatureHighlights() {
     // Create global instance for development testing
     window.featureHighlight = new FeatureHighlight();
     
+    // Initialize update notification manager
+    window.updateNotificationManager = new UpdateNotificationManager();
+
     // Process all configured highlights
     FEATURE_HIGHLIGHTS_CONFIG.forEach(config => {
         // Check if this feature should be shown in current version
@@ -9576,24 +9603,20 @@ async function initializeFeatureHighlights() {
                     versions: showInVersions,
                     showOnce: config.showOnce !== undefined ? config.showOnce : true
                 });
-                console.log(`Showing feature ${config.type || 'highlight'}: ${config.featureName} for version ${window.appVersion}`);
+
             }, config.delay || 500);
         } else {
-            console.log(`Feature ${config.featureName} skipped - version ${window.appVersion} not in [${showInVersions.join(', ')}]`);
+
         }
     });
     
     // For development: expose test functions in console
     if (window.location.href.includes('--dev') || process.env.ENABLE_DEBUG_LOGS) {
-        console.log('🎯 Feature Highlight Dev Mode Enabled!');
-        console.log('Test commands:');
-        console.log('  featureHighlight.testHighlight("tabbedMode") - Test tabbed mode highlight');
-        console.log('  featureHighlight.reset("tabbedMode") - Reset tabbed mode highlight');
-        console.log('  featureHighlight.resetAll() - Reset all highlights');
-        console.log('  featureHighlight.forceShow({...}) - Force show any highlight');
+        // Development mode features could go here
     }
 }
 
+// Main initialization code
 document.addEventListener('DOMContentLoaded', async () => {
     // Get loading screen element
     const loadingScreen = document.getElementById('loading-screen');
@@ -9603,25 +9626,24 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Clear terminal titles from localStorage on fresh app start
     // This ensures we don't keep old titles when the app restarts
-    console.log('🧹 Clearing terminal titles from previous session...');
+
     for (let i = 1; i <= 6; i++) {
         const titleKey = `terminal_title_${i}`;
         const taskKey = `terminal_task_${i}`;
         if (localStorage.getItem(titleKey)) {
-            console.log(`  Cleared title for terminal ${i}: "${localStorage.getItem(titleKey)}"`);
+
             localStorage.removeItem(titleKey);
         }
         if (localStorage.getItem(taskKey)) {
             localStorage.removeItem(taskKey);
         }
     }
-    console.log('✅ Terminal titles cleared for fresh session');
-    
+
     // Also clear old terminal title notifications from the file
     // This prevents them from being re-processed and put back into localStorage
     try {
         await ipcRenderer.invoke('clear-old-terminal-title-notifications');
-        console.log('🧹 Cleared old terminal title notifications from file');
+
     } catch (error) {
         console.error('Error clearing old terminal title notifications:', error);
     }
@@ -9629,7 +9651,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Clear the flag after a delay to allow mode switches later
     setTimeout(() => {
         window.isAppFreshStart = false;
-        console.log('App initialization complete - localStorage title restoration enabled for mode switches');
+
     }, 5000); // 5 seconds should be enough for initial setup
     
     try {
@@ -9690,12 +9712,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!debugEnabled) {
         const orphanButton = document.querySelector('.log-viewer-button');
         if (orphanButton) {
-            console.log('Removing orphan log viewer button');
+
             orphanButton.remove();
         }
         const orphanContainer = document.querySelector('.log-viewer-container');
         if (orphanContainer) {
-            console.log('Removing orphan log viewer container');
+
             orphanContainer.remove();
         }
     }
@@ -9713,7 +9735,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (isDevMode) {
         const PerformanceMonitor = loadPerformanceMonitor();
         if (PerformanceMonitor) {
-            console.log('🚀 Starting Performance Monitor...');
+
             const perfMonitor = new PerformanceMonitor();
             perfMonitor.startMonitoring();
             
@@ -9753,8 +9775,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Handle opening a new terminal with a task
     ipcRenderer.on('open-terminal-for-task', async (event, terminalId, taskData) => {
-        console.log('📧 Received request to open terminal for task:', terminalId, taskData);
-        
+
         if (!window.terminalManager) {
             console.error('Terminal manager not initialized');
             return;
@@ -9767,8 +9788,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         // FIRST: Always check if there are uninitialized terminals we can use
         const uninitializedTerminal = await window.terminalManager.findUninitializedTerminal();
         if (uninitializedTerminal !== null) {
-            console.log('🔄 Reusing uninitialized terminal:', uninitializedTerminal);
-            
+
             // Store task data for this terminal
             if (!window.pendingTerminalTasks) {
                 window.pendingTerminalTasks = {};
@@ -9783,23 +9803,33 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (selectedDir) {
                 // Directly start the terminal with the project directory
-                console.log(`📁 Auto-initializing terminal ${uninitializedTerminal} with directory: ${selectedDir}`);
+
                 window.terminalManager.startTerminal(uninitializedTerminal, selectedDir, 'new');
             } else {
                 // Show directory selector if no directory found
-                console.log('📂 No project directory found, showing directory selector');
+
                 window.terminalManager.showDirectorySelector(uninitializedTerminal);
             }
         } else {
             // Need to add a new terminal
+
             const result = await ipcRenderer.invoke('add-terminal');
+            
             if (result.success) {
                 const newTerminalId = result.terminalId;
-                window.pendingTerminalTasks[newTerminalId] = taskData;
+
+                // Initialize pendingTerminalTasks if not already initialized
+                if (!window.pendingTerminalTasks) {
+                    window.pendingTerminalTasks = {};
+
+                }
                 
+                window.pendingTerminalTasks[newTerminalId] = taskData;
+
                 // In tabbed mode, set active terminal before rendering
                 if (window.terminalManager.layoutMode === 'tabbed' && newTerminalId !== undefined) {
                     window.terminalManager.activeTabTerminal = newTerminalId;
+
                 }
                 
                 // Render terminals
@@ -9808,14 +9838,23 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Now initialize the terminal with the directory if we have one
                 if (selectedDir) {
-                    console.log(`📁 Auto-initializing new terminal ${newTerminalId} with directory: ${selectedDir}`);
+
                     // Small delay to ensure DOM is ready
                     setTimeout(() => {
                         window.terminalManager.startTerminal(newTerminalId, selectedDir, 'new');
                     }, 200);
                 } else {
                     // The placeholder will be shown and user can select directory
-                    console.log('📂 No project directory found, showing directory selector');
+
+                }
+            } else {
+                // Failed to add terminal
+                console.error('❌ Failed to add new terminal:', result.error || 'Unknown error');
+                const errorMsg = result.error || 'Failed to create new terminal';
+                
+                // Show error notification if kanban is available
+                if (window.kanban && window.kanban.showNotification) {
+                    window.kanban.showNotification(errorMsg, 'error', 3000);
                 }
             }
         }
@@ -9825,30 +9864,19 @@ document.addEventListener('DOMContentLoaded', async () => {
     
     // Debug functions for terminal titles
     window.checkTerminalTitles = () => {
-        console.log('🔍 Checking terminal titles in localStorage:');
+
         for (let i = 1; i <= 6; i++) {
             const title = localStorage.getItem(`terminal_title_${i}`);
             const taskId = localStorage.getItem(`terminal_task_${i}`);
-            console.log(`Terminal ${i}:`, {
-                title: title || '(not set)',
-                taskId: taskId || '(not set)'
-            });
-        }
-        return 'Check complete';
-    };
-    
-    window.clearTerminalTitles = () => {
-        console.log('🗑️ Clearing all terminal titles from localStorage...');
-        for (let i = 1; i <= 6; i++) {
-            localStorage.removeItem(`terminal_title_${i}`);
+
             localStorage.removeItem(`terminal_task_${i}`);
         }
-        console.log('✅ All terminal titles cleared');
+
         return 'Cleared';
     };
     
     window.testTerminalTitle = (terminalId = 1, title = 'Test Title') => {
-        console.log(`🧪 Testing terminal ${terminalId} with title: "${title}"`);
+
         localStorage.setItem(`terminal_title_${terminalId}`, title);
         localStorage.setItem(`terminal_task_${terminalId}`, '999');
         
@@ -9860,14 +9888,13 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             console.warn('TerminalManager not available yet. Title saved to localStorage only.');
         }
-        
-        console.log('✅ Test complete - check the terminal header');
+
         return 'Test applied';
     };
     
     // Function to manually reload terminal title notifications
     window.reloadTerminalTitles = async () => {
-        console.log('🔄 Manually reloading terminal title notifications...');
+
         try {
             const fs = require('fs');
             const path = require('path');
@@ -9881,15 +9908,11 @@ document.addEventListener('DOMContentLoaded', async () => {
                 
                 // Find terminal_title_update notifications
                 const titleNotifications = notifications.filter(n => n.type === 'terminal_title_update');
-                
-                console.log(`Found ${titleNotifications.length} terminal title notifications`);
-                
+
                 // Process each notification
                 titleNotifications.forEach(notification => {
                     const { terminal_id, title, task_id } = notification;
-                    
-                    console.log(`Processing: Terminal ${terminal_id} -> "${title}"`);
-                    
+
                     // Save to localStorage
                     localStorage.setItem(`terminal_title_${terminal_id}`, title);
                     if (task_id) {
@@ -9905,11 +9928,10 @@ document.addEventListener('DOMContentLoaded', async () => {
                         }
                     }
                 });
-                
-                console.log('✅ Terminal titles reloaded successfully');
+
                 return 'Reloaded';
             } else {
-                console.log('❌ Notification file not found');
+
                 return 'File not found';
             }
         } catch (error) {
@@ -9917,16 +9939,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             return 'Error';
         }
     };
-    
-    console.log('🛠️ Terminal title debug functions available:');
-    console.log('  - checkTerminalTitles() : View all terminal titles in localStorage');
-    console.log('  - clearTerminalTitles() : Clear all terminal titles');
-    console.log('  - testTerminalTitle(terminalId, title) : Test a title on a specific terminal');
-    console.log('  - reloadTerminalTitles() : Manually reload terminal titles from notification file');
-    
+
     // Initialize MCP Settings Manager
     initializeMCPSettings();
-});
+}); // Close DOMContentLoaded event listener
 
 // ================== MCP Settings Initialization ==================
 function initializeMCPSettings() {
@@ -9960,19 +9976,19 @@ function initializeMCPSettings() {
         
         const initMCP = async () => {
             if (!mcpInitialized) {
-                console.log('Initializing MCP Settings...');
+
                 await renderer.initialize();
                 mcpInitialized = true;
-                console.log('MCP Settings initialized successfully');
+
             }
         };
         
         const initMarketplace = async () => {
             if (!marketplaceInitialized && marketplaceContainer) {
-                console.log('Initializing MCP Marketplace...');
+
                 await marketplace.render(marketplaceContainer);
                 marketplaceInitialized = true;
-                console.log('MCP Marketplace initialized successfully');
+
             }
         };
         
@@ -10085,8 +10101,7 @@ function initializeMCPSettings() {
                 }, 100);
             }
         });
-        
-        console.log('MCP Settings and Marketplace modules loaded and ready');
+
     } catch (error) {
         console.error('Failed to initialize MCP Settings:', error);
     }

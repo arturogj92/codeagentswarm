@@ -187,7 +187,7 @@ class MCPInstructionsManager {
             // Merge servers from both configs
             config.mcpServers = { ...config.mcpServers, ...parsedConfig.mcpServers };
             configFound = true;
-            console.log(`✅ Found MCPs in: ${configPath}`);
+
           }
         } catch (error) {
           console.warn(`Failed to parse ${configPath}:`, error.message);
@@ -196,7 +196,7 @@ class MCPInstructionsManager {
     }
     
     if (!configFound) {
-      console.log('⚠️  No Claude config found with MCP servers');
+
       return [];
     }
     
@@ -212,8 +212,7 @@ class MCPInstructionsManager {
       
       return normalized;
     });
-    
-    console.log('✅ Detected MCPs:', installedMCPs);
+
     return installedMCPs;
   }
 
@@ -319,12 +318,12 @@ class MCPInstructionsManager {
       }
       // Crear archivo con contenido mínimo
       fs.writeFileSync(claudeMdPath, '# Global Claude Instructions\n\n');
-      console.log('✅ Created global CLAUDE.md at:', claudeMdPath);
+
     }
     
     // Verificar si existe CLAUDE.md
     if (!fs.existsSync(claudeMdPath)) {
-      console.log('⚠️  CLAUDE.md not found at', claudeMdPath);
+
       return false;
     }
     
@@ -348,13 +347,10 @@ class MCPInstructionsManager {
       
       // Guardar nuevo contenido
       fs.writeFileSync(claudeMdPath, newContent);
-      
-      console.log('✅ Global CLAUDE.md updated with MCP instructions');
-      console.log('   Location:', claudeMdPath);
-      console.log('   Backup saved to:', backupPath);
+
       return true;
     } else {
-      console.log('ℹ️  No changes needed in global CLAUDE.md');
+
       return false;
     }
   }
@@ -363,16 +359,14 @@ class MCPInstructionsManager {
    * Añadir instrucciones para un MCP específico
    */
   async addMCPInstructions(mcpName) {
-    console.log(`📦 Adding instructions for MCP: ${mcpName}`);
-    
+
     // Normalizar nombre
     const normalized = mcpName.toLowerCase()
       .replace('mcp-', '')
       .replace('@modelcontextprotocol/', '');
     
     if (!this.mcpTemplates[normalized]) {
-      console.log(`⚠️  No instructions template found for: ${normalized}`);
-      console.log('   Available templates:', Object.keys(this.mcpTemplates).join(', '));
+
       return false;
     }
     
@@ -384,13 +378,11 @@ class MCPInstructionsManager {
    * Listar MCPs con plantillas disponibles
    */
   listAvailableTemplates() {
-    console.log('\n📚 Available MCP instruction templates:\n');
-    
+
     for (const [key, value] of Object.entries(this.mcpTemplates)) {
-      console.log(`  • ${key}: ${value.name}`);
+
     }
-    
-    console.log('\nTo add a new template, edit mcp-instructions-manager.js');
+
   }
 }
 
@@ -429,32 +421,12 @@ if (require.main === module) {
     case 'detect':
       // Solo detectar MCPs instalados
       manager.detectInstalledMCPs().then(mcps => {
-        console.log('Detected MCPs:', mcps);
+
       });
       break;
       
     default:
-      console.log(`
-MCP Instructions Manager
-========================
 
-Usage:
-  node mcp-instructions-manager.js <command> [options]
-
-Commands:
-  update            Update global CLAUDE.md (~/.claude/CLAUDE.md) with all MCPs
-  update-local      Update local project CLAUDE.md with MCP instructions
-  add <mcp>         Add instructions for specific MCP to global CLAUDE.md
-  list              List available instruction templates
-  detect            Detect installed MCPs
-
-Examples:
-  node mcp-instructions-manager.js update              # Update global CLAUDE.md
-  node mcp-instructions-manager.js update-local        # Update local project CLAUDE.md
-  node mcp-instructions-manager.js add brave-search    # Add specific MCP to global
-  node mcp-instructions-manager.js list                # Show available templates
-
-Note: MCP instructions are now added to the global CLAUDE.md by default (~/.claude/CLAUDE.md)
       `);
   }
 }

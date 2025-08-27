@@ -279,12 +279,11 @@ class GlobalPermissionsFileManager {
     
     setupEventListeners() {
         setTimeout(() => {
-            console.log('[GlobalPermissions] Setting up event listeners');
-            
+
             // Search input
             const searchInput = document.getElementById('permissions-search');
             if (searchInput) {
-                console.log('[GlobalPermissions] Found search input');
+
                 searchInput.addEventListener('input', (e) => {
                     this.searchQuery = e.target.value.trim();
                     
@@ -302,7 +301,7 @@ class GlobalPermissionsFileManager {
             // Category filter
             const categoryFilter = document.getElementById('category-filter');
             if (categoryFilter) {
-                console.log('[GlobalPermissions] Found category filter');
+
                 categoryFilter.addEventListener('change', (e) => {
                     this.selectedCategory = e.target.value;
                     this.render();
@@ -313,7 +312,7 @@ class GlobalPermissionsFileManager {
             ['allow-all-btn', 'deny-all-btn', 'ask-all-btn'].forEach(id => {
                 const btn = document.getElementById(id);
                 if (btn) {
-                    console.log(`[GlobalPermissions] Found button: ${id}`);
+
                     const action = id.split('-')[0];
                     btn.addEventListener('click', () => this.bulkUpdatePermissions(action));
                 }
@@ -353,13 +352,13 @@ class GlobalPermissionsFileManager {
             
             const applyBtn = document.getElementById('apply-permissions-btn');
             if (applyBtn) {
-                console.log('[GlobalPermissions] Found apply button, adding click listener');
+
                 applyBtn.addEventListener('click', () => {
-                    console.log('[GlobalPermissions] Apply button clicked!');
+
                     this.applyChanges();
                 });
             } else {
-                console.log('[GlobalPermissions] ERROR: Apply button not found!');
+
             }
         }, 100);
     }
@@ -400,10 +399,7 @@ class GlobalPermissionsFileManager {
     
     async applyChanges(silent = false) {
         if (!silent) {
-            console.log('[GlobalPermissions] applyChanges called');
-            console.log('[GlobalPermissions] YOLO mode:', this.yoloMode);
-            console.log('[GlobalPermissions] Number of permissions:', this.permissions.length);
-            console.log('[GlobalPermissions] ipcRenderer available:', !!window.ipcRenderer);
+
         }
         
         // Get existing permissions to preserve MCP ones
@@ -449,35 +445,23 @@ class GlobalPermissionsFileManager {
         }
         
         // Log what we're about to save
-        console.log('[GlobalPermissions] New permissions being built:');
-        console.log('  - Non-MCP Allow:', newPermissions.allow);
-        console.log('  - Non-MCP Deny:', newPermissions.deny);
-        console.log('  - Non-MCP Ask:', newPermissions.ask);
-        
+
         // Merge with existing MCP permissions
         newPermissions.allow = [...newPermissions.allow, ...existingMcpAllow];
         newPermissions.deny = [...newPermissions.deny, ...existingMcpDeny];
         newPermissions.ask = [...newPermissions.ask, ...existingMcpAsk];
-        
-        console.log('[GlobalPermissions] Final merged permissions:');
-        console.log('  - Total Allow count:', newPermissions.allow.length);
-        console.log('  - Total Deny count:', newPermissions.deny.length);
-        console.log('  - Total Ask count:', newPermissions.ask.length);
-        console.log('[GlobalPermissions] New permissions object:', JSON.stringify(newPermissions, null, 2));
-        
+
         // Update settings
         this.currentSettings.permissions = newPermissions;
-        
-        console.log('[GlobalPermissions] Full settings to save:', JSON.stringify(this.currentSettings, null, 2));
-        
+
         // Save using IPC or localStorage
         try {
             if (window.ipcRenderer) {
-                console.log('[GlobalPermissions] Calling IPC save-claude-settings...');
+
                 // Use IPC to save to file through main process
                 const result = await window.ipcRenderer.invoke('save-claude-settings', this.currentSettings);
                 if (!silent) {
-                    console.log('[GlobalPermissions] IPC result:', result);
+
                 }
                 if (result.success) {
                     this.changes.clear();
@@ -488,7 +472,7 @@ class GlobalPermissionsFileManager {
                     throw new Error(result.error || 'Failed to save');
                 }
             } else {
-                console.log('[GlobalPermissions] No IPC, using localStorage fallback');
+
                 // Fallback - save to localStorage
                 localStorage.setItem('claudeSettings', JSON.stringify(this.currentSettings));
                 this.changes.clear();
@@ -1105,8 +1089,7 @@ class GlobalPermissionsFileManager {
         
         if (modalBody) {
             savedScrollTop = modalBody.scrollTop;
-            console.log('[GlobalPermissions] Current scroll position:', savedScrollTop);
-            
+
             // Find which tool is currently visible at the clicked position or viewport center
             const activeElement = document.activeElement;
             
@@ -1121,7 +1104,7 @@ class GlobalPermissionsFileManager {
                         const modalRect = modalBody.getBoundingClientRect();
                         const itemRect = permItem.getBoundingClientRect();
                         relativeOffset = itemRect.top - modalRect.top;
-                        console.log('[GlobalPermissions] Clicked tool:', visibleToolName, 'relative offset:', relativeOffset);
+
                     }
                 }
             } else {
@@ -1137,7 +1120,7 @@ class GlobalPermissionsFileManager {
                         if (toolNameEl) {
                             visibleToolName = toolNameEl.textContent.trim();
                             relativeOffset = rect.top - modalRect.top;
-                            console.log('[GlobalPermissions] Top visible tool:', visibleToolName, 'relative offset:', relativeOffset);
+
                             break;
                         }
                     }
@@ -1213,14 +1196,13 @@ class GlobalPermissionsFileManager {
         // Restore scroll position after re-rendering
         // Simple approach: just restore the exact scroll position
         if (savedScrollTop > 0) {
-            console.log('[GlobalPermissions] Will restore scroll position:', savedScrollTop);
-            
+
             // Try multiple times to ensure it sticks
             const restoreScroll = () => {
                 const newModalBody = document.querySelector('.modal-body');
                 if (newModalBody) {
                     newModalBody.scrollTop = savedScrollTop;
-                    console.log('[GlobalPermissions] Restored scroll to:', savedScrollTop);
+
                 }
             };
             
@@ -1239,18 +1221,15 @@ class GlobalPermissionsFileManager {
     }
     
     async applySecurityPreset(preset) {
-        console.log('[GlobalPermissions] Applying security preset:', preset);
-        console.log('[GlobalPermissions] Current YOLO mode status:', this.yoloMode);
-        console.log('[GlobalPermissions] Current permissions count:', this.permissions.length);
-        
+
         // Remove YOLO mode wildcard if applying specific denies
         if (preset !== 'allow-all' && this.yoloMode) {
-            console.log('[GlobalPermissions] Removing YOLO mode wildcard to apply denies');
+
             this.yoloMode = false;
             // Remove the wildcard permission from permissions list
             const wildcardIndex = this.permissions.findIndex(p => p.tool_name === '*');
             if (wildcardIndex !== -1) {
-                console.log('[GlobalPermissions] Found and removing wildcard at index:', wildcardIndex);
+
                 this.permissions.splice(wildcardIndex, 1);
             }
         }
@@ -1287,7 +1266,7 @@ class GlobalPermissionsFileManager {
                 
             case 'disable-git-dangerous':
                 // 2. Block dangerous git commands (merge, branch, push)
-                console.log('[GlobalPermissions] Blocking dangerous git commands');
+
                 const dangerousGitCommands = [
                     { name: 'Bash(git merge:*)', desc: 'Git merge operations' },
                     { name: 'Bash(git branch:*)', desc: 'Git branch operations' },
@@ -1299,7 +1278,7 @@ class GlobalPermissionsFileManager {
                 // First add these commands to tools if not present
                 dangerousGitCommands.forEach(cmd => {
                     if (!this.allTools.some(t => t.name === cmd.name)) {
-                        console.log(`[GlobalPermissions] Adding tool: ${cmd.name}`);
+
                         this.allTools.push({
                             name: cmd.name,
                             category: 'command-git',
@@ -1307,7 +1286,7 @@ class GlobalPermissionsFileManager {
                         });
                     }
                     if (!this.permissions.some(p => p.tool_name === cmd.name)) {
-                        console.log(`[GlobalPermissions] Creating new deny permission for: ${cmd.name}`);
+
                         this.permissions.push({
                             tool_name: cmd.name,
                             permission_type: 'deny',
@@ -1318,13 +1297,13 @@ class GlobalPermissionsFileManager {
                         // Update existing permission
                         const perm = this.permissions.find(p => p.tool_name === cmd.name);
                         if (perm) {
-                            console.log(`[GlobalPermissions] Updating existing permission to deny: ${cmd.name}`);
+
                             perm.permission_type = 'deny';
                         }
                     }
                     this.changes.add(cmd.name);
                 });
-                console.log('[GlobalPermissions] Added to changes:', Array.from(this.changes));
+
                 break;
                 
             case 'disable-delete':
@@ -1377,11 +1356,7 @@ class GlobalPermissionsFileManager {
         }
         
         // Log final state before saving
-        console.log('[GlobalPermissions] After preset, permissions count:', this.permissions.length);
-        console.log('[GlobalPermissions] Changes to save:', Array.from(this.changes));
-        console.log('[GlobalPermissions] Sample of deny permissions:', 
-            this.permissions.filter(p => p.permission_type === 'deny').slice(0, 3));
-        
+
         // Apply changes immediately
         await this.applyChanges(false); // false = show notification
         

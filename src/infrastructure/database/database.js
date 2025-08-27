@@ -39,7 +39,7 @@ class DatabaseManager {
     }
 
     initialize() {
-        console.log('🚀 Initializing DatabaseManager...');
+
         // Create tables if they don't exist
         this.db.exec(`
             CREATE TABLE IF NOT EXISTS terminal_directories (
@@ -124,8 +124,7 @@ class DatabaseManager {
         
         // Add parent_task_id column if it doesn't exist (migration)
         this.addParentTaskIdColumnIfNeeded();
-        
-        console.log('✅ DatabaseManager initialization completed');
+
     }
 
     addSortOrderColumnIfNeeded() {
@@ -136,8 +135,7 @@ class DatabaseManager {
             
             if (!hasSortOrder) {
                 this.db.exec("ALTER TABLE tasks ADD COLUMN sort_order INTEGER DEFAULT 0");
-                console.log('Added sort_order column to tasks table');
-                
+
                 // Initialize sort_order values for existing tasks
                 this.initializeSortOrder();
             }
@@ -165,7 +163,7 @@ class DatabaseManager {
             
             if (!hasPlan) {
                 this.db.exec("ALTER TABLE tasks ADD COLUMN plan TEXT");
-                console.log('Added plan column to tasks table');
+
             }
         } catch (error) {
             console.error('Error checking/adding plan column:', error);
@@ -180,7 +178,7 @@ class DatabaseManager {
             
             if (!hasImplementation) {
                 this.db.exec("ALTER TABLE tasks ADD COLUMN implementation TEXT");
-                console.log('Added implementation column to tasks table');
+
             }
         } catch (error) {
             console.error('Error checking/adding implementation column:', error);
@@ -188,7 +186,7 @@ class DatabaseManager {
     }
 
     updateStatusConstraintIfNeeded() {
-        console.log('🔍 Checking if status constraint supports in_testing...');
+
         try {
             // Always try to insert a test record to check if constraint allows in_testing
             try {
@@ -198,13 +196,12 @@ class DatabaseManager {
                 
                 // If successful, delete the test record and we're good
                 this.db.prepare("DELETE FROM tasks WHERE id = ?").run(testResult.lastInsertRowid);
-                console.log('✅ Status constraint already supports in_testing');
+
             } catch (constraintError) {
                 // If it fails, we need to recreate the table using a simpler approach
-                console.log('❌ Status constraint needs updating. Error:', constraintError.message);
-                console.log('🔄 Attempting simple table recreation...');
+
                 this.simpleTableRecreation();
-                console.log('✅ Table recreation completed');
+
             }
         } catch (error) {
             console.error('❌ Error checking/updating status constraint:', error);
@@ -213,13 +210,11 @@ class DatabaseManager {
 
     recreateTasksTableWithNewConstraint() {
         try {
-            console.log('  📦 Beginning transaction...');
+
             this.db.exec('BEGIN TRANSACTION');
-            
-            console.log('  🔓 Disabling foreign key constraints...');
+
             this.db.exec('PRAGMA foreign_keys = OFF');
-            
-            console.log('  🏗️  Creating new table with updated constraint...');
+
             this.db.exec(`
                 CREATE TABLE tasks_new (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -234,27 +229,22 @@ class DatabaseManager {
                     implementation TEXT
                 )
             `);
-            
-            console.log('  📋 Copying existing data...');
+
             this.db.exec(`
                 INSERT INTO tasks_new (id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation)
                 SELECT id, title, description, plan, status, terminal_id, sort_order, created_at, updated_at, implementation
                 FROM tasks
             `);
-            
-            console.log('  🔄 Replacing old table...');
+
             this.db.exec('DROP TABLE tasks');
             this.db.exec('ALTER TABLE tasks_new RENAME TO tasks');
-            
-            console.log('  🔒 Re-enabling foreign key constraints...');
+
             this.db.exec('PRAGMA foreign_keys = ON');
-            
-            console.log('  💾 Committing transaction...');
+
             this.db.exec('COMMIT');
-            
-            console.log('✅ Successfully updated tasks table with in_testing status constraint');
+
         } catch (error) {
-            console.log('  ❌ Rolling back transaction due to error...');
+
             this.db.exec('ROLLBACK');
             this.db.exec('PRAGMA foreign_keys = ON'); // Re-enable foreign keys even on error
             console.error('❌ Failed to update status constraint:', error);
@@ -266,16 +256,13 @@ class DatabaseManager {
         try {
             // First, disable foreign keys
             this.db.exec('PRAGMA foreign_keys = OFF');
-            
-            console.log('  📋 Backing up existing data...');
+
             // Get all existing data
             const existingTasks = this.db.prepare("SELECT * FROM tasks").all();
-            
-            console.log('  🗑️  Dropping old table...');
+
             // Drop the old table
             this.db.exec('DROP TABLE IF EXISTS tasks');
-            
-            console.log('  🏗️  Creating new table...');
+
             // Create new table with correct constraint
             this.db.exec(`
                 CREATE TABLE tasks (
@@ -294,8 +281,7 @@ class DatabaseManager {
                     FOREIGN KEY (parent_task_id) REFERENCES tasks(id) ON DELETE SET NULL
                 )
             `);
-            
-            console.log('  📤 Restoring data...');
+
             // Restore data
             if (existingTasks.length > 0) {
                 const insertStmt = this.db.prepare(`
@@ -320,14 +306,12 @@ class DatabaseManager {
                     );
                 }
             }
-            
-            console.log('  🔒 Re-enabling foreign keys...');
+
             // Re-enable foreign keys
             this.db.exec('PRAGMA foreign_keys = ON');
-            
-            console.log('✅ Simple table recreation completed successfully');
+
         } catch (error) {
-            console.log('  ❌ Simple recreation failed, re-enabling foreign keys...');
+
             this.db.exec('PRAGMA foreign_keys = ON');
             console.error('❌ Simple table recreation failed:', error);
             throw error;
@@ -342,11 +326,10 @@ class DatabaseManager {
             
             if (!hasProject) {
                 this.db.exec("ALTER TABLE tasks ADD COLUMN project TEXT");
-                console.log('Added project column to tasks table');
-                
+
                 // Update existing tasks with default project
                 // Tasks without projects remain NULL - will be assigned based on directory
-                console.log('Updated existing tasks with default project');
+
             }
         } catch (error) {
             console.error('Error checking/adding project column:', error);
@@ -363,11 +346,10 @@ class DatabaseManager {
             
             if (!hasDisplayName) {
                 this.db.exec("ALTER TABLE projects ADD COLUMN display_name TEXT");
-                console.log('Added display_name column to projects table');
-                
+
                 // Update existing projects with display_name = name
                 this.db.prepare("UPDATE projects SET display_name = name WHERE display_name IS NULL").run();
-                console.log('Updated existing projects with display_name');
+
             }
         } catch (error) {
             console.error('Error checking/adding display_name column:', error);
@@ -384,8 +366,7 @@ class DatabaseManager {
                 // First, check if it's truly missing or if the table needs to be recreated
                 // Since path is NOT NULL, we need to provide a default value
                 this.db.exec("ALTER TABLE projects ADD COLUMN path TEXT");
-                console.log('Added path column to projects table');
-                
+
                 // Update existing projects with path = name converted to slug
                 const projects = this.db.prepare("SELECT id, name FROM projects WHERE path IS NULL").all();
                 const updateStmt = this.db.prepare("UPDATE projects SET path = ? WHERE id = ?");
@@ -394,8 +375,7 @@ class DatabaseManager {
                     const path = project.name.toLowerCase().replace(/\s+/g, '-');
                     updateStmt.run(path, project.id);
                 });
-                
-                console.log('Updated existing projects with path values');
+
             }
         } catch (error) {
             console.error('Error checking/adding path column:', error);
@@ -404,14 +384,13 @@ class DatabaseManager {
     
     enforcePathConstraints() {
         try {
-            console.log('Checking path column constraints...');
+
             // Check current schema
             const columns = this.db.prepare("PRAGMA table_info(projects)").all();
             const pathColumn = columns.find(col => col.name === 'path');
             
             if (!pathColumn || pathColumn.notnull === 0) {
-                console.log('Path column needs to be NOT NULL, recreating table...');
-                
+
                 // Need to recreate table to change NOT NULL constraint
                 this.db.exec('BEGIN TRANSACTION');
                 
@@ -442,13 +421,13 @@ class DatabaseManager {
                     this.db.exec('ALTER TABLE projects_new RENAME TO projects');
                     
                     this.db.exec('COMMIT');
-                    console.log('Successfully updated projects table with NOT NULL path constraint');
+
                 } catch (error) {
                     this.db.exec('ROLLBACK');
                     throw error;
                 }
             } else {
-                console.log('Path column constraints are correct');
+
             }
         } catch (error) {
             console.error('Error updating path column constraint:', error);
@@ -463,11 +442,10 @@ class DatabaseManager {
             
             if (!hasLastOpened) {
                 this.db.exec("ALTER TABLE projects ADD COLUMN last_opened DATETIME");
-                console.log('Added last_opened column to projects table');
-                
+
                 // Initialize last_opened with created_at for existing projects
                 this.db.prepare("UPDATE projects SET last_opened = created_at WHERE last_opened IS NULL").run();
-                console.log('Initialized last_opened for existing projects');
+
             }
         } catch (error) {
             console.error('Error checking/adding last_opened column:', error);
@@ -482,7 +460,7 @@ class DatabaseManager {
             
             if (!hasParentTaskId) {
                 this.db.exec("ALTER TABLE tasks ADD COLUMN parent_task_id INTEGER REFERENCES tasks(id) ON DELETE SET NULL");
-                console.log('Added parent_task_id column to tasks table for subtask support');
+
             }
         } catch (error) {
             console.error('Error checking/adding parent_task_id column:', error);
@@ -519,21 +497,20 @@ class DatabaseManager {
                             if (!projectByName) {
                                 // Create new project
                                 this.createProject(projectName, directory);
-                                console.log(`Created project ${projectName} at ${directory}`);
+
                             }
                         }
                     } else {
                         // CLAUDE.md exists but no project name found
                         // Use directory name as project name
                         const projectName = path.basename(directory);
-                        console.log(`No project name found in CLAUDE.md, using directory name: ${projectName}`);
-                        
+
                         // Check if project exists at this path
                         const existingProject = this.getProjectByPath(directory);
                         if (!existingProject) {
                             const result = this.createProject(projectName, directory);
                             if (result.success) {
-                                console.log(`Created new project: ${projectName}`);
+
                             }
                         }
                         
@@ -550,7 +527,7 @@ class DatabaseManager {
                                              getCodeAgentSwarmSection(projectName) +
                                              content.substring(endIndex + SECTION_END.length);
                             fs.writeFileSync(claudeMdPath, newContent, 'utf8');
-                            console.log(`Updated CLAUDE.md with project name: ${projectName}`);
+
                         }
                     }
                 } catch (error) {
@@ -1051,7 +1028,7 @@ class DatabaseManager {
             // First check if project already exists
             const existingProject = this.getProjectByName(name);
             if (existingProject) {
-                console.log(`Project "${name}" already exists, returning existing project`);
+
                 // Path is already stored in projects table
                 return { 
                     success: true, 
@@ -1098,9 +1075,7 @@ class DatabaseManager {
                     error: `Path already used by project "${existingProjectWithPath.name}"` 
                 };
             }
-            
-            console.log('Creating project with:', { name, display_name: name, color, path });
-            
+
             const stmt = this.db.prepare(`
                 INSERT INTO projects (name, display_name, color, path)
                 VALUES (?, ?, ?, ?)
@@ -1145,10 +1120,10 @@ class DatabaseManager {
             const result = stmt.run(projectPath);
             
             if (result.changes > 0) {
-                console.log(`Updated last_opened for project at path: ${projectPath}`);
+
                 return { success: true };
             } else {
-                console.log(`No project found at path: ${projectPath}`);
+
                 return { success: false, error: 'Project not found' };
             }
         } catch (err) {
@@ -1242,9 +1217,9 @@ class DatabaseManager {
             `).get();
             
             if (tableExists) {
-                console.log('Dropping deprecated project_folders table...');
+
                 this.db.exec('DROP TABLE project_folders');
-                console.log('project_folders table dropped successfully');
+
             }
         } catch (err) {
             console.error('Error dropping project_folders table:', err);

@@ -2528,6 +2528,34 @@ input[type="radio"]:checked + .color-option {
 
 .parent-task-card {
     margin-top: 0.5rem;
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.btn-unlink-parent {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    padding: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+}
+
+.btn-unlink-parent:hover {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
+}
+
+.btn-unlink-parent svg {
+    width: 18px;
+    height: 18px;
 }
 
 .parent-task-link {
@@ -2655,7 +2683,6 @@ input[type="radio"]:checked + .color-option {
     max-width: 200px;
     display: block;
     box-sizing: border-box;
-    position: relative;
 }
 
 .subtask-item:hover {
@@ -2733,11 +2760,32 @@ input[type="radio"]:checked + .color-option {
     border-radius: 4px;
     transition: all 0.2s ease;
     flex-shrink: 0;
+    margin-left: 0.25rem;
 }
 
 .subtask-delete-btn:hover {
     color: #ff4444;
     background: rgba(255, 68, 68, 0.1);
+}
+
+.subtask-unlink-btn {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.4);
+    cursor: pointer;
+    padding: 0.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-left: 0.25rem;
+}
+
+.subtask-unlink-btn:hover {
+    color: #fbbf24;
+    background: rgba(251, 191, 36, 0.1);
 }
 
 .subtask-status.status-pending {

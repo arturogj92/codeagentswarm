@@ -51,8 +51,7 @@ function connect() {
             const message = JSON.parse(data.toString());
             
             // Forward response to stdout for Claude Code
-            console.log(JSON.stringify(message));
-            
+
         } catch (error) {
             console.error('Error parsing message from server:', error);
         }
@@ -108,8 +107,7 @@ rl.on('line', (line) => {
                 message: 'Parse error'
             }
         };
-        
-        console.log(JSON.stringify(errorResponse));
+
     }
 });
 

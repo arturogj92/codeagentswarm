@@ -21,7 +21,7 @@ class MCPTaskServer {
             this.wsServer = new WebSocketServer({ server: this.server });
             
             this.wsServer.on('connection', (ws) => {
-                console.log('MCP client connected');
+
                 this.clients.add(ws);
                 
                 ws.on('message', async (data) => {
@@ -43,7 +43,7 @@ class MCPTaskServer {
                 });
                 
                 ws.on('close', () => {
-                    console.log('MCP client disconnected');
+
                     this.clients.delete(ws);
                 });
                 
@@ -60,7 +60,7 @@ class MCPTaskServer {
                 }
                 
                 this.actualPort = this.server.address().port;
-                console.log(`MCP Task Server started on port ${this.actualPort}`);
+
                 resolve(this.actualPort);
             });
         });
@@ -294,7 +294,7 @@ class MCPTaskServer {
             
             if (this.server) {
                 this.server.close(() => {
-                    console.log('MCP Task Server stopped');
+
                     resolve();
                 });
             } else {

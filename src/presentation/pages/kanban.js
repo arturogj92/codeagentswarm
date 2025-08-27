@@ -215,18 +215,7 @@ class KanbanManager {
             window.close();
         });
 
-        // Modal controls
-        document.getElementById('modal-close-btn').addEventListener('click', () => {
-            this.hideTaskModal();
-        });
-
-        document.getElementById('cancel-btn').addEventListener('click', () => {
-            this.hideTaskModal();
-        });
-
-        document.getElementById('save-task-btn').addEventListener('click', () => {
-            this.saveTask();
-        });
+        // Modal controls are now handled by TaskModal component
 
         // Task details modal
         document.getElementById('details-modal-close-btn').addEventListener('click', () => {
@@ -240,6 +229,20 @@ class KanbanManager {
         // Create Subtask button
         document.getElementById('create-subtask-btn').addEventListener('click', () => {
             this.openSubtaskModal();
+        });
+
+        // Link Existing Task button
+        document.getElementById('link-subtask-btn').addEventListener('click', () => {
+            this.openLinkTaskModal();
+        });
+        
+        // Unlink Parent button - using event delegation since button might not exist yet
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'unlink-parent-btn' || e.target.closest('#unlink-parent-btn')) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.unlinkParentTask();
+            }
         });
 
         // Subtask modal handlers
@@ -262,6 +265,29 @@ class KanbanManager {
                 this.closeSubtaskModal();
             }
         });
+
+        // Link task modal handlers
+        document.getElementById('close-link-task-modal').addEventListener('click', () => {
+            this.closeLinkTaskModal();
+        });
+
+        document.getElementById('cancel-link-task-btn').addEventListener('click', () => {
+            this.closeLinkTaskModal();
+        });
+
+        document.getElementById('confirm-link-task-btn').addEventListener('click', async () => {
+            await this.linkSelectedTask();
+        });
+
+        // Close link task modal when clicking outside
+        document.getElementById('link-task-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'link-task-modal') {
+                this.closeLinkTaskModal();
+            }
+        });
+
+        // Link task search functionality
+        this.setupLinkTaskSearch();
 
         // Edit button removed - now using inline editing
 
@@ -335,11 +361,7 @@ class KanbanManager {
             }
         });
 
-        // Form submission
-        document.getElementById('task-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveTask();
-        });
+        // Form submission is now handled by TaskModal component
         
         // Project filter
         document.getElementById('project-filter-select').addEventListener('change', (e) => {
@@ -515,12 +537,7 @@ class KanbanManager {
             }
         });
 
-        // Click outside modal to close
-        document.getElementById('task-modal').addEventListener('click', (e) => {
-            if (e.target.id === 'task-modal') {
-                this.hideTaskModal();
-            }
-        });
+        // Modal backdrop clicks are now handled by TaskModal component
 
         document.getElementById('task-details-modal').addEventListener('click', (e) => {
             if (e.target.id === 'task-details-modal') {
@@ -842,7 +859,6 @@ class KanbanManager {
         }
     }
 
-
     async updateTaskOrder(list, status) {
         try {
             const taskCards = [...list.querySelectorAll('.task-card')];
@@ -898,9 +914,11 @@ class KanbanManager {
         const filterSelect = document.getElementById('project-filter-select');
         filterSelect.innerHTML = '<option value="all">All Projects</option>';
         
-        // Update task form select
+        // Update task form select (if it exists - now handled by TaskModal component)
         const taskSelect = document.getElementById('task-project');
-        taskSelect.innerHTML = '<option value="">No Project</option>';
+        if (taskSelect) {
+            taskSelect.innerHTML = '<option value="">No Project</option>';
+        }
         
         this.projects.forEach(project => {
             // Use display_name if available, otherwise fall back to name
@@ -913,17 +931,19 @@ class KanbanManager {
             filterOption.style.color = project.color;
             filterSelect.appendChild(filterOption);
             
-            // Add to task form
-            const taskOption = document.createElement('option');
-            taskOption.value = project.name;
-            taskOption.textContent = displayName;
-            taskOption.style.color = project.color;
-            taskSelect.appendChild(taskOption);
+            // Add to task form (if it exists)
+            if (taskSelect) {
+                const taskOption = document.createElement('option');
+                taskOption.value = project.name;
+                taskOption.textContent = displayName;
+                taskOption.style.color = project.color;
+                taskSelect.appendChild(taskOption);
+            }
         });
         
         
         // Set default project if none selected
-        if (taskSelect.options.length > 1 && !taskSelect.value) {
+        if (taskSelect && taskSelect.options.length > 1 && !taskSelect.value) {
             taskSelect.value = 'CodeAgentSwarm';
         }
         
@@ -948,149 +968,6 @@ class KanbanManager {
         });
     }
 
-    initializeParentTaskSearch(excludeTaskId = null, currentParentId = null) {
-        const searchInput = document.getElementById('task-parent-search');
-        const hiddenInput = document.getElementById('task-parent');
-        const dropdown = document.getElementById('parent-task-dropdown');
-        
-        if (!searchInput || !hiddenInput || !dropdown) return;
-        
-        // Set current parent if provided
-        if (currentParentId) {
-            const parentTask = this.tasks.find(t => t.id === currentParentId);
-            if (parentTask) {
-                searchInput.value = `#${parentTask.id} - ${parentTask.title}`;
-                hiddenInput.value = currentParentId;
-            }
-        } else {
-            searchInput.value = '';
-            hiddenInput.value = '';
-        }
-        
-        // Helper function to check if taskId is a descendant of excludeTaskId
-        const isDescendant = (taskId, ancestorId) => {
-            if (!ancestorId) return false;
-            const task = this.tasks.find(t => t.id === taskId);
-            if (!task) return false;
-            if (task.parent_task_id === ancestorId) return true;
-            return isDescendant(task.parent_task_id, ancestorId);
-        };
-        
-        // Function to filter and display tasks
-        const filterTasks = (query) => {
-            dropdown.innerHTML = '';
-            
-            // Add "No parent" option
-            const noParentDiv = document.createElement('div');
-            noParentDiv.className = 'parent-task-item no-parent';
-            noParentDiv.setAttribute('data-task-id', '');
-            noParentDiv.innerHTML = `<strong>No parent (standalone task)</strong>`;
-            noParentDiv.addEventListener('click', () => {
-                searchInput.value = '';
-                hiddenInput.value = '';
-                dropdown.style.display = 'none';
-            });
-            dropdown.appendChild(noParentDiv);
-            
-            // Filter tasks based on query
-            const queryLower = query.toLowerCase();
-            const filteredTasks = this.tasks.filter(task => {
-                // Skip the task itself and its descendants when editing
-                if (excludeTaskId && (task.id === excludeTaskId || isDescendant(task.id, excludeTaskId))) {
-                    return false;
-                }
-                
-                // Match by ID or title
-                const idMatch = task.id.toString().includes(query);
-                const titleMatch = task.title.toLowerCase().includes(queryLower);
-                return idMatch || titleMatch || query === '';
-            });
-            
-            // Sort by status and title
-            const sortedTasks = filteredTasks.sort((a, b) => {
-                const statusOrder = { 'in_progress': 0, 'in_testing': 1, 'pending': 2, 'completed': 3 };
-                const statusCompare = statusOrder[a.status] - statusOrder[b.status];
-                if (statusCompare !== 0) return statusCompare;
-                return a.title.localeCompare(b.title);
-            });
-            
-            // Limit results for performance
-            const maxResults = 20;
-            const tasksToShow = sortedTasks.slice(0, maxResults);
-            
-            tasksToShow.forEach(task => {
-                const taskDiv = document.createElement('div');
-                taskDiv.className = 'parent-task-item';
-                taskDiv.setAttribute('data-task-id', task.id);
-                
-                const statusEmoji = {
-                    'pending': '⏳',
-                    'in_progress': '🔄',
-                    'in_testing': '🧪',
-                    'completed': '✅'
-                }[task.status] || '📝';
-                
-                // Build HTML with the same structure as terminal modal
-                // Using parent-task-item class with same structure as terminal modal
-                let html = `
-                    <span class="task-id">#${task.id}</span>
-                    <span class="task-title">${this.capitalizeFirstLetter(task.title)}</span>
-                `;
-                
-                if (task.project) {
-                    html += `<span class="task-project">${task.project}</span>`;
-                }
-                
-                taskDiv.innerHTML = html;
-                
-                taskDiv.addEventListener('click', () => {
-                    searchInput.value = `#${task.id} - ${this.capitalizeFirstLetter(task.title)}`;
-                    hiddenInput.value = task.id;
-                    dropdown.style.display = 'none';
-                });
-                
-                dropdown.appendChild(taskDiv);
-            });
-            
-            if (filteredTasks.length > maxResults) {
-                const moreDiv = document.createElement('div');
-                moreDiv.className = 'parent-task-item';
-                moreDiv.style.textAlign = 'center';
-                moreDiv.style.fontStyle = 'italic';
-                moreDiv.style.opacity = '0.5';
-                moreDiv.innerHTML = `...and ${filteredTasks.length - maxResults} more results`;
-                dropdown.appendChild(moreDiv);
-            }
-            
-            dropdown.style.display = dropdown.children.length > 0 ? 'block' : 'none';
-        };
-        
-        // Event listeners
-        searchInput.addEventListener('focus', () => {
-            filterTasks(searchInput.value);
-        });
-        
-        searchInput.addEventListener('input', (e) => {
-            filterTasks(e.target.value);
-        });
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
-                dropdown.style.display = 'none';
-            }
-        });
-        
-        // Handle clearing the input
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                searchInput.value = '';
-                hiddenInput.value = '';
-                dropdown.style.display = 'none';
-            }
-        });
-    }
-
     async loadTasks(showLoading = false) {
         // Only show skeletons during initial load or when explicitly requested
         if (showLoading) {
@@ -1101,6 +978,11 @@ class KanbanManager {
             const result = await ipcRenderer.invoke('task-get-all');
             if (result.success) {
                 this.tasks = result.tasks;
+                
+                // Debug: Check how many subtasks are in the loaded tasks
+                const subtasksInTasks = this.tasks.filter(t => t.parent_task_id !== null);
+                console.log('Total tasks loaded:', this.tasks.length);
+                console.log('Subtasks in loaded tasks:', subtasksInTasks.length);
                 
                 // Build indexes for faster lookups
                 this.taskIndex.clear();
@@ -1117,11 +999,15 @@ class KanbanManager {
                     }
                 }
                 
+                console.log('Subtask index built:', Array.from(this.subtaskIndex.entries()).map(([parent, children]) => 
+                    `Parent ${parent}: ${children.length} children`
+                ));
+                
                 this.renderTasks();
                 
                 // Check if there's a pending task to focus
                 if (pendingFocusTaskId) {
-                    console.log('Processing pending focus task:', pendingFocusTaskId);
+
                     setTimeout(() => {
                         this.focusTask(pendingFocusTaskId);
                         pendingFocusTaskId = null;
@@ -1332,15 +1218,15 @@ class KanbanManager {
             <div class="task-terminal-wrapper">
                 ${parentIndicatorInActions}
                 <button class="task-action-btn task-action-delete" onclick="kanban.quickDeleteTask(${task.id})" title="Delete Task">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="trash-2" class="lucide lucide-trash-2"><path d="M10 11v6"></path><path d="M14 11v6"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"></path><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                    <i data-lucide="trash-2"></i>
                 </button>
                 <div class="send-to-terminal-icon" onclick="kanban.toggleSendToTerminalDropdown(event, ${task.id}); return false;" title="Send task to terminal">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="send" class="lucide lucide-send"><path d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z"></path><path d="m21.854 2.147-10.94 10.939"></path></svg>
+                    <i data-lucide="send"></i>
                 </div>
                 <div class="task-terminal-badge ${task.terminal_id ? '' : 'unassigned'}" 
                      onclick="kanban.toggleTerminalDropdown(event, ${task.id}); return false;" 
                      title="${task.terminal_id ? `Terminal ${task.terminal_id}` : 'Assign to terminal'}">
-                    ${task.terminal_id ? `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="terminal" class="lucide lucide-terminal"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="terminal-number">${task.terminal_id}</span>` : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" class="lucide lucide-plus"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>'}
+                    ${task.terminal_id ? `<i data-lucide="terminal"></i><span class="terminal-number">${task.terminal_id}</span>` : '<i data-lucide="plus"></i>'}
                 </div>
                 <div class="terminal-dropdown" id="terminal-dropdown-${task.id}" style="display: none;">
                     <div class="terminal-option ${!task.terminal_id ? 'active' : ''}" onclick="kanban.selectTerminal(${task.id}, null); return false;">
@@ -1526,192 +1412,210 @@ class KanbanManager {
     }
 
     showCreateTaskModal() {
-        // Clear form fields
-        document.getElementById('task-title').value = '';
-        document.getElementById('task-description').value = '';
-        document.getElementById('task-plan').value = '';
-        document.getElementById('task-implementation').value = '';
-        
-        // Set default status to pending using the new display
-        const statusDisplay = document.getElementById('create-status-display');
-        const statusText = document.getElementById('create-status-text');
-        if (statusDisplay && statusText) {
-            statusDisplay.className = 'status-display-modern clickable status-pending';
-            statusDisplay.dataset.status = 'pending';
-            statusText.textContent = 'PENDING';
-        }
-        
-        // Update project selects to ensure they have the latest projects
-        this.updateProjectSelects();
-        
-        // Use the currently selected project filter as default, or let user choose
-        const projectSelect = document.getElementById('task-project');
-        if (this.currentProjectFilter && this.currentProjectFilter !== 'all') {
-            projectSelect.value = this.currentProjectFilter;
+        // Use the TaskModal component
+        if (typeof window.TaskModal !== 'undefined') {
+            const modal = new window.TaskModal({
+                projects: this.projects,
+                onSave: async (taskData) => {
+                    // Create the task using the new format
+                    await this.createTaskFromModal(taskData);
+                },
+                onCancel: () => {
+
+                }
+            });
+            modal.show();
         } else {
-            // If "All Projects" is selected, default to empty (no project)
-            projectSelect.value = '';
+            console.error('TaskModal component not found');
+            // Fallback: show error message
+            this.showNotification('Error: Task creation modal not available', 'error');
         }
-        
-        // Populate parent task dropdown
-        this.initializeParentTaskSearch();
-        document.getElementById('task-parent').value = '';
-        
-        document.getElementById('task-terminal').value = '';
-        document.getElementById('save-task-btn').innerHTML = '<i data-lucide="check"></i> Save Task';
-        document.getElementById('task-modal').classList.add('show');
-        document.getElementById('task-title').focus();
-        
-        // Initialize markdown editors for create modal
-        if (typeof initializeCreateMarkdownEditors === 'function') {
-            setTimeout(() => initializeCreateMarkdownEditors(), 50);
-        }
-        
-        // Setup status dropdown for create modal
-        this.setupCreateModalStatusDropdown();
     }
 
-    setupCreateModalStatusDropdown() {
-        const statusDisplay = document.getElementById('create-status-display');
-        const statusDropdown = document.getElementById('create-status-dropdown-menu');
-        const statusText = document.getElementById('create-status-text');
-        
-        if (!statusDisplay || !statusDropdown) return;
-        
-        // Handle status display click
-        statusDisplay.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (statusDropdown.style.display === 'none') {
-                statusDropdown.style.display = 'block';
-                statusDisplay.classList.add('dropdown-open');
-                
-                // Highlight current status
-                const currentStatus = statusDisplay.dataset.status;
-                statusDropdown.querySelectorAll('.status-option').forEach(option => {
-                    if (option.getAttribute('data-value') === currentStatus) {
-                        option.classList.add('active');
-                    } else {
-                        option.classList.remove('active');
-                    }
-                });
-            } else {
-                statusDropdown.style.display = 'none';
-                statusDisplay.classList.remove('dropdown-open');
-            }
-        });
-        
-        // Handle status option clicks
-        statusDropdown.querySelectorAll('.status-option').forEach(option => {
-            option.addEventListener('click', (e) => {
-                e.stopPropagation();
-                const newStatus = option.getAttribute('data-value');
-                
-                // Update display
-                statusDisplay.dataset.status = newStatus;
-                statusDisplay.className = `status-display-modern clickable status-${newStatus}`;
-                statusText.textContent = newStatus.replace('_', ' ').toUpperCase();
-                
-                // Hide dropdown
-                statusDropdown.style.display = 'none';
-                statusDisplay.classList.remove('dropdown-open');
-            });
-        });
-        
-        // Close dropdown when clicking outside
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('#create-status-display') && !e.target.closest('#create-status-dropdown-menu')) {
-                statusDropdown.style.display = 'none';
-                statusDisplay.classList.remove('dropdown-open');
-            }
-        });
-    }
-
-    hideTaskModal() {
-        document.getElementById('task-modal').classList.remove('show');
-    }
-
-    async saveTask() {
-        const title = document.getElementById('task-title').value.trim();
-        const description = document.getElementById('task-description').value.trim();
-        const plan = document.getElementById('task-plan').value.trim();
-        const implementation = document.getElementById('task-implementation').value.trim();
-        const statusDisplay = document.getElementById('create-status-display');
-        const status = statusDisplay ? statusDisplay.dataset.status : 'pending';
-        const project = document.getElementById('task-project').value;
-        const parentTaskIdValue = document.getElementById('task-parent').value;
-        const parentTaskId = parentTaskIdValue ? parseInt(parentTaskIdValue) : null;
-        const terminalIdValue = document.getElementById('task-terminal').value;
-        let terminalId = null;
-        if (terminalIdValue !== '') {
-            terminalId = parseInt(terminalIdValue);
-            // Validate terminal ID (must be between 1 and 6)
-            if (isNaN(terminalId) || terminalId < 1 || terminalId > 6) {
-                await ipcRenderer.invoke('show-alert-dialog', {
-                    type: 'warning',
-                    title: 'Invalid Terminal ID',
-                    message: 'Terminal ID must be between 1 and 6'
-                });
-                return;
-            }
-        }
-
-        if (!title) {
-            await ipcRenderer.invoke('show-alert-dialog', {
-                type: 'warning',
-                title: 'Missing Title',
-                message: 'Task title is required'
-            });
-            return;
-        }
-
+    async createTaskFromModal(taskData) {
         try {
-            let result;
-            
-            // Create new task with parent_task_id
-            result = await ipcRenderer.invoke('task-create', {
-                title,
-                description,
-                terminal_id: terminalId,
-                project,
-                parent_task_id: parentTaskId
-            });
-                
-            
-            // Update plan for new task
-            if (result.success && plan) {
-                const planResult = await ipcRenderer.invoke('task-update-plan', result.taskId, plan);
-                if (!planResult.success) {
-                    console.error('Failed to update plan for new task:', planResult.error);
+            // Validate terminal ID if provided
+            if (taskData.terminal_id) {
+                const terminalId = parseInt(taskData.terminal_id);
+                if (isNaN(terminalId) || terminalId < 1 || terminalId > 6) {
+                    await ipcRenderer.invoke('show-alert-dialog', {
+                        type: 'warning',
+                        title: 'Invalid Terminal ID',
+                        message: 'Terminal ID must be between 1 and 6'
+                    });
+                    return;
                 }
             }
 
-            // Update implementation for new task
-            if (result.success && implementation) {
-                const implementationResult = await ipcRenderer.invoke('task-update-implementation', result.taskId, implementation);
-                if (!implementationResult.success) {
-                    console.error('Failed to update implementation for new task:', implementationResult.error);
-                }
-            }
+            // Create the task
+            const result = await ipcRenderer.invoke('task-create', {
+                title: taskData.title,
+                description: taskData.description || '',
+                plan: taskData.plan || '',
+                implementation: taskData.implementation || '',
+                status: taskData.status || 'pending',
+                project: taskData.project || null,
+                parent_task_id: taskData.parent_task_id || null,
+                terminal_id: taskData.terminal_id || null
+            });
 
             if (result.success) {
-                this.hideTaskModal();
-                await this.loadTasks();
-                // No notifications for create or update
+                this.showNotification('Task created successfully', 'success');
+                this.loadTasks(); // Reload tasks
             } else {
-                await ipcRenderer.invoke('show-alert-dialog', {
-                    type: 'error',
-                    title: 'Save Failed',
-                    message: `Failed to save task: ${result.error}`
-                });
+                throw new Error(result.error || 'Failed to create task');
             }
         } catch (error) {
-            console.error('Error saving task:', error);
+            console.error('Error creating task:', error);
             await ipcRenderer.invoke('show-alert-dialog', {
                 type: 'error',
-                title: 'Save Error',
-                message: 'Error saving task'
+                title: 'Error',
+                message: `Failed to create task: ${error.message}`
             });
         }
+    }
+
+    initializeDetailsParentTaskSearch(currentTask) {
+        const searchInput = document.getElementById('details-parent-search');
+        const hiddenInput = document.getElementById('details-parent');
+        const dropdown = document.getElementById('details-parent-dropdown');
+        
+        if (!searchInput || !hiddenInput || !dropdown) return;
+        
+        // Set current parent if exists
+        if (currentTask.parent_task_id) {
+            const parentTask = this.tasks.find(t => t.id === currentTask.parent_task_id);
+            if (parentTask) {
+                searchInput.value = `#${parentTask.id} - ${parentTask.title}`;
+                hiddenInput.value = currentTask.parent_task_id;
+            }
+        } else {
+            searchInput.value = '';
+            hiddenInput.value = '';
+        }
+        
+        // Remove any existing event listeners to prevent duplicates
+        const newSearchInput = searchInput.cloneNode(true);
+        searchInput.parentNode.replaceChild(newSearchInput, searchInput);
+        
+        // Helper function to check if taskId is a descendant of current task
+        const isDescendant = (taskId, ancestorId) => {
+            if (!ancestorId) return false;
+            const task = this.tasks.find(t => t.id === taskId);
+            if (!task) return false;
+            if (task.parent_task_id === ancestorId) return true;
+            return isDescendant(task.parent_task_id, ancestorId);
+        };
+        
+        // Function to filter and display tasks
+        const filterTasks = (query) => {
+            dropdown.innerHTML = '';
+            
+            // Add "No parent" option
+            const noParentDiv = document.createElement('div');
+            noParentDiv.className = 'parent-task-item no-parent';
+            noParentDiv.setAttribute('data-task-id', '');
+            noParentDiv.innerHTML = `<strong>No parent (standalone task)</strong>`;
+            noParentDiv.addEventListener('click', () => {
+                newSearchInput.value = '';
+                hiddenInput.value = '';
+                dropdown.style.display = 'none';
+            });
+            dropdown.appendChild(noParentDiv);
+            
+            // Filter tasks based on query
+            const queryLower = query.toLowerCase();
+            const filteredTasks = this.tasks.filter(task => {
+                // Skip the current task itself and its descendants
+                if (task.id === currentTask.id || isDescendant(task.id, currentTask.id)) {
+                    return false;
+                }
+                
+                // Match by ID or title
+                const idMatch = task.id.toString().includes(queryLower);
+                const titleMatch = task.title.toLowerCase().includes(queryLower);
+                return idMatch || titleMatch;
+            });
+            
+            // Limit to first 20 results
+            filteredTasks.slice(0, 20).forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = 'parent-task-item';
+                taskDiv.setAttribute('data-task-id', task.id);
+                
+                const project = task.project ? this.projects.find(p => p.name === task.project) : null;
+                const projectColor = project ? project.color : '#666';
+                
+                taskDiv.innerHTML = `
+                    <span class="task-id">#${task.id}</span>
+                    <span class="task-title">${this.escapeHtml(task.title)}</span>
+                    ${task.project ? `<span class="task-project" style="background: ${projectColor}; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.85em;">${this.escapeHtml(task.project)}</span>` : ''}
+                `;
+                
+                taskDiv.addEventListener('click', () => {
+                    newSearchInput.value = `#${task.id} - ${task.title}`;
+                    hiddenInput.value = task.id;
+                    dropdown.style.display = 'none';
+                    
+                    // Mark that we're manually saving to prevent auto-save
+                    this.skipNextParentAutoSave = true;
+                    
+                    // Trigger save immediately when parent is selected
+                    this.autoSaveParentTask(task.id);
+                });
+                
+                dropdown.appendChild(taskDiv);
+            });
+            
+            if (filteredTasks.length > 20) {
+                const moreDiv = document.createElement('div');
+                moreDiv.className = 'parent-task-item';
+                moreDiv.style.textAlign = 'center';
+                moreDiv.style.fontStyle = 'italic';
+                moreDiv.style.opacity = '0.5';
+                moreDiv.textContent = `...and ${filteredTasks.length - 20} more results`;
+                dropdown.appendChild(moreDiv);
+            }
+            
+            if (filteredTasks.length === 0 && query.length > 0) {
+                const noResultsDiv = document.createElement('div');
+                noResultsDiv.className = 'parent-task-item no-results';
+                noResultsDiv.textContent = 'No tasks found';
+                dropdown.appendChild(noResultsDiv);
+            }
+            
+            dropdown.style.display = 'block';
+        };
+        
+        // Event listeners
+        let searchTimeout;
+        newSearchInput.addEventListener('input', () => {
+            clearTimeout(searchTimeout);
+            const query = newSearchInput.value.trim();
+            
+            if (query.length < 2) {
+                dropdown.style.display = 'none';
+                return;
+            }
+            
+            searchTimeout = setTimeout(() => {
+                filterTasks(query);
+            }, 300);
+        });
+        
+        newSearchInput.addEventListener('focus', () => {
+            const query = newSearchInput.value.trim();
+            if (query.length >= 2) {
+                filterTasks(query);
+            }
+        });
+        
+        // Click outside to close dropdown
+        document.addEventListener('click', (e) => {
+            if (!newSearchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
     }
 
     async showTaskDetails(taskId) {
@@ -1810,6 +1714,8 @@ class KanbanManager {
         // Parent task information
         const parentTaskInfo = document.getElementById('parent-task-info');
         const parentTaskLink = document.getElementById('parent-task-link');
+        const unlinkParentBtn = document.getElementById('unlink-parent-btn');
+        
         if (task.parent_task_id) {
             const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
             if (parentTask) {
@@ -1821,12 +1727,23 @@ class KanbanManager {
                         <i data-lucide="arrow-right"></i>
                     </a>
                 `;
+                // Show unlink button when there's a parent
+                if (unlinkParentBtn) {
+                    unlinkParentBtn.style.display = 'flex';
+                }
             } else {
                 parentTaskInfo.style.display = 'none';
             }
         } else {
             parentTaskInfo.style.display = 'none';
+            // Hide unlink button when there's no parent
+            if (unlinkParentBtn) {
+                unlinkParentBtn.style.display = 'none';
+            }
         }
+        
+        // Initialize parent task search for details modal
+        this.initializeDetailsParentTaskSearch(task);
         
         // Subtasks information - defer rendering for better initial performance
         const subtasksSection = document.getElementById('subtasks-section');
@@ -1852,37 +1769,31 @@ class KanbanManager {
                     
                     if (subtasks.length > 0) {
                         subtasksList.innerHTML = subtasks.map(subtask => {
-                            // Get project info for the subtask
+                            // Remove project badge - not needed in subtasks
                             let projectBadge = '';
-                            if (subtask.project) {
-                                // Wait for projects to be loaded
-                                if (this.projects && this.projects.length > 0) {
-                                    const project = this.projects.find(p => p.name === subtask.project);
-                                    if (project) {
-                                        const displayName = project.display_name || project.name;
-                                        const gradient = this.getProjectGradient(project.color);
-                                        projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
-                                    } else {
-                                        // Project not found in list, show with default color
-                                        projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
-                                    }
-                                } else {
-                                    // Projects not loaded yet, show with default color
-                                    projectBadge = `<span class="subtask-project-badge" style="background: linear-gradient(135deg, #007ACC 0%, #0062A3 100%); font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(subtask.project)}</span>`;
-                                }
-                            }
                             
                             return `
                             <div class="subtask-item">
                                 <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                     <div class="subtask-header">
                                         <span class="task-id-badge">#${subtask.id}</span>
-                                        ${projectBadge}
                                         <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
+                                        <button class="subtask-unlink-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.unlinkSubtask(${subtask.id}, ${task.id}); return false;" title="Unlink subtask">
+                                            <svg class="no-lucide" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"></path>
+                                                <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"></path>
+                                                <line x1="8" x2="8" y1="2" y2="5"></line>
+                                                <line x1="2" x2="5" y1="8" y2="8"></line>
+                                                <line x1="16" x2="16" y1="19" y2="22"></line>
+                                                <line x1="19" x2="22" y1="16" y2="16"></line>
+                                            </svg>
+                                        </button>
                                         <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${task.id}); return false;" title="Delete subtask">
                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                <line x1="14" y1="11" x2="14" y2="17"></line>
                                             </svg>
                                         </button>
                                     </div>
@@ -2005,13 +1916,10 @@ class KanbanManager {
 
     // Focus on a specific task (called from IPC)
     async focusTask(taskId) {
-        console.log('focusTask called with taskId:', taskId);
-        console.log('Current tasks:', this.tasks);
-        
+
         // Find the task element in the DOM
         const taskElement = document.querySelector(`[data-task-id="${taskId}"]`);
-        console.log('Found task element:', taskElement);
-        
+
         if (taskElement) {
             // Scroll the task into view
             taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2034,6 +1942,11 @@ class KanbanManager {
         this.currentTask = null;
         // Reset status dropdown
         this.hideStatusDropdown();
+        // Clear parent value check interval if it exists
+        if (this.parentValueCheckInterval) {
+            clearInterval(this.parentValueCheckInterval);
+            this.parentValueCheckInterval = null;
+        }
         // Remove auto-save listeners
         this.removeAutoSaveListeners();
         // Reset markdown editors flag
@@ -2089,6 +2002,7 @@ class KanbanManager {
             // Get parent task to inherit project
             const parentTask = this.tasks.find(t => t.id === this.currentDetailTaskId);
             
+            console.log('Creating subtask with parent_task_id:', this.currentDetailTaskId);
             const result = await ipcRenderer.invoke('task-create-subtask', {
                 title,
                 description,
@@ -2096,12 +2010,20 @@ class KanbanManager {
                 project: parentTask?.project || null
             });
             
+            console.log('Subtask creation result:', result);
+            
             if (result.success) {
                 // Notification removed - no success message on subtask creation
                 this.closeSubtaskModal();
                 
                 // Reload tasks and refresh the current task details
                 await this.loadTasks();
+                
+                // Debug: Check if subtask is in the tasks array
+                const newSubtask = this.tasks.find(t => t.id === result.taskId);
+                console.log('New subtask found in tasks array:', newSubtask);
+                console.log('Subtask parent_task_id:', newSubtask?.parent_task_id);
+                console.log('Subtask index for parent:', this.subtaskIndex.get(this.currentDetailTaskId));
                 
                 // Refresh the task details view to show the new subtask
                 if (this.currentDetailTaskId) {
@@ -2189,14 +2111,18 @@ class KanbanManager {
         
         // Create debounced save function
         const debouncedSave = this.debounce(async (field, value) => {
-            if (!this.currentTask) return;
+
+            if (!this.currentTask) {
+
+                return;
+            }
             
             // Save task ID before async operations
             const taskId = this.currentTask.id;
-            
+
             try {
                 let result;
-                
+
                 // Handle different fields with their appropriate IPC calls
                 if (field === 'title' || field === 'description') {
                     // For title and description, use task-update
@@ -2216,6 +2142,30 @@ class KanbanManager {
                 } else if (field === 'terminal_id') {
                     // For terminal, use task-update-terminal
                     result = await ipcRenderer.invoke('task-update-terminal', taskId, value);
+                } else if (field === 'parent_task_id') {
+                    // For parent task, use task-link-to-parent or task-unlink-from-parent
+
+                    if (value) {
+                        result = await ipcRenderer.invoke('task-link-to-parent', {
+                            taskId: taskId,
+                            parentTaskId: value
+                        });
+
+                    } else {
+                        // Only unlink if there was a parent before
+                        if (this.currentTask.parent_task_id) {
+                            result = await ipcRenderer.invoke('task-unlink-from-parent', taskId);
+
+                        } else {
+                            // No change needed, skip the update
+
+                            return;
+                        }
+                    }
+                } else {
+                    // Unsupported field, skip
+                    console.warn(`Auto-save not implemented for field: ${field}`);
+                    return;
                 }
                 
                 if (result && result.success) {
@@ -2236,10 +2186,11 @@ class KanbanManager {
                             this.updateTaskCard(taskCard, this.tasks[taskIndex]);
                         }
                     }
-                    
-                    console.log(`Auto-saved ${field}:`, value);
+
+                } else if (result) {
+                    console.error(`Failed to auto-save ${field}:`, result.error || 'Unknown error', 'Full result:', result);
                 } else {
-                    console.error(`Failed to auto-save ${field}:`, result?.error);
+                    console.error(`Failed to auto-save ${field}: No result returned from IPC call`);
                 }
             } catch (error) {
                 console.error('Error auto-saving:', error);
@@ -2296,13 +2247,47 @@ class KanbanManager {
                 debouncedSave('terminal_id', e.target.value ? parseInt(e.target.value) : null);
             });
         }
+        
+        // Parent task hidden field - monitor changes to save parent_task_id
+        const detailsParentField = document.getElementById('details-parent');
+        if (detailsParentField) {
+            // Store the previous value to detect changes
+            let previousValue = detailsParentField.value;
+            
+            // Check periodically for value changes (since MutationObserver doesn't detect value property changes)
+            const checkValueInterval = setInterval(() => {
+                if (detailsParentField.value !== previousValue) {
+                    const oldValue = previousValue;
+                    const newValue = detailsParentField.value;
+                    previousValue = newValue;
+                    
+                    // Skip if we're manually saving via autoSaveParentTask
+                    if (this.skipNextParentAutoSave) {
+
+                        this.skipNextParentAutoSave = false;
+                        return;
+                    }
+
+                    const parentTaskId = newValue;
+                    debouncedSave('parent_task_id', parentTaskId ? parseInt(parentTaskId) : null);
+                }
+            }, 100);
+            
+            // Store interval ID to clear it when modal is closed
+            this.parentValueCheckInterval = checkValueInterval;
+            
+            // Also handle direct changes
+            detailsParentField.addEventListener('change', (e) => {
+                debouncedSave('parent_task_id', e.target.value ? parseInt(e.target.value) : null);
+            });
+        }
     }
 
     removeAutoSaveListeners() {
         // Clone and replace elements to remove all listeners
         // Note: details-project and details-terminal-info have been removed from HTML
         ['details-title', 'details-description', 'details-plan', 'details-implementation', 
-         'header-project-select', 'header-terminal-select'].forEach(id => {
+         'header-project-select', 'header-terminal-select', 'details-parent', 'details-parent-search'].forEach(id => {
             const element = document.getElementById(id);
             if (element) {
                 const newElement = element.cloneNode(true);
@@ -2384,6 +2369,98 @@ class KanbanManager {
         };
     }
 
+    async autoSaveParentTask(parentTaskId) {
+        // Save parent task selection immediately (not debounced)
+        if (!this.currentTask) {
+            console.warn('autoSaveParentTask: No current task');
+            return;
+        }
+        
+        const taskId = this.currentTask.id;
+
+        try {
+            let result;
+            if (parentTaskId) {
+
+                result = await ipcRenderer.invoke('task-link-to-parent', {
+                    taskId: taskId,
+                    parentTaskId: parentTaskId
+                });
+            } else {
+                // Only unlink if there was a parent before
+                if (this.currentTask.parent_task_id) {
+
+                    result = await ipcRenderer.invoke('task-unlink-from-parent', taskId);
+                } else {
+                    // No change needed
+
+                    return;
+                }
+            }
+            
+            if (result && result.success) {
+                // Update local task data
+                this.currentTask.parent_task_id = parentTaskId || null;
+                
+                // Update the task in the tasks array
+                const taskIndex = this.tasks.findIndex(t => t.id === taskId);
+                if (taskIndex !== -1) {
+                    this.tasks[taskIndex].parent_task_id = parentTaskId || null;
+                    
+                    // Update the task card if visible
+                    const taskCard = document.querySelector(`.task-card[data-task-id="${taskId}"]`);
+                    if (taskCard) {
+                        this.updateTaskCard(taskCard, this.tasks[taskIndex]);
+                    }
+                }
+                
+                // Update parent info display
+                const parentInfo = document.getElementById('task-parent-info');
+                if (parentInfo) {
+                    if (parentTaskId) {
+                        const parent = this.tasks.find(t => t.id === parentTaskId);
+                        if (parent) {
+                            parentInfo.innerHTML = `
+                                <div class="parent-task-link" data-parent-id="${parent.id}">
+                                    <i data-lucide="git-branch"></i>
+                                    <span class="parent-task-title">Parent: #${parent.id} - ${this.escapeHtml(parent.title)}</span>
+                                </div>
+                            `;
+                            parentInfo.style.display = 'block';
+                            
+                            // Re-init icons for the new content
+                            if (window.lucide) {
+                                window.lucide.createIcons();
+                            }
+                        }
+                    } else {
+                        parentInfo.style.display = 'none';
+                        parentInfo.innerHTML = '';
+                    }
+                }
+
+                // Refresh the kanban board to reflect changes
+                await this.loadTasks();
+            } else {
+                console.error('Failed to save parent task:', result?.error || 'Unknown error', 'Full result:', result);
+                
+                // Revert the hidden input value
+                const detailsParentField = document.getElementById('details-parent');
+                if (detailsParentField) {
+                    detailsParentField.value = this.currentTask.parent_task_id || '';
+                }
+            }
+        } catch (error) {
+            console.error('Error saving parent task:', error);
+            
+            // Revert the hidden input value
+            const detailsParentField = document.getElementById('details-parent');
+            if (detailsParentField) {
+                detailsParentField.value = this.currentTask.parent_task_id || '';
+            }
+        }
+    }
+
     async deleteSubtask(subtaskId, parentTaskId) {
         const subtask = this.tasks.find(t => t.id === subtaskId);
         if (!subtask) return;
@@ -2436,27 +2513,21 @@ class KanbanManager {
                     if (subtasksList) {
                         if (subtasks.length > 0) {
                             subtasksList.innerHTML = subtasks.map(subtask => {
-                                // Get project info for the subtask
+                                // Remove project badge - not needed in subtasks
                                 let projectBadge = '';
-                                if (subtask.project) {
-                                    const project = this.projects.find(p => p.name === subtask.project) || 
-                                                   { name: subtask.project, display_name: subtask.project, color: '#007ACC' };
-                                    const displayName = project.display_name || project.name;
-                                    const gradient = this.getProjectGradient(project.color);
-                                    projectBadge = `<span class="subtask-project-badge" style="background: ${gradient}; font-size: 0.6rem; padding: 0.1rem 0.3rem; border-radius: 4px; margin-left: 0.3rem;">${this.escapeHtml(displayName)}</span>`;
-                                }
                                 
                                 return `
                                 <div class="subtask-item">
                                     <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
                                         <div class="subtask-header">
                                             <span class="task-id-badge">#${subtask.id}</span>
-                                            ${projectBadge}
-                                            <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
+                                                <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
                                             <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Delete subtask">
                                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                    <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                    <line x1="14" y1="11" x2="14" y2="17"></line>
                                                 </svg>
                                             </button>
                                         </div>
@@ -2488,6 +2559,200 @@ class KanbanManager {
                 message: 'Failed to delete subtask'
             });
         }
+    }
+
+    async unlinkSubtask(subtaskId, parentTaskId) {
+        const subtask = this.tasks.find(t => t.id === subtaskId);
+        if (!subtask) return;
+        
+        const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
+            title: 'Unlink Subtask',
+            message: `Are you sure you want to unlink subtask "${this.capitalizeFirstLetter(subtask.title)}"?`
+        });
+        if (!confirmed) return;
+        
+        try {
+            const result = await ipcRenderer.invoke('task-unlink-from-parent', subtaskId);
+            
+            if (result.success) {
+                // Update local task data
+                const taskIndex = this.tasks.findIndex(t => t.id === subtaskId);
+                if (taskIndex !== -1) {
+                    this.tasks[taskIndex].parent_task_id = null;
+                }
+                
+                // Refresh the kanban board
+                await this.loadTasks();
+                
+                // Refresh task details if still open
+                if (this.currentTask && this.currentTask.id === parentTaskId) {
+                    const subtasksList = document.getElementById('subtasks-list');
+                    const subtasks = this.tasks.filter(t => t.parent_task_id === parentTaskId);
+                    
+                    if (subtasks.length > 0) {
+                        subtasksList.innerHTML = subtasks.map(subtask => {
+                            // Remove project badge - not needed in subtasks
+                            let projectBadge = '';
+                            
+                            return `
+                            <div class="subtask-item">
+                                <a href="#" onclick="kanban.showTaskDetails(${subtask.id}); return false;" class="subtask-link">
+                                    <div class="subtask-header">
+                                        <span class="task-id-badge">#${subtask.id}</span>
+                                        <span class="subtask-status status-${subtask.status}">${subtask.status.replace('_', ' ')}</span>
+                                        <button class="subtask-unlink-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.unlinkSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Unlink subtask">
+                                            <svg class="no-lucide" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"></path>
+                                                <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"></path>
+                                                <line x1="8" x2="8" y1="2" y2="5"></line>
+                                                <line x1="2" x2="5" y1="8" y2="8"></line>
+                                                <line x1="16" x2="16" y1="19" y2="22"></line>
+                                                <line x1="19" x2="22" y1="16" y2="16"></line>
+                                            </svg>
+                                        </button>
+                                        <button class="subtask-delete-btn" onclick="event.stopPropagation(); event.preventDefault(); kanban.deleteSubtask(${subtask.id}, ${parentTaskId}); return false;" title="Delete subtask">
+                                            <svg class="no-lucide" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                                <polyline points="3 6 5 6 21 6"></polyline>
+                                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                                <line x1="10" y1="11" x2="10" y2="17"></line>
+                                                <line x1="14" y1="11" x2="14" y2="17"></line>
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div class="subtask-title">${this.escapeHtml(this.capitalizeFirstLetter(subtask.title))}</div>
+                                </a>
+                            </div>
+                            `;
+                        }).join('');
+                        subtasksList.style.display = 'block';
+                    } else {
+                        subtasksList.innerHTML = '<div class="empty-subtasks">No subtasks</div>';
+                        subtasksList.style.display = 'none';
+                    }
+                }
+                
+                this.showNotification('Subtask unlinked successfully', 'success');
+            } else {
+                await ipcRenderer.invoke('show-alert-dialog', {
+                    type: 'error',
+                    title: 'Unlink Failed',
+                    message: 'Failed to unlink subtask: ' + (result.error || 'Unknown error')
+                });
+            }
+        } catch (error) {
+            console.error('Error unlinking subtask:', error);
+            await ipcRenderer.invoke('show-alert-dialog', {
+                type: 'error',
+                title: 'Unlink Error',
+                message: 'Failed to unlink subtask'
+            });
+        }
+    }
+
+    async unlinkParentTask() {
+        if (!this.currentTask || !this.currentTask.parent_task_id) {
+            return;
+        }
+        
+        // Show custom confirmation modal using existing modal styles
+        const modal = document.createElement('div');
+        modal.className = 'modal show';
+        modal.innerHTML = `
+            <div class="modal-content" style="max-width: 450px;">
+                <div class="modal-header" style="border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                    <h2 style="font-size: 1.25rem; display: flex; align-items: center; gap: 0.75rem;">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2">
+                            <path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"></path>
+                            <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"></path>
+                            <line x1="8" x2="8" y1="2" y2="5"></line>
+                            <line x1="2" x2="5" y1="8" y2="8"></line>
+                            <line x1="16" x2="16" y1="19" y2="22"></line>
+                            <line x1="19" x2="22" y1="16" y2="16"></line>
+                        </svg>
+                        Unlink from Parent Task
+                    </h2>
+                </div>
+                <div class="modal-body" style="padding: 1.5rem;">
+                    <p style="color: rgba(255, 255, 255, 0.8); margin: 0; text-align: center;">
+                        Are you sure you want to unlink this task from its parent?<br>
+                        <span style="color: rgba(255, 255, 255, 0.6); font-size: 0.9rem;">
+                            The task will become a standalone task.
+                        </span>
+                    </p>
+                </div>
+                <div class="modal-footer" style="padding: 1rem 1.5rem; gap: 0.75rem; display: flex; justify-content: flex-end;">
+                    <button class="btn-modern btn-secondary-modern" id="unlink-cancel-btn">Cancel</button>
+                    <button class="btn-modern" id="unlink-confirm-btn" style="background: #fbbf24; color: #1a1a1a;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 0.5rem;">
+                            <path d="m18.84 12.25 1.72-1.71h-.02a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71"></path>
+                            <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71"></path>
+                            <line x1="8" x2="8" y1="2" y2="5"></line>
+                            <line x1="2" x2="5" y1="8" y2="8"></line>
+                            <line x1="16" x2="16" y1="19" y2="22"></line>
+                            <line x1="19" x2="22" y1="16" y2="16"></line>
+                        </svg>
+                        Unlink Task
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        
+        return new Promise(async (resolve) => {
+            const handleConfirm = async () => {
+                modal.remove();
+                
+                try {
+                    // Use the correct IPC handler for unlinking
+                    const result = await ipcRenderer.invoke('task-unlink-from-parent', this.currentTask.id);
+                    
+                    if (result.success) {
+                        // Update local task data
+                        this.currentTask.parent_task_id = null;
+                        
+                        // Update the hidden parent field
+                        document.getElementById('details-parent').value = '';
+                        
+                        // Hide the parent task info section
+                        const parentTaskInfo = document.getElementById('parent-task-info');
+                        if (parentTaskInfo) {
+                            parentTaskInfo.style.display = 'none';
+                        }
+                        
+                        // Hide the unlink button
+                        const unlinkBtn = document.getElementById('unlink-parent-btn');
+                        if (unlinkBtn) {
+                            unlinkBtn.style.display = 'none';
+                        }
+                        
+                        // Reload tasks to update the view
+                        await this.loadTasks();
+                        
+                        this.showNotification('Task unlinked from parent successfully', 'success');
+                    } else {
+                        this.showNotification('Failed to unlink: ' + (result.error || 'Unknown error'), 'error');
+                    }
+                } catch (error) {
+                    console.error('Error unlinking from parent:', error);
+                    this.showNotification('Failed to unlink from parent', 'error');
+                }
+                resolve();
+            };
+            
+            const handleCancel = () => {
+                modal.remove();
+                resolve();
+            };
+            
+            // Add event listeners
+            modal.querySelector('#unlink-confirm-btn').addEventListener('click', handleConfirm);
+            modal.querySelector('#unlink-cancel-btn').addEventListener('click', handleCancel);
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    handleCancel();
+                }
+            });
+        });
     }
 
     async deleteCurrentTask() {
@@ -2705,11 +2970,19 @@ class KanbanManager {
         if (badge) {
             if (terminalId === null) {
                 badge.classList.add('unassigned');
-                badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="plus" class="lucide lucide-plus"><path d="M5 12h14"></path><path d="M12 5v14"></path></svg>';
+                badge.innerHTML = '<i data-lucide="plus"></i>';
+                // Re-initialize Lucide icons for this badge
+                if (window.lucide && badge) {
+                    window.lucide.createIcons({ el: badge });
+                }
                 badge.title = 'Assign to terminal';
             } else {
                 badge.classList.remove('unassigned');
-                badge.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" data-lucide="terminal" class="lucide lucide-terminal"><path d="M12 19h8"></path><path d="m4 17 6-6-6-6"></path></svg><span class="terminal-number">${terminalId}</span>`;
+                badge.innerHTML = `<i data-lucide="terminal"></i><span class="terminal-number">${terminalId}</span>`;
+                // Re-initialize Lucide icons for this badge
+                if (window.lucide && badge) {
+                    window.lucide.createIcons({ el: badge });
+                }
                 badge.title = `Terminal ${terminalId}`;
             }
             // Re-initialize Lucide icons for the updated badge
@@ -2796,7 +3069,6 @@ class KanbanManager {
         }
     }
 
-
     async quickDeleteTask(taskId) {
         const task = this.tasks.find(t => t.id === taskId);
         if (!task) return;
@@ -2818,11 +3090,224 @@ class KanbanManager {
         }
     }
 
+    openLinkTaskModal() {
+        const modal = document.getElementById('link-task-modal');
+        if (!modal || !this.currentTask) return;
+        
+        // Get the current task to display parent info
+        const parentTask = this.tasks.find(t => t.id === this.currentTask.id);
+        if (!parentTask) {
+            this.showNotification('Parent task not found', 'error');
+            return;
+        }
+        
+        // Clear previous search
+        document.getElementById('link-task-search').value = '';
+        document.getElementById('selected-link-task').value = '';
+        document.getElementById('link-task-dropdown').style.display = 'none';
+        document.getElementById('selected-task-preview').style.display = 'none';
+        document.getElementById('confirm-link-task-btn').disabled = true;
+        
+        // Show modal
+        modal.classList.add('show');
+        
+        // Focus on search input
+        setTimeout(() => {
+            document.getElementById('link-task-search').focus();
+        }, 100);
+    }
+
+    closeLinkTaskModal() {
+        const modal = document.getElementById('link-task-modal');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+    }
+
+    setupLinkTaskSearch() {
+        const searchInput = document.getElementById('link-task-search');
+        const dropdown = document.getElementById('link-task-dropdown');
+        let searchTimeout;
+        
+        if (!searchInput || !dropdown) return;
+        
+        // Search on input
+        searchInput.addEventListener('input', (e) => {
+            const query = e.target.value.trim();
+            
+            // Clear timeout if exists
+            if (searchTimeout) {
+                clearTimeout(searchTimeout);
+            }
+            
+            // Hide dropdown if query is too short
+            if (query.length < 2) {
+                dropdown.style.display = 'none';
+                document.getElementById('selected-task-preview').style.display = 'none';
+                document.getElementById('selected-link-task').value = '';
+                document.getElementById('confirm-link-task-btn').disabled = true;
+                return;
+            }
+            
+            // Set timeout for search
+            searchTimeout = setTimeout(() => {
+                this.searchTasksToLink(query);
+            }, 300);
+        });
+        
+        // Handle focus
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.trim().length >= 2) {
+                this.searchTasksToLink(searchInput.value.trim());
+            }
+        });
+        
+        // Handle click outside
+        document.addEventListener('click', (e) => {
+            if (!searchInput.contains(e.target) && !dropdown.contains(e.target)) {
+                dropdown.style.display = 'none';
+            }
+        });
+    }
+
+    async searchTasksToLink(query) {
+        const dropdown = document.getElementById('link-task-dropdown');
+        if (!dropdown) return;
+        
+        // Show loading
+        dropdown.innerHTML = '<div class="dropdown-loading">Searching...</div>';
+        dropdown.style.display = 'block';
+        
+        try {
+            // Search for tasks without parent (standalone tasks)
+            const result = await ipcRenderer.invoke('task-search', { query, limit: 20 });
+            
+            if (result.success && result.tasks) {
+                // Filter only tasks without parent
+                const availableTasks = result.tasks.filter(task => 
+                    !task.parent_task_id && 
+                    task.id !== this.currentTask.id // Exclude current parent task
+                );
+                
+                this.displayLinkTaskResults(dropdown, availableTasks);
+            } else {
+                dropdown.innerHTML = '<div class="link-task-item no-results">Search failed</div>';
+            }
+        } catch (error) {
+            console.error('Failed to search tasks:', error);
+            dropdown.innerHTML = '<div class="link-task-item no-results">Search failed</div>';
+        }
+    }
+
+    displayLinkTaskResults(dropdown, tasks) {
+        if (!tasks || tasks.length === 0) {
+            dropdown.innerHTML = '<div class="link-task-item no-results">No standalone tasks found matching your search</div>';
+            return;
+        }
+        
+        // Build HTML for task results
+        let html = tasks.map(task => {
+            return `
+                <div class="link-task-item" data-task-id="${task.id}" data-task-title="${this.escapeHtml(task.title)}" data-task-description="${this.escapeHtml(task.description || '')}" data-task-status="${task.status}">
+                    <span class="task-id">#${task.id}</span>
+                    <span class="task-title">${this.escapeHtml(task.title)}</span>
+                    <span class="task-status status-${task.status}">${task.status.replace('_', ' ')}</span>
+                    ${task.project ? `<span class="task-project">${this.escapeHtml(task.project)}</span>` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        dropdown.innerHTML = html;
+        
+        // Add click handlers
+        dropdown.querySelectorAll('.link-task-item').forEach(item => {
+            if (!item.classList.contains('no-results')) {
+                item.addEventListener('click', () => {
+                    this.selectTaskToLink(item);
+                });
+            }
+        });
+    }
+
+    selectTaskToLink(item) {
+        const taskId = item.dataset.taskId;
+        const taskTitle = item.dataset.taskTitle;
+        const taskDescription = item.dataset.taskDescription;
+        const taskStatus = item.dataset.taskStatus;
+        
+        // Update hidden input
+        document.getElementById('selected-link-task').value = taskId;
+        
+        // Update search input
+        document.getElementById('link-task-search').value = `#${taskId} - ${taskTitle}`;
+        
+        // Show preview
+        const preview = document.getElementById('selected-task-preview');
+        if (preview) {
+            preview.innerHTML = `
+                <h4>Selected Task</h4>
+                <div class="preview-content">
+                    <div>
+                        <span class="preview-id">#${taskId}</span>
+                        <span class="preview-title">${taskTitle}</span>
+                    </div>
+                    ${taskDescription ? `<div class="preview-description">${taskDescription}</div>` : ''}
+                    <div class="preview-status status-${taskStatus}">${taskStatus.replace('_', ' ')}</div>
+                </div>
+            `;
+            preview.style.display = 'block';
+        }
+        
+        // Enable confirm button
+        document.getElementById('confirm-link-task-btn').disabled = false;
+        
+        // Hide dropdown
+        document.getElementById('link-task-dropdown').style.display = 'none';
+        
+        // Mark selected item
+        document.querySelectorAll('.link-task-item').forEach(el => el.classList.remove('selected'));
+        item.classList.add('selected');
+    }
+
+    async linkSelectedTask() {
+        const taskId = document.getElementById('selected-link-task').value;
+        const parentTaskId = this.currentTask.id;
+        
+        if (!taskId || !parentTaskId) {
+            this.showNotification('Please select a task to link', 'error');
+            return;
+        }
+        
+        try {
+            const result = await ipcRenderer.invoke('task-link-to-parent', {
+                taskId: parseInt(taskId),
+                parentTaskId: parentTaskId
+            });
+            
+            if (result.success) {
+                this.closeLinkTaskModal();
+                
+                // Reload tasks and refresh the current task details
+                await this.loadTasks();
+                
+                // Refresh task details
+                if (this.currentTask) {
+                    await this.showTaskDetails(parentTaskId);
+                }
+                
+                this.showNotification('Task linked successfully', 'success');
+            } else {
+                this.showNotification('Failed to link task: ' + (result.error || 'Unknown error'), 'error');
+            }
+        } catch (error) {
+            console.error('Failed to link task:', error);
+            this.showNotification('Failed to link task', 'error');
+        }
+    }
 
     showNotification(message, type = 'info') {
         // Console log for debugging
-        console.log(`${type.toUpperCase()}: ${message}`);
-        
+
         // Determine notification title based on type
         let notificationTitle = 'CodeAgentSwarm';
         switch(type) {
@@ -3212,7 +3697,6 @@ class KanbanManager {
     loadMoreCompletedTasks() {
         this.loadMoreTasks('completed');
     }
-
 
     escapeHtml(text) {
         const div = document.createElement('div');
@@ -3979,11 +4463,11 @@ let pendingFocusTaskId = null;
 
 // Handle focus-task IPC message from main window
 ipcRenderer.on('focus-task', (event, taskId) => {
-    console.log('Received focus-task event with taskId:', taskId);
+
     if (kanban && kanban.tasks.length > 0) {
         kanban.focusTask(taskId);
     } else {
-        console.log('Kanban not ready yet, storing taskId for later');
+
         pendingFocusTaskId = taskId;
     }
 });

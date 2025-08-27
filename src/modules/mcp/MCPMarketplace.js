@@ -35,7 +35,7 @@ class MCPMarketplace {
         
         // Listen for server removal events
         this.manager.on('server-removed', (data) => {
-            console.log('[MCPMarketplace] Server removed event:', data);
+
             // Update the specific server card if it exists
             if (data && data.name) {
                 this.updateServerCard(data.name);
@@ -44,14 +44,14 @@ class MCPMarketplace {
         
         // Listen for server added events
         this.manager.on('servers-added', () => {
-            console.log('[MCPMarketplace] Servers added event');
+
             // Refresh all visible server cards
             this.refreshVisibleCards();
         });
         
         // Listen for servers loaded events (when config is reloaded)
         this.manager.on('servers-loaded', () => {
-            console.log('[MCPMarketplace] Servers loaded event');
+
             // Refresh all visible server cards
             this.refreshVisibleCards();
         });
@@ -75,7 +75,7 @@ class MCPMarketplace {
             // Use absolute path from the root of the app
             const response = await fetch('../../modules/mcp/marketplace.json');
             this.marketplace = await response.json();
-            console.log('[MCPMarketplace] Loaded marketplace data:', this.marketplace);
+
         } catch (error) {
             console.error('[MCPMarketplace] Error loading marketplace data:', error);
             // Provide a default marketplace structure
@@ -338,16 +338,13 @@ class MCPMarketplace {
         // This will handle all buttons, even those added dynamically
         const marketplaceGrid = container.querySelector('#marketplace-grid');
         if (marketplaceGrid) {
-            console.log('[MCPMarketplace] Setting up event delegation for marketplace grid');
+
             marketplaceGrid.addEventListener('click', async (e) => {
-                console.log('[MCPMarketplace] Click event on marketplace grid, target:', e.target);
-                console.log('[MCPMarketplace] Target element tagName:', e.target.tagName);
-                console.log('[MCPMarketplace] Target element className:', e.target.className);
-                
+
                 // Find the button that was clicked (could be the icon inside the button)
                 const btn = e.target.closest('[data-action]');
                 if (!btn) {
-                    console.log('[MCPMarketplace] No button with data-action found');
+
                     return;
                 }
                 
@@ -356,21 +353,17 @@ class MCPMarketplace {
                 
                 const action = btn.dataset.action;
                 const serverId = btn.dataset.server;
-                
-                console.log(`[MCPMarketplace] Button clicked via delegation - Action: ${action}, Server: ${serverId}`);
-                
+
                 if (!serverId) {
                     console.error('[MCPMarketplace] No server ID found on button');
                     return;
                 }
-                
-                console.log(`[MCPMarketplace] Processing ${action} action for server ${serverId}`);
-                
+
                 if (action === 'install') {
-                    console.log(`[MCPMarketplace] Calling installServer for ${serverId}`);
+
                     await this.installServer(serverId, container);
                 } else if (action === 'uninstall') {
-                    console.log(`[MCPMarketplace] Calling uninstallServer for ${serverId}`);
+
                     await this.uninstallServer(serverId, container);
                 }
             });
@@ -611,39 +604,34 @@ class MCPMarketplace {
      * Install a server from marketplace
      */
     async installServer(serverId, container) {
-        console.log(`[MCPMarketplace] Installing server: ${serverId}`);
-        
+
         const server = this.marketplace.servers.find(s => s.id === serverId);
         if (!server) {
             console.error(`[MCPMarketplace] Server not found in marketplace: ${serverId}`);
             return;
         }
-        
-        console.log(`[MCPMarketplace] Found server configuration:`, server);
-        console.log(`[MCPMarketplace] Server config:`, JSON.stringify(server.config, null, 2));
-        console.log(`[MCPMarketplace] Server requiresAuth: ${server.requiresAuth}, authFields:`, server.authFields);
-        
+
         // Check if requires auth
         if (server.requiresAuth && server.authFields) {
-            console.log(`[MCPMarketplace] Server requires authentication - showing auth modal`);
+
             try {
                 const authData = await this.showAuthModal(server);
-                console.log(`[MCPMarketplace] Auth modal result:`, authData ? 'Got auth data' : 'User cancelled');
+
                 if (!authData) {
-                    console.log(`[MCPMarketplace] User cancelled authentication`);
+
                     return; // User cancelled
                 }
                 
                 // Add auth data to config
                 server.config.env = authData;
-                console.log(`[MCPMarketplace] Auth data added to config`);
+
             } catch (error) {
                 console.error(`[MCPMarketplace] Error showing auth modal:`, error);
                 this.showError(`Failed to show authentication dialog: ${error.message}`);
                 return;
             }
         } else {
-            console.log(`[MCPMarketplace] Server does not require auth or has no auth fields`);
+
         }
         
         // Mark as installing
@@ -667,7 +655,7 @@ class MCPMarketplace {
             
             // Special handling for Puppeteer - install locally due to npx/zod issues
             if (serverId === 'puppeteer') {
-                console.log('[MCPMarketplace] Special handling for Puppeteer installation - installing locally');
+
                 try {
                     const { exec } = require('child_process');
                     const util = require('util');
@@ -678,8 +666,7 @@ class MCPMarketplace {
                     
                     // Create a local directory for MCP servers
                     const mcpServersDir = path.join(os.homedir(), '.codeagentswarm', 'mcp-servers', 'puppeteer');
-                    console.log('[MCPMarketplace] Creating directory:', mcpServersDir);
-                    
+
                     // Create directory if it doesn't exist
                     await fs.mkdir(mcpServersDir, { recursive: true });
                     
@@ -700,16 +687,14 @@ class MCPMarketplace {
                     );
                     
                     // Install dependencies
-                    console.log('[MCPMarketplace] Installing Puppeteer MCP server locally...');
+
                     this.showInfo('Installing Puppeteer MCP server locally, this may take a moment...');
                     
                     const installResult = await execPromise('npm install --silent', {
                         cwd: mcpServersDir,
                         timeout: 90000 // 90 seconds timeout
                     });
-                    
-                    console.log('[MCPMarketplace] Installation completed');
-                    
+
                     // The server-puppeteer dist/index.js is already an executable script
                     // We just need to point to it directly
                     const serverPath = path.join(mcpServersDir, 'node_modules', '@modelcontextprotocol', 'server-puppeteer', 'dist', 'index.js');
@@ -717,8 +702,7 @@ class MCPMarketplace {
                     // Update the config to use the local installation
                     configToUse.command = 'node';
                     configToUse.args = [serverPath];
-                    
-                    console.log('[MCPMarketplace] Puppeteer MCP server installed locally at:', mcpServersDir);
+
                 } catch (installError) {
                     console.error('[MCPMarketplace] Failed to install Puppeteer locally:', installError);
                     this.showError(`Failed to install Puppeteer: ${installError.message}`);
@@ -737,18 +721,15 @@ class MCPMarketplace {
                     }
                 }
             };
-            
-            console.log(`[MCPMarketplace] Final config to be added:`, JSON.stringify(config, null, 2));
-            
+
             // Add server via manager
             const result = await this.manager.addServers(JSON.stringify(config));
             
             if (result.success) {
-                console.log(`[MCPMarketplace] Server ${serverId} added successfully to config`);
-                
+
                 // Special handling for Playwright - ensure browsers are installed
                 if (serverId === 'playwright') {
-                    console.log('[MCPMarketplace] Installing Playwright browsers...');
+
                     try {
                         // Use electron's node to run the installation
                         const { exec } = require('child_process');
@@ -759,7 +740,7 @@ class MCPMarketplace {
                         await execPromise('npx playwright install chromium', {
                             timeout: 120000 // 2 minutes timeout
                         });
-                        console.log('[MCPMarketplace] Playwright browsers installed successfully');
+
                     } catch (browserError) {
                         console.warn('[MCPMarketplace] Failed to install Playwright browsers:', browserError);
                         // Show warning but don't fail the installation
@@ -769,7 +750,7 @@ class MCPMarketplace {
                 
                 // Special handling for Puppeteer - ensure Chrome is available
                 if (serverId === 'puppeteer') {
-                    console.log('[MCPMarketplace] Puppeteer installed - Chrome will be downloaded on first use');
+
                     this.showSuccess(`${server.name} installed successfully!`);
                 } else {
                     this.showSuccess(`${server.name} installed successfully!`);
@@ -781,7 +762,7 @@ class MCPMarketplace {
                 // Verify the server was actually added to the config
                 const addedServer = this.manager.hasServer(serverId);
                 if (addedServer) {
-                    console.log(`[MCPMarketplace] Verified: Server ${serverId} is now in the configuration`);
+
                 } else {
                     console.warn(`[MCPMarketplace] Warning: Server ${serverId} was not found in configuration after adding`);
                 }
@@ -789,7 +770,7 @@ class MCPMarketplace {
                 // Update CLAUDE.md with MCP instructions
                 try {
                     await this.updateClaudeMdInstructions(serverId);
-                    console.log(`[MCPMarketplace] Updated CLAUDE.md with ${server.name} instructions`);
+
                 } catch (error) {
                     console.warn('[MCPMarketplace] Failed to update CLAUDE.md:', error);
                     // Don't fail the installation if CLAUDE.md update fails
@@ -814,17 +795,10 @@ class MCPMarketplace {
      * Show authentication modal
      */
     async showAuthModal(server) {
-        console.log('[MCPMarketplace] showAuthModal called for server:', server.id);
-        console.log('[MCPMarketplace] Server details:', {
-            id: server.id,
-            name: server.name,
-            requiresAuth: server.requiresAuth,
-            authFields: server.authFields
-        });
-        
+
         return new Promise((resolve) => {
             try {
-                console.log('[MCPMarketplace] Creating auth modal promise...');
+
                 // Special handling for PostgreSQL - show separate fields
                 let bodyContent = '';
                 if (server.id === 'postgres') {
@@ -947,11 +921,7 @@ class MCPMarketplace {
                     </div>
                 </div>
             `;
-            
-            console.log('[MCPMarketplace] Adding modal HTML to body');
-            console.log('[MCPMarketplace] Current body element:', document.body);
-            console.log('[MCPMarketplace] Modal HTML length:', modalHtml.length);
-            
+
             // Add modal to body
             document.body.insertAdjacentHTML('beforeend', modalHtml);
             
@@ -967,14 +937,9 @@ class MCPMarketplace {
                 resolve(null);
                 return;
             }
-            
-            console.log('[MCPMarketplace] Modal created successfully:', modal);
-            console.log('[MCPMarketplace] Modal display style:', window.getComputedStyle(modal).display);
-            console.log('[MCPMarketplace] Modal visibility:', window.getComputedStyle(modal).visibility);
-            console.log('[MCPMarketplace] Modal z-index:', window.getComputedStyle(modal).zIndex);
-            
+
             // Force the modal to be visible with inline styles
-            console.log('[MCPMarketplace] Forcing modal display with inline styles...');
+
             modal.style.display = 'flex';
             modal.style.position = 'fixed';
             modal.style.top = '0';
@@ -992,13 +957,7 @@ class MCPMarketplace {
             if (!modal.classList.contains('mcp-marketplace-auth-modal')) {
                 modal.classList.add('mcp-marketplace-auth-modal');
             }
-            
-            console.log('[MCPMarketplace] After forcing styles:');
-            console.log('[MCPMarketplace] - display:', modal.style.display);
-            console.log('[MCPMarketplace] - visibility:', modal.style.visibility);
-            console.log('[MCPMarketplace] - z-index:', modal.style.zIndex);
-            console.log('[MCPMarketplace] - class:', modal.className);
-            
+
             // Also ensure the content is visible
             const modalContent = modal.querySelector('.auth-modal-content');
             if (modalContent) {
@@ -1010,7 +969,7 @@ class MCPMarketplace {
                 modalContent.style.maxHeight = '80vh';
                 modalContent.style.overflow = 'auto';
                 modalContent.style.position = 'relative';
-                console.log('[MCPMarketplace] Modal content styles applied');
+
             }
             
             // Force a reflow to ensure styles are applied
@@ -1019,7 +978,7 @@ class MCPMarketplace {
             // Use setTimeout to ensure the modal is visible after any other scripts run
             setTimeout(() => {
                 if (modal && modal.style.display !== 'flex') {
-                    console.log('[MCPMarketplace] Modal was hidden, forcing display again...');
+
                     modal.style.display = 'flex';
                     modal.style.visibility = 'visible';
                     modal.style.opacity = '1';
@@ -1076,7 +1035,7 @@ class MCPMarketplace {
             }
             
             submitButton.addEventListener('click', () => {
-                console.log('[MCPMarketplace] Auth submit button clicked');
+
                 const authData = {};
                 let valid = true;
                 
@@ -1107,11 +1066,9 @@ class MCPMarketplace {
                     }
                 } else {
                     // Default handling for other servers
-                    console.log('[MCPMarketplace] Processing auth fields for server:', server.id);
-                    console.log('[MCPMarketplace] Auth fields:', server.authFields);
-                    
+
                     server.authFields.forEach(field => {
-                        console.log(`[MCPMarketplace] Processing field: ${field.key}`);
+
                         const input = document.getElementById(field.key);
                         
                         if (!input) {
@@ -1119,35 +1076,30 @@ class MCPMarketplace {
                             valid = false;
                             return;
                         }
-                        
-                        console.log(`[MCPMarketplace] Field ${field.key} value:`, input.value ? 'Has value' : 'Empty');
-                        
+
                         if (field.required && !input.value) {
-                            console.log(`[MCPMarketplace] Field ${field.key} is required but empty`);
+
                             valid = false;
                             input.classList.add('error');
                         } else {
                             authData[field.key] = input.value;
-                            console.log(`[MCPMarketplace] Field ${field.key} added to auth data`);
+
                         }
                     });
                 }
-                
-                console.log(`[MCPMarketplace] Form validation result: ${valid ? 'Valid' : 'Invalid'}`);
-                console.log('[MCPMarketplace] Auth data collected:', authData);
-                
+
                 if (valid) {
-                    console.log('[MCPMarketplace] Validation passed, closing modal and resolving with auth data');
+
                     modal.remove();
                     resolve(authData);
                 } else {
-                    console.log('[MCPMarketplace] Validation failed, keeping modal open');
+
                 }
             });
             
             // Handle cancel
             let closeModal = () => {
-                console.log('[MCPMarketplace] Closing modal - user cancelled');
+
                 modal.remove();
                 resolve(null);
             };
@@ -1428,7 +1380,7 @@ class MCPMarketplace {
                 const result = await this.manager.ipcCall('mcp:update-claude-instructions', { serverId });
                 
                 if (result && result.success) {
-                    console.log(`[MCPMarketplace] Successfully updated CLAUDE.md instructions for ${serverId}`);
+
                     return true;
                 } else {
                     console.warn('[MCPMarketplace] Failed to update CLAUDE.md:', result?.error);

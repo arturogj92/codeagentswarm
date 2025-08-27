@@ -13,7 +13,7 @@ const dualLog = {
         const logger = require('../logger');
         logger.addLog('info', args);
       } catch (e) {
-        console.log('[UpdaterService] Logger error:', e.message, args);
+
       }
     });
   },

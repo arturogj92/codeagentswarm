@@ -17,7 +17,7 @@ const childLogger = new ChildProcessLogger('MCP-Server');
 // Import our MCP-compatible database manager
 // Always use standalone version to avoid native module compatibility issues
 let DatabaseManagerMCP;
-console.log('[MCP Server] Using standalone database module');
+
 DatabaseManagerMCP = require('../database/database-mcp-standalone');
 
 // PID lock file path
@@ -232,7 +232,7 @@ class MCPStdioServer {
             const response = await this.processRequest(message);
             
             if (response) {
-                console.log(JSON.stringify(response));
+
                 this.logError('📤 Sent response for method:', message.method || 'unknown');
             }
         } catch (error) {
@@ -248,8 +248,7 @@ class MCPStdioServer {
                     message: 'Parse error: ' + error.message
                 }
             };
-            
-            console.log(JSON.stringify(errorResponse));
+
         }
     }
 

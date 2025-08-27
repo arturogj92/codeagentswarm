@@ -362,8 +362,7 @@ class LogViewer {
   }
 
   setDebugMode(enabled) {
-    console.log('LogViewer.setDebugMode called with:', enabled, 'button exists:', !!this.button);
-    
+
     if (enabled && !this.button) {
       // Initialize if not already initialized
       this.init();
@@ -377,12 +376,12 @@ class LogViewer {
       // Button doesn't exist but we're trying to hide - check if button exists in DOM
       const existingButton = document.querySelector('.log-viewer-button');
       if (existingButton) {
-        console.log('Found orphan button in DOM, removing it');
+
         existingButton.remove();
       }
       const existingContainer = document.querySelector('.log-viewer-container');
       if (existingContainer) {
-        console.log('Found orphan container in DOM, removing it');
+
         existingContainer.remove();
       }
     }

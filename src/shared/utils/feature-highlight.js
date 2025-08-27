@@ -67,13 +67,13 @@ class FeatureHighlight {
 
         // Check if we're in the right version range (if versions array is provided)
         if (versions.length > 0 && !versions.includes(this.appVersion)) {
-            console.log(`Feature '${featureName}' not shown - version ${this.appVersion} not in target versions`);
+
             return;
         }
 
         // Check if feature has been shown for this version
         if (showOnce && this.hasBeenShown(featureName)) {
-            console.log(`Feature highlight '${featureName}' already shown for version ${this.appVersion}`);
+
             return;
         }
 
@@ -229,8 +229,7 @@ class FeatureHighlight {
         };
         
         targetElement.addEventListener('click', clickHandler, { once: true });
-        
-        console.log(`Badge added for feature '${featureName}' on version ${this.appVersion}`);
+
     }
 
     createHighlightElement(message, position) {
@@ -453,8 +452,7 @@ class FeatureHighlight {
     testHighlight(featureName) {
         // Reset the feature first
         this.reset(featureName);
-        console.log(`[FeatureHighlight] Testing feature: ${featureName}`);
-        
+
         // Show the highlight based on feature name
         if (featureName === 'tabbedMode') {
             this.show({

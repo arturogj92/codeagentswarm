@@ -19,7 +19,7 @@ const execAsync = (command, options) => {
 // Use spawn for better control over the claude command
 const spawnAsync = (command, args, options) => {
     return new Promise((resolve, reject) => {
-        console.log(`[spawnAsync] Running: ${command} ${args.join(' ')}`);
+
         const child = spawn(command, args, options);
         
         let stdout = '';
@@ -29,12 +29,12 @@ const spawnAsync = (command, args, options) => {
         
         child.stdout.on('data', (data) => {
             stdout += data.toString();
-            console.log(`[spawnAsync] stdout chunk:`, data.toString());
+
         });
         
         child.stderr.on('data', (data) => {
             stderr += data.toString();
-            console.log(`[spawnAsync] stderr chunk:`, data.toString());
+
         });
         
         child.on('error', (error) => {
@@ -45,8 +45,7 @@ const spawnAsync = (command, args, options) => {
         
         child.on('close', (code) => {
             if (timeoutId) clearTimeout(timeoutId);
-            console.log(`[spawnAsync] Process closed with code: ${code}`);
-            
+
             if (timedOut) {
                 const error = new Error(`Command timed out after ${options.timeout}ms`);
                 error.code = 'TIMEOUT';
@@ -68,7 +67,7 @@ const spawnAsync = (command, args, options) => {
         if (options.timeout) {
             timeoutId = setTimeout(() => {
                 timedOut = true;
-                console.log(`[spawnAsync] Timeout reached, killing process`);
+
                 child.kill('SIGTERM');
             }, options.timeout);
         }
@@ -103,7 +102,7 @@ class ClaudeCommitAdapter extends CommitRepository {
             console.error('[ClaudeCommitAdapter] First attempt failed:', error.message);
             
             // Try with a simplified prompt as fallback
-            console.log('[ClaudeCommitAdapter] Trying with simplified prompt...');
+
             try {
                 const simplifiedPrompt = this.buildSimplifiedPrompt(modifiedFiles);
                 const message = await this.callClaudeSimple(simplifiedPrompt, workingDirectory);
@@ -112,7 +111,7 @@ class ClaudeCommitAdapter extends CommitRepository {
                 console.error('[ClaudeCommitAdapter] Fallback also failed:', fallbackError.message);
                 
                 // Last resort: Generate a basic message locally
-                console.log('[ClaudeCommitAdapter] Using local fallback message generation...');
+
                 const localMessage = this.generateLocalFallback(modifiedFiles);
                 return CommitMessage.fromString(localMessage);
             }
@@ -255,8 +254,7 @@ class ClaudeCommitAdapter extends CommitRepository {
         const claudeCmd = this.claudePath || 'claude';
         
         try {
-            console.log('[ClaudeCommitAdapter] Executing simplified prompt with stdin...');
-            
+
             // Use stdin for prompt
             const { stdout, stderr } = await this.spawnWithStdin(claudeCmd, ['-p'], prompt, {
                 cwd: workingDirectory,
@@ -291,17 +289,11 @@ class ClaudeCommitAdapter extends CommitRepository {
     async callClaude(prompt, workingDirectory) {
         // Use spawn instead of exec for better control
         const claudeCmd = this.claudePath || 'claude';
-        
-        console.log('[ClaudeCommitAdapter] Using spawn method with claude CLI via stdin');
-        console.log('[ClaudeCommitAdapter] Prompt length:', prompt.length);
-        
+
         let lastError;
         for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
             try {
-                console.log(`[ClaudeCommitAdapter] Attempt ${attempt}/${this.maxRetries} - Generating commit message...`);
-                console.log(`[ClaudeCommitAdapter] Working directory: ${workingDirectory}`);
-                console.log(`[ClaudeCommitAdapter] Timeout: ${this.timeout}ms`);
-                
+
                 const startTime = Date.now();
                 
                 // Use spawn with stdin for prompt
@@ -316,8 +308,7 @@ class ClaudeCommitAdapter extends CommitRepository {
                 });
                 
                 const duration = Date.now() - startTime;
-                console.log(`[ClaudeCommitAdapter] Command completed in ${duration}ms`);
-                
+
                 if (stderr && !stderr.includes('Warning')) {
                     console.warn('[ClaudeCommitAdapter] Claude stderr:', stderr);
                 }
@@ -353,7 +344,7 @@ class ClaudeCommitAdapter extends CommitRepository {
                 
                 if (attempt < this.maxRetries) {
                     const backoffDelay = 1000 * attempt;
-                    console.log(`[ClaudeCommitAdapter] Waiting ${backoffDelay}ms before retry...`);
+
                     await this.delay(backoffDelay); // Exponential backoff
                 }
             }
@@ -461,7 +452,7 @@ class ClaudeCommitAdapter extends CommitRepository {
      */
     spawnWithStdin(command, args, input, options) {
         return new Promise((resolve, reject) => {
-            console.log(`[spawnWithStdin] Running: ${command} ${args.join(' ')} with stdin input`);
+
             const child = spawn(command, args, options);
             
             let stdout = '';
@@ -489,8 +480,7 @@ class ClaudeCommitAdapter extends CommitRepository {
             
             child.on('close', (code) => {
                 if (timeoutId) clearTimeout(timeoutId);
-                console.log(`[spawnWithStdin] Process closed with code: ${code}`);
-                
+
                 if (timedOut) {
                     const error = new Error(`Command timed out after ${options.timeout}ms`);
                     error.code = 'TIMEOUT';
@@ -512,7 +502,7 @@ class ClaudeCommitAdapter extends CommitRepository {
             if (options.timeout) {
                 timeoutId = setTimeout(() => {
                     timedOut = true;
-                    console.log(`[spawnWithStdin] Timeout reached, killing process`);
+
                     child.kill('SIGTERM');
                 }, options.timeout);
             }
@@ -543,8 +533,7 @@ class ClaudeCommitAdapter extends CommitRepository {
                 });
                 
                 if (stdout && (stdout.includes('Claude') || stdout.includes('claude'))) {
-                    console.log(`[ClaudeCommitAdapter] Claude CLI is available at: ${claudePath}`);
-                    console.log(`[ClaudeCommitAdapter] Version: ${stdout.trim()}`);
+
                     // Store the working path for later use
                     this.claudePath = claudePath;
                     return true;
@@ -563,7 +552,7 @@ class ClaudeCommitAdapter extends CommitRepository {
             });
             if (stdout && stdout.trim()) {
                 const claudePath = stdout.trim().split('\n')[0]; // Take first result
-                console.log('[ClaudeCommitAdapter] Claude CLI found via which at:', claudePath);
+
                 this.claudePath = claudePath;
                 
                 // Verify it works
@@ -572,7 +561,7 @@ class ClaudeCommitAdapter extends CommitRepository {
                         timeout: 5000,
                         env: { ...process.env, CLAUDE_DISABLE_TELEMETRY: '1' }
                     });
-                    console.log(`[ClaudeCommitAdapter] Version: ${versionOut.trim()}`);
+
                     return true;
                 } catch (e) {
                     console.warn('[ClaudeCommitAdapter] Found claude but cannot execute it:', e.message);

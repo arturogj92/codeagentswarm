@@ -644,9 +644,7 @@ class MCPRenderer {
     async toggleServer(serverName) {
         const server = this.manager.getServer(serverName);
         const isEnabled = server?.metadata?.enabled !== false;
-        
-        console.log(`[MCP Renderer] Toggling ${serverName}: currently ${isEnabled ? 'enabled' : 'disabled'}, will ${isEnabled ? 'disable' : 'enable'}`);
-        
+
         try {
             const result = await this.manager.toggleServer(serverName, !isEnabled);
             
@@ -654,7 +652,7 @@ class MCPRenderer {
                 console.error(`[MCP Renderer] Toggle failed:`, result.error);
                 this.showError(result.error);
             } else {
-                console.log(`[MCP Renderer] Toggle successful for ${serverName}`);
+
                 // Show success message with reminder to restart Claude Code
                 this.showSuccess(`Server ${isEnabled ? 'disabled' : 'enabled'} successfully. Please restart Claude Code for changes to take effect.`);
             }
@@ -690,7 +688,7 @@ class MCPRenderer {
      */
     showSuccess(message) {
         // You can implement a toast notification here
-        console.log('Success:', message);
+
     }
 
     /**

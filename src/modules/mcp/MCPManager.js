@@ -215,7 +215,7 @@ class MCPManager {
             if (result.success) {
                 // After successful toggle, reload servers to get the actual state
                 // This is necessary because the main process renames servers with _disabled_ prefix
-                console.log(`[MCPManager] Toggle successful, reloading servers to reflect actual state...`);
+
                 await this.loadServers();
                 
                 this.emit('server-toggled', { name, enabled });

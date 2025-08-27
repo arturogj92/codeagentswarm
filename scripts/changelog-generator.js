@@ -230,33 +230,42 @@ class ChangelogGenerator {
    * If DEEPSEEK_API_KEY is not set in GitHub secrets, falls back to simple generation
    */
   async generateChangelogWithAI(currentVersion, previousVersion, commits) {
+    // Filter commits to only include user-relevant changes
+    const filteredCommits = this.filterUserRelevantCommits(commits);
+    
     // If no DeepSeek API key, use simple changelog
     if (!this.deepseekApiKey) {
       console.log('No DeepSeek API key provided, using simple changelog generation');
       console.log('To get better changelogs, add DEEPSEEK_API_KEY to GitHub secrets');
-      return this.generateSimpleChangelog(currentVersion, commits);
+      return this.generateSimpleChangelog(currentVersion, filteredCommits);
     }
 
-    // Prepare commit information for AI
-    const commitInfo = commits.map(commit => ({
+    // Prepare commit information for AI (only user-relevant commits)
+    const commitInfo = filteredCommits.map(commit => ({
       message: commit.commit.message,
       author: commit.commit.author.name,
       date: commit.commit.author.date
     }));
 
-    const prompt = `You are a technical writer creating a changelog for a software release. 
+    const prompt = `You are a technical writer creating a changelog for end users of a software application. 
 Generate a professional changelog for version ${currentVersion} based on the following commits since version ${previousVersion}.
 
 IMPORTANT RULES:
-1. Group changes by category: ✨ New Features, 🐛 Bug Fixes, 🔧 Improvements, 📚 Documentation, 🔨 Technical Changes
-2. Write in user-friendly language, explain the benefit of each change
-3. Ignore commits that are just version bumps or merge commits
-4. Use bullet points for each change
-5. Be concise but informative
-6. Format in Markdown
-7. Start with "## Version ${currentVersion} - ${new Date().toISOString().split('T')[0]}"
-8. If a commit message starts with feat:, fix:, docs:, etc., use that to categorize
-9. Focus on changes that affect users, not internal refactoring unless significant
+1. Group changes by category: ✨ New Features, 🐛 Bug Fixes, 🔧 Improvements, 🎨 UI/UX Updates
+2. Write in simple, non-technical language that any user can understand
+3. Focus ONLY on changes that directly affect the user experience
+4. Explain the benefit or impact of each change from the user's perspective
+5. DO NOT include technical details like:
+   - Code refactoring or restructuring
+   - Test additions or modifications
+   - Build system changes
+   - Development tool updates
+   - Internal architecture changes
+6. Use bullet points for each change
+7. Be concise and clear
+8. Format in Markdown
+9. Start with "## Version ${currentVersion} - ${new Date().toISOString().split('T')[0]}"
+10. If there are no significant user-facing changes, write a brief summary like "Performance improvements and bug fixes"
 
 Commits:
 ${JSON.stringify(commitInfo, null, 2)}
@@ -275,7 +284,7 @@ Generate the changelog:`;
           messages: [
             {
               role: 'system',
-              content: 'You are a technical writer specializing in creating clear, informative software changelogs.'
+              content: 'You are a user experience writer creating changelogs for end users who are not technical. Focus on benefits and user impact, not technical details.'
             },
             {
               role: 'user',
@@ -296,50 +305,191 @@ Generate the changelog:`;
     } catch (error) {
       console.error('Error calling DeepSeek API:', error);
       // Fallback to simple changelog if AI fails
-      return this.generateSimpleChangelog(currentVersion, commits);
+      return this.generateSimpleChangelog(currentVersion, filteredCommits);
     }
   }
 
+  /**
+   * Filter commits to only include user-relevant changes
+   */
+  filterUserRelevantCommits(commits) {
+    // Keywords that indicate technical/internal changes to exclude
+    const excludePatterns = [
+      /^(test|tests):/i,
+      /^(chore|build|ci|perf|refactor|style|docs\(internal\)):/i,
+      /^(merge|merged)/i,
+      /\b(refactor|restructure|reorganize|cleanup|lint|format)\b/i,
+      /\b(test|tests|testing|spec|specs)\b/i,
+      /\b(dependency|dependencies|deps|devDependencies)\b/i,
+      /\b(webpack|babel|eslint|prettier|tsconfig|gitignore)\b/i,
+      /\b(ci\/cd|github.actions|workflow|pipeline)\b/i,
+      /\b(readme|documentation)\s+(update|fix|improve)/i,
+      /^bump/i,
+      /^update.*version/i,
+      /\b(console\.log|debug|logging)\b/i
+    ];
+    
+    // Keywords that indicate user-facing changes to include
+    const includePatterns = [
+      /^(feat|feature|add|new):/i,
+      /^fix:/i,
+      /^(ui|ux):/i,
+      /\b(user|users|customer|customers)\b/i,
+      /\b(interface|screen|display|view|page|modal|dialog|menu)\b/i,
+      /\b(button|form|input|field|dropdown|checkbox|radio)\b/i,
+      /\b(performance|speed|faster|slower|optimize)\b.*\b(app|application|loading)\b/i,
+      /\b(crash|crashes|freeze|freezes|hang|hangs)\b/i,
+      /\b(error|errors|bug|bugs|issue|issues|problem|problems)\b.*\b(fix|fixed|resolve|resolved)\b/i
+    ];
+    
+    return commits.filter(commit => {
+      const message = commit.commit.message.toLowerCase();
+      
+      // First check if it should be excluded
+      for (const pattern of excludePatterns) {
+        if (pattern.test(message)) {
+          // Check if it also matches an include pattern (include patterns override exclude)
+          let shouldInclude = false;
+          for (const includePattern of includePatterns) {
+            if (includePattern.test(message)) {
+              shouldInclude = true;
+              break;
+            }
+          }
+          if (!shouldInclude) {
+            return false;
+          }
+        }
+      }
+      
+      return true;
+    });
+  }
+  
   /**
    * Generate a simple changelog without AI
    */
   generateSimpleChangelog(version, commits) {
     const date = new Date().toISOString().split('T')[0];
     let changelog = `## Version ${version} - ${date}\n\n`;
+    
+    if (commits.length === 0) {
+      changelog += '### 🔧 Improvements\n';
+      changelog += '- Performance improvements and minor bug fixes\n';
+      changelog += '- General stability enhancements\n';
+      return changelog;
+    }
 
     const features = [];
     const fixes = [];
-    const other = [];
+    const improvements = [];
+    const uiChanges = [];
 
     commits.forEach(commit => {
       const message = commit.commit.message;
-      if (message.toLowerCase().includes('feat:') || message.toLowerCase().includes('feature')) {
-        features.push(message);
-      } else if (message.toLowerCase().includes('fix:') || message.toLowerCase().includes('bug')) {
-        fixes.push(message);
+      const lowerMessage = message.toLowerCase();
+      
+      // Categorize commits and clean up messages for user readability
+      if (lowerMessage.includes('feat:') || lowerMessage.includes('feature:') || lowerMessage.includes('add:') || lowerMessage.includes('new:')) {
+        const cleanMessage = this.cleanCommitMessage(message);
+        if (cleanMessage) features.push(cleanMessage);
+      } else if (lowerMessage.includes('fix:') || lowerMessage.includes('bug:')) {
+        const cleanMessage = this.cleanCommitMessage(message);
+        if (cleanMessage) fixes.push(cleanMessage);
+      } else if (lowerMessage.includes('ui:') || lowerMessage.includes('ux:') || lowerMessage.includes('design:')) {
+        const cleanMessage = this.cleanCommitMessage(message);
+        if (cleanMessage) uiChanges.push(cleanMessage);
       } else {
-        other.push(message);
+        const cleanMessage = this.cleanCommitMessage(message);
+        if (cleanMessage) improvements.push(cleanMessage);
       }
     });
 
     if (features.length > 0) {
       changelog += '### ✨ New Features\n';
-      features.forEach(feat => changelog += `- ${feat.split('\n')[0]}\n`);
+      features.forEach(feat => changelog += `- ${feat}\n`);
       changelog += '\n';
     }
 
     if (fixes.length > 0) {
       changelog += '### 🐛 Bug Fixes\n';
-      fixes.forEach(fix => changelog += `- ${fix.split('\n')[0]}\n`);
+      fixes.forEach(fix => changelog += `- ${fix}\n`);
+      changelog += '\n';
+    }
+    
+    if (uiChanges.length > 0) {
+      changelog += '### 🎨 UI/UX Improvements\n';
+      uiChanges.forEach(change => changelog += `- ${change}\n`);
       changelog += '\n';
     }
 
-    if (other.length > 0) {
-      changelog += '### 🔧 Other Changes\n';
-      other.forEach(change => changelog += `- ${change.split('\n')[0]}\n`);
+    if (improvements.length > 0) {
+      changelog += '### 🔧 Improvements\n';
+      improvements.forEach(change => changelog += `- ${change}\n`);
+    }
+    
+    // If no categorized changes, add a generic message
+    if (features.length === 0 && fixes.length === 0 && uiChanges.length === 0 && improvements.length === 0) {
+      changelog += '### 🔧 Improvements\n';
+      changelog += '- Performance improvements and minor enhancements\n';
     }
 
     return changelog;
+  }
+  
+  /**
+   * Clean up commit messages for user readability
+   */
+  cleanCommitMessage(message) {
+    // Remove conventional commit prefixes
+    let cleaned = message
+      .replace(/^(feat|feature|fix|chore|docs|style|refactor|perf|test|build|ci|revert|merge)(\([^)]+\))?:\s*/i, '')
+      .replace(/^(add|update|remove|delete|modify|change|ui|ux|design):\s*/i, '');
+    
+    // Take only the first line
+    cleaned = cleaned.split('\n')[0];
+    
+    // Capitalize first letter
+    cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+    
+    // Remove technical jargon and make more user-friendly
+    const replacements = [
+      [/\bAPI\b/gi, 'connection'],
+      [/\bendpoint\b/gi, 'feature'],
+      [/\bUI\b/g, 'interface'],
+      [/\bUX\b/g, 'user experience'],
+      [/\brefactor\b/gi, 'improve'],
+      [/\boptimize performance of\b/gi, 'speed up'],
+      [/\boptimize\b/gi, 'improve'],
+      [/\bdebug\b/gi, 'fix issue with'],
+      [/\bimpl\b/gi, 'add'],
+      [/\bconfig\b/gi, 'settings'],
+      [/\brepo\b/gi, 'project'],
+      [/\bdeps\b/gi, 'components']
+    ];
+    
+    for (const [pattern, replacement] of replacements) {
+      cleaned = cleaned.replace(pattern, replacement);
+    }
+    
+    // Remove trailing periods and ensure proper ending
+    cleaned = cleaned.replace(/\.+$/, '');
+    
+    // Filter out messages that are still too technical
+    const technicalIndicators = [
+      /\b(npm|yarn|pnpm|webpack|babel|eslint|typescript|jest|mocha)\b/i,
+      /\b(function|method|class|variable|const|let|var)\b/i,
+      /\b(import|export|require|module)\b/i,
+      /\b\w+\.(js|ts|jsx|tsx|css|scss|json|yml|yaml)\b/i
+    ];
+    
+    for (const indicator of technicalIndicators) {
+      if (indicator.test(cleaned)) {
+        return null; // Filter out this message
+      }
+    }
+    
+    return cleaned;
   }
 
   /**

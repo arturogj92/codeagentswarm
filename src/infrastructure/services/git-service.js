@@ -14,8 +14,7 @@ class GitService {
             await commitServiceFactory.initialize({
                 logger: console
             });
-            
-            console.log('[GitService] Commit service initialized with Claude CLI');
+
         } catch (error) {
             console.warn('[GitService] Commit service initialization failed:', error.message);
             console.warn('[GitService] Please install Claude Code to use commit generation');
@@ -26,7 +25,7 @@ class GitService {
     async reinitializeCommitService() {
         try {
             await this.initializeCommitService();
-            console.log('[GitService] Commit service reinitialized');
+
             return true;
         } catch (error) {
             console.error('[GitService] Failed to reinitialize commit service:', error);

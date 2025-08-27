@@ -2391,6 +2391,61 @@ body::before {
   font-weight: 500;
 }
 
+/* Click hint style - more friendly and prominent than danger warning */
+.session-danger-warning.click-hint {
+  background: linear-gradient(135deg, 
+    rgba(59, 130, 246, 0.15) 0%, 
+    rgba(99, 102, 241, 0.1) 100%);
+  border: 2px solid rgba(59, 130, 246, 0.5);
+  animation: pulseHint 0.5s ease-out;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.2);
+}
+
+.session-danger-warning.click-hint .danger-icon {
+  font-size: 1.4rem;
+  animation: tick 1.5s ease-in-out infinite;
+}
+
+.session-danger-warning.click-hint .danger-text {
+  color: #93c5fd;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.session-danger-warning.click-hint .danger-text strong {
+  color: #dbeafe;
+  font-size: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+@keyframes pulseHint {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.02);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes tick {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  25% {
+    transform: scale(1.1) rotate(-10deg);
+  }
+  75% {
+    transform: scale(1.1) rotate(10deg);
+  }
+}
+
 /* Progress bar for hold-to-activate */
 .session-danger-progress {
   position: relative;

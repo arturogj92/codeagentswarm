@@ -25,8 +25,7 @@ class DatabaseManagerMCP {
       
       this.dbPath = path.join(appDataDir, 'codeagentswarm.db');
     }
-    console.log('[MCP Database] Using database at:', this.dbPath);
-    
+
     // Initialize database if needed
     this.initialize();
   }
@@ -140,8 +139,7 @@ class DatabaseManagerMCP {
           this.execSQL(stmt);
         }
       });
-      
-      console.log('[MCP Database] Database initialized successfully');
+
     } catch (error) {
       console.error('[MCP Database] Failed to initialize:', error.message);
     }
