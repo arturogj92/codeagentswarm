@@ -176,8 +176,8 @@ class UpdateNotificationManager {
         
         settingsBtn.addEventListener('click', clickHandler, { once: true });
         
-        // Start pulse animation
-        this.startPulseAnimation();
+        // Start pulse animation - DISABLED to remove vibration effect
+        // this.startPulseAnimation();
         
     }
     
@@ -209,22 +209,22 @@ class UpdateNotificationManager {
         dialog.className = 'update-dismissal-dialog';
         dialog.innerHTML = `
             <div class="update-dismissal-content">
-                <div class="update-dismissal-header">
-                    <h3>Update Available!</h3>
-                    <button class="update-dismissal-close" id="update-dialog-close">×</button>
+                <div class="update-icon">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2L2 7V12C2 16.5 4.23 20.68 7.62 21.47L12 22L16.38 21.47C19.77 20.68 22 16.5 22 12V7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        <path d="M12 6V12M12 16H12.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
                 </div>
-                <div class="update-dismissal-body">
-                    <p>A new version of CodeAgentSwarm is available. Would you like to check for updates now?</p>
-                    <div class="update-dismissal-options">
-                        <label class="update-dismissal-checkbox">
-                            <input type="checkbox" id="dont-show-today">
-                            <span>Don't remind me for 24 hours</span>
-                        </label>
-                    </div>
-                </div>
-                <div class="update-dismissal-footer">
-                    <button class="btn btn-secondary" id="update-dialog-cancel">Later</button>
-                    <button class="btn btn-primary" id="update-dialog-settings">Go to Settings</button>
+                <h3>¡Nueva actualización disponible!</h3>
+                <p>Una nueva versión de CodeAgentSwarm está lista para instalar.</p>
+                <div class="update-dismissal-buttons">
+                    <button class="update-btn update-btn-secondary" id="update-dialog-later">Recordar más tarde</button>
+                    <button class="update-btn update-btn-primary" id="update-dialog-update">
+                        <span>Ver actualización</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </button>
                 </div>
             </div>
         `;
@@ -240,16 +240,12 @@ class UpdateNotificationManager {
         });
         
         // Handle dialog actions
-        const closeBtn = document.getElementById('update-dialog-close');
-        const cancelBtn = document.getElementById('update-dialog-cancel');
-        const settingsBtn = document.getElementById('update-dialog-settings');
-        const dontShowCheckbox = document.getElementById('dont-show-today');
+        const laterBtn = document.getElementById('update-dialog-later');
+        const updateBtn = document.getElementById('update-dialog-update');
         
         const closeDialog = () => {
-            // Check if "don't show today" is checked
-            if (dontShowCheckbox && dontShowCheckbox.checked) {
-                localStorage.setItem(this.STORAGE_KEYS.DONT_SHOW_TODAY, Date.now().toString());
-            }
+            // Save dismissal time for 24 hours
+            localStorage.setItem(this.STORAGE_KEYS.DONT_SHOW_TODAY, Date.now().toString());
             
             // Remove dialog with animation
             dialog.classList.remove('show');
@@ -260,8 +256,14 @@ class UpdateNotificationManager {
             }, 300);
         };
         
-        const goToSettings = () => {
-            closeDialog();
+        const goToUpdate = () => {
+            // Remove dialog first
+            dialog.classList.remove('show');
+            setTimeout(() => {
+                if (dialog.parentNode) {
+                    dialog.remove();
+                }
+            }, 300);
             
             // Open settings modal
             const settingsModal = document.getElementById('settings-modal');
@@ -284,11 +286,10 @@ class UpdateNotificationManager {
             }
         };
         
-        closeBtn.addEventListener('click', closeDialog);
-        cancelBtn.addEventListener('click', closeDialog);
-        settingsBtn.addEventListener('click', goToSettings);
+        laterBtn.addEventListener('click', closeDialog);
+        updateBtn.addEventListener('click', goToUpdate);
         
-        // Close on escape key
+        // Close on escape key or click outside
         const escapeHandler = (e) => {
             if (e.key === 'Escape') {
                 closeDialog();
@@ -296,6 +297,13 @@ class UpdateNotificationManager {
             }
         };
         document.addEventListener('keydown', escapeHandler);
+        
+        // Click outside to close
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                closeDialog();
+            }
+        });
     }
     
     addStyles() {
@@ -308,8 +316,9 @@ class UpdateNotificationManager {
         styles.textContent = `
             .update-notification-badge {
                 position: absolute;
-                top: -8px;
-                right: -8px;
+                bottom: -8px;
+                left: 50%;
+                transform: translateX(-50%);
                 display: flex;
                 align-items: center;
                 gap: 4px;
@@ -335,7 +344,7 @@ class UpdateNotificationManager {
                 height: 6px;
                 background: white;
                 border-radius: 50%;
-                animation: update-dot-blink 1.5s infinite;
+                /* animation: update-dot-blink 1.5s infinite; -- DISABLED */
             }
             
             .update-badge-text {
@@ -344,15 +353,15 @@ class UpdateNotificationManager {
             
             @keyframes update-badge-pulse {
                 0% {
-                    transform: scale(1);
+                    transform: translateX(-50%) scale(1);
                     box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
                 }
                 50% {
-                    transform: scale(1.1);
+                    transform: translateX(-50%) scale(1.1);
                     box-shadow: 0 4px 12px rgba(255, 68, 68, 0.6);
                 }
                 100% {
-                    transform: scale(1);
+                    transform: translateX(-50%) scale(1);
                     box-shadow: 0 2px 8px rgba(255, 68, 68, 0.4);
                 }
             }
@@ -383,7 +392,8 @@ class UpdateNotificationManager {
                 left: 0;
                 right: 0;
                 bottom: 0;
-                background: rgba(0, 0, 0, 0.5);
+                background: rgba(0, 0, 0, 0.8);
+                backdrop-filter: blur(10px);
                 display: flex;
                 align-items: center;
                 justify-content: center;
@@ -397,92 +407,151 @@ class UpdateNotificationManager {
             }
             
             .update-dismissal-content {
-                background: var(--bg-primary, #2a2a2a);
-                border: 1px solid var(--border-color, #3a3a3a);
-                border-radius: 12px;
-                padding: 0;
-                max-width: 450px;
+                background: linear-gradient(135deg, rgba(127, 90, 240, 0.1) 0%, rgba(118, 75, 162, 0.05) 100%);
+                backdrop-filter: blur(20px);
+                border: 1px solid rgba(127, 90, 240, 0.2);
+                border-radius: 20px;
+                padding: 2.5rem;
+                max-width: 420px;
                 width: 90%;
-                box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-                transform: scale(0.9);
-                transition: transform 0.3s ease;
+                box-shadow: 
+                    0 20px 60px rgba(0, 0, 0, 0.5),
+                    0 0 100px rgba(127, 90, 240, 0.1),
+                    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+                transform: translateY(20px) scale(0.95);
+                transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+                text-align: center;
             }
             
             .update-dismissal-dialog.show .update-dismissal-content {
-                transform: scale(1);
+                transform: translateY(0) scale(1);
             }
             
-            .update-dismissal-header {
+            .update-icon {
                 display: flex;
-                align-items: center;
-                justify-content: space-between;
-                padding: 20px;
-                border-bottom: 1px solid var(--border-color, #3a3a3a);
-            }
-            
-            .update-dismissal-header h3 {
-                margin: 0;
-                color: var(--text-primary, #fff);
-                font-size: 18px;
-                font-weight: 600;
-            }
-            
-            .update-dismissal-close {
-                background: none;
-                border: none;
-                color: var(--text-secondary, #999);
-                font-size: 24px;
-                cursor: pointer;
-                padding: 0;
-                width: 30px;
-                height: 30px;
-                display: flex;
-                align-items: center;
                 justify-content: center;
-                border-radius: 4px;
-                transition: all 0.2s;
+                margin-bottom: 1.5rem;
             }
             
-            .update-dismissal-close:hover {
-                background: var(--bg-hover, #3a3a3a);
-                color: var(--text-primary, #fff);
+            .update-icon svg {
+                width: 56px;
+                height: 56px;
+                color: #7f5af0;
+                filter: drop-shadow(0 0 20px rgba(127, 90, 240, 0.5));
+                animation: update-icon-pulse 2s ease-in-out infinite;
             }
             
-            .update-dismissal-body {
-                padding: 20px;
+            @keyframes update-icon-pulse {
+                0%, 100% {
+                    transform: scale(1);
+                }
+                50% {
+                    transform: scale(1.05);
+                }
             }
             
-            .update-dismissal-body p {
-                margin: 0 0 16px 0;
-                color: var(--text-secondary, #ccc);
+            .update-dismissal-content h3 {
+                margin: 0 0 1rem 0;
+                color: #ffffff;
+                font-size: 1.5rem;
+                font-weight: 600;
+                background: linear-gradient(135deg, #ffffff 0%, #e0d4ff 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                background-clip: text;
+            }
+            
+            .update-dismissal-content p {
+                margin: 0 0 2rem 0;
+                color: rgba(255, 255, 255, 0.7);
+                font-size: 0.95rem;
                 line-height: 1.5;
             }
             
-            .update-dismissal-options {
-                margin-top: 16px;
+            .update-dismissal-buttons {
+                display: flex;
+                gap: 1rem;
+                justify-content: center;
             }
             
-            .update-dismissal-checkbox {
+            .update-btn {
+                padding: 0.75rem 1.5rem;
+                border-radius: 12px;
+                border: none;
+                font-size: 0.95rem;
+                font-weight: 500;
+                cursor: pointer;
+                transition: all 0.2s ease;
                 display: flex;
                 align-items: center;
-                gap: 8px;
-                cursor: pointer;
-                color: var(--text-secondary, #ccc);
-                font-size: 14px;
+                gap: 0.5rem;
+                position: relative;
+                overflow: hidden;
             }
             
-            .update-dismissal-checkbox input[type="checkbox"] {
+            .update-btn::before {
+                content: '';
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+                opacity: 0;
+                transition: opacity 0.2s ease;
+            }
+            
+            .update-btn:hover::before {
+                opacity: 1;
+            }
+            
+            .update-btn-secondary {
+                background: rgba(255, 255, 255, 0.1);
+                color: rgba(255, 255, 255, 0.8);
+                border: 1px solid rgba(255, 255, 255, 0.2);
+            }
+            
+            .update-btn-secondary:hover {
+                background: rgba(255, 255, 255, 0.15);
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            }
+            
+            .update-btn-primary {
+                background: linear-gradient(135deg, #7f5af0 0%, #6943d0 100%);
+                color: white;
+                box-shadow: 0 4px 15px rgba(127, 90, 240, 0.3);
+            }
+            
+            .update-btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 6px 20px rgba(127, 90, 240, 0.4);
+            }
+            
+            .update-btn-primary svg {
                 width: 16px;
                 height: 16px;
-                cursor: pointer;
+                transition: transform 0.2s ease;
             }
             
-            .update-dismissal-footer {
-                display: flex;
-                justify-content: flex-end;
-                gap: 12px;
-                padding: 20px;
-                border-top: 1px solid var(--border-color, #3a3a3a);
+            .update-btn-primary:hover svg {
+                transform: translateX(3px);
+            }
+            
+            @media (max-width: 480px) {
+                .update-dismissal-content {
+                    padding: 2rem;
+                }
+                
+                .update-dismissal-buttons {
+                    flex-direction: column;
+                    width: 100%;
+                }
+                
+                .update-btn {
+                    width: 100%;
+                    justify-content: center;
+                }
             }
         `;
         document.head.appendChild(styles);

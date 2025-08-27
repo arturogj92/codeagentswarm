@@ -1716,6 +1716,9 @@ class KanbanManager {
         const parentTaskLink = document.getElementById('parent-task-link');
         const unlinkParentBtn = document.getElementById('unlink-parent-btn');
         
+        // Get the parent task search field container to hide/show it
+        const parentSearchContainer = document.querySelector('#details-parent-search')?.closest('.form-group');
+        
         if (task.parent_task_id) {
             const parentTask = this.tasks.find(t => t.id === task.parent_task_id);
             if (parentTask) {
@@ -1731,14 +1734,26 @@ class KanbanManager {
                 if (unlinkParentBtn) {
                     unlinkParentBtn.style.display = 'flex';
                 }
+                // Hide parent search field when task already has a parent
+                if (parentSearchContainer) {
+                    parentSearchContainer.style.display = 'none';
+                }
             } else {
                 parentTaskInfo.style.display = 'none';
+                // Show parent search field when parent doesn't exist
+                if (parentSearchContainer) {
+                    parentSearchContainer.style.display = 'block';
+                }
             }
         } else {
             parentTaskInfo.style.display = 'none';
             // Hide unlink button when there's no parent
             if (unlinkParentBtn) {
                 unlinkParentBtn.style.display = 'none';
+            }
+            // Show parent search field when task has no parent
+            if (parentSearchContainer) {
+                parentSearchContainer.style.display = 'block';
             }
         }
         
@@ -2184,6 +2199,48 @@ class KanbanManager {
                         if (taskCard) {
                             // Update the task card content directly without full re-render
                             this.updateTaskCard(taskCard, this.tasks[taskIndex]);
+                        }
+                    }
+                    
+                    // Handle parent task UI updates
+                    if (field === 'parent_task_id') {
+                        const parentSearchContainer = document.querySelector('#details-parent-search')?.closest('.form-group');
+                        const parentTaskInfo = document.getElementById('parent-task-info');
+                        const parentTaskLink = document.getElementById('parent-task-link');
+                        const unlinkParentBtn = document.getElementById('unlink-parent-btn');
+                        
+                        if (value) {
+                            // Parent was assigned - hide search field and show parent info
+                            if (parentSearchContainer) {
+                                parentSearchContainer.style.display = 'none';
+                            }
+                            
+                            // Show parent task info
+                            const parentTask = this.tasks.find(t => t.id === value);
+                            if (parentTask && parentTaskInfo && parentTaskLink) {
+                                parentTaskInfo.style.display = 'block';
+                                parentTaskLink.innerHTML = `
+                                    <a href="#" onclick="kanban.showTaskDetails(${parentTask.id}); return false;" class="parent-task-link">
+                                        <span class="task-id-badge">#${parentTask.id}</span>
+                                        <span class="parent-task-title">${this.escapeHtml(parentTask.title)}</span>
+                                        <i data-lucide="arrow-right"></i>
+                                    </a>
+                                `;
+                                if (unlinkParentBtn) {
+                                    unlinkParentBtn.style.display = 'flex';
+                                }
+                            }
+                        } else {
+                            // Parent was removed - show search field and hide parent info
+                            if (parentSearchContainer) {
+                                parentSearchContainer.style.display = 'block';
+                            }
+                            if (parentTaskInfo) {
+                                parentTaskInfo.style.display = 'none';
+                            }
+                            if (unlinkParentBtn) {
+                                unlinkParentBtn.style.display = 'none';
+                            }
                         }
                     }
 
@@ -2723,6 +2780,18 @@ class KanbanManager {
                         const unlinkBtn = document.getElementById('unlink-parent-btn');
                         if (unlinkBtn) {
                             unlinkBtn.style.display = 'none';
+                        }
+                        
+                        // Show the parent search field again after unlinking
+                        const parentSearchContainer = document.querySelector('#details-parent-search')?.closest('.form-group');
+                        if (parentSearchContainer) {
+                            parentSearchContainer.style.display = 'block';
+                        }
+                        
+                        // Clear the parent search input
+                        const parentSearchInput = document.getElementById('details-parent-search');
+                        if (parentSearchInput) {
+                            parentSearchInput.value = '';
                         }
                         
                         // Reload tasks to update the view

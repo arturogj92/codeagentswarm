@@ -1402,7 +1402,7 @@ class TerminalManager {
                 wrapper.removeChild(selectorDiv);
                 this.startTerminal(quadrant, selectedDirectory, 'dangerous');
                 // Show persistent danger notification
-                this.showDangerNotification(quadrant);
+                // this.showDangerNotification(quadrant); // Disabled danger mode notification
             }, HOLD_DURATION);
         };
         
