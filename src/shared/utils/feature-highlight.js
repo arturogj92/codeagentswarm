@@ -153,12 +153,14 @@ class FeatureHighlight {
         
         // Set position based on parameter
         if (position === 'bottom') {
-            badge.style.bottom = '-8px';
+            badge.style.bottom = '-12px';  // Increased from -8px to ensure visibility
             badge.style.left = '50%';
             badge.style.transform = 'translateX(-50%)';
+            badge.style.zIndex = '10000';  // Ensure it's on top
         } else if (position === 'top') {
             badge.style.top = '-8px';
             badge.style.right = '-8px';
+            badge.style.zIndex = '10000';  // Ensure it's on top
         }
 
         // Add styles if not already added

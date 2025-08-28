@@ -4,6 +4,31 @@ const pty = require('node-pty');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
+
+// Initialize Error Reporter (secure proxy-based)
+const { getInstance: getErrorReporter } = require('./src/infrastructure/services/error-reporter');
+const errorReporter = getErrorReporter();
+
+// Global error handlers
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  errorReporter.captureException(error, {
+    level: 'error',
+    tags: { type: 'uncaught_exception' }
+  });
+  // Optionally restart the app or show an error dialog
+  dialog.showErrorBox('Unexpected Error', 
+    `An unexpected error occurred: ${error.message}\n\nThe application will continue running, but some features may not work correctly.`);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  errorReporter.captureException(reason, {
+    level: 'error',
+    tags: { type: 'unhandled_rejection' }
+  });
+});
+
 const DatabaseManager = require('./src/infrastructure/database/database');
 const MCPTaskServer = require('./src/infrastructure/mcp/mcp-server');
 const HooksManager = require('./src/infrastructure/hooks/hooks-manager');
@@ -94,6 +119,24 @@ ipcMain.on('clear-logs', (event) => {
 ipcMain.on('export-logs', (event) => {
   const logsText = logger.exportLogs();
   event.sender.send('export-logs-response', logsText);
+});
+
+// Handle error reporting from renderer process
+ipcMain.handle('report-error', async (event, errorData) => {
+  try {
+    const { type, data } = errorData;
+    
+    if (type === 'exception') {
+      await errorReporter.captureException(data.error, data);
+    } else if (type === 'message') {
+      await errorReporter.captureMessage(data.message, data.level, data);
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('[Main] Failed to report error from renderer:', error);
+    return { success: false, error: error.message };
+  }
 });
 
 // Database-dependent handlers are registered in registerDatabaseHandlers() after db initialization
@@ -5125,9 +5168,11 @@ ipcMain.on('show-desktop-notification', (event, title, message) => {
         mainWindow.focus();
         
         // If in tabbed mode, switch to the corresponding tab
-        const terminalNumber = parseInt(terminalMatch[1]);
-        const quadrant = terminalNumber - 1; // Convert 1-based to 0-based
-        mainWindow.webContents.send('focus-terminal-tab', quadrant);
+        if (terminalMatch) {
+          const terminalNumber = parseInt(terminalMatch[1]);
+          const quadrant = terminalNumber - 1; // Convert 1-based to 0-based
+          mainWindow.webContents.send('focus-terminal-tab', quadrant);
+        }
       }
     });
   } else {

@@ -7114,6 +7114,12 @@ textarea {
   display: none !important;
 }
 
+/* Tabbed mode button specific styles */
+.btn-tabbed-mode {
+  overflow: visible !important;  /* Ensure badge can extend outside */
+  position: relative;
+}
+
 /* Highlight tabbed mode button when active */
 .btn-tabbed-mode.active {
   background: var(--primary);

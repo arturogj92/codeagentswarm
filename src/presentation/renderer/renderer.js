@@ -6,6 +6,10 @@ const LogViewer = require('../components/log-viewer');
 const FeatureHighlight = require('../../shared/utils/feature-highlight');
 const UpdateNotificationManager = require('../../shared/utils/update-notification-manager');
 
+// Initialize error tracking through secure proxy
+const errorReporter = require('../services/renderer-error-reporter');
+console.log('🔧 [RENDERER] Error reporter initialized with secure proxy');
+
 // Log renderer initialization
 console.log('🔧 [RENDERER] renderer.js loaded');
 
@@ -207,9 +211,12 @@ class TerminalManager {
                 // Also scroll to bottom for good measure
                 this.scrollTerminalToBottom(quadrant);
             } else if (this.layoutMode === 'grid') {
-                // In grid mode, just scroll to bottom and highlight the terminal
-                this.scrollTerminalToBottom(quadrant);
-                this.highlightTerminal(quadrant);
+                // In grid mode, focus the terminal, scroll to bottom and highlight it
+                if (this.terminals.has(quadrant)) {
+                    this.setActiveTerminal(quadrant);
+                    this.scrollTerminalToBottom(quadrant);
+                    this.highlightTerminal(quadrant);
+                }
             }
         });
     }
@@ -6626,6 +6633,14 @@ class TerminalManager {
                 // Get the new terminal ID from the result
                 const newTerminalId = result.terminalId;
                 
+                // Clear the last selected directory for this new terminal
+                // This ensures the header doesn't show the old project name
+                if (newTerminalId !== undefined) {
+                    delete this.lastSelectedDirectories[newTerminalId];
+                    // Also clear from localStorage to ensure consistency
+                    localStorage.removeItem(`terminal_title_${newTerminalId + 1}`);
+                }
+                
                 // In tabbed mode, set active terminal before rendering
                 if (this.layoutMode === 'tabbed' && newTerminalId !== undefined) {
                     this.activeTabTerminal = newTerminalId;
@@ -7853,11 +7868,11 @@ class TerminalManager {
             tab.classList.remove('tab-has-notification');
         }
         
-        // If already on this tab, we need to still show the terminal (in case of notification clear)
+        // If already on this tab, we need to still refresh the terminal (in case of notification clear)
         if (this.activeTabTerminal === terminalId) {
 
-            // Make sure the terminal is visible
-            this.showTerminal(terminalId);
+            // Refresh the terminal display to ensure it's properly visible
+            this.refreshTerminalDisplay(terminalId);
             return;
         }
 
@@ -8049,6 +8064,13 @@ class TerminalManager {
     async addTerminalSilent() {
         try {
             const result = await ipcRenderer.invoke('add-terminal');
+            if (result.success && result.terminalId !== undefined) {
+                // Clear the last selected directory for this new terminal
+                // This ensures the header doesn't show the old project name
+                delete this.lastSelectedDirectories[result.terminalId];
+                // Also clear from localStorage to ensure consistency
+                localStorage.removeItem(`terminal_title_${result.terminalId + 1}`);
+            }
             return result.success;
         } catch (error) {
             console.error('Error adding terminal silently:', error);
@@ -10229,6 +10251,14 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (result.success) {
                 const newTerminalId = result.terminalId;
+                
+                // Clear the last selected directory for this new terminal
+                // This ensures the header doesn't show the old project name
+                if (newTerminalId !== undefined) {
+                    delete window.terminalManager.lastSelectedDirectories[newTerminalId];
+                    // Also clear from localStorage to ensure consistency
+                    localStorage.removeItem(`terminal_title_${newTerminalId + 1}`);
+                }
 
                 // Initialize pendingTerminalTasks if not already initialized
                 if (!window.pendingTerminalTasks) {

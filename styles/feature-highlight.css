@@ -9,6 +9,16 @@
     z-index: 99999;
 }
 
+/* Ensure tabbed mode button can show badge properly */
+#tabbed-mode-btn {
+    overflow: visible !important;
+    position: relative !important;
+}
+
+#tabbed-mode-btn .feature-badge {
+    z-index: 10000 !important;
+}
+
 .feature-highlight {
     position: absolute;
     display: flex;

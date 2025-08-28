@@ -165,6 +165,8 @@ class WebhookServer {
                 if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                     this.mainWindow.show();
                     this.mainWindow.focus();
+                    // Focus the specific terminal tab
+                    this.mainWindow.webContents.send('focus-terminal-tab', terminalNum);
                 }
             });
             
@@ -227,6 +229,8 @@ class WebhookServer {
                 if (this.mainWindow && !this.mainWindow.isDestroyed()) {
                     this.mainWindow.show();
                     this.mainWindow.focus();
+                    // Focus the specific terminal tab
+                    this.mainWindow.webContents.send('focus-terminal-tab', terminalNum);
                 }
             });
             
