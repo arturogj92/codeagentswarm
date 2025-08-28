@@ -306,6 +306,23 @@ body::before {
     height: 14px !important;
 }
 
+/* Spin animation for refresh button */
+.spin-animation {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}
+
+/* Refreshing button state */
+.btn.refreshing {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+.btn.refreshing svg,
+.btn.refreshing i[data-lucide] {
+    animation: spin 1s linear infinite;
+}
+
 /* All button icons */
 .btn svg,
 .btn i[data-lucide] {

@@ -1033,7 +1033,7 @@ class TerminalManager {
                     medium: width < 850,         // Medium terminals (extended to cover more range)
                     large: width >= 850,         // Large terminals
                     panoramic: width / height > 2.2, // Wide aspect ratio
-                    constrained: height < 450    // Vertically constrained
+                    constrained: height < 400    // Vertically constrained (reduced from 450)
                 };
                 
                 // Apply appropriate layout class based on container size

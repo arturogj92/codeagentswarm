@@ -71,6 +71,11 @@
   animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
 }
 
+/* Ensure session info is hidden in all layout modes unless active */
+.directory-selector .session-info:not(.active) {
+  display: none !important;
+}
+
 @keyframes slideDown {
   from {
     opacity: 0;
@@ -90,6 +95,16 @@
   font-weight: 600 !important;
   color: rgba(255, 255, 255, 0.95) !important;
   margin-bottom: 8px !important;
+  overflow: hidden !important;  /* Prevent overflow */
+}
+
+/* Default session name styling */
+#session-name {
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  flex: 1 1 auto !important;
+  min-width: 0 !important;  /* Allow flex item to shrink */
 }
 
 .session-directory-icon {
@@ -118,6 +133,11 @@
   display: none !important;
   gap: 12px !important;
   margin-bottom: 24px !important;
+}
+
+/* Ensure session buttons are hidden in all layout modes unless active */
+.directory-selector .session-selector-buttons:not(.active) {
+  display: none !important;
 }
 
 .session-selector-buttons.active {
@@ -203,7 +223,8 @@
 .recent-projects-list {
   flex: 1 1 auto !important;
   min-height: 0 !important;
-  overflow-y: auto !important;
+  height: 100% !important; /* Force immediate height calculation */
+  overflow-y: scroll !important; /* ALWAYS show scrollbar */
   overflow-x: hidden !important;
   margin: 0 !important;
   padding: 0 4px 0 0 !important;
@@ -211,24 +232,28 @@
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
   gap: 16px !important;
   align-content: start !important;
+  will-change: scroll-position !important; /* Optimize for scrolling */
 }
 
 /* Custom Scrollbar */
 .recent-projects-list::-webkit-scrollbar {
-  width: 4px !important;
+  width: 6px !important; /* Increased from 4px for better visibility */
+  opacity: 1 !important;
 }
 
 .recent-projects-list::-webkit-scrollbar-track {
-  background: transparent !important;
+  background: rgba(255, 255, 255, 0.05) !important; /* Make track slightly visible */
+  border-radius: 3px !important;
 }
 
 .recent-projects-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08) !important;
-  border-radius: 2px !important;
+  background: rgba(255, 255, 255, 0.15) !important; /* More visible by default */
+  border-radius: 3px !important;
+  transition: background 0.2s ease !important; /* Only transition the color, not appearance */
 }
 
 .recent-projects-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.12) !important;
+  background: rgba(255, 255, 255, 0.25) !important;
 }
 
 /* Project Card - Ultra Modern */
@@ -389,7 +414,9 @@
 }
 
 /* Create New Project Button - Redesigned */
-#create-new-project-btn {
+#create-new-project-btn,
+.directory-selector #create-new-project-btn,
+.terminal-wrapper #create-new-project-btn {
   flex: 0 0 auto !important;
   margin-top: 8px !important;
   width: 100% !important;
@@ -413,7 +440,9 @@
   overflow: hidden !important;
 }
 
-#create-new-project-btn::before {
+#create-new-project-btn::before,
+.directory-selector #create-new-project-btn::before,
+.terminal-wrapper #create-new-project-btn::before {
   content: '' !important;
   position: absolute !important;
   top: 0 !important;
@@ -424,18 +453,24 @@
   transition: left 0.5s !important;
 }
 
-#create-new-project-btn:hover {
+#create-new-project-btn:hover,
+.directory-selector #create-new-project-btn:hover,
+.terminal-wrapper #create-new-project-btn:hover {
   transform: translateY(-2px) !important;
   box-shadow: 
     0 12px 24px rgba(16, 185, 129, 0.4),
     0 0 0 2px rgba(16, 185, 129, 0.2) inset !important;
 }
 
-#create-new-project-btn:hover::before {
+#create-new-project-btn:hover::before,
+.directory-selector #create-new-project-btn:hover::before,
+.terminal-wrapper #create-new-project-btn:hover::before {
   left: 100% !important;
 }
 
-#create-new-project-btn:active {
+#create-new-project-btn:active,
+.directory-selector #create-new-project-btn:active,
+.terminal-wrapper #create-new-project-btn:active {
   transform: translateY(0) !important;
 }
 
@@ -492,14 +527,14 @@
   transform: translateY(0) !important;
 }
 
-/* Primary Button */
-.btn-primary {
+/* Primary Button - Generic styles for other buttons, NOT for create-new-project-btn */
+.btn-primary:not(#create-new-project-btn) {
   background: linear-gradient(135deg, #7f5af0 0%, #6b46db 100%) !important;
   border-color: rgba(127, 90, 240, 0.3) !important;
   color: white !important;
 }
 
-.btn-primary:hover {
+.btn-primary:not(#create-new-project-btn):hover {
   background: linear-gradient(135deg, #8e69f7 0%, #7a55e2 100%) !important;
   border-color: rgba(127, 90, 240, 0.5) !important;
   box-shadow: 
@@ -718,6 +753,27 @@
   transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
 }
 
+/* Disable transitions on scrollable list to prevent slow scrolling */
+.recent-projects-list {
+  transition: none !important;
+  scroll-behavior: auto !important; /* Use instant scrolling instead of smooth */
+  -webkit-overflow-scrolling: touch !important; /* Momentum scrolling on iOS */
+  overflow-y: scroll !important; /* ALWAYS show scrollbar, even if not needed */
+  overflow-x: hidden !important;
+  scrollbar-gutter: stable !important; /* Reserve space for scrollbar */
+}
+
+/* Force scrollbar visibility on Windows/Linux */
+.recent-projects-list::-webkit-scrollbar {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.recent-projects-list * {
+  transition: opacity 0.2s ease, transform 0.2s ease !important; /* Only allow specific transitions */
+}
+
 /* Vertically constrained */
 .directory-selector.vertically-constrained .directory-selector-content {
   padding: 12px !important;
@@ -868,18 +924,18 @@
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
-  padding: 16px 24px !important;
+  padding: 12px 20px !important; /* Reduced padding for more space */
 }
 
 .directory-selector.horizontal-layout h3 {
-  font-size: 20px !important;
-  margin-bottom: 4px !important;
+  font-size: 18px !important; /* Slightly smaller for constrained space */
+  margin-bottom: 2px !important; /* Less margin */
   text-align: left !important;
 }
 
 .directory-selector.horizontal-layout .directory-selector-subtitle {
-  font-size: 12px !important;
-  margin-bottom: 16px !important;
+  font-size: 11px !important; /* Smaller subtitle */
+  margin-bottom: 10px !important; /* Less margin */
   text-align: left !important;
 }
 
@@ -893,11 +949,12 @@
 }
 
 .directory-selector.horizontal-layout .recent-projects-section {
-  flex: 1 1 60% !important;
+  flex: 1 1 auto !important; /* Take available space */
   display: flex !important;
   flex-direction: column !important;
   min-width: 0 !important;
-  max-width: 70% !important;
+  max-width: none !important; /* Remove max-width constraint */
+  overflow: hidden !important;
 }
 
 .directory-selector.horizontal-layout .recent-projects-section h4 {
@@ -916,6 +973,8 @@
   overflow-x: hidden !important;
   padding-right: 8px !important;
   flex: 1 1 auto !important;
+  min-height: 0 !important; /* Allow shrinking */
+  max-height: 100% !important;
 }
 
 .directory-selector.horizontal-layout .recent-project-item {
@@ -964,16 +1023,15 @@
 
 .directory-selector.horizontal-layout #create-new-project-btn {
   width: 100% !important;
-  min-height: 32px !important;
+  min-height: 26px !important; /* Smaller for constrained heights */
   flex-direction: row !important;
   justify-content: center !important;
   align-items: center !important;
-  gap: 6px !important;
+  gap: 4px !important;
   font-size: 10px !important;
-  background: rgba(16, 185, 129, 0.1) !important;
-  border: 1px dashed rgba(16, 185, 129, 0.3) !important;
-  margin-top: 6px !important;
-  padding: 6px 12px !important;
+  /* Keep the green gradient background from the base style */
+  margin-top: 4px !important; /* Less margin */
+  padding: 4px 10px !important; /* Smaller padding */
 }
 
 .directory-selector.horizontal-layout #create-new-project-btn .btn-icon {
@@ -985,7 +1043,7 @@
   display: flex !important;
   flex-direction: column !important;
   gap: 8px !important;
-  justify-content: center !important;
+  justify-content: flex-end !important; /* Align buttons to bottom */
   flex: 0 0 auto !important;
   min-width: 150px !important;
   padding-left: 20px !important;
@@ -1017,33 +1075,18 @@
 }
 
 /* Horizontal layout - Session view adjustments */
-.directory-selector.horizontal-layout .session-info {
-  margin-bottom: 16px !important;
-  padding: 12px !important;
-}
-
+/* Note: These elements should be visible when in session view, 
+   they're controlled by JavaScript to show/hide as needed */
 .directory-selector.horizontal-layout .session-directory-icon {
   width: 36px !important;
   height: 36px !important;
   font-size: 16px !important;
 }
 
-.directory-selector.horizontal-layout .session-selector-buttons {
-  display: flex !important;
-  flex-direction: row !important;
-  gap: 12px !important;
-  margin-bottom: 16px !important;
-}
-
 .directory-selector.horizontal-layout .session-selector-buttons button {
   flex: 1 !important;
   padding: 10px 16px !important;
   font-size: 13px !important;
-}
-
-.directory-selector.horizontal-layout .danger-mode-option {
-  margin-bottom: 12px !important;
-  font-size: 12px !important;
 }
 
 /* Back button removed - no longer needed */
@@ -1057,11 +1100,13 @@
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
+  padding: 8px 12px !important; /* Very compact padding */
+  overflow: hidden !important;
 }
 
 .directory-selector.vertically-constrained .directory-selector-main {
   flex: 1 1 auto !important;
-  min-height: 0 !important;
+  min-height: 0 !important; /* Allow to shrink as needed */
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -1069,7 +1114,7 @@
 
 .directory-selector.vertically-constrained .recent-projects-section {
   flex: 1 1 auto !important;
-  min-height: 0 !important;
+  min-height: 0 !important; /* Allow to shrink as needed */
   display: flex !important;
   flex-direction: column !important;
   overflow: hidden !important;
@@ -1080,6 +1125,309 @@
   min-height: 0 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
+}
+
+/* Medium-layout with vertical constraints - very compact */
+.directory-selector.medium-layout.vertically-constrained h3 {
+  font-size: 14px !important;  /* Even smaller */
+  margin-bottom: 2px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .directory-selector-subtitle {
+  display: none !important;  /* Hide subtitle to save space */
+}
+
+.directory-selector.medium-layout.vertically-constrained .recent-projects-section h4 {
+  font-size: 11px !important;
+  margin: 0 0 4px 0 !important;
+  text-transform: uppercase !important;
+  opacity: 0.6 !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .recent-projects-list {
+  gap: 2px !important; /* Minimal gap between items */
+  max-height: 150px !important; /* Limit height for very small terminals */
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .recent-project-item {
+  padding: 4px 6px !important; /* Even more compact */
+  min-height: 26px !important; /* Even smaller height */
+  display: flex !important;
+  align-items: center !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .project-color-indicator {
+  width: 20px !important; /* Even smaller indicator */
+  height: 20px !important;
+  font-size: 9px !important;
+  flex-shrink: 0 !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .project-name {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained #create-new-project-btn {
+  padding: 4px 8px !important; /* Even more compact */
+  font-size: 10px !important;
+  margin-top: 2px !important;
+  min-height: 24px !important; /* Even smaller height */
+  flex-shrink: 0 !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .directory-selector-actions {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  display: flex !important;
+  flex-direction: row !important;  /* Force horizontal layout */
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;  /* Prevent wrapping */
+}
+
+.directory-selector.medium-layout.vertically-constrained .directory-selector-actions .btn-text {
+  padding: 4px 8px !important; /* Very compact buttons */
+  font-size: 10px !important;
+  white-space: nowrap !important;  /* Prevent text wrapping */
+  flex: 0 1 auto !important;  /* Allow shrinking if needed */
+}
+
+.directory-selector.medium-layout.vertically-constrained .btn-text svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Medium-layout with vertical constraints - session view specific */
+/* Hide session elements by default - they should only show when active class is added by JS */
+.directory-selector.medium-layout.vertically-constrained .session-info:not(.active),
+.directory-selector.medium-layout.vertically-constrained .session-selector-buttons:not(.active) {
+  display: none !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-info.active {
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-directory {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  overflow: hidden !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-directory-icon {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Add specific styling for session name at small resolutions */
+.directory-selector.medium-layout.vertically-constrained #session-name {
+  font-size: 14px !important;  /* Reduced from default 18px */
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  max-width: calc(100% - 40px) !important;  /* Account for icon and gap */
+  flex: 1 1 auto !important;
+  min-width: 0 !important;  /* Allow flex item to shrink below content size */
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-path {
+  font-size: 10px !important;
+  opacity: 0.6 !important;
+  margin-top: 2px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  padding-left: 36px !important;  /* Adjusted for smaller icon */
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-selector-buttons {
+  display: flex !important;
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-selector-buttons button {
+  padding: 6px 12px !important;
+  font-size: 11px !important;
+  min-height: 28px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .session-selector-buttons .btn-icon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .danger-mode-option {
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .checkbox-text {
+  font-size: 11px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .checkbox-text svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+/* Horizontal-layout with vertical constraints - copy same behavior as medium-layout */
+.directory-selector.horizontal-layout.vertically-constrained h3 {
+  font-size: 14px !important;
+  margin-bottom: 2px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .directory-selector-subtitle {
+  display: none !important;  /* Hide subtitle to save space */
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .recent-projects-section h4 {
+  font-size: 11px !important;
+  margin: 0 0 4px 0 !important;
+  text-transform: uppercase !important;
+  opacity: 0.6 !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .recent-projects-list {
+  gap: 2px !important;
+  max-height: 150px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .recent-project-item {
+  padding: 4px 6px !important;
+  min-height: 26px !important;
+  display: flex !important;
+  align-items: center !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .project-color-indicator {
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 9px !important;
+  flex-shrink: 0 !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .project-name {
+  font-size: 11px !important;
+  line-height: 1.2 !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained #create-new-project-btn {
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  margin-top: 2px !important;
+  min-height: 24px !important;
+  flex-shrink: 0 !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .directory-selector-actions {
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  gap: 8px !important;
+  flex-wrap: nowrap !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .directory-selector-actions .btn-text {
+  padding: 4px 8px !important;
+  font-size: 10px !important;
+  white-space: nowrap !important;
+  flex: 0 1 auto !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .btn-text svg {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .delete-project-btn {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 12px !important;
+  line-height: 14px !important;
+  top: 2px !important;
+  right: 2px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .project-info {
+  gap: 4px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .project-details {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .project-meta {
+  display: none !important;
+}
+
+/* Horizontal-layout with vertical constraints - session view specific */
+/* Hide session elements by default - they should only show when active class is added by JS */
+.directory-selector.horizontal-layout.vertically-constrained .session-info:not(.active),
+.directory-selector.horizontal-layout.vertically-constrained .session-selector-buttons:not(.active) {
+  display: none !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .session-info.active {
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .session-directory-icon {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 12px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .session-selector-buttons {
+  gap: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .session-selector-buttons button {
+  padding: 6px 12px !important;
+  font-size: 11px !important;
+  min-height: 28px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .danger-mode-option {
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .checkbox-text {
+  font-size: 11px !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained .delete-project-btn {
+  width: 16px !important;
+  height: 16px !important;
+  font-size: 10px !important;
+  top: 4px !important;
+  right: 4px !important;
+  line-height: 1 !important;
+}
+
+.directory-selector.medium-layout.vertically-constrained #create-new-project-btn .btn-icon {
+  width: 12px !important;
+  height: 12px !important;
 }
 
 /* ==================== RESPONSIVE DESIGN ==================== */
@@ -1104,6 +1452,28 @@
   
   .session-selector-buttons .btn {
     width: 100% !important;
+  }
+}
+
+/* Extra narrow width handling (around 577px) */
+@media (max-width: 580px) {
+  .directory-selector.medium-layout #session-name {
+    font-size: 12px !important;  /* Even smaller for very narrow screens */
+  }
+  
+  .directory-selector.medium-layout .session-directory-icon {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 10px !important;
+  }
+  
+  .directory-selector.medium-layout .session-path {
+    font-size: 9px !important;
+    padding-left: 32px !important;
+  }
+  
+  .directory-selector.medium-layout .session-info {
+    padding: 8px !important;
   }
 }
 

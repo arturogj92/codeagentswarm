@@ -362,6 +362,46 @@ class KanbanManager {
             this.showCreateTaskModal();
         });
 
+        document.getElementById('refresh-kanban-btn').addEventListener('click', async () => {
+            // Show visual feedback that refresh is happening
+            const refreshBtn = document.getElementById('refresh-kanban-btn');
+            
+            // Prevent multiple simultaneous refreshes
+            if (refreshBtn.disabled) {
+                return;
+            }
+            
+            // Add spinning animation to button itself for more reliable animation
+            refreshBtn.disabled = true;
+            refreshBtn.classList.add('refreshing');
+            
+            // Also add to icon if found
+            const refreshIcon = refreshBtn.querySelector('svg') || refreshBtn.querySelector('i[data-lucide]');
+            if (refreshIcon) {
+                refreshIcon.classList.add('spin-animation');
+            }
+            
+            try {
+                // Reload tasks and projects
+                await this.loadProjects();
+                await this.loadTasks(false); // Don't show skeletons for refresh
+            } catch (error) {
+                console.error('Error refreshing tasks:', error);
+            } finally {
+                // Always re-enable button and remove animation
+                setTimeout(() => {
+                    refreshBtn.disabled = false;
+                    refreshBtn.classList.remove('refreshing');
+                    
+                    // Get fresh reference to the icon element (may have been replaced)
+                    const currentIcon = refreshBtn.querySelector('svg') || refreshBtn.querySelector('i[data-lucide]');
+                    if (currentIcon) {
+                        currentIcon.classList.remove('spin-animation');
+                    }
+                }, 300);
+            }
+        });
+
         document.getElementById('back-to-terminal-btn').addEventListener('click', () => {
             window.close();
         });
@@ -1293,8 +1333,19 @@ class KanbanManager {
             }
         });
 
-        // Re-initialize icons for new elements
-        this.initializeLucideIcons();
+        // Re-initialize icons only for task cards (not header buttons)
+        // This prevents losing the spin animation on the refresh button
+        const taskListsForIcons = document.querySelectorAll('.task-list');
+        taskListsForIcons.forEach(list => {
+            if (typeof lucide !== 'undefined') {
+                // Call createIcons without parameters for the specific container
+                const originalIcons = lucide.icons;
+                lucide.createIcons({ 
+                    icons: originalIcons,
+                    container: list 
+                });
+            }
+        });
         
         // Update sort button states
         Object.keys(this.sortStates).forEach(status => {
@@ -3913,8 +3964,14 @@ class KanbanManager {
             container.appendChild(loadMoreBtn);
         }
         
-        // Re-initialize Lucide icons for the new tasks and button
-        this.initializeLucideIcons();
+        // Re-initialize Lucide icons only for the completed tasks area
+        const completedContainer = document.getElementById('completed-tasks');
+        if (completedContainer && typeof lucide !== 'undefined') {
+            lucide.createIcons({ 
+                icons: lucide.icons,
+                container: completedContainer 
+            });
+        }
     }
     
     // Keep old method for backward compatibility
@@ -4167,8 +4224,13 @@ class KanbanManager {
                 dropdownIcon.style.transform = 'rotate(180deg)';
             }
             
-            // Re-initialize icons for the loading state
-            this.initializeLucideIcons();
+            // Re-initialize icons only for the dropdown
+            if (dropdown && typeof lucide !== 'undefined') {
+                lucide.createIcons({ 
+                    icons: lucide.icons,
+                    container: dropdown 
+                });
+            }
             
             // Request available terminals from main process asynchronously
             ipcRenderer.invoke('get-terminals-for-project', task.project).then(terminals => {
@@ -4186,8 +4248,13 @@ class KanbanManager {
                 // Update dropdown content if it's still open
                 if (dropdown.style.display === 'block') {
                     dropdown.innerHTML = dropdownHTML;
-                    // Re-initialize icons for the new content
-                    this.initializeLucideIcons();
+                    // Re-initialize icons only for the dropdown
+                    if (typeof lucide !== 'undefined') {
+                        lucide.createIcons({ 
+                    icons: lucide.icons,
+                    container: dropdown 
+                });
+                    }
                     // Attach event handlers using shared function
                     this.attachSendToTerminalHandlers(dropdown);
                 }
@@ -4204,7 +4271,12 @@ class KanbanManager {
                             Copy Task Summary
                         </div>
                     `;
-                    this.initializeLucideIcons();
+                    if (dropdown && typeof lucide !== 'undefined') {
+                        lucide.createIcons({ 
+                    icons: lucide.icons,
+                    container: dropdown 
+                });
+                    }
                 }
             });
             
@@ -4461,8 +4533,13 @@ class KanbanManager {
             dropdown.innerHTML = dropdownHTML;
             dropdown.style.display = 'block';
             
-            // Re-initialize icons
-            this.initializeLucideIcons();
+            // Re-initialize icons only for the dropdown
+            if (dropdown && typeof lucide !== 'undefined') {
+                lucide.createIcons({ 
+                    icons: lucide.icons,
+                    container: dropdown 
+                });
+            }
             
             // Attach event handlers using shared function with modal prefix
             this.attachSendToTerminalHandlers(dropdown, 'modal-');
