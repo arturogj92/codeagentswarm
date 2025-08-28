@@ -3574,7 +3574,7 @@ ipcMain.handle('show-confirm-dialog', async (event, options) => {
     noLink: true
   });
   
-  return result.response === 1; // Return true if OK was clicked
+  return result.response; // Return the button index
 });
 
 // Handler for showing alert dialogs with app icon

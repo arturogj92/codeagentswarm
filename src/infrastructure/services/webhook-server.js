@@ -104,6 +104,7 @@ class WebhookServer {
     }
 
     handleConfirmationNeeded(terminalId, tool) {
+        console.log(`[WebhookServer] handleConfirmationNeeded called - terminalId: ${terminalId}, tool: ${tool}`);
         
         // Terminal ID comes as 1-based from the environment variable
         const terminalNum = parseInt(terminalId) || 1;

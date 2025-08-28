@@ -828,27 +828,56 @@ class TerminalManager {
         const selectorDiv = document.createElement('div');
         selectorDiv.className = 'directory-selector';
         
-        // Build recent projects HTML - Show first 6 projects (already sorted by most recent)
+        // Build recent projects HTML - Show first 20 projects (already sorted by most recent)
         let recentProjectsHTML = '';
         if (projects.length > 0) {
-            // Take only the first 6 projects (already sorted by most recent first)
-            const recentProjects = projects.slice(0, 6);
+            // Take the first 20 projects (already sorted by most recent first)
+            const recentProjects = projects.slice(0, 20);
             recentProjectsHTML = `
                 <div class="recent-projects-section">
                     <h4>Recent Projects</h4>
                     <div class="recent-projects-list">
-                        ${recentProjects.map(project => `
-                            <div class="recent-project-item" data-project-path="${project.path}" data-project-name="${project.name}">
+                        ${recentProjects.map(project => {
+                            // Get first letter of project name for icon
+                            const initial = (project.display_name || project.name).charAt(0).toUpperCase();
+                            return `
+                            <div class="recent-project-item" data-project-path="${project.path}" data-project-name="${project.name}" data-project-color="${project.color}">
                                 <button class="delete-project-btn" data-project-name="${project.name}" title="Remove from recent projects">×</button>
                                 <div class="project-info">
-                                    <span class="project-color-indicator" style="background-color: ${project.color}"></span>
-                                    <span class="project-name">${project.display_name || project.name}</span>
+                                    <span class="project-color-indicator" style="--project-color: ${project.color}; background-color: ${project.color}" data-initial="${initial}"></span>
+                                    <div class="project-details">
+                                        <span class="project-name">${project.display_name || project.name}</span>
+                                        <span class="project-meta"></span>
+                                    </div>
                                 </div>
                             </div>
-                        `).join('')}
+                        `}).join('')}
                     </div>
-                    <button id="create-new-project-btn" class="btn-primary" style="margin-top: 12px; width: 100%;">
-                        <i data-lucide="plus"></i>
+                    <button id="create-new-project-btn" class="btn-primary">
+                        <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
+                        Create New Project
+                    </button>
+                </div>
+            `;
+        } else {
+            // Empty state when no projects
+            recentProjectsHTML = `
+                <div class="recent-projects-section">
+                    <h4>Recent Projects</h4>
+                    <div class="recent-projects-list" style="display: flex; align-items: center; justify-content: center; min-height: 200px;">
+                        <div style="text-align: center; color: rgba(255, 255, 255, 0.4);">
+                            <div style="font-size: 14px; margin-bottom: 8px;">No recent projects</div>
+                            <div style="font-size: 12px;">Select a directory to get started</div>
+                        </div>
+                    </div>
+                    <button id="create-new-project-btn" class="btn-primary">
+                        <svg class="btn-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="5" x2="12" y2="19"></line>
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                        </svg>
                         Create New Project
                     </button>
                 </div>
@@ -858,27 +887,85 @@ class TerminalManager {
         selectorDiv.innerHTML = `
             <div class="directory-selector-content">
                 <h3>Select Working Directory</h3>
-                <div class="directory-selector-main">
-                    <div class="directory-selector-left">
-                        ${recentProjectsHTML}
+                <div class="directory-selector-subtitle">Choose a project to continue</div>
+                
+                <!-- Session info (hidden initially) -->
+                <div class="session-info" id="session-info">
+                    <div class="session-directory">
+                        <div class="session-directory-icon" id="session-icon">C</div>
+                        <span id="session-name">Project Name</span>
                     </div>
-                    <div class="directory-selector-right">
-                        ${this.lastSelectedDirectories[quadrant] ? `
-                            <div class="last-directory-section">
-                                <div class="last-directory-label">Last used:</div>
-                                <div class="selected-directory-display clickable last-directory" id="last-directory-display">
-                                    ${this.lastSelectedDirectories[quadrant]}
-                                </div>
-                            </div>
-                        ` : ''}
-                        <div class="selected-directory-display clickable" id="directory-display">
-                            ${this.lastSelectedDirectories[quadrant] ? 'Click to select different directory' : 'Click to select directory'}
-                        </div>
-                        <div class="directory-selector-buttons">
-                            <button class="btn" id="choose-dir-btn" data-full-text="Browse..." data-short-text="Browse" data-tiny-text="📂">Browse...</button>
-                            ${this.lastSelectedDirectories[quadrant] ? `<button class="btn btn-primary" id="use-last-btn" data-full-text="Use Last" data-short-text="Last" data-tiny-text="🔄"><span class="btn-main-text">Use Last</span><span class="last-project-name">${this.lastSelectedDirectories[quadrant].split('/').pop()}</span></button>` : ''}
-                            <button class="btn" id="cancel-btn" data-full-text="Cancel" data-short-text="Cancel" data-tiny-text="❌">Cancel</button>
-                        </div>
+                    <div class="session-path" id="session-path">/path/to/project</div>
+                </div>
+                
+                <!-- Session buttons (hidden initially) -->
+                <div class="session-selector-buttons" id="session-buttons">
+                    <button class="btn btn-primary" id="resume-session-btn">
+                        <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <polyline points="23 4 23 10 17 10"></polyline>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        <span class="btn-text">Resume Session</span>
+                    </button>
+                    <button class="btn btn-secondary" id="new-session-btn">
+                        <svg class="btn-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <path d="M12 6v12M6 12h12"></path>
+                        </svg>
+                        <span class="btn-text">New Session</span>
+                    </button>
+                </div>
+                
+                <!-- Danger Mode Option -->
+                <div class="danger-mode-option" id="danger-option" style="display: none;">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="danger-mode-checkbox">
+                        <span class="checkbox-custom"></span>
+                        <span class="checkbox-text">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                            Enable Danger Mode (skip confirmations)
+                        </span>
+                    </label>
+                </div>
+                
+                <!-- Hold Warning Message -->
+                <div class="hold-warning-message" id="hold-warning" style="display: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffcc00" stroke="#ffcc00" stroke-width="2">
+                        <path d="M12 2L2 20h20L12 2z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13" stroke="#1a1a1a" stroke-width="2"></line>
+                        <circle cx="12" cy="17" r="1" fill="#1a1a1a"></circle>
+                    </svg>
+                    <span class="warning-text">You must hold the button for 3 seconds with danger mode enabled</span>
+                </div>
+                
+                <!-- Back button (hidden initially) -->
+                <div class="session-back-button" id="back-button">
+                    <button class="btn btn-small" id="back-btn">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back
+                    </button>
+                </div>
+                
+                <div class="directory-selector-main">
+                    ${recentProjectsHTML}
+                    <div class="directory-selector-actions">
+                        <button class="btn btn-text" id="choose-dir-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+                            </svg>
+                            Browse for folder
+                        </button>
+                        <button class="btn btn-text" id="cancel-btn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                            Cancel
+                        </button>
                     </div>
                 </div>
             </div>
@@ -894,29 +981,39 @@ class TerminalManager {
         
         // Force the projects list to expand to full height (fix CSS specificity issue)
         // User confirmed this works: element.style { max-height: 100%; }
+        // Skip for small quadrants and vertically constrained views (handled by CSS)
         requestAnimationFrame(() => {
             const projectsList = selectorDiv.querySelector('.recent-projects-list');
             if (projectsList) {
-                projectsList.style.maxHeight = '100%';
-                projectsList.style.flex = '1 1 auto';
-                projectsList.style.minHeight = '0';
-                projectsList.style.overflow = 'auto';
+                // Check if we're in a constrained view
+                const isSmallQuadrant = selectorDiv.classList.contains('small-quadrant');
+                const isVerticallyConstrained = selectorDiv.classList.contains('vertically-constrained');
+                const isHorizontalLayout = selectorDiv.classList.contains('horizontal-layout');
                 
-                // Also ensure the container expands properly
-                const projectsContainer = selectorDiv.querySelector('.recent-projects-container');
-                if (projectsContainer) {
-                    projectsContainer.style.flex = '1 1 auto';
-                    projectsContainer.style.minHeight = '0';
-                    projectsContainer.style.display = 'flex';
-                    projectsContainer.style.flexDirection = 'column';
-                }
-                
-                // Ensure the content area expands
-                const contentArea = selectorDiv.querySelector('.directory-selector-content');
-                if (contentArea) {
-                    contentArea.style.display = 'flex';
-                    contentArea.style.flexDirection = 'column';
-                    contentArea.style.height = '100%';
+                // Only apply inline styles for normal sized views
+                // Small/constrained/horizontal quadrants are handled purely by CSS
+                if (!isSmallQuadrant && !isVerticallyConstrained && !isHorizontalLayout) {
+                    projectsList.style.maxHeight = '100%';
+                    projectsList.style.flex = '1 1 auto';
+                    projectsList.style.minHeight = '0';
+                    projectsList.style.overflow = 'auto';
+                    
+                    // Also ensure the container expands properly
+                    const projectsContainer = selectorDiv.querySelector('.recent-projects-container');
+                    if (projectsContainer) {
+                        projectsContainer.style.flex = '1 1 auto';
+                        projectsContainer.style.minHeight = '0';
+                        projectsContainer.style.display = 'flex';
+                        projectsContainer.style.flexDirection = 'column';
+                    }
+                    
+                    // Ensure the content area expands
+                    const contentArea = selectorDiv.querySelector('.directory-selector-content');
+                    if (contentArea) {
+                        contentArea.style.display = 'flex';
+                        contentArea.style.flexDirection = 'column';
+                        contentArea.style.height = '100%';
+                    }
                 }
             }
             
@@ -935,110 +1032,47 @@ class TerminalManager {
                 const isShortHeight = quadrantHeight < 400;  // Very short vertically
                 const isVerticallyConstrained = quadrantHeight < 500;
                 
+                // Detect horizontal/panoramic layout (width much greater than height)
+                const aspectRatio = quadrantWidth / quadrantHeight;
+                const isHorizontalLayout = aspectRatio > 2.5 || (quadrantHeight < 350 && quadrantWidth > 800);
+                
                 // Apply horizontal layout if:
                 // 1. We have 4 quadrants AND the individual quadrant is small
                 // 2. OR the quadrant is extremely small (less than 500px width)
                 // 3. OR the quadrant is very short (less than 400px height)
-                const shouldUseHorizontalLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
+                const shouldUseSmallLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
 
                 // Remove all responsive classes first
-                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained');
+                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained', 'horizontal-layout');
                 
-                if (shouldUseHorizontalLayout) {
+                // Apply appropriate layout class
+                if (isHorizontalLayout) {
+                    selectorDiv.classList.add('horizontal-layout');
+                } else if (shouldUseSmallLayout) {
                     selectorDiv.classList.add('small-quadrant');
                     
-                    // Apply horizontal layout directly via JavaScript for immediate effect
+                    // Apply compact layout for small quadrants
                     const mainSection = selectorDiv.querySelector('.directory-selector-main');
                     if (mainSection) {
-                        mainSection.style.flexDirection = 'row';
-                        mainSection.style.gap = '8px';
-                        mainSection.style.alignItems = 'stretch';
-                        
-                        const leftSection = mainSection.querySelector('.directory-selector-left');
-                        const rightSection = mainSection.querySelector('.directory-selector-right');
-                        
-                        if (leftSection) {
-                            leftSection.style.flex = '1 1 55%';
-                            leftSection.style.maxWidth = '55%';
-                            leftSection.style.minHeight = 'auto';
-                        }
-                        
-                        if (rightSection) {
-                            rightSection.style.setProperty('flex', '1 1 45%', 'important');
-                            rightSection.style.setProperty('max-width', '45%', 'important');
-                            rightSection.style.setProperty('border-left', '1px solid rgba(255, 255, 255, 0.1)', 'important');
-                            rightSection.style.setProperty('border-top', 'none', 'important');
-                            rightSection.style.setProperty('padding-left', '15px', 'important');
-                            rightSection.style.setProperty('display', 'flex', 'important');
-                            rightSection.style.setProperty('flex-direction', 'column', 'important');
-                            rightSection.style.setProperty('justify-content', 'center', 'important');
-                            rightSection.style.setProperty('align-items', 'stretch', 'important');
-                            rightSection.style.setProperty('padding-top', '0', 'important');
-                            rightSection.style.setProperty('padding-bottom', '0', 'important');
-                            
-                            // Also ensure the buttons container is centered
-                            const buttonsContainer = rightSection.querySelector('.directory-selector-buttons');
-                            if (buttonsContainer) {
-                                buttonsContainer.style.setProperty('margin', 'auto 0', 'important');
-                                buttonsContainer.style.setProperty('display', 'flex', 'important');
-                                buttonsContainer.style.setProperty('flex-direction', 'column', 'important');
-                                buttonsContainer.style.setProperty('gap', '10px', 'important');
-                                buttonsContainer.style.setProperty('width', '100%', 'important');
-                            }
-                        }
+                        // Remove inline styles that break the layout
+                        mainSection.style.flexDirection = '';
+                        mainSection.style.gap = '';
+                        mainSection.style.alignItems = '';
                     }
                 } else {
-                    // Reset to vertical layout
+                    // Reset to normal layout
                     const mainSection = selectorDiv.querySelector('.directory-selector-main');
                     if (mainSection) {
                         mainSection.style.flexDirection = '';
                         mainSection.style.gap = '';
                         mainSection.style.alignItems = '';
-                        
-                        const leftSection = mainSection.querySelector('.directory-selector-left');
-                        const rightSection = mainSection.querySelector('.directory-selector-right');
-                        
-                        if (leftSection) {
-                            leftSection.style.flex = '';
-                            leftSection.style.maxWidth = '';
-                            leftSection.style.minHeight = '';
-                        }
-                        
-                        if (rightSection) {
-                            rightSection.style.flex = '';
-                            rightSection.style.maxWidth = '';
-                            rightSection.style.borderLeft = '';
-                            rightSection.style.borderTop = '';
-                            rightSection.style.paddingLeft = '';
-                            rightSection.style.display = '';
-                            rightSection.style.flexDirection = '';
-                            rightSection.style.justifyContent = '';
-                            rightSection.style.alignItems = '';
-                        }
                     }
                 }
                 
                 // Add class for vertically constrained layouts (even if not using horizontal)
                 if (isVerticallyConstrained) {
                     selectorDiv.classList.add('vertically-constrained');
-                    
-                    // Apply compact vertical spacing
-                    const contentArea = selectorDiv.querySelector('.directory-selector-content');
-                    if (contentArea) {
-                        contentArea.style.padding = '6px';
-                    }
-                    
-                    const projectItems = selectorDiv.querySelectorAll('.recent-project-item');
-                    projectItems.forEach(item => {
-                        item.style.padding = '4px 8px';
-                        item.style.marginBottom = '2px';
-                    });
-                    
-                    const buttons = selectorDiv.querySelectorAll('.directory-selector-buttons button');
-                    buttons.forEach(btn => {
-                        btn.style.minHeight = '28px';
-                        btn.style.padding = '4px 8px';
-                    });
+                    // Let CSS handle the styling instead of inline styles
                 }
             };
             
@@ -1082,20 +1116,72 @@ class TerminalManager {
                 // Update last opened if this directory corresponds to a project
                 await ipcRenderer.invoke('project-update-last-opened', selectedDir);
                 
-                // After selecting directory, show session selector
-                wrapper.removeChild(selectorDiv);
-                this.showSessionSelector(quadrant, selectedDir);
+                // Update the UI to show the selected directory info
+                const sessionInfo = selectorDiv.querySelector('#session-info');
+                const sessionButtons = selectorDiv.querySelector('#session-buttons');
+                const backButton = selectorDiv.querySelector('#back-button');
+                const mainContent = selectorDiv.querySelector('.directory-selector-main');
+                const subtitle = selectorDiv.querySelector('.directory-selector-subtitle');
+                
+                if (sessionInfo && sessionButtons) {
+                    // Extract directory name from path
+                    const dirName = selectedDir.split('/').pop() || selectedDir;
+                    const firstLetter = dirName.charAt(0).toUpperCase();
+                    
+                    // Update session info
+                    const sessionIcon = selectorDiv.querySelector('#session-icon');
+                    const sessionName = selectorDiv.querySelector('#session-name');
+                    const sessionPath = selectorDiv.querySelector('#session-path');
+                    
+                    if (sessionIcon) {
+                        sessionIcon.textContent = firstLetter;
+                        // Generate a color for the icon
+                        const projectColors = [
+                            '#007ACC', '#FF6B6B', '#4ECDC4', '#FFA07A', 
+                            '#98D8C8', '#FDCB6E', '#6C5CE7', '#A29BFE',
+                            '#00B894', '#E17055', '#74B9FF', '#EC407A'
+                        ];
+                        // Simple hash to get consistent color for same directory
+                        let hash = 0;
+                        for (let i = 0; i < dirName.length; i++) {
+                            hash = dirName.charCodeAt(i) + ((hash << 5) - hash);
+                        }
+                        const color = projectColors[Math.abs(hash) % projectColors.length];
+                        sessionIcon.style.backgroundColor = color;
+                    }
+                    if (sessionName) sessionName.textContent = dirName;
+                    if (sessionPath) sessionPath.textContent = selectedDir;
+                    
+                    // Show session info and buttons
+                    sessionInfo.classList.add('active');
+                    sessionButtons.classList.add('active');
+                    if (backButton) backButton.classList.add('active');
+                    
+                    // Show danger mode option
+                    const dangerOption = selectorDiv.querySelector('#danger-option');
+                    if (dangerOption) {
+                        dangerOption.style.display = 'block';
+                    }
+                    
+                    // Collapse the main content
+                    if (mainContent) mainContent.classList.add('collapsed');
+                    
+                    // Update subtitle
+                    if (subtitle) subtitle.textContent = 'Ready to continue working';
+                }
             } else {
-                // User cancelled, restore placeholder
-                restorePlaceholder();
+                // User cancelled, do nothing
             }
         };
 
         // Handle browse button
         selectorDiv.querySelector('#choose-dir-btn').addEventListener('click', selectDirectory);
         
-        // Handle clickable directory display
-        selectorDiv.querySelector('#directory-display').addEventListener('click', selectDirectory);
+        // Handle clickable directory display (if exists in new design)
+        const directoryDisplay = selectorDiv.querySelector('#directory-display');
+        if (directoryDisplay) {
+            directoryDisplay.addEventListener('click', selectDirectory);
+        }
         
         // Handle last directory click (if exists)
         const lastDirectoryDisplay = selectorDiv.querySelector('#last-directory-display');
@@ -1126,7 +1212,7 @@ class TerminalManager {
             restorePlaceholder();
         });
         
-        // Handle recent project clicks
+        // Handle recent project clicks with transition
         selectorDiv.querySelectorAll('.recent-project-item').forEach(projectItem => {
             projectItem.addEventListener('click', async (e) => {
                 // Don't trigger if clicking on delete button
@@ -1136,17 +1222,328 @@ class TerminalManager {
                 
                 const projectPath = projectItem.dataset.projectPath;
                 const projectName = projectItem.dataset.projectName;
+                const projectColor = projectItem.dataset.projectColor;
                 
-                // Update last opened timestamp for this project
-                await ipcRenderer.invoke('project-update-last-opened', projectPath);
+                // Mark as selected
+                projectItem.classList.add('selected');
                 
-                // Update last selected directory
-                this.lastSelectedDirectories[quadrant] = projectPath;
-                this.saveDirectoryToStorage(quadrant, projectPath);
+                // Get first letter for icon
+                const initial = projectName.charAt(0).toUpperCase();
                 
-                // Remove selector and show session selector
-                wrapper.removeChild(selectorDiv);
-                this.showSessionSelector(quadrant, projectPath);
+                // Update session info
+                const sessionInfo = selectorDiv.querySelector('#session-info');
+                const sessionIcon = selectorDiv.querySelector('#session-icon');
+                const sessionName = selectorDiv.querySelector('#session-name');
+                const sessionPath = selectorDiv.querySelector('#session-path');
+                const sessionButtons = selectorDiv.querySelector('#session-buttons');
+                const backButton = selectorDiv.querySelector('#back-button');
+                const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                
+                sessionIcon.textContent = initial;
+                sessionIcon.style.backgroundColor = projectColor;
+                sessionName.textContent = projectName;
+                sessionPath.textContent = projectPath;
+                
+                // Show session info with animation
+                sessionInfo.classList.add('active');
+                sessionButtons.classList.add('active');
+                backButton.classList.add('active');
+                mainSection.classList.add('collapsed');
+                
+                // Show danger mode option
+                const dangerOption = selectorDiv.querySelector('#danger-option');
+                dangerOption.style.display = 'block';
+                
+                // Update title
+                selectorDiv.querySelector('h3').textContent = 'Claude Code Session';
+                selectorDiv.querySelector('.directory-selector-subtitle').textContent = 'Ready to continue working';
+                
+                // Handle Resume button with hold functionality for danger mode
+                const resumeBtn = selectorDiv.querySelector('#resume-session-btn');
+                const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                let resumeHoldTimer = null;
+                let resumeHoldProgress = null;
+                
+                const executeResume = async () => {
+                    // Update last opened timestamp
+                    await ipcRenderer.invoke('project-update-last-opened', projectPath);
+                    
+                    // Update last selected directory
+                    this.lastSelectedDirectories[quadrant] = projectPath;
+                    this.saveDirectoryToStorage(quadrant, projectPath);
+                    
+                    // Check if danger mode is enabled
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    // Remove selector and launch IDE directly
+                    wrapper.removeChild(selectorDiv);
+                    if (isDangerMode) {
+                        // Launch with danger mode
+                        this.startTerminal(quadrant, projectPath, 'dangerous-resume');
+                    } else {
+                        // Launch normally
+                        this.startTerminal(quadrant, projectPath, 'resume');
+                    }
+                };
+                
+                const startResumeHold = () => {
+                    // Check if danger mode is enabled
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    if (!isDangerMode) {
+                        // If danger mode is not enabled, execute immediately
+                        executeResume();
+                        return;
+                    }
+                    
+                    // Create progress indicator
+                    if (!resumeHoldProgress) {
+                        resumeHoldProgress = document.createElement('div');
+                        resumeHoldProgress.className = 'hold-progress';
+                        resumeHoldProgress.innerHTML = `
+                            <div class="hold-progress-bar"></div>
+                            <div class="hold-progress-text">Hold for 3 seconds</div>
+                        `;
+                        resumeBtn.appendChild(resumeHoldProgress);
+                    }
+                    
+                    // Start the progress animation
+                    const progressBar = resumeHoldProgress.querySelector('.hold-progress-bar');
+                    progressBar.style.width = '0%';
+                    resumeHoldProgress.classList.add('active');
+                    
+                    // Animate progress over 3 seconds
+                    let startTime = Date.now();
+                    const animateProgress = () => {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min((elapsed / 3000) * 100, 100);
+                        progressBar.style.width = progress + '%';
+                        
+                        if (progress < 100) {
+                            requestAnimationFrame(animateProgress);
+                        }
+                    };
+                    requestAnimationFrame(animateProgress);
+                    
+                    // Set timer for 3 seconds
+                    resumeHoldTimer = setTimeout(() => {
+                        executeResume();
+                    }, 3000);
+                };
+                
+                const cancelResumeHold = () => {
+                    const wasHolding = resumeHoldTimer !== null;
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    if (resumeHoldTimer) {
+                        clearTimeout(resumeHoldTimer);
+                        resumeHoldTimer = null;
+                    }
+                    if (resumeHoldProgress) {
+                        resumeHoldProgress.classList.remove('active');
+                        setTimeout(() => {
+                            const progressBar = resumeHoldProgress.querySelector('.hold-progress-bar');
+                            if (progressBar) progressBar.style.width = '0%';
+                        }, 300);
+                    }
+                    
+                    // Show warning if danger mode is on and user released early
+                    if (wasHolding && isDangerMode) {
+                        const warningElement = selectorDiv.querySelector('#hold-warning');
+                        if (warningElement) {
+                            warningElement.style.display = 'flex';
+                            warningElement.classList.add('show');
+                            
+                            // Hide warning after 5 seconds
+                            setTimeout(() => {
+                                warningElement.classList.remove('show');
+                                setTimeout(() => {
+                                    warningElement.style.display = 'none';
+                                }, 300);
+                            }, 5000);
+                        }
+                    }
+                };
+                
+                // Mouse events
+                resumeBtn.addEventListener('mousedown', startResumeHold);
+                resumeBtn.addEventListener('mouseup', cancelResumeHold);
+                resumeBtn.addEventListener('mouseleave', cancelResumeHold);
+                
+                // Touch events for mobile
+                resumeBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    startResumeHold();
+                });
+                resumeBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    cancelResumeHold();
+                });
+                resumeBtn.addEventListener('touchcancel', cancelResumeHold);
+                
+                // Prevent default click behavior
+                resumeBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                });
+                
+                // Handle New Session button with hold functionality for danger mode
+                const newBtn = selectorDiv.querySelector('#new-session-btn');
+                let newHoldTimer = null;
+                let newHoldProgress = null;
+                
+                const executeNewSession = async () => {
+                    // Create new session in the same directory
+                    await ipcRenderer.invoke('project-update-last-opened', projectPath);
+                    
+                    this.lastSelectedDirectories[quadrant] = projectPath;
+                    this.saveDirectoryToStorage(quadrant, projectPath);
+                    
+                    // Check if danger mode is enabled
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    // Clear any existing session data before starting new
+                    // TODO: Add session clearing logic here if needed
+                    
+                    // Remove selector and launch IDE directly
+                    wrapper.removeChild(selectorDiv);
+                    if (isDangerMode) {
+                        // Launch new session with danger mode
+                        this.startTerminal(quadrant, projectPath, 'dangerous');
+                    } else {
+                        // Launch new session normally
+                        this.startTerminal(quadrant, projectPath, 'new');
+                    }
+                };
+                
+                const startNewHold = () => {
+                    // Check if danger mode is enabled
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    if (!isDangerMode) {
+                        // If danger mode is not enabled, execute immediately
+                        executeNewSession();
+                        return;
+                    }
+                    
+                    // Create progress indicator
+                    if (!newHoldProgress) {
+                        newHoldProgress = document.createElement('div');
+                        newHoldProgress.className = 'hold-progress';
+                        newHoldProgress.innerHTML = `
+                            <div class="hold-progress-bar"></div>
+                            <div class="hold-progress-text">Hold for 3 seconds</div>
+                        `;
+                        newBtn.appendChild(newHoldProgress);
+                    }
+                    
+                    // Start the progress animation
+                    const progressBar = newHoldProgress.querySelector('.hold-progress-bar');
+                    progressBar.style.width = '0%';
+                    newHoldProgress.classList.add('active');
+                    
+                    // Animate progress over 3 seconds
+                    let startTime = Date.now();
+                    const animateProgress = () => {
+                        const elapsed = Date.now() - startTime;
+                        const progress = Math.min((elapsed / 3000) * 100, 100);
+                        progressBar.style.width = progress + '%';
+                        
+                        if (progress < 100) {
+                            requestAnimationFrame(animateProgress);
+                        }
+                    };
+                    requestAnimationFrame(animateProgress);
+                    
+                    // Set timer for 3 seconds
+                    newHoldTimer = setTimeout(() => {
+                        executeNewSession();
+                    }, 3000);
+                };
+                
+                const cancelNewHold = () => {
+                    const wasHolding = newHoldTimer !== null;
+                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                    
+                    if (newHoldTimer) {
+                        clearTimeout(newHoldTimer);
+                        newHoldTimer = null;
+                    }
+                    if (newHoldProgress) {
+                        newHoldProgress.classList.remove('active');
+                        setTimeout(() => {
+                            const progressBar = newHoldProgress.querySelector('.hold-progress-bar');
+                            if (progressBar) progressBar.style.width = '0%';
+                        }, 300);
+                    }
+                    
+                    // Show warning if danger mode is on and user released early
+                    if (wasHolding && isDangerMode) {
+                        const warningElement = selectorDiv.querySelector('#hold-warning');
+                        if (warningElement) {
+                            warningElement.style.display = 'flex';
+                            warningElement.classList.add('show');
+                            
+                            // Hide warning after 5 seconds
+                            setTimeout(() => {
+                                warningElement.classList.remove('show');
+                                setTimeout(() => {
+                                    warningElement.style.display = 'none';
+                                }, 300);
+                            }, 5000);
+                        }
+                    }
+                };
+                
+                // Mouse events
+                newBtn.addEventListener('mousedown', startNewHold);
+                newBtn.addEventListener('mouseup', cancelNewHold);
+                newBtn.addEventListener('mouseleave', cancelNewHold);
+                
+                // Touch events for mobile
+                newBtn.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    startNewHold();
+                });
+                newBtn.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    cancelNewHold();
+                });
+                newBtn.addEventListener('touchcancel', cancelNewHold);
+                
+                // Prevent default click behavior
+                newBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                });
+                
+                // Handle Back button
+                const backBtn = selectorDiv.querySelector('#back-btn');
+                backBtn.onclick = () => {
+                    // Remove selected state
+                    projectItem.classList.remove('selected');
+                    
+                    // Hide session info
+                    sessionInfo.classList.remove('active');
+                    sessionButtons.classList.remove('active');
+                    backButton.classList.remove('active');
+                    mainSection.classList.remove('collapsed');
+                    
+                    // Hide danger mode checkbox
+                    const dangerOption = selectorDiv.querySelector('#danger-option');
+                    if (dangerOption) {
+                        dangerOption.style.display = 'none';
+                    }
+                    
+                    // Hide hold warning if visible
+                    const holdWarning = selectorDiv.querySelector('#hold-warning');
+                    if (holdWarning) {
+                        holdWarning.style.display = 'none';
+                        holdWarning.classList.remove('show');
+                    }
+                    
+                    // Reset title
+                    selectorDiv.querySelector('h3').textContent = 'Select Working Directory';
+                    selectorDiv.querySelector('.directory-selector-subtitle').textContent = 'Choose a project to continue';
+                };
             });
         });
         
@@ -1196,55 +1593,8 @@ class TerminalManager {
         };
         document.addEventListener('keydown', handleEscape);
         
-        // Function to update button text based on container width
-        const updateButtonText = () => {
-            const content = selectorDiv.querySelector('.directory-selector-content');
-            if (!content) return;
-            
-            const width = content.offsetWidth;
-            const buttons = content.querySelectorAll('.directory-selector-buttons .btn');
-            
-            buttons.forEach(btn => {
-                // Special handling for use-last-btn to preserve project name
-                if (btn.id === 'use-last-btn') {
-                    const mainTextSpan = btn.querySelector('.btn-main-text');
-                    if (mainTextSpan) {
-                        if (width < 400) {
-                            mainTextSpan.textContent = btn.getAttribute('data-tiny-text') || '🔄';
-                        } else if (width < 500) {
-                            mainTextSpan.textContent = btn.getAttribute('data-short-text') || 'Last';
-                        } else {
-                            mainTextSpan.textContent = btn.getAttribute('data-full-text') || 'Use Last';
-                        }
-                    }
-                } else {
-                    // Regular buttons
-                    if (width < 400) {
-                        btn.textContent = btn.getAttribute('data-tiny-text') || btn.textContent;
-                    } else if (width < 500) {
-                        btn.textContent = btn.getAttribute('data-short-text') || btn.textContent;
-                    } else {
-                        btn.textContent = btn.getAttribute('data-full-text') || btn.textContent;
-                    }
-                }
-            });
-        };
-        
-        // Update button text initially and on resize
-        setTimeout(updateButtonText, 0);
-        
-        // Create ResizeObserver to watch for size changes
-        const resizeObserver = new ResizeObserver(() => {
-            updateButtonText();
-        });
-        resizeObserver.observe(selectorDiv.querySelector('.directory-selector-content'));
-        
-        // Clean up observer when selector is removed
-        const originalRestorePlaceholder = restorePlaceholder;
-        restorePlaceholder = () => {
-            resizeObserver.disconnect();
-            originalRestorePlaceholder();
-        };
+        // No longer need responsive text handling since we're using icons
+        // Icons scale naturally with the button size
     }
 
     showSessionSelector(quadrant, selectedDirectory) {
@@ -1690,9 +2040,10 @@ class TerminalManager {
                     this.lastSelectedDirectories[quadrant] = fullProjectPath;
                     this.saveDirectoryToStorage(quadrant, fullProjectPath);
                     
-                    // Remove directory selector and show session selector
+                    // Remove directory selector and start the terminal directly with a new session
                     parentWrapper.removeChild(directorySelectorDiv);
-                    this.showSessionSelector(quadrant, fullProjectPath);
+                    // Start terminal directly with 'new' session type since we just created the project
+                    this.startTerminal(quadrant, fullProjectPath, 'new');
                     
                     this.showNotification(`Project "${projectName}" created successfully`, 'success');
                 } else {

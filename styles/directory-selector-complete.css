@@ -1,4 +1,4 @@
-/* Directory Selector - Complete Styles with All Fixes */
+/* Directory Selector - Ultra Modern UX Remaster */
 
 /* ==================== BASE CONTAINER ==================== */
 .terminal-wrapper .directory-selector {
@@ -11,110 +11,152 @@
   height: 100% !important;
   display: flex !important;
   flex-direction: column !important;
-  background: 
-    radial-gradient(ellipse at top left, rgba(102, 126, 234, 0.15) 0%, transparent 50%),
-    radial-gradient(ellipse at bottom right, rgba(240, 147, 251, 0.15) 0%, transparent 50%),
-    linear-gradient(135deg, 
-      rgba(15, 10, 25, 0.98) 0%, 
-      rgba(25, 18, 40, 0.96) 30%,
-      rgba(30, 22, 48, 0.95) 60%, 
-      rgba(35, 28, 55, 0.98) 100%) !important;
+  background: linear-gradient(135deg, #0f0f11 0%, #1a1a1f 100%) !important;
+  backdrop-filter: blur(30px) saturate(1.5) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(1.5) !important;
   overflow: hidden !important;
   z-index: 10 !important;
-  position: relative !important;
 }
-
-/* Add subtle animated particles background */
-.terminal-wrapper .directory-selector::before {
-  content: '' !important;
-  position: absolute !important;
-  top: 0 !important;
-  left: 0 !important;
-  right: 0 !important;
-  bottom: 0 !important;
-  background-image: 
-    radial-gradient(circle at 20% 30%, rgba(102, 126, 234, 0.1) 0%, transparent 2%),
-    radial-gradient(circle at 80% 70%, rgba(240, 147, 251, 0.1) 0%, transparent 2%),
-    radial-gradient(circle at 40% 80%, rgba(255, 216, 155, 0.08) 0%, transparent 2%),
-    radial-gradient(circle at 65% 20%, rgba(102, 126, 234, 0.08) 0%, transparent 2%) !important;
-  background-size: 250px 250px, 350px 350px, 450px 450px, 300px 300px !important;
-  animation: floatingParticles 30s linear infinite !important;
-  pointer-events: none !important;
-  opacity: 0.6 !important;
-}
-
-@keyframes floatingParticles {
-  0% { transform: translate(0, 0) rotate(0deg); }
-  33% { transform: translate(-20px, -20px) rotate(120deg); }
-  66% { transform: translate(20px, -10px) rotate(240deg); }
-  100% { transform: translate(0, 0) rotate(360deg); }
-}
-
-/* Animated background pattern - REMOVED for better performance */
-/* The rotating gradient animation has been removed */
 
 /* ==================== CONTENT WRAPPER ==================== */
 .directory-selector-content {
   display: flex !important;
   flex-direction: column !important;
   height: 100% !important;
-  padding: clamp(10px, 2vw, 20px) !important;  /* Responsive padding */
+  padding: 16px !important;
   box-sizing: border-box !important;
   position: relative !important;
   z-index: 1 !important;
+  max-width: 500px !important;
+  width: 100% !important;
+  margin: 0 auto !important;
 }
 
-/* Title - Beautiful Typography */
-.directory-selector-content h3,
-.directory-selector-title {
-  flex: 0 0 auto !important;
-  margin: 0 0 clamp(10px, 1.5vh, 20px) 0 !important;  /* Even less margin */
-  font-size: clamp(0.9rem, 1.8vw, 1.3rem) !important;  /* Even smaller font size */
-  font-weight: 600 !important;  /* Semi-bold */
-  font-family: 'SF Pro Display', 'Helvetica Neue', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif !important;
-  letter-spacing: 0.02em !important;  /* Wider letter spacing for elegance */
-  text-transform: uppercase !important;  /* Uppercase for modern look */
-  line-height: 1.3 !important;
-  text-align: center !important;
-  position: relative !important;
-  
-  /* Simple gradient text without animation */
-  background: linear-gradient(135deg, 
-    #8b7aa8 0%, 
-    #a890c4 50%, 
-    #c4b0d8 100%) !important;
+/* ==================== TITLE - REDESIGNED ==================== */
+.directory-selector-content h3 {
+  margin: 0 0 4px 0 !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  background: linear-gradient(135deg, #fff 0%, #b8b8c8 100%) !important;
   -webkit-background-clip: text !important;
   -webkit-text-fill-color: transparent !important;
   background-clip: text !important;
-  
-  /* Very subtle shadow */
-  opacity: 0.9 !important;
+  letter-spacing: -0.5px !important;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif !important;
+  text-align: center !important;
 }
 
-@keyframes titleGradient {
-  0% { background-position: 0% center; }
-  100% { background-position: 200% center; }
+.directory-selector-subtitle {
+  text-align: center !important;
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.4) !important;
+  margin-bottom: 12px !important;
+  letter-spacing: 0.5px !important;
 }
 
-@keyframes gradientShift {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+/* ==================== SESSION INFO (After Selection) ==================== */
+.session-info {
+  display: none !important;
+  background: rgba(255, 255, 255, 0.03) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 8px !important;
+  padding: 12px !important;
+  margin-bottom: 12px !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.session-info.active {
+  display: block !important;
+  animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.session-directory {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  margin-bottom: 8px !important;
+}
+
+.session-directory-icon {
+  width: 24px !important;
+  height: 24px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--project-color, #7f5af0) !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 700 !important;
+  color: white !important;
+}
+
+.session-path {
+  font-size: 12px !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  font-family: 'SF Mono', 'Monaco', 'Courier New', monospace !important;
+  padding-left: 44px !important;
+  letter-spacing: 0.3px !important;
+}
+
+/* ==================== SESSION SELECTOR BUTTONS ==================== */
+.session-selector-buttons {
+  display: none !important;
+  gap: 12px !important;
+  margin-bottom: 24px !important;
+}
+
+.session-selector-buttons.active {
+  display: flex !important;
+  animation: fadeIn 0.5s ease-out 0.2s backwards !important;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* ==================== MAIN LAYOUT ==================== */
 .directory-selector-main {
   display: flex !important;
-  flex-direction: column !important;  /* ALWAYS column, not row */
+  flex-direction: column !important;
   flex: 1 1 auto !important;
   min-height: 0 !important;
-  gap: clamp(8px, 1.5vh, 15px) !important;  /* Responsive gap */
+  gap: 24px !important;
   overflow: hidden !important;
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+.directory-selector-main.collapsed {
+  opacity: 0 !important;
+  transform: scale(0.95) !important;
+  pointer-events: none !important;
+  max-height: 0 !important;
 }
 
 /* ==================== LEFT SECTION - PROJECTS ==================== */
 .directory-selector-left {
-  flex: 1 1 auto !important;  /* Take all available space */
+  flex: 1 1 auto !important;
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
@@ -128,57 +170,36 @@
   min-height: 0 !important;
   max-height: 100% !important;
   overflow: hidden !important;
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.08) 0%, 
-    rgba(255, 255, 255, 0.03) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 16px !important;
-  padding: clamp(12px, 2vw, 20px) !important;  /* Responsive padding */
-  backdrop-filter: blur(20px) saturate(1.5) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.5) !important;
-  box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.3),
-    0 2px 8px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.2) !important;
-  transition: all 0.3s ease !important;
-}
-
-.recent-projects-section:hover {
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.1) 0%, 
-    rgba(255, 255, 255, 0.04) 100%) !important;
-  border-color: rgba(255, 255, 255, 0.15) !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 
-    0 12px 40px rgba(0, 0, 0, 0.35),
-    0 4px 12px rgba(0, 0, 0, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.25) !important;
 }
 
 .recent-projects-section h4 {
   flex: 0 0 auto !important;
-  margin: 0 0 clamp(6px, 1vh, 12px) 0 !important;  /* Responsive margin */
-  font-size: clamp(0.7rem, 1.5vw, 0.85rem) !important;  /* Responsive font */
+  margin: 0 0 8px 0 !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.4) !important;
   text-transform: uppercase !important;
-  letter-spacing: 0.5px !important;
-  color: rgba(255, 255, 255, 0.7) !important;
+  letter-spacing: 1px !important;
   display: flex !important;
   align-items: center !important;
   gap: 8px !important;
 }
 
 .recent-projects-section h4::before {
-  content: '';
-  width: 0;
-  height: 0;
-  border-left: 5px solid rgba(127, 90, 240, 0.8);
-  border-top: 5px solid transparent;
-  border-bottom: 5px solid transparent;
+  content: '' !important;
+  width: 24px !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2)) !important;
 }
 
-/* Projects List - CRITICAL FOR SCROLLING */
+.recent-projects-section h4::after {
+  content: '' !important;
+  flex: 1 !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), transparent) !important;
+}
+
+/* Projects List - Grid */
 .recent-projects-list {
   flex: 1 1 auto !important;
   min-height: 0 !important;
@@ -186,624 +207,1135 @@
   overflow-x: hidden !important;
   margin: 0 !important;
   padding: 0 4px 0 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
+  display: grid !important;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)) !important;
+  gap: 16px !important;
+  align-content: start !important;
 }
 
 /* Custom Scrollbar */
 .recent-projects-list::-webkit-scrollbar {
-  width: 8px !important;
+  width: 4px !important;
 }
 
 .recent-projects-list::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05) !important;
-  border-radius: 4px !important;
+  background: transparent !important;
 }
 
 .recent-projects-list::-webkit-scrollbar-thumb {
-  background: rgba(127, 90, 240, 0.5) !important;
-  border-radius: 4px !important;
-  min-height: 30px !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  border-radius: 2px !important;
 }
 
 .recent-projects-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(127, 90, 240, 0.7) !important;
+  background: rgba(255, 255, 255, 0.12) !important;
 }
 
-/* Project Items */
+/* Project Card - Ultra Modern */
 .recent-project-item {
-  flex: 0 0 auto !important;
-  margin-bottom: clamp(4px, 0.8vh, 8px) !important;  /* Responsive margin */
-  padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px) !important;  /* Responsive padding */
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.04) 0%, 
-    rgba(255, 255, 255, 0.02) 100%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.08) !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
   position: relative !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  padding: 10px !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  min-height: 50px !important;
+  display: flex !important;
+  align-items: center !important;
   overflow: hidden !important;
 }
 
+.recent-project-item::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  background: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), 
+    rgba(127, 90, 240, 0.1) 0%, 
+    transparent 50%) !important;
+  opacity: 0 !important;
+  transition: opacity 0.3s !important;
+  pointer-events: none !important;
+}
+
 .recent-project-item:hover {
-  background: linear-gradient(135deg, 
-    rgba(127, 90, 240, 0.15) 0%, 
-    rgba(102, 126, 234, 0.1) 100%) !important;
-  border-color: rgba(127, 90, 240, 0.4) !important;
-  transform: translateX(4px) !important;
-  box-shadow: 0 4px 12px rgba(127, 90, 240, 0.2) !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(127, 90, 240, 0.3) !important;
+  /* Removed transform animation */
+  box-shadow: 
+    0 10px 20px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(127, 90, 240, 0.2) inset !important;
 }
 
-.recent-project-item:last-child {
-  margin-bottom: 0 !important;
+.recent-project-item:hover::before {
+  opacity: 1 !important;
 }
 
-/* Delete button */
+.recent-project-item:active {
+  /* Removed transform animation */
+}
+
+.recent-project-item.selected {
+  background: rgba(127, 90, 240, 0.1) !important;
+  border-color: rgba(127, 90, 240, 0.5) !important;
+  box-shadow: 
+    0 10px 30px rgba(127, 90, 240, 0.2),
+    0 0 0 2px rgba(127, 90, 240, 0.3) inset !important;
+}
+
+/* Delete button - Modern */
 .delete-project-btn {
   position: absolute !important;
-  top: 50% !important;
-  right: 16px !important;
-  transform: translateY(-50%) !important;
-  width: 24px !important;
-  height: 24px !important;
-  border: 1px solid rgba(255, 59, 48, 0.3) !important;
+  top: 9px !important;
+  right: 12px !important;
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
   background: rgba(255, 59, 48, 0.1) !important;
-  color: rgba(255, 59, 48, 0.8) !important;
-  border-radius: 6px !important;
-  cursor: pointer !important;
-  font-size: 18px !important;
-  line-height: 1 !important;
+  backdrop-filter: blur(10px) !important;
+  border: 1px solid rgba(255, 59, 48, 0.2) !important;
+  color: rgba(255, 59, 48, 0.9) !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
+  cursor: pointer !important;
+  font-size: 22px !important;
+  line-height: 1 !important;
+  font-weight: 300 !important;
+  padding: 0 !important;
+  padding-bottom: 1px !important;
   opacity: 0 !important;
-  transition: all 0.2s ease !important;
+  /* No initial transform - button stays static */
+  transition: opacity 0.3s ease !important;
+  z-index: 2 !important;
 }
 
 .recent-project-item:hover .delete-project-btn {
   opacity: 1 !important;
+  /* Keep button static - no transform */
+}
+
+.delete-project-btn:hover {
+  background: rgba(255, 59, 48, 0.2) !important;
+  border-color: rgba(255, 59, 48, 0.4) !important;
+  /* No transform animation on hover */
 }
 
 /* Project info */
 .project-info {
   display: flex !important;
   align-items: center !important;
-  gap: clamp(6px, 1vw, 12px) !important;  /* Responsive gap */
-  padding-right: clamp(30px, 3vw, 40px) !important;  /* Responsive padding */
-}
-
-.project-color-indicator {
-  width: clamp(10px, 1.5vw, 14px) !important;  /* Responsive size */
-  height: clamp(10px, 1.5vw, 14px) !important;  /* Responsive size */
-  border-radius: 50% !important;
-  flex-shrink: 0 !important;
-  /* Removed box-shadow effects for clean solid color */
-}
-
-.project-name {
-  font-weight: 500 !important;
-  color: rgba(255, 255, 255, 0.95) !important;
-  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
-  letter-spacing: 0.2px !important;
-}
-
-.project-path {
-  color: rgba(255, 255, 255, 0.4) !important;
-  font-size: clamp(0.65rem, 1.2vw, 0.75rem) !important;  /* Responsive font */
-  font-family: 'SF Mono', 'Menlo', 'Monaco', monospace !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  flex: 1 !important;
-}
-
-/* Create New Project Button */
-#create-new-project-btn {
-  flex: 0 0 auto !important;
-  margin-top: clamp(8px, 1.5vh, 12px) !important;  /* Responsive margin */
+  gap: 16px !important;
   width: 100% !important;
-  min-height: clamp(36px, 5vh, 44px) !important;  /* Responsive height */
-  background: linear-gradient(135deg, 
-    rgba(46, 213, 115, 0.9) 0%, 
-    rgba(0, 184, 148, 0.9) 100%) !important;
-  border: 1px solid rgba(46, 213, 115, 0.3) !important;
-  color: white !important;
-  font-weight: 500 !important;
-  padding: clamp(8px, 1.5vh, 12px) !important;  /* Responsive padding */
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
+  padding-right: 28px !important;
+}
+
+/* Project Icon - Ultra Modern */
+.project-color-indicator {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 6px !important;
+  flex-shrink: 0 !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  gap: clamp(4px, 0.8vw, 6px) !important;  /* Responsive gap */
-  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
-  letter-spacing: 0.3px !important;
+  position: relative !important;
+  background: var(--project-color, #7f5af0) !important;
+  box-shadow: 
+    0 2px 6px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.1) inset !important;
+  transition: all 0.3s !important;
+}
+
+.recent-project-item:hover .project-color-indicator {
+  /* No transform animation - keep static */
+  box-shadow: 
+    0 4px 10px rgba(0, 0, 0, 0.2),
+    0 0 0 2px rgba(255, 255, 255, 0.2) inset !important;
+}
+
+.project-color-indicator::after {
+  content: attr(data-initial) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: white !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* Project Name */
+.project-details {
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+.project-name {
+  font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-size: 12px !important;
+  letter-spacing: -0.3px !important;
+  margin-bottom: 2px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.project-meta {
+  /* Hide the WORKSPACE label - not needed */
+  display: none !important;
+}
+
+/* Create New Project Button - Redesigned */
+#create-new-project-btn {
+  flex: 0 0 auto !important;
+  margin-top: 8px !important;
+  width: 100% !important;
+  min-height: 36px !important;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  border: 1px solid rgba(16, 185, 129, 0.3) !important;
+  color: white !important;
+  font-weight: 600 !important;
+  padding: 8px 16px !important;
+  border-radius: 8px !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 10px !important;
+  font-size: 14px !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+#create-new-project-btn::before {
+  content: '' !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: -100% !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent) !important;
+  transition: left 0.5s !important;
 }
 
 #create-new-project-btn:hover {
   transform: translateY(-2px) !important;
-  box-shadow: 0 8px 24px rgba(46, 213, 115, 0.3) !important;
-  background: linear-gradient(135deg, 
-    rgba(46, 213, 115, 1) 0%, 
-    rgba(0, 184, 148, 1) 100%) !important;
+  box-shadow: 
+    0 12px 24px rgba(16, 185, 129, 0.4),
+    0 0 0 2px rgba(16, 185, 129, 0.2) inset !important;
+}
+
+#create-new-project-btn:hover::before {
+  left: 100% !important;
+}
+
+#create-new-project-btn:active {
+  transform: translateY(0) !important;
 }
 
 /* ==================== RIGHT SECTION - BUTTONS ==================== */
 .directory-selector-right {
-  flex: 0 0 auto !important;  /* Fixed height for buttons */
+  flex: 0 0 auto !important;
   display: flex !important;
   flex-direction: column !important;
-  gap: clamp(6px, 1vh, 10px) !important;  /* Responsive gap */
-  padding: clamp(8px, 1.5vw, 15px) !important;  /* Responsive padding */
-  background: linear-gradient(to top,
-    rgba(20, 12, 30, 0.98) 0%,
-    rgba(20, 12, 30, 0.9) 30%,
-    transparent 100%) !important;
-  border-radius: 12px !important;
+  gap: 12px !important;
 }
 
-/* Hide directory displays - we don't need them in single column */
+/* Hide the directory displays */
 .last-directory-section,
 .selected-directory-display {
   display: none !important;
 }
 
-/* Action Buttons */
+/* Action Buttons - Redesigned */
 .directory-selector-buttons {
   display: flex !important;
-  gap: clamp(6px, 1vw, 10px) !important;  /* Responsive gap */
+  gap: 12px !important;
   width: 100% !important;
 }
 
-/* Button Group */
+.btn {
+  flex: 1 !important;
+  padding: 8px 16px !important;
+  border-radius: 6px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  cursor: pointer !important;
+  transition: all 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+  letter-spacing: 0.3px !important;
+  position: relative !important;
+  overflow: hidden !important;
+  text-transform: none !important;
+}
 
-/* Use Last button - make it flex to contain both texts */
+.btn:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2) !important;
+}
+
+.btn:active {
+  transform: translateY(0) !important;
+}
+
+/* Primary Button */
+.btn-primary {
+  background: linear-gradient(135deg, #7f5af0 0%, #6b46db 100%) !important;
+  border-color: rgba(127, 90, 240, 0.3) !important;
+  color: white !important;
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #8e69f7 0%, #7a55e2 100%) !important;
+  border-color: rgba(127, 90, 240, 0.5) !important;
+  box-shadow: 
+    0 12px 24px rgba(127, 90, 240, 0.4),
+    0 0 0 2px rgba(127, 90, 240, 0.2) inset !important;
+}
+
+/* Secondary Button */
+.btn-secondary {
+  background: transparent !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.03) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Button Icons */
+.btn-icon {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 2px !important;
+}
+
+.btn-text {
+  font-weight: 600 !important;
+}
+
+/* Button with subtitle */
 #use-last-btn {
+  flex-direction: column !important;
+  padding: 12px 24px !important;
+  gap: 4px !important;
+}
+
+.btn-main-text {
+  display: block !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+}
+
+.last-project-name {
+  display: block !important;
+  font-size: 11px !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-weight: 400 !important;
+  opacity: 0.8 !important;
+}
+
+/* Danger Mode Checkbox */
+.danger-mode-option {
+  margin-top: 20px !important;
+  padding: 16px !important;
+  background: rgba(255, 59, 48, 0.05) !important;
+  border: 1px solid rgba(255, 59, 48, 0.2) !important;
+  border-radius: 12px !important;
+  animation: fadeIn 0.5s ease-out 0.3s backwards !important;
+}
+
+.checkbox-label {
+  display: flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  user-select: none !important;
+  position: relative !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+  position: absolute !important;
+  opacity: 0 !important;
+  cursor: pointer !important;
+  height: 0 !important;
+  width: 0 !important;
+}
+
+.checkbox-custom {
+  width: 20px !important;
+  height: 20px !important;
+  border: 2px solid rgba(255, 59, 48, 0.4) !important;
+  border-radius: 6px !important;
+  margin-right: 12px !important;
+  transition: all 0.3s !important;
+  position: relative !important;
+  flex-shrink: 0 !important;
+}
+
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom {
+  background: rgba(255, 59, 48, 0.9) !important;
+  border-color: rgba(255, 59, 48, 0.9) !important;
+}
+
+.checkbox-custom::after {
+  content: '' !important;
+  position: absolute !important;
+  display: none !important;
+  left: 50% !important;
+  top: 50% !important;
+  width: 5px !important;
+  height: 10px !important;
+  border: solid white !important;
+  border-width: 0 2px 2px 0 !important;
+  transform: translate(-50%, -60%) rotate(45deg) !important;
+}
+
+.checkbox-label input[type="checkbox"]:checked ~ .checkbox-custom::after {
+  display: block !important;
+}
+
+.checkbox-text {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
+.checkbox-text svg {
+  width: 16px !important;
+  height: 16px !important;
+  stroke: rgba(255, 59, 48, 0.8) !important;
+}
+
+.checkbox-label:hover .checkbox-custom {
+  border-color: rgba(255, 59, 48, 0.6) !important;
+  background: rgba(255, 59, 48, 0.1) !important;
+}
+
+/* Session Back Button */
+.session-back-button {
+  display: none !important;
+  position: absolute !important;
+  top: 32px !important;
+  left: 32px !important;
+}
+
+.session-back-button.active {
+  display: block !important;
+}
+
+#back-btn {
+  padding: 8px 16px !important;
+  font-size: 13px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  transition: all 0.2s !important;
+}
+
+#back-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+  transform: translateX(-2px) !important;
+}
+
+/* Empty State */
+.empty-projects-state {
+  flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
-  padding: 8px 12px !important;
-  min-height: 45px !important;
+  padding: 48px !important;
+  text-align: center !important;
 }
 
-/* Main button text */
-#use-last-btn .btn-main-text {
-  display: block !important;
-  font-size: inherit !important;
+.empty-icon {
+  width: 64px !important;
+  height: 64px !important;
+  margin-bottom: 16px !important;
+  opacity: 0.2 !important;
 }
 
-/* Last project name - very small and subtle */
-#use-last-btn .last-project-name {
-  display: block !important;
-  font-size: 10px !important;
-  color: rgba(255, 255, 255, 0.8) !important;
-  font-weight: 500 !important;
-  margin-top: 3px !important;
-  white-space: nowrap !important;
-  overflow: hidden !important;
-  text-overflow: ellipsis !important;
-  line-height: 1 !important;
-  max-width: 100% !important;
-}
-
-.directory-selector-buttons .btn,
-.directory-selector-buttons button {
-  flex: 1 !important;
-  padding: clamp(8px, 1.5vh, 12px) clamp(10px, 2vw, 16px) !important;  /* Responsive padding */
-  font-size: clamp(0.75rem, 1.5vw, 0.9rem) !important;  /* Responsive font */
-  font-weight: 500 !important;
-  letter-spacing: 0.2px !important;
-  border-radius: 8px !important;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  background: linear-gradient(135deg, 
-    rgba(255, 255, 255, 0.08) 0%, 
-    rgba(255, 255, 255, 0.04) 100%) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  cursor: pointer !important;
-  transition: all 0.2s ease !important;
-  position: relative !important;
-  overflow: hidden !important;
-}
-
-.directory-selector-buttons .btn:hover,
-.directory-selector-buttons button:hover {
-  background: linear-gradient(135deg, 
-    rgba(127, 90, 240, 0.2) 0%, 
-    rgba(102, 126, 234, 0.15) 100%) !important;
-  border-color: rgba(127, 90, 240, 0.4) !important;
-  transform: translateY(-2px) !important;
-  box-shadow: 0 6px 20px rgba(127, 90, 240, 0.3) !important;
-}
-
-.directory-selector-buttons .btn-primary,
-#use-last-btn {
-  background: linear-gradient(135deg, 
-    rgba(127, 90, 240, 0.5) 0%, 
-    rgba(102, 126, 234, 0.4) 100%) !important;
-  border-color: rgba(127, 90, 240, 0.6) !important;
+.empty-title {
+  font-size: 16px !important;
   font-weight: 600 !important;
+  color: rgba(255, 255, 255, 0.5) !important;
+  margin-bottom: 8px !important;
 }
 
-.directory-selector-buttons .btn-primary:hover,
-#use-last-btn:hover {
-  background: linear-gradient(135deg, 
-    rgba(127, 90, 240, 0.7) 0%, 
-    rgba(102, 126, 234, 0.6) 100%) !important;
-  border-color: rgba(127, 90, 240, 0.8) !important;
+.empty-subtitle {
+  font-size: 13px !important;
+  color: rgba(255, 255, 255, 0.3) !important;
 }
 
-/* ==================== RESPONSIVE - SMALL SCREENS ==================== */
-/* Already single column, just adjust spacing for small screens */
-@media (max-width: 700px), (max-height: 650px) {
+/* ==================== RESPONSIVE ==================== */
+@media (max-width: 768px) {
   .directory-selector-content {
-    padding: 15px !important;
+    padding: 20px !important;
   }
   
-  .directory-selector-main {
-    gap: 10px !important;
+  .recent-projects-list {
+    grid-template-columns: 1fr !important;
   }
   
-  .directory-selector-left {
-    flex: 1 1 auto !important;
-    min-height: 150px !important;
-  }
-  
-  .directory-selector-right {
-    padding: 12px !important;
-  }
-  
-  .directory-selector-buttons .btn,
-  .directory-selector-buttons button {
-    padding: 10px 12px !important;
-    font-size: 0.85rem !important;
-  }
-  
-  .project-path {
-    display: none !important;
-  }
-  
-  .recent-project-item {
-    padding: 10px 14px !important;
-  }
-  
-  #create-new-project-btn {
-    min-height: 38px !important;
-    padding: 10px !important;
-    font-size: 0.85rem !important;
+  .directory-selector-buttons {
+    flex-direction: column !important;
   }
 }
 
-/* Ultra small screens */
-@media (max-height: 500px) {
-  .directory-selector-content {
-    padding: 10px !important;
-  }
-  
-  .directory-selector-content h3 {
-    font-size: 1.2rem !important;
-    margin-bottom: 10px !important;
-  }
-  
-  .recent-projects-section {
-    padding: 10px !important;
-  }
-  
-  .recent-projects-section h4 {
-    font-size: 0.75rem !important;
-    margin-bottom: 8px !important;
-  }
+/* Small quadrant mode */
+.directory-selector.small-quadrant .directory-selector-content {
+  padding: 16px !important;
 }
 
-/* ==================== OVERRIDE STYLES.CSS MAX-HEIGHT ISSUES ==================== */
-/* ULTRA HIGH SPECIFICITY to override styles.css - Using 100% like you discovered works */
-body .directory-selector-container .directory-selector-content .directory-selector-main .directory-selector-left .recent-projects-section .recent-projects-list {
-  max-height: 100% !important;  /* Use 100% instead of calc - this is what works! */
+.directory-selector.small-quadrant h3 {
+  font-size: 16px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list {
+  grid-template-columns: 1fr !important;
+  gap: 8px !important;
+}
+
+.directory-selector.small-quadrant .recent-project-item {
+  padding: 12px !important;
+  min-height: 70px !important;
+}
+
+.directory-selector.small-quadrant .project-color-indicator {
+  width: 36px !important;
+  height: 36px !important;
+}
+
+.directory-selector.small-quadrant .project-color-indicator::after {
+  font-size: 16px !important;
+}
+
+.directory-selector.small-quadrant .project-name {
+  font-size: 14px !important;
+}
+
+.directory-selector.small-quadrant .btn {
+  padding: 10px 16px !important;
+  font-size: 12px !important;
+}
+
+/* ==================== TRANSITIONS ==================== */
+.directory-selector * {
+  transition-timing-function: cubic-bezier(0.25, 0.46, 0.45, 0.94) !important;
+}
+
+/* Vertically constrained */
+.directory-selector.vertically-constrained .directory-selector-content {
+  padding: 12px !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-list {
+  gap: 6px !important;
+}
+
+.directory-selector.vertically-constrained .recent-project-item {
+  padding: 10px !important;
+  min-height: 60px !important;
+}
+
+/* ==================== OVERRIDES ==================== */
+.terminal-wrapper .directory-selector .recent-projects-list {
+  max-height: 100% !important;
+}
+
+/* ==================== SMALL QUADRANT STYLES ==================== */
+.directory-selector.small-quadrant {
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-content {
+  padding: 12px !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+
+.directory-selector.small-quadrant h3 {
+  font-size: 18px !important;
+  margin-bottom: 4px !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-subtitle {
+  font-size: 11px !important;
+  margin-bottom: 12px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-section {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-main {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-section h4 {
+  font-size: 12px !important;
+  margin: 0 0 8px 0 !important;
+  padding: 0 !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  max-height: none !important;
   height: auto !important;
+  grid-template-columns: 1fr !important;
+  gap: 4px !important;
+}
+
+.directory-selector.small-quadrant .recent-project-item {
+  padding: 8px !important;
+  margin-bottom: 4px !important;
+  min-height: auto !important;
+}
+
+.directory-selector.small-quadrant .project-color-indicator {
+  width: 32px !important;
+  height: 32px !important;
+  font-size: 14px !important;
+}
+
+.directory-selector.small-quadrant .project-name {
+  font-size: 12px !important;
+}
+
+.directory-selector.small-quadrant #create-new-project-btn {
+  padding: 8px !important;
+  font-size: 12px !important;
+  margin-top: 8px !important;
+  flex-shrink: 0 !important;
+  width: 100% !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-actions {
+  margin-top: auto !important;
+  padding-top: 12px !important;
+  flex-shrink: 0 !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-actions .btn-text {
+  padding: 6px 12px !important;
+  font-size: 11px !important;
+}
+
+/* ==================== HORIZONTAL LAYOUT (PANORAMIC) ==================== */
+.directory-selector.horizontal-layout {
+  padding: 0 !important;
+  height: 100% !important;
+}
+
+.directory-selector.horizontal-layout .directory-selector-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  padding: 16px 24px !important;
+}
+
+.directory-selector.horizontal-layout h3 {
+  font-size: 20px !important;
+  margin-bottom: 4px !important;
+  text-align: left !important;
+}
+
+.directory-selector.horizontal-layout .directory-selector-subtitle {
+  font-size: 12px !important;
+  margin-bottom: 16px !important;
+  text-align: left !important;
+}
+
+.directory-selector.horizontal-layout .directory-selector-main {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 20px !important;
+  min-height: 0 !important;
+  align-items: stretch !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-section {
+  flex: 1 1 60% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-width: 0 !important;
+  max-width: 70% !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-section h4 {
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  margin-bottom: 12px !important;
+  opacity: 0.6 !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-list {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 6px !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding-right: 8px !important;
+  flex: 1 1 auto !important;
+}
+
+.directory-selector.horizontal-layout .recent-project-item {
+  width: 100% !important;
+  min-height: 40px !important;
+  flex-shrink: 0 !important;
+  padding: 8px 12px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  border-radius: 6px !important;
+}
+
+.directory-selector.horizontal-layout .project-info {
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  flex: 1 !important;
+}
+
+.directory-selector.horizontal-layout .project-color-indicator {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 10px !important;
+  border-radius: 4px !important;
+}
+
+.directory-selector.horizontal-layout .project-details {
+  align-items: flex-start !important;
+  flex: 1 !important;
+}
+
+.directory-selector.horizontal-layout .project-name {
+  font-size: 11px !important;
+  text-align: left !important;
+}
+
+.directory-selector.horizontal-layout .delete-project-btn {
+  top: 8px !important;
+  right: 8px !important;
+  width: 20px !important;
+  height: 20px !important;
+  font-size: 14px !important;
+}
+
+.directory-selector.horizontal-layout #create-new-project-btn {
+  width: 100% !important;
+  min-height: 32px !important;
+  flex-direction: row !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 6px !important;
+  font-size: 10px !important;
+  background: rgba(16, 185, 129, 0.1) !important;
+  border: 1px dashed rgba(16, 185, 129, 0.3) !important;
+  margin-top: 6px !important;
+  padding: 6px 12px !important;
+}
+
+.directory-selector.horizontal-layout #create-new-project-btn .btn-icon {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.directory-selector.horizontal-layout .directory-selector-actions {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  justify-content: center !important;
+  flex: 0 0 auto !important;
+  min-width: 150px !important;
+  padding-left: 20px !important;
+  border-left: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.directory-selector.horizontal-layout .directory-selector-actions .btn-text {
+  padding: 8px 16px !important;
+  font-size: 12px !important;
+}
+
+/* Horizontal layout scrollbar styling */
+.directory-selector.horizontal-layout .recent-projects-list::-webkit-scrollbar {
+  width: 4px !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 3px !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 3px !important;
+}
+
+.directory-selector.horizontal-layout .recent-projects-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Horizontal layout - Session view adjustments */
+.directory-selector.horizontal-layout .session-info {
+  margin-bottom: 16px !important;
+  padding: 12px !important;
+}
+
+.directory-selector.horizontal-layout .session-directory-icon {
+  width: 36px !important;
+  height: 36px !important;
+  font-size: 16px !important;
+}
+
+.directory-selector.horizontal-layout .session-selector-buttons {
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 12px !important;
+  margin-bottom: 16px !important;
+}
+
+.directory-selector.horizontal-layout .session-selector-buttons button {
+  flex: 1 !important;
+  padding: 10px 16px !important;
+  font-size: 13px !important;
+}
+
+.directory-selector.horizontal-layout .danger-mode-option {
+  margin-bottom: 12px !important;
+  font-size: 12px !important;
+}
+
+.directory-selector.horizontal-layout .session-back-button {
+  position: absolute !important;
+  top: 16px !important;
+  right: 24px !important;
+}
+
+/* ==================== VERTICALLY CONSTRAINED STYLES ==================== */
+.directory-selector.vertically-constrained {
+  height: 100% !important;
+}
+
+.directory-selector.vertically-constrained .directory-selector-content {
+  height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.directory-selector.vertically-constrained .directory-selector-main {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-section {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-list {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow-y: auto !important;
   overflow-x: hidden !important;
 }
 
-/* Override the specific problematic media query with EXACT match */
-@media (max-width: 1280px) and (min-width: 1000px) {
-  body .directory-selector-container .recent-projects-list {
-    max-height: 100% !important;  /* Override the 150px with 100% */
+/* ==================== RESPONSIVE DESIGN ==================== */
+@media (max-width: 768px) {
+  .recent-projects-list {
+    grid-template-columns: 1fr !important;
     gap: 8px !important;
-  }
-}
-
-/* Override for ALL possible media queries */
-@media all and (max-width: 9999px) {
-  body .directory-selector-container .recent-projects-list {
-    max-height: 100% !important;
-  }
-}
-
-/* Fallback with maximum specificity */
-.terminal-wrapper .directory-selector .recent-projects-list {
-  max-height: 100% !important;
-}
-
-/* ==================== SMALL QUADRANT RESPONSIVE STYLES ==================== */
-/* Apply horizontal layout ONLY when JavaScript detects small quadrant */
-.directory-selector.small-quadrant .directory-selector-main {
-  flex-direction: row !important;  /* Switch to horizontal */
-  gap: 8px !important;
-  height: 100% !important;
-  align-items: stretch !important;
-}
-
-/* Also apply when we have 4 terminals to avoid flash */
-.terminals-container.count-4 .directory-selector .directory-selector-main {
-  flex-direction: row !important;
-  gap: 8px !important;
-  height: 100% !important;
-  align-items: stretch !important;
-}
-
-.directory-selector.small-quadrant .directory-selector-left,
-.terminals-container.count-4 .directory-selector .directory-selector-left {
-  flex: 1 1 55% !important;  /* Take slightly more than half */
-  max-width: 55% !important;
-  min-width: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-}
-
-.directory-selector.small-quadrant .directory-selector-right,
-.terminals-container.count-4 .directory-selector .directory-selector-right {
-  flex: 0 0 45% !important;  /* Take slightly less than half */
-  max-width: 45% !important;
-  min-width: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;  /* Center buttons vertically */
-  align-items: stretch !important;  /* Stretch buttons horizontally */
-  align-content: center !important;
-  background: rgba(255, 255, 255, 0.02) !important;
-  border-radius: 8px !important;
-  padding: 15px !important;
-  padding-top: 0 !important;  /* Remove top padding to help centering */
-  padding-bottom: 0 !important;  /* Remove bottom padding to help centering */
-  gap: 0 !important;  /* Remove gap, let buttons handle spacing */
-}
-
-.directory-selector.small-quadrant .directory-selector-buttons,
-.terminals-container.count-4 .directory-selector .directory-selector-buttons {
-  flex-direction: column !important;  /* Stack buttons vertically */
-  width: 100% !important;
-  gap: 10px !important;  /* Space between buttons */
-  display: flex !important;
-  justify-content: center !important;  /* Center the button group */
-  align-items: stretch !important;
-  flex: 0 0 auto !important;  /* Don't grow/shrink */
-  margin: auto 0 !important;  /* Center vertically in parent */
-  padding: 0 !important;  /* Remove any padding */
-}
-
-.directory-selector.small-quadrant .directory-selector-buttons .btn,
-.directory-selector.small-quadrant .directory-selector-buttons button,
-.terminals-container.count-4 .directory-selector .directory-selector-buttons .btn,
-.terminals-container.count-4 .directory-selector .directory-selector-buttons button {
-  width: 100% !important;
-  min-height: 40px !important;  /* Slightly taller for better clickability */
-  padding: 10px 16px !important;
-  font-size: 0.85rem !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  white-space: nowrap !important;
-  margin: 0 !important;  /* Remove any margin that might interfere */
-}
-
-/* Extra specific rule to ensure centering works */
-/* Removed position/transform as they were interfering with proper centering */
-.terminal-wrapper .directory-selector.small-quadrant .directory-selector-right > .directory-selector-buttons {
-  margin: 0 !important;
-}
-
-/* Hide last directory section in small quadrants */
-.directory-selector.small-quadrant .last-directory-section,
-.directory-selector.small-quadrant .selected-directory-display:not(.directory-selector-buttons *) {
-  display: none !important;
-}
-
-
-/* Adjust projects section for horizontal layout */
-.directory-selector.small-quadrant .recent-projects-section {
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: column !important;
-  padding: 8px !important;
-}
-
-.directory-selector.small-quadrant .recent-projects-section h4 {
-  font-size: 1.2vw !important;  /* Responsive font with vw */
-  margin-bottom: 8px !important;
-}
-
-.directory-selector.small-quadrant #create-new-project-btn {
-  margin-top: 8px !important;
-  min-height: 34px !important;
-  font-size: 1.3vw !important;  /* Responsive font with vw */
-}
-
-/* Hide title in small quadrants to save space */
-.directory-selector.small-quadrant h3,
-.directory-selector.small-quadrant .directory-selector-title {
-  display: none !important;
-}
-
-/* Compact styles for small quadrants */
-.directory-selector.small-quadrant .directory-selector-content {
-  padding: 8px !important;
-}
-
-.directory-selector.small-quadrant .recent-project-item {
-  padding: 6px 10px !important;
-  margin-bottom: 4px !important;
-}
-
-.directory-selector.small-quadrant .project-name {
-  font-size: 1.3vw !important;  /* Better scaling with viewport */
-}
-
-.directory-selector.small-quadrant .project-path {
-  font-size: 1.1vw !important;  /* Slightly smaller for path */
-}
-
-.directory-selector.small-quadrant .project-color-indicator {
-  width: 10px !important;
-  height: 10px !important;
-}
-
-/* ==================== VERTICALLY CONSTRAINED STYLES ==================== */
-/* When the selector is vertically short, make everything more compact */
-.directory-selector.vertically-constrained {
-  /* Reduce all vertical spacing */
-}
-
-.directory-selector.vertically-constrained .directory-selector-content {
-  padding: 6px !important;
-}
-
-.directory-selector.vertically-constrained .directory-selector-main {
-  gap: 6px !important;
-}
-
-.directory-selector.vertically-constrained .recent-projects-section {
-  padding: 6px !important;
-}
-
-.directory-selector.vertically-constrained .recent-projects-section h4 {
-  font-size: 0.75rem !important;
-  margin-bottom: 4px !important;
-  padding: 2px 0 !important;
-}
-
-.directory-selector.vertically-constrained .recent-project-item {
-  padding: 4px 8px !important;
-  margin-bottom: 2px !important;
-  min-height: 24px !important;
-}
-
-.directory-selector.vertically-constrained .project-name {
-  font-size: 0.8rem !important;
-  line-height: 1.2 !important;
-}
-
-.directory-selector.vertically-constrained .project-path {
-  font-size: 0.7rem !important;
-  line-height: 1.1 !important;
-  margin-top: 1px !important;
-}
-
-.directory-selector.vertically-constrained .directory-selector-buttons button,
-.directory-selector.vertically-constrained .directory-selector-buttons .btn {
-  min-height: 28px !important;
-  padding: 4px 8px !important;
-  font-size: 0.75rem !important;
-}
-
-.directory-selector.vertically-constrained #create-new-project-btn {
-  min-height: 28px !important;
-  padding: 4px 8px !important;
-  font-size: 0.75rem !important;
-  margin-top: 4px !important;
-}
-
-.directory-selector.vertically-constrained .directory-selector-left {
-  min-height: 100px !important;  /* Reduce minimum height */
-}
-
-.directory-selector.vertically-constrained .recent-projects-list {
-  gap: 2px !important;  /* Tighter spacing between items */
-}
-
-/* When BOTH vertically constrained AND small quadrant, extra compact */
-.directory-selector.vertically-constrained.small-quadrant .recent-project-item {
-  padding: 3px 6px !important;
-  margin-bottom: 1px !important;
-}
-
-.directory-selector.vertically-constrained.small-quadrant .project-name {
-  font-size: 0.75rem !important;
-}
-
-.directory-selector.vertically-constrained.small-quadrant .directory-selector-buttons button {
-  min-height: 26px !important;
-  padding: 3px 6px !important;
-  font-size: 0.7rem !important;
-}
-
-/* ==================== 4-QUADRANT OPTIMIZATIONS ==================== */
-/* Additional optimizations for very small viewports */
-@media (max-width: 960px) and (max-height: 600px) {
-  .directory-selector-content {
-    padding: 8px !important;
-  }
-  
-  .directory-selector-content h3,
-  .directory-selector-title {
-    margin-bottom: 8px !important;
-    font-size: 1.1rem !important;
-  }
-  
-  .directory-selector-main {
-    gap: 8px !important;
-  }
-  
-  .recent-projects-section {
-    padding: 8px !important;
-  }
-  
-  .recent-projects-section h4 {
-    margin-bottom: 6px !important;
-    font-size: 0.7rem !important;
   }
   
   .recent-project-item {
-    padding: 6px 10px !important;
-    margin-bottom: 4px !important;
+    padding: 12px !important;
   }
   
-  .project-name {
-    font-size: 0.75rem !important;
+  .directory-selector-content {
+    padding: 20px !important;
   }
   
-  .project-path {
-    font-size: 0.65rem !important;
+  .session-selector-buttons {
+    flex-direction: column !important;
+    gap: 10px !important;
   }
   
-  .project-color-indicator {
-    width: 10px !important;
-    height: 10px !important;
+  .session-selector-buttons .btn {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .directory-selector {
+    width: 95vw !important;
+    height: 90vh !important;
+    margin: 5vh auto !important;
   }
   
-  #create-new-project-btn {
-    min-height: 32px !important;
-    padding: 6px !important;
-    margin-top: 6px !important;
-    font-size: 0.75rem !important;
+  .directory-selector-content h3 {
+    font-size: 20px !important;
   }
   
-  .directory-selector-right {
-    padding: 8px !important;
-    gap: 6px !important;
+  .recent-projects-section h4 {
+    font-size: 14px !important;
   }
-  
-  .directory-selector-buttons {
-    gap: 6px !important;
+}
+
+@media (min-width: 769px) and (max-width: 1024px) {
+  .recent-projects-list {
+    grid-template-columns: repeat(2, 1fr) !important;
   }
-  
-  .directory-selector-buttons .btn,
-  .directory-selector-buttons button {
-    padding: 6px 10px !important;
-    font-size: 0.75rem !important;
-    min-height: 32px !important;
-  }
+}
+
+/* Directory actions for browse and cancel */
+.directory-selector-actions {
+  display: flex !important;
+  justify-content: center !important;
+  gap: 16px !important;
+  margin-top: 20px !important;
+  padding-top: 20px !important;
+  border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.directory-selector-actions .btn-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 8px 16px !important;
+  background: transparent !important;
+  border: none !important;
+  color: rgba(255, 255, 255, 0.6) !important;
+  font-size: 13px !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+  border-radius: 6px !important;
+}
+
+.directory-selector-actions .btn-text:hover {
+  background: rgba(255, 255, 255, 0.05) !important;
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+.directory-selector-actions .btn-text svg {
+  width: 16px !important;
+  height: 16px !important;
+  opacity: 0.7 !important;
+}
+
+/* ==================== HOLD TO CONFIRM STYLES ==================== */
+/* Hold Progress Indicator Styles */
+.hold-progress {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    pointer-events: none !important;
+    opacity: 0 !important;
+    transition: opacity 0.3s ease !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    background: rgba(0, 0, 0, 0.7) !important;
+    border-radius: 12px !important;
+}
+
+.hold-progress.active {
+    opacity: 1 !important;
+}
+
+.hold-progress-bar {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    height: 100% !important;
+    background: linear-gradient(90deg, #ff4444 0%, #ff6666 100%) !important;
+    border-radius: 12px !important;
+    transition: width 0.1s linear !important;
+    opacity: 0.3 !important;
+}
+
+.hold-progress-text {
+    position: relative !important;
+    color: white !important;
+    font-size: 14px !important;
+    font-weight: 600 !important;
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5) !important;
+    z-index: 1 !important;
+}
+
+/* Hold Tooltip Styles */
+.hold-tooltip {
+    position: absolute !important;
+    bottom: calc(100% + 10px) !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    background: #2a2a2a !important;
+    color: #fff !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+    z-index: 1000 !important;
+    animation: tooltipIn 0.3s ease !important;
+}
+
+.hold-tooltip::after {
+    content: '' !important;
+    position: absolute !important;
+    top: 100% !important;
+    left: 50% !important;
+    margin-left: -5px !important;
+    border-width: 5px !important;
+    border-style: solid !important;
+    border-color: #2a2a2a transparent transparent transparent !important;
+}
+
+.hold-tooltip.fade-out {
+    animation: tooltipOut 0.3s ease forwards !important;
+}
+
+@keyframes tooltipIn {
+    from {
+        opacity: 0 !important;
+        transform: translateX(-50%) translateY(5px) !important;
+    }
+    to {
+        opacity: 1 !important;
+        transform: translateX(-50%) translateY(0) !important;
+    }
+}
+
+@keyframes tooltipOut {
+    from {
+        opacity: 1 !important;
+        transform: translateX(-50%) translateY(0) !important;
+    }
+    to {
+        opacity: 0 !important;
+        transform: translateX(-50%) translateY(5px) !important;
+    }
+}
+
+/* Session buttons need position relative for absolute children */
+#resume-session-btn,
+#new-session-btn {
+    position: relative !important;
+}
+
+/* Hold Warning Message Styles */
+.hold-warning-message {
+    display: none;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    background: rgba(255, 107, 107, 0.95) !important;
+    border: 1px solid rgba(255, 107, 107, 0.3) !important;
+    border-radius: 6px !important;
+    color: #ffffff !important;
+    font-size: 11px !important;
+    font-weight: 500 !important;
+    opacity: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    transition: all 0.3s ease !important;
+    box-shadow: 0 4px 12px rgba(255, 107, 107, 0.3) !important;
+    pointer-events: none !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+    width: fit-content !important;
+}
+
+.hold-warning-message.show {
+    display: flex !important;
+    opacity: 1 !important;
+    max-height: 100px !important;
+    margin: 16px auto !important;
+    padding: 10px 14px !important;
+}
+
+.hold-warning-message svg {
+    flex-shrink: 0 !important;
+}
+
+.warning-text {
+    line-height: 1.4 !important;
+}
+
+/* ==================== INLINE STYLE OVERRIDES ==================== */
+/* Override problematic inline styles */
+.directory-selector .directory-selector-main[style*="flex-direction: row"] {
+  flex-direction: column !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-main[style*="flex-direction: row"] {
+  flex-direction: column !important;
+}
+
+/* Ensure list is always visible within quadrant constraints */
+.directory-selector .recent-projects-list[style*="max-height"] {
+  max-height: none !important;
+  flex: 1 1 auto !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list[style*="max-height"] {
+  max-height: none !important;
+  flex: 1 1 auto !important;
+}
+
+.directory-selector.vertically-constrained .recent-projects-list[style*="max-height"] {
+  max-height: none !important;
+  flex: 1 1 auto !important;
 }

@@ -2684,9 +2684,10 @@ class KanbanManager {
 
         const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
             title: 'Delete Subtask',
-            message: `Are you sure you want to delete subtask "${this.capitalizeFirstLetter(subtask.title)}"?`
+            message: `Are you sure you want to delete subtask "${this.capitalizeFirstLetter(subtask.title)}"?`,
+            buttons: ['Cancel', 'Delete']
         });
-        if (!confirmed) return;
+        if (confirmed !== 1) return; // 1 is the index of "Delete" button
 
         try {
             const result = await ipcRenderer.invoke('task-delete', subtaskId);
@@ -2775,9 +2776,10 @@ class KanbanManager {
         
         const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
             title: 'Unlink Subtask',
-            message: `Are you sure you want to unlink subtask "${this.capitalizeFirstLetter(subtask.title)}"?`
+            message: `Are you sure you want to unlink subtask "${this.capitalizeFirstLetter(subtask.title)}"?`,
+            buttons: ['Cancel', 'Unlink']
         });
-        if (!confirmed) return;
+        if (confirmed !== 1) return; // 1 is the index of "Unlink" button
         
         try {
             const result = await ipcRenderer.invoke('task-unlink-from-parent', subtaskId);
@@ -2989,9 +2991,10 @@ class KanbanManager {
 
         const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
             title: 'Delete Task',
-            message: `Are you sure you want to delete "${this.currentTask.title}"?`
+            message: `Are you sure you want to delete "${this.currentTask.title}"?`,
+            buttons: ['Cancel', 'Delete']
         });
-        if (!confirmed) return;
+        if (confirmed !== 1) return; // 1 is the index of "Delete" button
 
         try {
             const result = await ipcRenderer.invoke('task-delete', this.currentTask.id);
@@ -3736,9 +3739,10 @@ class KanbanManager {
         const confirmed = await ipcRenderer.invoke('show-confirm-dialog', {
             title: 'Delete Project',
             message: `Are you sure you want to delete the project "${project.display_name || project.name}"?`,
-            detail: 'This will NOT delete tasks associated with this project.'
+            detail: 'This will NOT delete tasks associated with this project.',
+            buttons: ['Cancel', 'Delete']
         });
-        if (!confirmed) return;
+        if (confirmed !== 1) return; // 1 is the index of "Delete" button
         
         try {
             const result = await ipcRenderer.invoke('project-delete', this.editingProjectName);

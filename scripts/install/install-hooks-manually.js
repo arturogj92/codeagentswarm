@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const HooksManager = require('./hooks-manager');
+const HooksManager = require('../../src/infrastructure/hooks/hooks-manager');
 
 async function installHooksManually() {
     console.log('Installing CodeAgentSwarm hooks manually...\n');
