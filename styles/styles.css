@@ -1698,19 +1698,7 @@ body::before {
   backdrop-filter: none;
 }
 
-.terminal-placeholder::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle at center, rgba(127, 90, 240, 0.15) 0%, transparent 60%);
-  opacity: 0;
-  transition: opacity 0.4s ease;
-  pointer-events: none;
-  animation: rotate 20s linear infinite;
-}
+/* Removed terminal-placeholder::before - was causing visual distraction */
 
 @keyframes rotate {
   from { transform: rotate(0deg); }

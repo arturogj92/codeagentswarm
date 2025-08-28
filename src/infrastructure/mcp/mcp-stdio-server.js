@@ -443,8 +443,18 @@ class MCPStdioServer {
     }
 
     async getAllTasks(params) {
-        const tasks = this.db.getAllTasks();
-        return { tasks };
+        const { limit = 20, offset = 0 } = params || {};
+        const tasks = this.db.getAllTasks(limit, offset);
+        const totalCount = this.db.getTasksCount();
+        return { 
+            tasks, 
+            pagination: {
+                limit,
+                offset,
+                total: totalCount,
+                hasMore: offset + limit < totalCount
+            }
+        };
     }
 
     async getCurrentTask(params) {
@@ -1095,11 +1105,13 @@ class MCPStdioServer {
                 },
                 {
                     name: 'list_tasks',
-                    description: 'List all tasks',
+                    description: 'List all tasks with pagination support',
                     inputSchema: {
                         type: 'object',
                         properties: {
-                            status: { type: 'string', enum: ['pending', 'in_progress', 'in_testing', 'completed'], description: 'Filter by status' }
+                            status: { type: 'string', enum: ['pending', 'in_progress', 'in_testing', 'completed'], description: 'Filter by status' },
+                            limit: { type: 'number', description: 'Maximum number of tasks to return (default: 20)', default: 20 },
+                            offset: { type: 'number', description: 'Number of tasks to skip for pagination (default: 0)', default: 0 }
                         }
                     }
                 },
@@ -1436,12 +1448,33 @@ class MCPStdioServer {
                 break;
                 
             case 'list_tasks':
+                const limit = args.limit || 20;
+                const offset = args.offset || 0;
+                
                 if (args.status) {
-                    const tasks = await this.db.getTasksByStatus(args.status);
-                    result = { tasks };
+                    const tasks = await this.db.getTasksByStatus(args.status, limit, offset);
+                    const totalCount = await this.db.getTasksCountByStatus(args.status);
+                    result = { 
+                        tasks,
+                        pagination: {
+                            limit,
+                            offset,
+                            total: totalCount,
+                            hasMore: offset + limit < totalCount
+                        }
+                    };
                 } else {
-                    const tasks = await this.db.getAllTasks();
-                    result = { tasks };
+                    const tasks = await this.db.getAllTasks(limit, offset);
+                    const totalCount = await this.db.getTasksCount();
+                    result = { 
+                        tasks,
+                        pagination: {
+                            limit,
+                            offset,
+                            total: totalCount,
+                            hasMore: offset + limit < totalCount
+                        }
+                    };
                 }
                 break;
                 

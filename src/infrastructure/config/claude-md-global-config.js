@@ -9,25 +9,29 @@ const getGlobalCodeAgentSwarmSection = () => `${CODEAGENTSWARM_START}
 
 ## 🤖 CodeAgentSwarm Task Management System
 
-### 🚨🚨🚨 OBLIGATORY: Task Creation Before ANY Work 🚨🚨🚨
+### 🚨 SMART Task Creation - For ACTUAL Development Work 🚨
 
-# ⛔ STOP! DO NOT PROCEED WITHOUT A TASK ⛔
+# 🎯 CREATE TASKS FOR REAL WORK, NOT SETUP
 
-**IT IS ABSOLUTELY MANDATORY TO CREATE A TASK BEFORE STARTING ANY WORK**
+**MANDATORY: Create tasks for actual development work that modifies the codebase**
 
-**THIS INCLUDES:**
-- ✅ **RESEARCH TASKS**: "Investigate", "Analyze", "Search", "Find", "Look into", "Check", "Explain"
-- ✅ **CODE CHANGES**: Any modification, no matter how small
-- ✅ **FILE READING**: Even just looking at files  
-- ✅ **QUESTIONS**: "How does X work?", "What is Y?", "Where is Z?"
-- ✅ **ANALYSIS**: Architecture review, code analysis, performance checks
-- ✅ **LITERALLY EVERYTHING**: If the user asks for ANYTHING, create a task FIRST
+**REQUIRES A TASK - Development Work:**
+- ✅ **CODE CHANGES**: Any modification to code files, configs, or schemas
+- ✅ **NEW FEATURES**: Creating new functionality or components
+- ✅ **BUG FIXES**: Any code change to fix an issue
+- ✅ **REFACTORING**: Code improvements or restructuring
+- ✅ **API/DB CHANGES**: Modifications to endpoints or database schemas
+- ✅ **TEST WRITING**: Creating or modifying test files
 
-**NO EXCEPTIONS. NO EXCUSES. NO "QUICK FIXES" WITHOUT A TASK.**
+**NO TASK NEEDED - Setup, Navigation & Investigation:**
+- ❌ **OPENING TERMINALS**: Just opening a bash session
+- ❌ **NAVIGATION**: Using cd, ls, pwd to move around
+- ❌ **READING CODE**: Understanding existing code without changes
+- ❌ **CHECKING STATUS**: Viewing logs, git status, running tests
+- ❌ **QUESTIONS**: Explaining how code works or answering questions
+- ❌ **SEARCHING**: Finding functions or references (without modifying)
 
-Before doing ANY work, including research, investigation, or code changes, you MUST create and start a task. This is NOT optional - it is a MANDATORY requirement for ALL work.
-
-**VIOLATIONS WILL BE TRACKED AND REPORTED**
+**USE YOUR JUDGMENT: Tasks are for tracking actual development progress, not every action.**
 
 ### ⚠️ EXCEPTIONS - Operations that DON'T require tasks:
 
@@ -47,6 +51,15 @@ Before doing ANY work, including research, investigation, or code changes, you M
 - ✅ \`gh pr list\` - Listing pull requests
 - ✅ \`gh release create\` - Creating releases after task work
 
+**Setup and Navigation Operations that DON'T require tasks:**
+- ✅ Opening terminals or terminal sessions
+- ✅ Navigating to directories (\`cd\`, \`pwd\`)
+- ✅ Checking environment variables (\`echo $VAR\`, \`env\`)
+- ✅ Listing files and directories (\`ls\`, \`tree\`, \`find\` for exploration)
+- ✅ Reading files for understanding (without modification intent)
+- ✅ Opening files in editors for viewing (without modification)
+- ✅ Checking system status (\`ps\`, \`top\`, \`df\`, \`which\`)
+
 **Other operations that DON'T require tasks:**
 - ✅ Running tests with existing test commands (npm test, pytest, etc.)
 - ✅ Checking linting status (npm run lint, etc.)
@@ -54,15 +67,40 @@ Before doing ANY work, including research, investigation, or code changes, you M
 - ✅ Installing dependencies (npm install, pip install, etc.)
 - ✅ Starting/stopping development servers
 - ✅ Reading documentation or help commands
+- ✅ Running existing scripts without modification
+- ✅ Database queries for investigation (SELECT statements)
+- ✅ API testing with existing tools (curl, Postman, etc.)
 
 **These are ADMINISTRATIVE/MAINTENANCE operations that are part of normal workflow and DO NOT require task creation.**
 
-**IMPORTANT:** If the user asks you to:
-- "Implement a git workflow" → REQUIRES A TASK
-- "Create git hooks" → REQUIRES A TASK  
-- "Fix the tests" → REQUIRES A TASK
-- "Update dependencies" → REQUIRES A TASK
-- Any actual development work → REQUIRES A TASK
+### 🎯 What ACTUALLY Requires a Task - Development Work Detection
+
+**REQUIRES A TASK - Actual Development Work:**
+- ✅ **Creating new files** (code, configs, schemas)
+- ✅ **Modifying existing files** (any code changes, even small fixes)
+- ✅ **Deleting files** (removing code or resources)
+- ✅ **Database schema changes** (CREATE, ALTER, DROP tables)
+- ✅ **API endpoint changes** (new routes, modified responses)
+- ✅ **Configuration changes** that affect application behavior
+- ✅ **Writing new tests** or modifying test suites
+- ✅ **Refactoring code** (even if functionality stays the same)
+- ✅ **Bug fixes** (any code change to fix an issue)
+- ✅ **Performance optimizations** (code changes for efficiency)
+
+**DOES NOT REQUIRE A TASK - Investigation & Understanding:**
+- ❌ **Reading code** to understand how it works
+- ❌ **Searching for functions** or references
+- ❌ **Analyzing architecture** without changes
+- ❌ **Running existing code** to see output
+- ❌ **Checking logs** or debugging output
+- ❌ **Asking questions** about code behavior
+
+**Development Work Threshold:**
+- Tasks should be created for work that:
+  - Will take more than 5 minutes to complete
+  - Involves modifying multiple files
+  - Creates persistent changes to the codebase
+  - Needs to be tracked for project management
 
 The exceptions are ONLY for routine operations that don't modify the codebase functionality.
 
@@ -167,6 +205,9 @@ The exceptions are ONLY for routine operations that don't modify the codebase fu
 ### 🔄 Workflow
 
 1. **When receiving a user request:**
+   - **FIRST: Evaluate if this is development work or just setup/navigation**
+   - If it's just setup (opening terminal, navigating, reading files) → NO TASK NEEDED
+   - If it's actual development work → Continue to step 2
    - Review existing tasks with \`list_tasks\`
    - **CHECK FIRST:** Is this a bug fix or modification of a recently completed task?
      - If YES → Ask if should continue with the existing task
@@ -180,6 +221,40 @@ The exceptions are ONLY for routine operations that don't modify the codebase fu
    - Keep task status updated
    - If plan changes significantly, update it again
    - Only one active task per terminal
+
+### 🤔 Task Continuation Decision - When User Provides New Instructions
+
+**When user provides new instructions while a task is active:**
+
+1. **Analyze the new instruction:**
+   - Is it related to the current task? (bug fix, enhancement, continuation)
+   - Is it a completely new feature or scope?
+   - Is it just a clarification or information request?
+
+2. **If related but significant change, ASK THE USER:**
+   \`\`\`
+   "This seems related to the current task [#ID: Title]. Should I:
+   a) Continue with the current task and update the plan
+   b) Create a new subtask under the current task  
+   c) Create a completely new task"
+   \`\`\`
+
+3. **If unrelated to current work, ASK THE USER:**
+   \`\`\`
+   "This appears to be a different scope from task [#ID]. Should I:
+   a) Pause current task and create a new one
+   b) Complete current task first, then create new
+   c) Create as a separate task to work in parallel"
+   \`\`\`
+
+4. **If it's just clarification or doesn't require code changes:**
+   - Answer the question without creating a new task
+   - Continue with current task if one is active
+
+**Smart Task Title Generation:**
+- ❌ NEVER create tasks with titles like: "Open terminal", "Check status", "View logs", "Read file"
+- ✅ DO create tasks with titles like: "Implement auth feature", "Fix login bug", "Refactor database module"
+- Focus on the actual deliverable, not the preparation steps
 
 3. **When finishing technical work:**
    - **MANDATORY: Verify plan compliance** - Before completing, review all plan points have been fulfilled
@@ -305,7 +380,7 @@ The following MCP tools are available for task management:
 - **\`start_task\`**: Mark task as "in_progress"
 - **\`complete_task\`**: First call: ALWAYS moves to "in_testing" (NEVER directly to "completed"). Second call (only after manual approval and testing): moves to "completed"
 - **\`submit_for_testing\`**: Mark task as "in_testing"
-- **\`list_tasks\`**: List all tasks (optional: filter by status)
+- **\`list_tasks\`**: List all tasks (optional: filter by status, supports pagination with limit and offset parameters)
 - **\`search_tasks\`**: Search for tasks by keywords in title, description, plan, or implementation
 - **\`update_task_plan\`**: Update specific task plan
 - **\`update_task_implementation\`**: Update task implementation
@@ -346,6 +421,10 @@ start_task(task_id=123)
 update_terminal_title(title="Implement Auth Feature")  # MANDATORY after start_task
 
 update_task_plan(task_id=123, plan="1. Review existing code\\n2. Implement new functionality\\n3. Write tests")
+
+# List tasks with pagination (new feature)
+list_tasks(status="in_testing", limit=10, offset=0)  # Get first 10 in_testing tasks
+list_tasks(limit=20, offset=20)  # Get tasks 21-40
 
 update_task_implementation(task_id=123, implementation="Modified files: database.js, mcp-server.js\\nSummary: Added implementation field to tasks table\\nFlow: New field allows documenting changes made during implementation")
 
@@ -523,68 +602,76 @@ When there are many tasks in the database (30+), the \`list_tasks\` MCP command 
 
 **This documentation is CRITICAL to maintain the knowledge base updated and facilitate other developers' work.**
 
-## 🚨 CRITICAL ENFORCEMENT CHECKLIST - FINAL VERIFICATION 🚨
+## 🚨 CRITICAL ENFORCEMENT CHECKLIST - INTELLIGENT VERIFICATION 🚨
 
-### ⚠️ BEFORE YOU DO ANYTHING - VERIFY: ⚠️
+### ⚠️ BEFORE YOU DO ANYTHING - SMART VERIFICATION: ⚠️
 
-**DID YOU CREATE A TASK?**
-- If NO → STOP IMMEDIATELY and create one
-- If YES → Continue
+**1. IS THIS ACTUAL DEVELOPMENT WORK?**
+- If it's just setup/navigation (opening terminal, cd, ls, pwd) → NO TASK NEEDED ✅
+- If it's reading files for understanding → NO TASK NEEDED ✅
+- If it's viewing logs or checking status → NO TASK NEEDED ✅
+- If it MODIFIES any code or files → NEEDS A TASK ⚠️
 
-**IS THE TASK STARTED?**
-- If NO → STOP and start it with \`start_task\`
-- If YES → Continue
+**2. DOES THIS MODIFY CODE OR JUST READ/UNDERSTAND?**
+- Just reading/analyzing without changes → NO TASK NEEDED ✅
+- Will create, modify, or delete files → NEEDS A TASK ⚠️
+- Will change configuration that affects behavior → NEEDS A TASK ⚠️
 
-**DID YOU UPDATE THE TERMINAL TITLE?**
-- If NO → STOP and update it with \`update_terminal_title\`
-- If YES → Continue
+**3. IS THIS A CONTINUATION OF EXISTING WORK?**
+- If related to current task → ASK USER about continuation
+- If completely new scope → Consider new task
+- If just clarification → Answer without new task
 
-### 🔴 REMEMBER: NO TASK = NO WORK 🔴
+**4. FOR ACTUAL DEVELOPMENT WORK, VERIFY:**
+- Task exists or has been created → Continue
+- Task is started (\`start_task\`) → Continue  
+- Terminal title updated (\`update_terminal_title\`) → Continue
+- Plan documented (\`update_task_plan\`) → Continue
 
-**Every single request from the user requires a task. EVERY. SINGLE. ONE.**
+### 🔴 SMART TASK CREATION - NOT EVERYTHING NEEDS A TASK 🔴
 
-**INCLUDING RESEARCH AND INVESTIGATION TASKS:**
-- "Investigate how X works" → NEEDS A TASK
-- "Search for Y in the codebase" → NEEDS A TASK
-- "Analyze this feature" → NEEDS A TASK
-- "Find all occurrences of Z" → NEEDS A TASK
-- "Explain how this works" → NEEDS A TASK
-- "Look into this issue" → NEEDS A TASK
-- "Research best practices for..." → NEEDS A TASK
-- "Check what's in this file" → NEEDS A TASK (even if just reading!)
-- "Tell me about..." → NEEDS A TASK
+**NEEDS A TASK - Real Development Work:**
+- "Implement new feature" → NEEDS A TASK ✅
+- "Fix this bug" → NEEDS A TASK ✅
+- "Add authentication" → NEEDS A TASK ✅
+- "Refactor this module" → NEEDS A TASK ✅
+- "Update the API endpoint" → NEEDS A TASK ✅
+- "Create new component" → NEEDS A TASK ✅
 
-**AND ALSO CODE CHANGES:**
-- "Just add a console.log" → NEEDS A TASK
-- "Fix this typo" → NEEDS A TASK  
-- "Quick test" → NEEDS A TASK
-- "Small change" → NEEDS A TASK
+**NO TASK NEEDED - Setup & Investigation:**
+- "Open a terminal in X directory" → NO TASK ❌
+- "Show me what's in this file" → NO TASK ❌
+- "Explain how this works" → NO TASK ❌
+- "Check the logs" → NO TASK ❌
+- "Run the tests" → NO TASK ❌
+- "Search for function X" → NO TASK ❌
 
-**🚨 ABSOLUTELY NO EXCEPTIONS - EVEN FOR:**
-- Reading files → NEEDS A TASK
-- Searching code → NEEDS A TASK  
-- Analyzing architecture → NEEDS A TASK
-- Answering questions about code → NEEDS A TASK
-- ANY request that involves looking at project files → NEEDS A TASK
+**THRESHOLD CHECK:**
+- Will it take >5 minutes? → Consider a task
+- Will it modify multiple files? → Needs a task
+- Is it a one-time read/check? → No task needed
+- Will changes persist in codebase? → Needs a task
 
-### ❌ FINAL WARNING - THIS MEANS YOU ❌
+### ❌ FINAL REMINDER - BE SMART ABOUT TASKS ❌
 
-**🚨 COMMON MISTAKES THAT STILL REQUIRE TASKS:**
-- "Just tell me what's in this file" → CREATE A TASK
-- "Search for function X" → CREATE A TASK
-- "How does this feature work?" → CREATE A TASK
-- "Investigate this bug" → CREATE A TASK
-- "Analyze the architecture" → CREATE A TASK
-- "What does this code do?" → CREATE A TASK
-- "Find all uses of..." → CREATE A TASK
+**🚨 DO CREATE TASKS FOR:**
+- Any code modifications (even one line)
+- Creating new files or features
+- Bug fixes that change code
+- Database schema modifications
+- API changes
+- Configuration changes that affect behavior
 
-**Failure to create tasks is the #1 complaint from users.**
-**Don't be the agent that ignores this requirement.**
+**✅ DON'T CREATE TASKS FOR:**
+- Opening terminals or navigating directories
+- Reading files to understand code
+- Checking logs or status
+- Running existing tests
+- Simple questions about code
+- Setup and navigation operations
 
-**CREATE. THE. TASK. ALWAYS.**
-**FOR. EVERY. SINGLE. REQUEST.**
-**NO. MATTER. HOW. SIMPLE.**
-**RESEARCH. NEEDS. TASKS. TOO.**
+**The goal is to track REAL WORK, not every single action.**
+**Be intelligent about what constitutes actual development.**
 
 ${CODEAGENTSWARM_END}`;
 

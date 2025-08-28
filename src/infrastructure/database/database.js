@@ -695,32 +695,64 @@ class DatabaseManager {
         }
     }
 
-    // Get all tasks
-    getAllTasks() {
+    // Get all tasks with pagination
+    getAllTasks(limit = null, offset = 0) {
         try {
-            const stmt = this.db.prepare(`
+            let query = `
                 SELECT * FROM tasks 
                 ORDER BY sort_order ASC, created_at DESC
-            `);
+            `;
             
+            if (limit !== null) {
+                query += ` LIMIT ${limit} OFFSET ${offset}`;
+            }
+            
+            const stmt = this.db.prepare(query);
             return stmt.all();
         } catch (err) {
             return [];
         }
     }
-
-    // Get tasks by status
-    getTasksByStatus(status) {
+    
+    // Get total count of tasks
+    getTasksCount() {
         try {
-            const stmt = this.db.prepare(`
+            const stmt = this.db.prepare(`SELECT COUNT(*) as count FROM tasks`);
+            const result = stmt.get();
+            return result ? result.count : 0;
+        } catch (err) {
+            return 0;
+        }
+    }
+
+    // Get tasks by status with pagination
+    getTasksByStatus(status, limit = null, offset = 0) {
+        try {
+            let query = `
                 SELECT * FROM tasks 
                 WHERE status = ?
                 ORDER BY sort_order ASC, created_at DESC
-            `);
+            `;
             
+            if (limit !== null) {
+                query += ` LIMIT ${limit} OFFSET ${offset}`;
+            }
+            
+            const stmt = this.db.prepare(query);
             return stmt.all(status);
         } catch (err) {
             return [];
+        }
+    }
+    
+    // Get count of tasks by status
+    getTasksCountByStatus(status) {
+        try {
+            const stmt = this.db.prepare(`SELECT COUNT(*) as count FROM tasks WHERE status = ?`);
+            const result = stmt.get(status);
+            return result ? result.count : 0;
+        } catch (err) {
+            return 0;
         }
     }
 
