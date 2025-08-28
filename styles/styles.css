@@ -2656,10 +2656,7 @@ body::before {
   text-align: center;
 }
 
-.session-back-button {
-  display: flex;
-  justify-content: center;
-}
+/* Back button removed - no longer needed */
 
 .btn-small {
   padding: 8px 16px;

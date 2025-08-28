@@ -27,7 +27,7 @@
   box-sizing: border-box !important;
   position: relative !important;
   z-index: 1 !important;
-  max-width: 500px !important;
+  max-width: 500px !important; /* Default max-width for base layout */
   width: 100% !important;
   margin: 0 auto !important;
 }
@@ -629,33 +629,7 @@
   background: rgba(255, 59, 48, 0.1) !important;
 }
 
-/* Session Back Button */
-.session-back-button {
-  display: none !important;
-  position: absolute !important;
-  top: 32px !important;
-  left: 32px !important;
-}
-
-.session-back-button.active {
-  display: block !important;
-}
-
-#back-btn {
-  padding: 8px 16px !important;
-  font-size: 13px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  border-radius: 8px !important;
-  color: rgba(255, 255, 255, 0.7) !important;
-  transition: all 0.2s !important;
-}
-
-#back-btn:hover {
-  background: rgba(255, 255, 255, 0.08) !important;
-  color: rgba(255, 255, 255, 0.9) !important;
-  transform: translateX(-2px) !important;
-}
+/* Back button removed - no longer needed */
 
 /* Empty State */
 .empty-projects-state {
@@ -702,28 +676,28 @@
   }
 }
 
-/* Small quadrant mode */
+/* Small quadrant mode - Use same style as medium-layout */
 .directory-selector.small-quadrant .directory-selector-content {
-  padding: 16px !important;
+  padding: 20px !important;  /* Same as medium-layout */
 }
 
 .directory-selector.small-quadrant h3 {
-  font-size: 16px !important;
+  font-size: 18px !important;  /* Same as medium-layout default */
 }
 
 .directory-selector.small-quadrant .recent-projects-list {
   grid-template-columns: 1fr !important;
-  gap: 8px !important;
+  gap: 10px !important;  /* Same as medium-layout */
 }
 
 .directory-selector.small-quadrant .recent-project-item {
-  padding: 12px !important;
+  padding: 14px !important;  /* Same as medium-layout */
   min-height: 70px !important;
 }
 
 .directory-selector.small-quadrant .project-color-indicator {
-  width: 36px !important;
-  height: 36px !important;
+  width: 40px !important;  /* Same as medium-layout */
+  height: 40px !important;  /* Same as medium-layout */
 }
 
 .directory-selector.small-quadrant .project-color-indicator::after {
@@ -735,8 +709,8 @@
 }
 
 .directory-selector.small-quadrant .btn {
-  padding: 10px 16px !important;
-  font-size: 12px !important;
+  padding: 12px !important;  /* Same as medium-layout default */
+  font-size: 13px !important;  /* Same as medium-layout default */
 }
 
 /* ==================== TRANSITIONS ==================== */
@@ -773,7 +747,7 @@
 }
 
 .directory-selector.small-quadrant .directory-selector-content {
-  padding: 12px !important;
+  padding: 20px !important;  /* Same as medium-layout */
   max-width: 100% !important;
   display: flex !important;
   flex-direction: column !important;
@@ -783,13 +757,24 @@
 }
 
 .directory-selector.small-quadrant h3 {
-  font-size: 18px !important;
-  margin-bottom: 4px !important;
+  font-size: 18px !important;  /* Same as medium-layout default */
+  margin-bottom: 8px !important;  /* Same as medium-layout */
+  flex-shrink: 0 !important;
 }
 
 .directory-selector.small-quadrant .directory-selector-subtitle {
-  font-size: 11px !important;
-  margin-bottom: 12px !important;
+  font-size: 12px !important;  /* Same as medium-layout default */
+  margin-bottom: 12px !important;  /* Same as medium-layout */
+  flex-shrink: 0 !important;
+}
+
+.directory-selector.small-quadrant .directory-selector-main {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  gap: 10px !important;
 }
 
 .directory-selector.small-quadrant .recent-projects-section {
@@ -800,64 +785,77 @@
   overflow: hidden !important;
 }
 
-.directory-selector.small-quadrant .directory-selector-main {
-  flex: 1 1 auto !important;
-  display: flex !important;
-  flex-direction: column !important;
-  min-height: 0 !important;
-  overflow: hidden !important;
-}
-
 .directory-selector.small-quadrant .recent-projects-section h4 {
-  font-size: 12px !important;
-  margin: 0 0 8px 0 !important;
+  font-size: 13px !important;  /* Same as medium-layout default */
+  margin: 0 0 10px 0 !important;  /* Same as medium-layout */
   padding: 0 !important;
+  flex-shrink: 0 !important;
 }
 
 .directory-selector.small-quadrant .recent-projects-list {
   flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow-y: auto !important;
+  overflow-x: hidden !important;
   max-height: none !important;
-  height: auto !important;
   grid-template-columns: 1fr !important;
-  gap: 4px !important;
+  gap: 10px !important;  /* Same as medium-layout */
+  padding-right: 4px !important;
 }
 
 .directory-selector.small-quadrant .recent-project-item {
-  padding: 8px !important;
-  margin-bottom: 4px !important;
+  padding: 14px !important;  /* Same as medium-layout */
   min-height: auto !important;
+  flex-shrink: 0 !important;
 }
 
 .directory-selector.small-quadrant .project-color-indicator {
-  width: 32px !important;
-  height: 32px !important;
-  font-size: 14px !important;
+  width: 40px !important;  /* Same as medium-layout */
+  height: 40px !important;  /* Same as medium-layout */
+  font-size: 16px !important;  /* Same as medium-layout default */
 }
 
 .directory-selector.small-quadrant .project-name {
-  font-size: 12px !important;
+  font-size: 14px !important;  /* Same as medium-layout default */
 }
 
 .directory-selector.small-quadrant #create-new-project-btn {
-  padding: 8px !important;
-  font-size: 12px !important;
-  margin-top: 8px !important;
+  padding: 12px !important;  /* Same as medium-layout default */
+  font-size: 13px !important;  /* Same as medium-layout default */
+  margin-top: 12px !important;  /* Same as medium-layout */
   flex-shrink: 0 !important;
   width: 100% !important;
 }
 
 .directory-selector.small-quadrant .directory-selector-actions {
   margin-top: auto !important;
-  padding-top: 12px !important;
+  padding-top: 16px !important;  /* Same as medium-layout default */
   flex-shrink: 0 !important;
   border-top: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
 
 .directory-selector.small-quadrant .directory-selector-actions .btn-text {
-  padding: 6px 12px !important;
-  font-size: 11px !important;
+  padding: 8px 16px !important;  /* Same as medium-layout default */
+  font-size: 12px !important;  /* Same as medium-layout default */
+}
+
+/* Scrollbar styling for small quadrant */
+.directory-selector.small-quadrant .recent-projects-list::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 3px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 3px !important;
+}
+
+.directory-selector.small-quadrant .recent-projects-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
 }
 
 /* ==================== HORIZONTAL LAYOUT (PANORAMIC) ==================== */
@@ -1048,11 +1046,7 @@
   font-size: 12px !important;
 }
 
-.directory-selector.horizontal-layout .session-back-button {
-  position: absolute !important;
-  top: 16px !important;
-  right: 24px !important;
-}
+/* Back button removed - no longer needed */
 
 /* ==================== VERTICALLY CONSTRAINED STYLES ==================== */
 .directory-selector.vertically-constrained {
@@ -1312,6 +1306,163 @@
 
 .warning-text {
     line-height: 1.4 !important;
+}
+
+/* ==================== COMPACT LAYOUT (< 320px width) ==================== */
+.directory-selector.compact-layout .directory-selector-content {
+  padding: 8px !important;
+  max-width: 100% !important;
+}
+
+.directory-selector.compact-layout h3 {
+  font-size: 14px !important;
+  margin-bottom: 2px !important;
+}
+
+.directory-selector.compact-layout .directory-selector-subtitle {
+  font-size: 10px !important;
+  margin-bottom: 8px !important;
+}
+
+.directory-selector.compact-layout .recent-projects-section h4 {
+  font-size: 10px !important;
+  margin: 0 0 6px 0 !important;
+}
+
+.directory-selector.compact-layout .recent-projects-list {
+  grid-template-columns: 1fr !important;
+  gap: 3px !important;
+}
+
+.directory-selector.compact-layout .recent-project-item {
+  padding: 6px !important;
+  min-height: auto !important;
+  flex-direction: row !important;
+  align-items: center !important;
+}
+
+.directory-selector.compact-layout .project-color-indicator {
+  width: 24px !important;
+  height: 24px !important;
+  font-size: 11px !important;
+}
+
+.directory-selector.compact-layout .project-name {
+  font-size: 11px !important;
+}
+
+.directory-selector.compact-layout #create-new-project-btn {
+  padding: 6px !important;
+  font-size: 11px !important;
+  margin-top: 6px !important;
+}
+
+.directory-selector.compact-layout .directory-selector-actions {
+  margin-top: 8px !important;
+  padding-top: 8px !important;
+}
+
+.directory-selector.compact-layout .directory-selector-actions .btn-text {
+  padding: 5px 10px !important;
+  font-size: 10px !important;
+}
+
+/* ==================== MEDIUM LAYOUT (500-700px width) ==================== */
+.directory-selector.medium-layout .directory-selector-content {
+  padding: 20px !important;
+  max-width: 600px !important;
+}
+
+.directory-selector.medium-layout .recent-projects-list {
+  grid-template-columns: 1fr !important; /* Single column for better readability */
+  gap: 10px !important;
+}
+
+.directory-selector.medium-layout .recent-project-item {
+  padding: 14px !important;
+}
+
+.directory-selector.medium-layout .project-color-indicator {
+  width: 40px !important;
+  height: 40px !important;
+}
+
+.directory-selector.medium-layout #create-new-project-btn {
+  grid-column: span 1 !important; /* Single column span */
+}
+
+/* ==================== LARGE LAYOUT (>= 700px width) ==================== */
+.directory-selector.large-layout .directory-selector-content {
+  padding: 24px !important;
+  max-width: 700px !important; /* Allow more width for large terminals */
+}
+
+.directory-selector.large-layout h3 {
+  font-size: 20px !important;
+}
+
+.directory-selector.large-layout .directory-selector-subtitle {
+  font-size: 13px !important;
+  margin-bottom: 16px !important;
+}
+
+.directory-selector.large-layout .recent-projects-section h4 {
+  font-size: 14px !important;
+  margin-bottom: 12px !important;
+}
+
+.directory-selector.large-layout .recent-projects-list {
+  grid-template-columns: 1fr !important; /* Keep single column for consistency */
+  gap: 12px !important;
+}
+
+.directory-selector.large-layout .recent-project-item {
+  padding: 16px !important;
+}
+
+.directory-selector.large-layout .project-color-indicator {
+  width: 44px !important;
+  height: 44px !important;
+  font-size: 18px !important;
+}
+
+.directory-selector.large-layout .project-name {
+  font-size: 15px !important;
+}
+
+.directory-selector.large-layout #create-new-project-btn {
+  padding: 14px !important;
+  font-size: 14px !important;
+}
+
+.directory-selector.large-layout .directory-selector-actions {
+  padding-top: 20px !important;
+  margin-top: 20px !important;
+}
+
+.directory-selector.large-layout .directory-selector-actions .btn-text {
+  padding: 10px 20px !important;
+  font-size: 13px !important;
+}
+
+/* ==================== CONTAINER-BASED RESPONSIVE ADJUSTMENTS ==================== */
+/* Combine classes for more specific layouts */
+.directory-selector.small-quadrant.vertically-constrained .recent-projects-list {
+  gap: 4px !important;
+}
+
+.directory-selector.small-quadrant.vertically-constrained .recent-project-item {
+  padding: 6px 8px !important;
+  min-height: 40px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .recent-projects-list {
+  gap: 4px !important;
+}
+
+.directory-selector.horizontal-layout.vertically-constrained .recent-project-item {
+  min-height: 32px !important;
+  padding: 6px 10px !important;
 }
 
 /* ==================== INLINE STYLE OVERRIDES ==================== */

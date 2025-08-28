@@ -940,16 +940,6 @@ class TerminalManager {
                     <span class="warning-text">You must hold the button for 3 seconds with danger mode enabled</span>
                 </div>
                 
-                <!-- Back button (hidden initially) -->
-                <div class="session-back-button" id="back-button">
-                    <button class="btn btn-small" id="back-btn">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M19 12H5M12 19l-7-7 7-7"/>
-                        </svg>
-                        Back
-                    </button>
-                </div>
-                
                 <div class="directory-selector-main">
                     ${recentProjectsHTML}
                     <div class="directory-selector-actions">
@@ -976,7 +966,8 @@ class TerminalManager {
         // Pre-apply responsive classes based on terminal count for instant styling
         const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
         if (terminalCount === 4) {
-            selectorDiv.classList.add('small-quadrant');
+            // Don't add any initial class - let ResizeObserver handle it
+            // selectorDiv.classList.add('small-quadrant');
         }
         
         // Force the projects list to expand to full height (fix CSS specificity issue)
@@ -986,13 +977,13 @@ class TerminalManager {
             const projectsList = selectorDiv.querySelector('.recent-projects-list');
             if (projectsList) {
                 // Check if we're in a constrained view
-                const isSmallQuadrant = selectorDiv.classList.contains('small-quadrant');
+                const isCompactLayout = selectorDiv.classList.contains('compact-layout');
                 const isVerticallyConstrained = selectorDiv.classList.contains('vertically-constrained');
                 const isHorizontalLayout = selectorDiv.classList.contains('horizontal-layout');
                 
                 // Only apply inline styles for normal sized views
-                // Small/constrained/horizontal quadrants are handled purely by CSS
-                if (!isSmallQuadrant && !isVerticallyConstrained && !isHorizontalLayout) {
+                // Compact/constrained/horizontal layouts are handled purely by CSS
+                if (!isCompactLayout && !isVerticallyConstrained && !isHorizontalLayout) {
                     projectsList.style.maxHeight = '100%';
                     projectsList.style.flex = '1 1 auto';
                     projectsList.style.minHeight = '0';
@@ -1017,72 +1008,96 @@ class TerminalManager {
                 }
             }
             
-            // Apply responsive layout immediately based on initial detection
-            const applyResponsiveLayout = () => {
-                const quadrantWidth = wrapper.offsetWidth;
-                const quadrantHeight = wrapper.offsetHeight;
+            // Apply responsive layout based on container size, not window size
+            const applyResponsiveLayout = (containerWidth, containerHeight) => {
+                // Use provided dimensions or get from wrapper
+                const width = containerWidth || wrapper.offsetWidth;
+                const height = containerHeight || wrapper.offsetHeight;
                 
-                // Check if we have 4 terminals active
-                const terminalCount = document.querySelectorAll('.terminal-wrapper').length;
-                const hasFourQuadrants = terminalCount === 4 || document.querySelector('.terminals-container.count-4');
-                
-                // Detect different size constraints
-                const isSmallWidth = quadrantWidth < 500;
-                const isMediumWidth = quadrantWidth < 800;
-                const isShortHeight = quadrantHeight < 400;  // Very short vertically
-                const isVerticallyConstrained = quadrantHeight < 500;
-                
-                // Detect horizontal/panoramic layout (width much greater than height)
-                const aspectRatio = quadrantWidth / quadrantHeight;
-                const isHorizontalLayout = aspectRatio > 2.5 || (quadrantHeight < 350 && quadrantWidth > 800);
-                
-                // Apply horizontal layout if:
-                // 1. We have 4 quadrants AND the individual quadrant is small
-                // 2. OR the quadrant is extremely small (less than 500px width)
-                // 3. OR the quadrant is very short (less than 400px height)
-                const shouldUseSmallLayout = (hasFourQuadrants && isMediumWidth) || isSmallWidth || isShortHeight;
-
                 // Remove all responsive classes first
-                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained', 'horizontal-layout');
+                selectorDiv.classList.remove('small-quadrant', 'vertically-constrained', 'horizontal-layout', 'compact-layout', 'medium-layout', 'large-layout');
                 
-                // Apply appropriate layout class
-                if (isHorizontalLayout) {
+                // Clean up any inline styles
+                const mainSection = selectorDiv.querySelector('.directory-selector-main');
+                if (mainSection) {
+                    mainSection.style.flexDirection = '';
+                    mainSection.style.gap = '';
+                    mainSection.style.alignItems = '';
+                }
+                
+                // Define breakpoints based on container size (not window size)
+                const breakpoints = {
+                    ultraCompact: width < 320,   // Ultra-compact for very small terminals
+                    compact: width < 400,        // Compact layout
+                    small: width < 500,          // Small terminals
+                    medium: width < 850,         // Medium terminals (extended to cover more range)
+                    large: width >= 850,         // Large terminals
+                    panoramic: width / height > 2.2, // Wide aspect ratio
+                    constrained: height < 450    // Vertically constrained
+                };
+                
+                // Apply appropriate layout class based on container size
+                if (breakpoints.ultraCompact) {
+                    // Ultra-compact layout for very small containers
+                    selectorDiv.classList.add('compact-layout');
+                } else if (breakpoints.panoramic && width > 600) {
+                    // Horizontal layout for wide terminals (only if width is sufficient)
                     selectorDiv.classList.add('horizontal-layout');
-                } else if (shouldUseSmallLayout) {
-                    selectorDiv.classList.add('small-quadrant');
-                    
-                    // Apply compact layout for small quadrants
-                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
-                    if (mainSection) {
-                        // Remove inline styles that break the layout
-                        mainSection.style.flexDirection = '';
-                        mainSection.style.gap = '';
-                        mainSection.style.alignItems = '';
-                    }
-                } else {
-                    // Reset to normal layout
-                    const mainSection = selectorDiv.querySelector('.directory-selector-main');
-                    if (mainSection) {
-                        mainSection.style.flexDirection = '';
-                        mainSection.style.gap = '';
-                        mainSection.style.alignItems = '';
-                    }
+                } else if (breakpoints.compact) {
+                    // For 320-399px: use medium-layout style (not compact)
+                    selectorDiv.classList.add('medium-layout');
+                } else if (breakpoints.small) {
+                    // For 400-499px: use medium-layout style (not small-quadrant)
+                    selectorDiv.classList.add('medium-layout');
+                } else if (breakpoints.medium) {
+                    // Medium layout (500-849px)
+                    selectorDiv.classList.add('medium-layout');
+                } else if (breakpoints.large) {
+                    // Large layout for big terminals
+                    selectorDiv.classList.add('large-layout');
                 }
                 
-                // Add class for vertically constrained layouts (even if not using horizontal)
-                if (isVerticallyConstrained) {
+                // Add vertical constraint class if needed (can combine with other layouts)
+                if (breakpoints.constrained) {
                     selectorDiv.classList.add('vertically-constrained');
-                    // Let CSS handle the styling instead of inline styles
                 }
+                
+                // Add data attributes for debugging
+                selectorDiv.dataset.containerWidth = Math.round(width);
+                selectorDiv.dataset.containerHeight = Math.round(height);
+                selectorDiv.dataset.aspectRatio = (width / height).toFixed(2);
             };
             
-            // Apply layout immediately to avoid visual flash
+            // Create ResizeObserver to monitor container size changes
+            let resizeObserver = null;
+            if (window.ResizeObserver) {
+                resizeObserver = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        const { width, height } = entry.contentRect;
+                        applyResponsiveLayout(width, height);
+                    }
+                });
+                
+                // Start observing the wrapper for size changes
+                resizeObserver.observe(wrapper);
+            }
+            
+            // Initial layout application
             applyResponsiveLayout();
             
-            // Also check again after a small delay in case DOM measurements change
+            // Also apply on next frame to ensure proper measurements
             requestAnimationFrame(() => {
                 applyResponsiveLayout();
             });
+            
+            // Clean up observer when selector is removed
+            const originalRestorePlaceholder = restorePlaceholder;
+            restorePlaceholder = () => {
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                }
+                originalRestorePlaceholder();
+            };
         });
         
         // Function to restore placeholder if cancelled
@@ -1119,7 +1134,7 @@ class TerminalManager {
                 // Update the UI to show the selected directory info
                 const sessionInfo = selectorDiv.querySelector('#session-info');
                 const sessionButtons = selectorDiv.querySelector('#session-buttons');
-                const backButton = selectorDiv.querySelector('#back-button');
+                // Back button removed - no longer needed
                 const mainContent = selectorDiv.querySelector('.directory-selector-main');
                 const subtitle = selectorDiv.querySelector('.directory-selector-subtitle');
                 
@@ -1155,7 +1170,7 @@ class TerminalManager {
                     // Show session info and buttons
                     sessionInfo.classList.add('active');
                     sessionButtons.classList.add('active');
-                    if (backButton) backButton.classList.add('active');
+                    // Back button removed - no longer showing
                     
                     // Show danger mode option
                     const dangerOption = selectorDiv.querySelector('#danger-option');
@@ -1236,7 +1251,7 @@ class TerminalManager {
                 const sessionName = selectorDiv.querySelector('#session-name');
                 const sessionPath = selectorDiv.querySelector('#session-path');
                 const sessionButtons = selectorDiv.querySelector('#session-buttons');
-                const backButton = selectorDiv.querySelector('#back-button');
+                // Back button removed - no longer needed
                 const mainSection = selectorDiv.querySelector('.directory-selector-main');
                 
                 sessionIcon.textContent = initial;
@@ -1247,7 +1262,7 @@ class TerminalManager {
                 // Show session info with animation
                 sessionInfo.classList.add('active');
                 sessionButtons.classList.add('active');
-                backButton.classList.add('active');
+                // Back button removed - no longer showing
                 mainSection.classList.add('collapsed');
                 
                 // Show danger mode option
@@ -1515,35 +1530,7 @@ class TerminalManager {
                     e.preventDefault();
                 });
                 
-                // Handle Back button
-                const backBtn = selectorDiv.querySelector('#back-btn');
-                backBtn.onclick = () => {
-                    // Remove selected state
-                    projectItem.classList.remove('selected');
-                    
-                    // Hide session info
-                    sessionInfo.classList.remove('active');
-                    sessionButtons.classList.remove('active');
-                    backButton.classList.remove('active');
-                    mainSection.classList.remove('collapsed');
-                    
-                    // Hide danger mode checkbox
-                    const dangerOption = selectorDiv.querySelector('#danger-option');
-                    if (dangerOption) {
-                        dangerOption.style.display = 'none';
-                    }
-                    
-                    // Hide hold warning if visible
-                    const holdWarning = selectorDiv.querySelector('#hold-warning');
-                    if (holdWarning) {
-                        holdWarning.style.display = 'none';
-                        holdWarning.classList.remove('show');
-                    }
-                    
-                    // Reset title
-                    selectorDiv.querySelector('h3').textContent = 'Select Working Directory';
-                    selectorDiv.querySelector('.directory-selector-subtitle').textContent = 'Choose a project to continue';
-                };
+                // Back button functionality removed - no longer needed
             });
         });
         
@@ -1653,9 +1640,6 @@ class TerminalManager {
                 <div class="session-danger-progress" id="danger-progress" style="display: none;">
                     <div class="progress-bar"></div>
                     <span class="progress-text">Keep holding... <span class="progress-countdown">3</span>s</span>
-                </div>
-                <div class="session-back-button">
-                    <button class="btn btn-small" id="back-btn">← Back</button>
                 </div>
             </div>
         `;
@@ -1886,10 +1870,7 @@ class TerminalManager {
         });
         skipBtn.addEventListener('touchcancel', cancelHold);
 
-        // Handle back button
-        selectorDiv.querySelector('#back-btn').addEventListener('click', () => {
-            goBack();
-        });
+        // Back button removed - no longer needed
 
         // Handle Escape key
         const handleEscape = (e) => {
