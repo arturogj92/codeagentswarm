@@ -1203,25 +1203,40 @@ class TerminalManager {
         // Function to setup event listeners for Resume and New Session buttons
         // This needs to be called both when selecting a project and when browsing for folder
         const setupSessionButtonListeners = (projectPath) => {
+            console.log('setupSessionButtonListeners called with path:', projectPath);
             // Handle Resume button with hold functionality for danger mode
             const resumeBtn = selectorDiv.querySelector('#resume-session-btn');
             const newBtn = selectorDiv.querySelector('#new-session-btn');
             const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+            
+            console.log('Found elements:', {
+                resumeBtn: !!resumeBtn,
+                newBtn: !!newBtn,
+                dangerCheckbox: !!dangerCheckbox,
+                dangerCheckboxChecked: dangerCheckbox?.checked
+            });
             
             if (!resumeBtn || !newBtn) {
                 console.error('Session buttons not found');
                 return;
             }
             
-            // Remove any existing listeners first to avoid duplicates
-            const oldResumeBtn = resumeBtn.cloneNode(true);
-            const oldNewBtn = newBtn.cloneNode(true);
-            resumeBtn.parentNode.replaceChild(oldResumeBtn, resumeBtn);
-            newBtn.parentNode.replaceChild(oldNewBtn, newBtn);
+            // Store references to avoid issues with cloning
+            const freshResumeBtn = resumeBtn;
+            const freshNewBtn = newBtn;
             
-            // Get fresh references
-            const freshResumeBtn = selectorDiv.querySelector('#resume-session-btn');
-            const freshNewBtn = selectorDiv.querySelector('#new-session-btn');
+            // Remove any existing event listeners by using AbortController
+            // DISABLED TEMPORARILY - This might be causing issues
+            /*
+            if (this.sessionButtonController) {
+                this.sessionButtonController.abort();
+            }
+            this.sessionButtonController = new AbortController();
+            const signal = this.sessionButtonController.signal;
+            */
+            
+            // Use a simpler approach without AbortController for now
+            const signal = undefined;
             
             let resumeHoldTimer = null;
             let resumeHoldProgress = null;
@@ -1229,6 +1244,7 @@ class TerminalManager {
             let newHoldProgress = null;
             
             const executeResume = async () => {
+                console.log('executeResume called');
                 // Update last opened timestamp
                 await ipcRenderer.invoke('project-update-last-opened', projectPath);
                 
@@ -1238,9 +1254,12 @@ class TerminalManager {
                 
                 // Check if danger mode is enabled
                 const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                console.log('Danger mode checkbox checked:', isDangerMode);
                 
                 // Remove selector and launch IDE directly
-                wrapper.removeChild(selectorDiv);
+                if (selectorDiv && selectorDiv.parentNode === wrapper) {
+                    wrapper.removeChild(selectorDiv);
+                }
                 if (isDangerMode) {
                     // Launch with danger mode
                     this.startTerminal(quadrant, projectPath, 'dangerous-resume');
@@ -1261,7 +1280,9 @@ class TerminalManager {
                 const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
                 
                 // Remove selector and launch IDE
-                wrapper.removeChild(selectorDiv);
+                if (selectorDiv && selectorDiv.parentNode === wrapper) {
+                    wrapper.removeChild(selectorDiv);
+                }
                 if (isDangerMode) {
                     // Launch with danger mode
                     this.startTerminal(quadrant, projectPath, 'dangerous');
@@ -1272,124 +1293,402 @@ class TerminalManager {
             };
             
             const startResumeHold = () => {
-                // Check if danger mode is enabled
-                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                console.log('startResumeHold called');
+                // Re-query the checkbox every time to ensure we get the current state
+                const currentCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                const isDangerMode = currentCheckbox && currentCheckbox.checked;
+                console.log('Current checkbox state:', {
+                    checkboxFound: !!currentCheckbox,
+                    checked: currentCheckbox?.checked,
+                    isDangerMode: isDangerMode
+                });
                 
                 if (!isDangerMode) {
                     // No danger mode, execute immediately
+                    console.log('No danger mode, executing resume immediately');
                     executeResume();
                     return;
                 }
                 
-                // Start hold timer for danger mode
-                const warningText = selectorDiv.querySelector('.warning-text');
-                if (warningText) {
-                    warningText.style.color = '#ff6b6b';
+                console.log('Danger mode active, starting hold timer with animation...');
+                // Start hold timer for danger mode with progress animation
+                freshResumeBtn.classList.add('btn-danger-active');
+                freshResumeBtn.style.position = 'relative';
+                
+                // Create hold progress element directly on the button
+                let holdProgress = freshResumeBtn.querySelector('.hold-progress');
+                if (!holdProgress) {
+                    holdProgress = document.createElement('div');
+                    holdProgress.className = 'hold-progress';
+                    holdProgress.innerHTML = `
+                        <div class="hold-progress-bar" style="width: 0%"></div>
+                        <div class="hold-progress-text">Hold... <span class="countdown">3</span>s</div>
+                    `;
+                    freshResumeBtn.appendChild(holdProgress);
                 }
                 
-                // Create progress indicator
-                resumeHoldProgress = document.createElement('div');
-                resumeHoldProgress.className = 'hold-progress';
-                freshResumeBtn.appendChild(resumeHoldProgress);
+                holdProgress.classList.add('active');
+                const progressBar = holdProgress.querySelector('.hold-progress-bar');
+                const countdown = holdProgress.querySelector('.countdown');
+                
+                // Also show the danger-progress element for additional visual feedback
+                const dangerProgressDiv = selectorDiv.querySelector('#danger-progress');
+                if (dangerProgressDiv) {
+                    dangerProgressDiv.style.display = 'block';
+                }
+                
+                // Animate progress
+                const holdStartTime = Date.now();
+                const HOLD_DURATION = 3000;
+                
+                const progressInterval = setInterval(() => {
+                    const elapsed = Date.now() - holdStartTime;
+                    const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+                    const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+                    
+                    if (progressBar) {
+                        progressBar.style.width = `${progress}%`;
+                    }
+                    if (countdown) {
+                        countdown.textContent = remaining;
+                    }
+                    
+                    // Also update the danger-progress bar
+                    const dangerBar = dangerProgressDiv?.querySelector('.progress-bar');
+                    const dangerCountdown = dangerProgressDiv?.querySelector('.progress-countdown');
+                    if (dangerBar) {
+                        dangerBar.style.width = `${progress}%`;
+                    }
+                    if (dangerCountdown) {
+                        dangerCountdown.textContent = remaining;
+                    }
+                    
+                    if (elapsed >= HOLD_DURATION) {
+                        clearInterval(progressInterval);
+                    }
+                }, 50);
+                
+                resumeHoldProgress = { interval: progressInterval, element: holdProgress };
                 
                 resumeHoldTimer = setTimeout(() => {
+                    console.log('Hold timer completed, executing resume');
+                    clearInterval(progressInterval);
+                    
+                    // Clean up
+                    if (holdProgress) {
+                        holdProgress.classList.remove('active');
+                        if (progressBar) progressBar.style.width = '0%';
+                        if (countdown) countdown.textContent = '3';
+                    }
+                    if (dangerProgressDiv) {
+                        dangerProgressDiv.style.display = 'none';
+                        const dangerBar = dangerProgressDiv.querySelector('.progress-bar');
+                        const dangerCountdown = dangerProgressDiv.querySelector('.progress-countdown');
+                        if (dangerBar) dangerBar.style.width = '0%';
+                        if (dangerCountdown) dangerCountdown.textContent = '3';
+                    }
+                    freshResumeBtn.classList.remove('btn-danger-active');
                     executeResume();
-                }, 3000);
+                }, HOLD_DURATION);
             };
             
             const cancelResumeHold = () => {
                 if (resumeHoldTimer) {
                     clearTimeout(resumeHoldTimer);
                     resumeHoldTimer = null;
-                    
-                    const warningText = selectorDiv.querySelector('.warning-text');
-                    if (warningText) {
-                        warningText.style.color = '';
-                    }
-                    
-                    if (resumeHoldProgress) {
-                        resumeHoldProgress.remove();
-                        resumeHoldProgress = null;
-                    }
                 }
+                
+                if (resumeHoldProgress) {
+                    if (resumeHoldProgress.interval) {
+                        clearInterval(resumeHoldProgress.interval);
+                    }
+                    if (resumeHoldProgress.element) {
+                        resumeHoldProgress.element.classList.remove('active');
+                        const progressBar = resumeHoldProgress.element.querySelector('.hold-progress-bar');
+                        const countdown = resumeHoldProgress.element.querySelector('.countdown');
+                        if (progressBar) progressBar.style.width = '0%';
+                        if (countdown) countdown.textContent = '3';
+                    }
+                    resumeHoldProgress = null;
+                }
+                
+                // Also clean up danger-progress bar
+                const dangerProgressDiv = selectorDiv.querySelector('#danger-progress');
+                if (dangerProgressDiv) {
+                    dangerProgressDiv.style.display = 'none';
+                    const dangerBar = dangerProgressDiv.querySelector('.progress-bar');
+                    const dangerCountdown = dangerProgressDiv.querySelector('.progress-countdown');
+                    if (dangerBar) dangerBar.style.width = '0%';
+                    if (dangerCountdown) dangerCountdown.textContent = '3';
+                }
+                
+                freshResumeBtn.classList.remove('btn-danger-active');
             };
             
             const startNewHold = () => {
-                // Check if danger mode is enabled
-                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                console.log('startNewHold called');
+                // Re-query the checkbox every time to ensure we get the current state
+                const currentCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                const isDangerMode = currentCheckbox && currentCheckbox.checked;
+                console.log('Current checkbox state for new:', {
+                    checkboxFound: !!currentCheckbox,
+                    checked: currentCheckbox?.checked,
+                    isDangerMode: isDangerMode
+                });
                 
                 if (!isDangerMode) {
                     // No danger mode, execute immediately
+                    console.log('No danger mode, executing new session immediately');
                     executeNewSession();
                     return;
                 }
                 
-                // Start hold timer for danger mode
-                const warningText = selectorDiv.querySelector('.warning-text');
-                if (warningText) {
-                    warningText.style.color = '#ff6b6b';
+                console.log('Danger mode active, starting hold timer with animation for new session...');
+                // Start hold timer for danger mode with progress animation
+                freshNewBtn.classList.add('btn-danger-active');
+                freshNewBtn.style.position = 'relative';
+                
+                // Create hold progress element directly on the button
+                let holdProgress = freshNewBtn.querySelector('.hold-progress');
+                if (!holdProgress) {
+                    holdProgress = document.createElement('div');
+                    holdProgress.className = 'hold-progress';
+                    holdProgress.innerHTML = `
+                        <div class="hold-progress-bar" style="width: 0%"></div>
+                        <div class="hold-progress-text">Hold... <span class="countdown">3</span>s</div>
+                    `;
+                    freshNewBtn.appendChild(holdProgress);
                 }
                 
-                // Create progress indicator
-                newHoldProgress = document.createElement('div');
-                newHoldProgress.className = 'hold-progress';
-                freshNewBtn.appendChild(newHoldProgress);
+                holdProgress.classList.add('active');
+                const progressBar = holdProgress.querySelector('.hold-progress-bar');
+                const countdown = holdProgress.querySelector('.countdown');
+                
+                // Also show the danger-progress element for additional visual feedback
+                const dangerProgressDiv = selectorDiv.querySelector('#danger-progress');
+                if (dangerProgressDiv) {
+                    dangerProgressDiv.style.display = 'block';
+                }
+                
+                // Animate progress
+                const holdStartTime = Date.now();
+                const HOLD_DURATION = 3000;
+                
+                const progressInterval = setInterval(() => {
+                    const elapsed = Date.now() - holdStartTime;
+                    const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+                    const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+                    
+                    if (progressBar) {
+                        progressBar.style.width = `${progress}%`;
+                    }
+                    if (countdown) {
+                        countdown.textContent = remaining;
+                    }
+                    
+                    // Also update the danger-progress bar
+                    const dangerBar = dangerProgressDiv?.querySelector('.progress-bar');
+                    const dangerCountdown = dangerProgressDiv?.querySelector('.progress-countdown');
+                    if (dangerBar) {
+                        dangerBar.style.width = `${progress}%`;
+                    }
+                    if (dangerCountdown) {
+                        dangerCountdown.textContent = remaining;
+                    }
+                    
+                    if (elapsed >= HOLD_DURATION) {
+                        clearInterval(progressInterval);
+                    }
+                }, 50);
+                
+                newHoldProgress = { interval: progressInterval, element: holdProgress };
                 
                 newHoldTimer = setTimeout(() => {
+                    console.log('Hold timer completed, executing new session');
+                    clearInterval(progressInterval);
+                    
+                    // Clean up
+                    if (holdProgress) {
+                        holdProgress.classList.remove('active');
+                        if (progressBar) progressBar.style.width = '0%';
+                        if (countdown) countdown.textContent = '3';
+                    }
+                    if (dangerProgressDiv) {
+                        dangerProgressDiv.style.display = 'none';
+                        const dangerBar = dangerProgressDiv.querySelector('.progress-bar');
+                        const dangerCountdown = dangerProgressDiv.querySelector('.progress-countdown');
+                        if (dangerBar) dangerBar.style.width = '0%';
+                        if (dangerCountdown) dangerCountdown.textContent = '3';
+                    }
+                    freshNewBtn.classList.remove('btn-danger-active');
                     executeNewSession();
-                }, 3000);
+                }, HOLD_DURATION);
             };
             
             const cancelNewHold = () => {
                 if (newHoldTimer) {
                     clearTimeout(newHoldTimer);
                     newHoldTimer = null;
-                    
-                    const warningText = selectorDiv.querySelector('.warning-text');
-                    if (warningText) {
-                        warningText.style.color = '';
-                    }
-                    
-                    if (newHoldProgress) {
-                        newHoldProgress.remove();
-                        newHoldProgress = null;
-                    }
                 }
+                
+                if (newHoldProgress) {
+                    if (newHoldProgress.interval) {
+                        clearInterval(newHoldProgress.interval);
+                    }
+                    if (newHoldProgress.element) {
+                        newHoldProgress.element.classList.remove('active');
+                        const progressBar = newHoldProgress.element.querySelector('.hold-progress-bar');
+                        const countdown = newHoldProgress.element.querySelector('.countdown');
+                        if (progressBar) progressBar.style.width = '0%';
+                        if (countdown) countdown.textContent = '3';
+                    }
+                    newHoldProgress = null;
+                }
+                
+                // Also clean up danger-progress bar
+                const dangerProgressDiv = selectorDiv.querySelector('#danger-progress');
+                if (dangerProgressDiv) {
+                    dangerProgressDiv.style.display = 'none';
+                    const dangerBar = dangerProgressDiv.querySelector('.progress-bar');
+                    const dangerCountdown = dangerProgressDiv.querySelector('.progress-countdown');
+                    if (dangerBar) dangerBar.style.width = '0%';
+                    if (dangerCountdown) dangerCountdown.textContent = '3';
+                }
+                
+                freshNewBtn.classList.remove('btn-danger-active');
             };
             
-            // Resume button events
-            freshResumeBtn.addEventListener('mousedown', startResumeHold);
-            freshResumeBtn.addEventListener('mouseup', cancelResumeHold);
-            freshResumeBtn.addEventListener('mouseleave', cancelResumeHold);
+            // Resume button events with signal for cleanup
+            console.log('Adding event listeners to Resume button');
+            
+            freshResumeBtn.addEventListener('mousedown', (e) => {
+                console.log('Resume button mousedown event fired');
+                startResumeHold();
+            });
+            
+            freshResumeBtn.addEventListener('mouseup', (e) => {
+                console.log('Resume button mouseup event fired');
+                cancelResumeHold();
+            });
+            
+            freshResumeBtn.addEventListener('mouseleave', (e) => {
+                console.log('Resume button mouseleave event fired');
+                cancelResumeHold();
+            });
+            
             freshResumeBtn.addEventListener('touchstart', (e) => {
+                console.log('Resume button touchstart event fired');
                 e.preventDefault();
                 startResumeHold();
             });
+            
             freshResumeBtn.addEventListener('touchend', (e) => {
+                console.log('Resume button touchend event fired');
                 e.preventDefault();
                 cancelResumeHold();
             });
-            freshResumeBtn.addEventListener('touchcancel', cancelResumeHold);
-            freshResumeBtn.addEventListener('click', (e) => {
-                e.preventDefault();
+            
+            freshResumeBtn.addEventListener('touchcancel', (e) => {
+                console.log('Resume button touchcancel event fired');
+                cancelResumeHold();
             });
             
-            // New Session button events
-            freshNewBtn.addEventListener('mousedown', startNewHold);
-            freshNewBtn.addEventListener('mouseup', cancelNewHold);
-            freshNewBtn.addEventListener('mouseleave', cancelNewHold);
+            freshResumeBtn.addEventListener('click', (e) => {
+                console.log('Resume button CLICK event fired');
+                e.preventDefault();
+                e.stopPropagation(); // Stop event bubbling
+                
+                // Single click should execute immediately if no danger mode
+                const currentCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                const isDangerMode = currentCheckbox && currentCheckbox.checked;
+                console.log('Click handler - danger mode:', isDangerMode);
+                
+                // Only execute on click if NOT in danger mode
+                // In danger mode, the mousedown/mouseup events handle the hold logic
+                if (!isDangerMode) {
+                    console.log('Executing resume from click handler (no danger mode)');
+                    executeResume();
+                } else {
+                    console.log('Danger mode active - you must hold the button for 3 seconds');
+                    // Show a message to the user
+                    const warningDiv = selectorDiv.querySelector('#hold-warning');
+                    if (warningDiv) {
+                        warningDiv.classList.add('show');
+                        warningDiv.style.display = 'flex';
+                        setTimeout(() => {
+                            warningDiv.classList.remove('show');
+                            warningDiv.style.display = 'none';
+                        }, 2000);
+                    }
+                }
+            });
+            
+            // New Session button events with signal for cleanup
+            console.log('Adding event listeners to New button');
+            
+            freshNewBtn.addEventListener('mousedown', (e) => {
+                console.log('New button mousedown event fired');
+                startNewHold();
+            });
+            
+            freshNewBtn.addEventListener('mouseup', (e) => {
+                console.log('New button mouseup event fired');
+                cancelNewHold();
+            });
+            
+            freshNewBtn.addEventListener('mouseleave', (e) => {
+                console.log('New button mouseleave event fired');
+                cancelNewHold();
+            });
+            
             freshNewBtn.addEventListener('touchstart', (e) => {
+                console.log('New button touchstart event fired');
                 e.preventDefault();
                 startNewHold();
             });
+            
             freshNewBtn.addEventListener('touchend', (e) => {
+                console.log('New button touchend event fired');
                 e.preventDefault();
                 cancelNewHold();
             });
-            freshNewBtn.addEventListener('touchcancel', cancelNewHold);
-            freshNewBtn.addEventListener('click', (e) => {
-                e.preventDefault();
+            
+            freshNewBtn.addEventListener('touchcancel', (e) => {
+                console.log('New button touchcancel event fired');
+                cancelNewHold();
             });
+            
+            freshNewBtn.addEventListener('click', (e) => {
+                console.log('New button CLICK event fired');
+                e.preventDefault();
+                e.stopPropagation(); // Stop event bubbling
+                
+                // Single click should execute immediately if no danger mode
+                const currentCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                const isDangerMode = currentCheckbox && currentCheckbox.checked;
+                console.log('Click handler - danger mode:', isDangerMode);
+                
+                // Only execute on click if NOT in danger mode
+                // In danger mode, the mousedown/mouseup events handle the hold logic
+                if (!isDangerMode) {
+                    console.log('Executing new session from click handler (no danger mode)');
+                    executeNewSession();
+                } else {
+                    console.log('Danger mode active - you must hold the button for 3 seconds');
+                    // Show a message to the user
+                    const warningDiv = selectorDiv.querySelector('#hold-warning');
+                    if (warningDiv) {
+                        warningDiv.classList.add('show');
+                        warningDiv.style.display = 'flex';
+                        setTimeout(() => {
+                            warningDiv.classList.remove('show');
+                            warningDiv.style.display = 'none';
+                        }, 2000);
+                    }
+                }
+            });
+            
+            console.log('All event listeners added successfully');
         };
 
         // Handle browse button
@@ -1569,6 +1868,15 @@ class TerminalManager {
                         <span class="btn-text">New</span>
                     </button>
                 </div>
+                <!-- Hold Warning Message for Resume/New buttons -->
+                <div class="hold-warning-message" id="hold-warning" style="display: none;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="#ffcc00" stroke="#ffcc00" stroke-width="2">
+                        <path d="M12 2L2 20h20L12 2z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13" stroke="#1a1a1a" stroke-width="2"></line>
+                        <circle cx="12" cy="17" r="1" fill="#1a1a1a"></circle>
+                    </svg>
+                    <span class="warning-text">Hold the button for 3 seconds to execute in danger mode</span>
+                </div>
                 <div class="session-danger-toggle">
                     <button class="btn btn-danger-toggle" id="danger-mode-toggle" title="Hold for 3 seconds to enable dangerous mode">
                         <span class="toggle-icon">⚡</span>
@@ -1587,6 +1895,18 @@ class TerminalManager {
                 <div class="session-danger-progress" id="danger-progress" style="display: none;">
                     <div class="progress-bar"></div>
                     <span class="progress-text">Keep holding... <span class="progress-countdown">3</span>s</span>
+                </div>
+                <!-- Danger mode checkbox (hidden by default, shown after danger mode is enabled) -->
+                <div class="danger-mode-option" id="danger-option" style="display: none;">
+                    <label>
+                        <input type="checkbox" id="danger-mode-checkbox" />
+                        <span>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                            </svg>
+                            Enable Danger Mode (skip confirmations)
+                        </span>
+                    </label>
                 </div>
             </div>
         `;
@@ -1631,6 +1951,10 @@ class TerminalManager {
             }
         };
 
+        // COMMENTED OUT - These are duplicate event listeners that conflict with setupSessionButtonListeners
+        // The proper event listeners are added in setupSessionButtonListeners function
+        // which handles both normal click and danger mode hold functionality
+        /*
         // Handle resume session
         resumeBtn.addEventListener('click', () => {
             wrapper.removeChild(selectorDiv);
@@ -1650,172 +1974,62 @@ class TerminalManager {
                 this.startTerminal(quadrant, selectedDirectory, 'new');
             }
         });
+        */
 
         // Handle exit danger mode
         if (exitDangerBtn) {
             exitDangerBtn.addEventListener('click', () => {
                 isDangerMode = false;
                 updateButtonStates();
+                // Hide the danger mode checkbox
+                const dangerOption = selectorDiv.querySelector('#danger-option');
+                const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                if (dangerOption) {
+                    dangerOption.style.display = 'none';
+                }
+                if (dangerCheckbox) {
+                    dangerCheckbox.checked = false;
+                }
             });
         }
 
         // Handle danger mode toggle - requires holding for 3 seconds
         const skipBtn = dangerToggle;
-        const warningDiv = selectorDiv.querySelector('#danger-warning');
-        const progressDiv = selectorDiv.querySelector('#danger-progress');
-        const progressBar = progressDiv?.querySelector('.progress-bar');
-        const progressCountdown = progressDiv?.querySelector('.progress-countdown');
         
-        let holdTimer = null;
-        let holdStartTime = null;
-        let progressInterval = null;
-        let clickHintTimer = null;
-        const HOLD_DURATION = 3000; // 3 seconds
-        const CLICK_THRESHOLD = 300; // milliseconds to detect a simple click
+        // Check if the danger toggle button exists
+        if (!skipBtn) {
+            console.error('Danger mode toggle button not found in DOM. Looking for #danger-mode-toggle');
+            console.log('Available elements:', selectorDiv.innerHTML.substring(0, 500));
+            
+            // Try to find it again after a small delay
+            setTimeout(() => {
+                const retryBtn = selectorDiv.querySelector('#danger-mode-toggle');
+                if (retryBtn) {
+                    console.log('Found danger mode button on retry, attaching listeners...');
+                    // Create an object to hold the isDangerMode value by reference
+                    const isDangerModeRef = { value: isDangerMode };
+                    this.attachDangerModeListeners(retryBtn, selectorDiv, isDangerModeRef, updateButtonStates);
+                } else {
+                    console.error('Still cannot find danger mode button after retry');
+                }
+            }, 100);
+            return;
+        }
         
-        const showClickHint = () => {
-            // Clear any existing hint timer
-            if (clickHintTimer) {
-                clearTimeout(clickHintTimer);
-            }
-            
-            // Hide the progress bar immediately
-            progressDiv.style.display = 'none';
-            
-            // Update the warning message for click hint - emphasize the HOLD action
-            warningDiv.innerHTML = `
-                <span class="danger-icon">⏱️</span>
-                <span class="danger-text"><strong>HOLD BUTTON!</strong> You must hold the button for 3 seconds to activate danger mode</span>
-            `;
-            warningDiv.style.display = 'block';
-            warningDiv.classList.add('click-hint');
-            
-            // Keep the message visible for 4 seconds (more time to read)
-            clickHintTimer = setTimeout(() => {
-                warningDiv.style.display = 'none';
-                warningDiv.classList.remove('click-hint');
-                // Restore original warning message
-                warningDiv.innerHTML = `
-                    <span class="danger-icon">⚠️</span>
-                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
-                `;
-            }, 4000);
+        console.log('Danger mode button found, attaching event listeners...');
+        
+        // Create an object to hold the isDangerMode value by reference  
+        const isDangerModeRef = { value: isDangerMode };
+        
+        // Update the updateButtonStates function to use the reference
+        const originalUpdateButtonStates = updateButtonStates;
+        const newUpdateButtonStates = () => {
+            isDangerMode = isDangerModeRef.value;
+            originalUpdateButtonStates();
         };
         
-        const startHold = () => {
-            // Clear any click hint timer
-            if (clickHintTimer) {
-                clearTimeout(clickHintTimer);
-                clickHintTimer = null;
-            }
-            
-            // Show warning and progress
-            warningDiv.innerHTML = `
-                <span class="danger-icon">⚠️</span>
-                <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
-            `;
-            warningDiv.classList.remove('click-hint');
-            warningDiv.style.display = 'block';
-            progressDiv.style.display = 'block';
-            skipBtn.classList.add('btn-danger-active');
-            
-            holdStartTime = Date.now();
-            
-            // Update progress bar
-            progressInterval = setInterval(() => {
-                const elapsed = Date.now() - holdStartTime;
-                const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
-                const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
-                
-                if (progressBar) {
-                    progressBar.style.width = `${progress}%`;
-                }
-                if (progressCountdown) {
-                    progressCountdown.textContent = remaining;
-                }
-                
-                if (elapsed >= HOLD_DURATION) {
-                    clearInterval(progressInterval);
-                }
-            }, 50);
-            
-            // Set timer for 3 seconds
-            holdTimer = setTimeout(() => {
-                // Success! Enable dangerous mode
-                isDangerMode = true;
-                updateButtonStates();
-                
-                // Reset UI
-                warningDiv.style.display = 'none';
-                progressDiv.style.display = 'none';
-                skipBtn.classList.remove('btn-danger-active');
-                
-                // Reset progress
-                if (progressBar) {
-                    progressBar.style.width = '0%';
-                }
-                if (progressCountdown) {
-                    progressCountdown.textContent = '3';
-                }
-                
-                // Clear intervals
-                if (progressInterval) {
-                    clearInterval(progressInterval);
-                    progressInterval = null;
-                }
-            }, HOLD_DURATION);
-        };
-        
-        const cancelHold = () => {
-            // Check if it was a click (any duration less than full hold time)
-            const wasIncompleteHold = holdStartTime && (Date.now() - holdStartTime < HOLD_DURATION);
-            
-            if (holdTimer) {
-                clearTimeout(holdTimer);
-                holdTimer = null;
-            }
-            if (progressInterval) {
-                clearInterval(progressInterval);
-                progressInterval = null;
-            }
-            
-            // Reset UI
-            progressDiv.style.display = 'none';
-            skipBtn.classList.remove('btn-danger-active');
-            
-            if (progressBar) {
-                progressBar.style.width = '0%';
-            }
-            if (progressCountdown) {
-                progressCountdown.textContent = '3';
-            }
-            
-            // If the user released before completing the hold, show the hint
-            if (wasIncompleteHold) {
-                showClickHint();
-            } else {
-                warningDiv.style.display = 'none';
-                warningDiv.classList.remove('click-hint');
-            }
-            
-            holdStartTime = null;
-        };
-        
-        // Mouse events
-        skipBtn.addEventListener('mousedown', startHold);
-        skipBtn.addEventListener('mouseup', cancelHold);
-        skipBtn.addEventListener('mouseleave', cancelHold);
-        
-        // Touch events for mobile
-        skipBtn.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            startHold();
-        });
-        skipBtn.addEventListener('touchend', (e) => {
-            e.preventDefault();
-            cancelHold();
-        });
-        skipBtn.addEventListener('touchcancel', cancelHold);
+        // Use the helper method to attach all event listeners
+        this.attachDangerModeListeners(skipBtn, selectorDiv, isDangerModeRef, newUpdateButtonStates);
 
         // Back button removed - no longer needed
 
@@ -1827,6 +2041,11 @@ class TerminalManager {
             }
         };
         document.addEventListener('keydown', handleEscape);
+        
+        // IMPORTANT: Always setup session button listeners at the end
+        // This ensures the buttons work regardless of how we got to this screen
+        console.log('Setting up session button listeners for directory:', selectedDirectory);
+        setupSessionButtonListeners(selectedDirectory);
     }
 
     async showCreateProjectModal(quadrant, parentWrapper, directorySelectorDiv) {
@@ -2004,6 +2223,191 @@ class TerminalManager {
         
         // Focus on project name input
         modal.querySelector('#project-name').focus();
+    }
+
+    attachDangerModeListeners(skipBtn, selectorDiv, isDangerModeRef, updateButtonStates) {
+        const warningDiv = selectorDiv.querySelector('#danger-warning');
+        const progressDiv = selectorDiv.querySelector('#danger-progress');
+        const progressBar = progressDiv?.querySelector('.progress-bar');
+        const progressCountdown = progressDiv?.querySelector('.progress-countdown');
+        
+        let holdTimer = null;
+        let holdStartTime = null;
+        let progressInterval = null;
+        let clickHintTimer = null;
+        const HOLD_DURATION = 3000; // 3 seconds
+        
+        const showClickHint = () => {
+            if (clickHintTimer) {
+                clearTimeout(clickHintTimer);
+            }
+            
+            progressDiv.style.display = 'none';
+            
+            warningDiv.innerHTML = `
+                <span class="danger-icon">⏱️</span>
+                <span class="danger-text"><strong>HOLD BUTTON!</strong> You must hold the button for 3 seconds to activate danger mode</span>
+            `;
+            warningDiv.style.display = 'block';
+            warningDiv.classList.add('click-hint');
+            
+            clickHintTimer = setTimeout(() => {
+                warningDiv.style.display = 'none';
+                warningDiv.classList.remove('click-hint');
+                warningDiv.innerHTML = `
+                    <span class="danger-icon">⚠️</span>
+                    <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+                `;
+            }, 4000);
+        };
+        
+        const startHold = () => {
+            if (clickHintTimer) {
+                clearTimeout(clickHintTimer);
+                clickHintTimer = null;
+            }
+            
+            warningDiv.innerHTML = `
+                <span class="danger-icon">⚠️</span>
+                <span class="danger-text">Hold button for 3 seconds to run in dangerous mode - skips ALL confirmations!</span>
+            `;
+            warningDiv.classList.remove('click-hint');
+            warningDiv.style.display = 'block';
+            progressDiv.style.display = 'block';
+            skipBtn.classList.add('btn-danger-active');
+            
+            holdStartTime = Date.now();
+            
+            progressInterval = setInterval(() => {
+                const elapsed = Date.now() - holdStartTime;
+                const progress = Math.min((elapsed / HOLD_DURATION) * 100, 100);
+                const remaining = Math.max(0, Math.ceil((HOLD_DURATION - elapsed) / 1000));
+                
+                if (progressBar) {
+                    progressBar.style.width = `${progress}%`;
+                }
+                if (progressCountdown) {
+                    progressCountdown.textContent = remaining;
+                }
+                
+                if (elapsed >= HOLD_DURATION) {
+                    clearInterval(progressInterval);
+                }
+            }, 50);
+            
+            holdTimer = setTimeout(() => {
+                // Success! Enable dangerous mode - update the reference
+                isDangerModeRef.value = true;
+                updateButtonStates();
+                
+                // Show the danger mode checkbox
+                const dangerOption = selectorDiv.querySelector('#danger-option');
+                const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+                if (dangerOption) {
+                    dangerOption.style.display = 'block';
+                }
+                if (dangerCheckbox) {
+                    dangerCheckbox.checked = true; // Check it by default when danger mode is enabled
+                }
+                
+                warningDiv.style.display = 'none';
+                progressDiv.style.display = 'none';
+                skipBtn.classList.remove('btn-danger-active');
+                
+                if (progressBar) {
+                    progressBar.style.width = '0%';
+                }
+                if (progressCountdown) {
+                    progressCountdown.textContent = '3';
+                }
+                
+                if (progressInterval) {
+                    clearInterval(progressInterval);
+                    progressInterval = null;
+                }
+            }, HOLD_DURATION);
+        };
+        
+        const cancelHold = () => {
+            const wasIncompleteHold = holdStartTime && (Date.now() - holdStartTime < HOLD_DURATION);
+            
+            if (holdTimer) {
+                clearTimeout(holdTimer);
+                holdTimer = null;
+            }
+            if (progressInterval) {
+                clearInterval(progressInterval);
+                progressInterval = null;
+            }
+            
+            progressDiv.style.display = 'none';
+            skipBtn.classList.remove('btn-danger-active');
+            
+            if (progressBar) {
+                progressBar.style.width = '0%';
+            }
+            if (progressCountdown) {
+                progressCountdown.textContent = '3';
+            }
+            
+            if (wasIncompleteHold) {
+                showClickHint();
+            } else {
+                warningDiv.style.display = 'none';
+                warningDiv.classList.remove('click-hint');
+            }
+            
+            holdStartTime = null;
+        };
+        
+        // Add event listeners
+        try {
+            skipBtn.addEventListener('mousedown', (e) => {
+                console.log('Danger mode button mousedown event triggered');
+                e.preventDefault();
+                startHold();
+            });
+            
+            skipBtn.addEventListener('mouseup', (e) => {
+                console.log('Danger mode button mouseup event triggered');
+                e.preventDefault();
+                cancelHold();
+            });
+            
+            skipBtn.addEventListener('mouseleave', (e) => {
+                console.log('Danger mode button mouseleave event triggered');
+                cancelHold();
+            });
+            
+            skipBtn.addEventListener('click', (e) => {
+                console.log('Danger mode button clicked - showing hold instruction');
+                e.preventDefault();
+                e.stopPropagation();
+                showClickHint();
+            });
+            
+            // Touch events
+            skipBtn.addEventListener('touchstart', (e) => {
+                console.log('Danger mode button touchstart event triggered');
+                e.preventDefault();
+                startHold();
+            });
+            
+            skipBtn.addEventListener('touchend', (e) => {
+                console.log('Danger mode button touchend event triggered');
+                e.preventDefault();
+                cancelHold();
+            });
+            
+            skipBtn.addEventListener('touchcancel', () => {
+                console.log('Danger mode button touchcancel event triggered');
+                cancelHold();
+            });
+            
+            console.log('All danger mode event listeners successfully attached');
+        } catch (error) {
+            console.error('Error attaching danger mode event listeners:', error);
+        }
     }
 
     async startTerminal(quadrant, selectedDirectory, sessionType = 'resume') {
@@ -5208,7 +5612,7 @@ class TerminalManager {
     
     async displayDiffModalSplitView(fileName, diff, fileContents, workingDirectory) {
         // Load the diff parser if not already loaded
-        const DiffParser = require('./diff-parser.js');
+        const DiffParser = require('../../shared/parsers/diff-parser.js');
         const parser = new DiffParser();
         
         // Parse the diff
@@ -10184,7 +10588,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // In tabbed mode, make this terminal active
             if (window.terminalManager.layoutMode === 'tabbed') {
                 window.terminalManager.activeTabTerminal = uninitializedTerminal;
-                window.terminalManager.switchToTerminal(uninitializedTerminal);
+                window.terminalManager.switchToTab(uninitializedTerminal);
             }
             
             if (selectedDir) {

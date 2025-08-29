@@ -1,0 +1,6 @@
+// This test file has been replaced with:
+// - danger-mode-integration.test.js 
+// - danger-mode-complete.test.js
+// 
+// The new test files provide better coverage and properly test the actual implementation.
+// This file is kept for reference but renamed to .skip so it won't run.

@@ -21,7 +21,7 @@ jest.mock('fs', () => ({
 jest.mock('../src/infrastructure/adapters/commit/commit-service-factory', () => ({
     initialize: jest.fn(() => Promise.resolve()),
     getDefaultAdapterName: jest.fn(() => 'claude'),
-    createCommitService: jest.fn(() => ({
+    createUseCase: jest.fn(() => ({
         generateCommitMessage: jest.fn(() => Promise.resolve({
             format: jest.fn(() => 'Test commit message')
         }))
@@ -301,7 +301,7 @@ describe('GitService', () => {
 
         test('should generate commit message', async () => {
             const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
-            commitServiceFactory.createCommitService.mockReturnValue({
+            commitServiceFactory.createUseCase.mockReturnValue({
                 generateCommitMessage: jest.fn(() => Promise.resolve({
                     format: jest.fn(() => 'feat: Add new feature')
                 }))
@@ -353,7 +353,7 @@ describe('GitService', () => {
         test('should handle exception during message generation', async () => {
             const commitServiceFactory = require('../src/infrastructure/adapters/commit/commit-service-factory');
             commitServiceFactory.getDefaultAdapterName.mockReturnValue('claude');
-            commitServiceFactory.createCommitService.mockReturnValue({
+            commitServiceFactory.createUseCase.mockReturnValue({
                 generateCommitMessage: jest.fn(() => Promise.reject(new Error('Generation failed')))
             });
 

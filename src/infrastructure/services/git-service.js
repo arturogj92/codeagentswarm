@@ -164,19 +164,39 @@ class GitService {
             }
 
             // Get the commit service
-            const commitService = commitServiceFactory.createCommitService();
+            const commitService = commitServiceFactory.createUseCase();
             
-            // Get the diff
+            // Get the diff - check staged, unstaged, and untracked files
             const diffResult = await this.getDiff(cwd, true); // Get staged diff
-            if (!diffResult.success || !diffResult.diff) {
+            let hasChanges = diffResult.success && diffResult.diff;
+            
+            if (!hasChanges) {
                 // If no staged diff, get unstaged diff
                 const unstagedDiff = await this.getDiff(cwd, false);
-                if (!unstagedDiff.success || !unstagedDiff.diff) {
+                hasChanges = unstagedDiff.success && unstagedDiff.diff;
+            }
+            
+            if (!hasChanges) {
+                // Check for untracked files
+                const statusOutput = execSync('git status --porcelain', { cwd, encoding: 'utf8' });
+                const untrackedFiles = statusOutput.split('\n')
+                    .filter(line => line.startsWith('??'))
+                    .map(line => line.substring(3).trim());
+                    
+                if (untrackedFiles.length === 0) {
                     return { 
                         success: false, 
                         error: 'No changes to generate commit message for' 
                     };
                 }
+                
+                // For untracked files, provide a summary for commit message generation
+                // Note: This is a fallback - ideally files should be staged first
+                return {
+                    success: false,
+                    error: `Cannot generate commit message for untracked files. Please stage files first using 'git add' before generating a commit message.`,
+                    untrackedFiles
+                };
             }
             
             // Generate commit message
