@@ -1253,3 +1253,126 @@
 .parent-task-link .parent-task-title {
     font-size: 1em;
 }
+
+/* ================ Labels Styling ================ */
+
+/* Labels input wrapper */
+.labels-input-wrapper {
+    position: relative;
+}
+
+/* Labels container */
+.task-labels-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    /* Remove min-height to prevent empty space */
+    /* min-height: 28px; */
+    /* Reduce padding when empty */
+    padding: 0;
+}
+
+/* Add padding only when container has labels */
+.task-labels-container:not(:empty) {
+    padding: 4px 0;
+    min-height: 28px;
+}
+
+/* Individual label chip */
+.task-label-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: linear-gradient(135deg, rgba(127, 90, 240, 0.2), rgba(147, 51, 234, 0.15));
+    border: 1px solid rgba(127, 90, 240, 0.3);
+    border-radius: 12px;
+    font-size: 12px;
+    color: var(--task-text-primary);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.task-label-chip:hover {
+    background: linear-gradient(135deg, rgba(127, 90, 240, 0.3), rgba(147, 51, 234, 0.25));
+    border-color: rgba(127, 90, 240, 0.5);
+    transform: translateY(-1px);
+}
+
+/* Label remove button */
+.label-remove-btn {
+    background: none;
+    border: none;
+    color: var(--task-text-muted);
+    cursor: pointer;
+    font-size: 16px;
+    line-height: 1;
+    padding: 0;
+    margin-left: 2px;
+    opacity: 0.7;
+    transition: all 0.2s ease;
+}
+
+.label-remove-btn:hover {
+    color: var(--task-accent-danger);
+    opacity: 1;
+    transform: scale(1.2);
+}
+
+/* Label suggestions dropdown */
+.label-suggestions-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    max-height: 150px;
+    overflow-y: auto;
+    background: var(--task-bg-secondary);
+    border: 1px solid var(--task-border);
+    border-radius: var(--task-radius-sm);
+    margin-top: 4px;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+/* Individual suggestion item */
+.label-suggestion-item {
+    padding: 8px 12px;
+    color: var(--task-text-secondary);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 13px;
+}
+
+.label-suggestion-item:hover {
+    background: rgba(127, 90, 240, 0.1);
+    color: var(--task-text-primary);
+}
+
+/* Label in task cards - to display on kanban board */
+.task-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 6px;
+}
+
+.task-label {
+    display: inline-block;
+    padding: 2px 6px;
+    background: rgba(127, 90, 240, 0.15);
+    border: 1px solid rgba(127, 90, 240, 0.25);
+    border-radius: 10px;
+    font-size: 10px;
+    color: var(--task-text-secondary);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+}
+
+.task-label:hover {
+    background: rgba(127, 90, 240, 0.25);
+    border-color: rgba(127, 90, 240, 0.4);
+    color: var(--task-text-primary);
+}

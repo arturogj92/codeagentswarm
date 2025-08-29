@@ -133,10 +133,10 @@ describe('CLAUDE.md Configuration Tests', () => {
     test('should clarify what DOES require tasks', () => {
       const content = fs.readFileSync(globalClaudeMdPath, 'utf8');
       const clarifications = [
-        'Implement a git workflow',
-        'Create git hooks',
-        'Fix the tests',
-        'Update dependencies',
+        'CODE CHANGES',
+        'NEW FEATURES',
+        'BUG FIXES',
+        'REFACTORING',
         'REQUIRES A TASK'
       ];
 
@@ -176,8 +176,8 @@ describe('CLAUDE.md Configuration Tests', () => {
 
     test('should NOT have full task instructions', () => {
       const content = fs.readFileSync(projectClaudeMdPath, 'utf8');
-      // The project file should not have the full obligatory section
-      expect(content).not.toContain('OBLIGATORY: Task Creation Before ANY Work');
+      // The project file should not have the full task section
+      expect(content).not.toContain('SMART Task Creation - For ACTUAL Development Work');
     });
 
     test('should reference global CLAUDE.md', () => {
@@ -196,7 +196,7 @@ describe('CLAUDE.md Configuration Tests', () => {
       const { getGlobalCodeAgentSwarmSection } = require('../claude-md-global-config');
       const section = getGlobalCodeAgentSwarmSection();
       
-      expect(section).toContain('OBLIGATORY: Task Creation Before ANY Work');
+      expect(section).toContain('SMART Task Creation - For ACTUAL Development Work');
       expect(section).toContain('EXCEPTIONS - Operations that DON\'T require tasks');
       expect(section).toContain('git commit');
       expect(section).toContain('REQUIRES A TASK');
@@ -208,7 +208,7 @@ describe('CLAUDE.md Configuration Tests', () => {
       
       expect(section).toContain('**Project Name**: TestProject');
       expect(section).toContain('~/.claude/CLAUDE.md');
-      expect(section).not.toContain('OBLIGATORY');
+      expect(section).not.toContain('SMART Task Creation');
     });
   });
 
@@ -247,7 +247,7 @@ describe('CLAUDE.md Configuration Tests', () => {
 
     test('should clearly state the important note', () => {
       const content = fs.readFileSync(globalClaudeMdPath, 'utf8');
-      expect(content).toContain('**IMPORTANT:** If the user asks you to:');
+      expect(content).toContain('IMPORTANT: Terminal ID');
       expect(content).toContain('The exceptions are ONLY for routine operations');
     });
   });

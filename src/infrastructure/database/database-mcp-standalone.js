@@ -109,6 +109,7 @@ class DatabaseManagerMCP {
           status TEXT DEFAULT 'pending',
           terminal_id INTEGER,
           project TEXT,
+          labels TEXT DEFAULT '[]',
           sort_order INTEGER DEFAULT 0,
           created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
           updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -146,18 +147,20 @@ class DatabaseManagerMCP {
   }
 
   // Task management methods
-  async createTask(title, description, terminalId, project = null, parentTaskId = null) {
+  async createTask(title, description, terminalId, project = null, parentTaskId = null, labels = []) {
     try {
       // Combine INSERT and SELECT in a single SQLite session to get the correct ID
       // Using a temporary file to avoid command line escaping issues
       const tempFile = path.join(os.tmpdir(), `mcp_task_${Date.now()}.sql`);
+      const labelsJSON = JSON.stringify(labels || []).replace(/'/g, "''");
       const sqlCommands = `
-        INSERT INTO tasks (title, description, terminal_id, project, parent_task_id) 
+        INSERT INTO tasks (title, description, terminal_id, project, parent_task_id, labels) 
         VALUES ('${(title || '').replace(/'/g, "''")}', 
                 '${(description || '').replace(/'/g, "''")}', 
                 ${terminalId || 0}, 
                 ${project ? `'${project.replace(/'/g, "''")}'` : 'NULL'},
-                ${parentTaskId || 'NULL'});
+                ${parentTaskId || 'NULL'},
+                '${labelsJSON}');
         SELECT last_insert_rowid();
       `;
       
@@ -233,7 +236,7 @@ class DatabaseManagerMCP {
   async getAllTasks() {
     try {
       // Use JSON mode for better handling of multiline fields
-      const query = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at FROM tasks ORDER BY sort_order ASC, created_at DESC';
+      const query = 'SELECT id, title, description, plan, implementation, status, terminal_id, project, labels, sort_order, created_at, updated_at FROM tasks ORDER BY sort_order ASC, created_at DESC';
       const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
       if (!result || result.trim() === '') {
@@ -247,7 +250,8 @@ class DatabaseManagerMCP {
         ...task,
         id: parseInt(task.id),
         terminal_id: task.terminal_id ? parseInt(task.terminal_id) : null,
-        sort_order: parseInt(task.sort_order) || 0
+        sort_order: parseInt(task.sort_order) || 0,
+        labels: task.labels ? JSON.parse(task.labels) : []
       }));
     } catch (error) {
       console.error('[MCP Database] Error getting all tasks:', error.message);
@@ -395,7 +399,7 @@ class DatabaseManagerMCP {
       // Use JSON mode for better handling of multiline fields
       console.error(`[MCP Database] getTaskById called with ID: ${taskId}`);
       console.error(`[MCP Database] Using database path: ${this.dbPath}`);
-      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, sort_order, created_at, updated_at, parent_task_id FROM tasks WHERE id = ${parseInt(taskId)}`;
+      const query = `SELECT id, title, description, plan, implementation, status, terminal_id, project, labels, sort_order, created_at, updated_at, parent_task_id FROM tasks WHERE id = ${parseInt(taskId)}`;
       const result = execSync(`sqlite3 "${this.dbPath}" ".mode json" "${query}"`, { encoding: 'utf8' });
       
       if (!result || result.trim() === '') {
@@ -424,6 +428,7 @@ class DatabaseManagerMCP {
         status: task.status || 'pending',
         terminal_id: task.terminal_id ? parseInt(task.terminal_id) : null,
         project: task.project || null,
+        labels: task.labels ? JSON.parse(task.labels) : [],
         sort_order: parseInt(task.sort_order) || 0,
         created_at: task.created_at || null,
         updated_at: task.updated_at || null,
@@ -471,6 +476,21 @@ class DatabaseManagerMCP {
     try {
       const sql = `UPDATE tasks SET terminal_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
       this.execSQL(sql, [terminalId === '' ? null : terminalId, taskId]);
+      
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  }
+
+  updateTaskLabels(taskId, labels) {
+    try {
+      const labelsJSON = JSON.stringify(labels || []);
+      const sql = `UPDATE tasks SET labels = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`;
+      this.execSQL(sql, [labelsJSON, taskId]);
       
       return { success: true };
     } catch (error) {

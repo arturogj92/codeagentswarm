@@ -1190,10 +1190,206 @@ class TerminalManager {
                     
                     // Update subtitle
                     if (subtitle) subtitle.textContent = 'Ready to continue working';
+                    
+                    // IMPORTANT: Setup event listeners for session buttons
+                    // This was missing when using Browse for folder
+                    setupSessionButtonListeners(selectedDir);
                 }
             } else {
                 // User cancelled, do nothing
             }
+        };
+        
+        // Function to setup event listeners for Resume and New Session buttons
+        // This needs to be called both when selecting a project and when browsing for folder
+        const setupSessionButtonListeners = (projectPath) => {
+            // Handle Resume button with hold functionality for danger mode
+            const resumeBtn = selectorDiv.querySelector('#resume-session-btn');
+            const newBtn = selectorDiv.querySelector('#new-session-btn');
+            const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
+            
+            if (!resumeBtn || !newBtn) {
+                console.error('Session buttons not found');
+                return;
+            }
+            
+            // Remove any existing listeners first to avoid duplicates
+            const oldResumeBtn = resumeBtn.cloneNode(true);
+            const oldNewBtn = newBtn.cloneNode(true);
+            resumeBtn.parentNode.replaceChild(oldResumeBtn, resumeBtn);
+            newBtn.parentNode.replaceChild(oldNewBtn, newBtn);
+            
+            // Get fresh references
+            const freshResumeBtn = selectorDiv.querySelector('#resume-session-btn');
+            const freshNewBtn = selectorDiv.querySelector('#new-session-btn');
+            
+            let resumeHoldTimer = null;
+            let resumeHoldProgress = null;
+            let newHoldTimer = null;
+            let newHoldProgress = null;
+            
+            const executeResume = async () => {
+                // Update last opened timestamp
+                await ipcRenderer.invoke('project-update-last-opened', projectPath);
+                
+                // Update last selected directory
+                this.lastSelectedDirectories[quadrant] = projectPath;
+                this.saveDirectoryToStorage(quadrant, projectPath);
+                
+                // Check if danger mode is enabled
+                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                
+                // Remove selector and launch IDE directly
+                wrapper.removeChild(selectorDiv);
+                if (isDangerMode) {
+                    // Launch with danger mode
+                    this.startTerminal(quadrant, projectPath, 'dangerous-resume');
+                } else {
+                    // Launch normally
+                    this.startTerminal(quadrant, projectPath, 'resume');
+                }
+            };
+            
+            const executeNewSession = async () => {
+                // Create new session in the same directory
+                await ipcRenderer.invoke('project-update-last-opened', projectPath);
+                
+                this.lastSelectedDirectories[quadrant] = projectPath;
+                this.saveDirectoryToStorage(quadrant, projectPath);
+                
+                // Check if danger mode is enabled
+                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                
+                // Remove selector and launch IDE
+                wrapper.removeChild(selectorDiv);
+                if (isDangerMode) {
+                    // Launch with danger mode
+                    this.startTerminal(quadrant, projectPath, 'dangerous');
+                } else {
+                    // Launch normally
+                    this.startTerminal(quadrant, projectPath, 'new');
+                }
+            };
+            
+            const startResumeHold = () => {
+                // Check if danger mode is enabled
+                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                
+                if (!isDangerMode) {
+                    // No danger mode, execute immediately
+                    executeResume();
+                    return;
+                }
+                
+                // Start hold timer for danger mode
+                const warningText = selectorDiv.querySelector('.warning-text');
+                if (warningText) {
+                    warningText.style.color = '#ff6b6b';
+                }
+                
+                // Create progress indicator
+                resumeHoldProgress = document.createElement('div');
+                resumeHoldProgress.className = 'hold-progress';
+                freshResumeBtn.appendChild(resumeHoldProgress);
+                
+                resumeHoldTimer = setTimeout(() => {
+                    executeResume();
+                }, 3000);
+            };
+            
+            const cancelResumeHold = () => {
+                if (resumeHoldTimer) {
+                    clearTimeout(resumeHoldTimer);
+                    resumeHoldTimer = null;
+                    
+                    const warningText = selectorDiv.querySelector('.warning-text');
+                    if (warningText) {
+                        warningText.style.color = '';
+                    }
+                    
+                    if (resumeHoldProgress) {
+                        resumeHoldProgress.remove();
+                        resumeHoldProgress = null;
+                    }
+                }
+            };
+            
+            const startNewHold = () => {
+                // Check if danger mode is enabled
+                const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
+                
+                if (!isDangerMode) {
+                    // No danger mode, execute immediately
+                    executeNewSession();
+                    return;
+                }
+                
+                // Start hold timer for danger mode
+                const warningText = selectorDiv.querySelector('.warning-text');
+                if (warningText) {
+                    warningText.style.color = '#ff6b6b';
+                }
+                
+                // Create progress indicator
+                newHoldProgress = document.createElement('div');
+                newHoldProgress.className = 'hold-progress';
+                freshNewBtn.appendChild(newHoldProgress);
+                
+                newHoldTimer = setTimeout(() => {
+                    executeNewSession();
+                }, 3000);
+            };
+            
+            const cancelNewHold = () => {
+                if (newHoldTimer) {
+                    clearTimeout(newHoldTimer);
+                    newHoldTimer = null;
+                    
+                    const warningText = selectorDiv.querySelector('.warning-text');
+                    if (warningText) {
+                        warningText.style.color = '';
+                    }
+                    
+                    if (newHoldProgress) {
+                        newHoldProgress.remove();
+                        newHoldProgress = null;
+                    }
+                }
+            };
+            
+            // Resume button events
+            freshResumeBtn.addEventListener('mousedown', startResumeHold);
+            freshResumeBtn.addEventListener('mouseup', cancelResumeHold);
+            freshResumeBtn.addEventListener('mouseleave', cancelResumeHold);
+            freshResumeBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startResumeHold();
+            });
+            freshResumeBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                cancelResumeHold();
+            });
+            freshResumeBtn.addEventListener('touchcancel', cancelResumeHold);
+            freshResumeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+            });
+            
+            // New Session button events
+            freshNewBtn.addEventListener('mousedown', startNewHold);
+            freshNewBtn.addEventListener('mouseup', cancelNewHold);
+            freshNewBtn.addEventListener('mouseleave', cancelNewHold);
+            freshNewBtn.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                startNewHold();
+            });
+            freshNewBtn.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                cancelNewHold();
+            });
+            freshNewBtn.addEventListener('touchcancel', cancelNewHold);
+            freshNewBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+            });
         };
 
         // Handle browse button
@@ -1280,264 +1476,8 @@ class TerminalManager {
                 selectorDiv.querySelector('h3').textContent = 'Claude Code Session';
                 selectorDiv.querySelector('.directory-selector-subtitle').textContent = 'Ready to continue working';
                 
-                // Handle Resume button with hold functionality for danger mode
-                const resumeBtn = selectorDiv.querySelector('#resume-session-btn');
-                const dangerCheckbox = selectorDiv.querySelector('#danger-mode-checkbox');
-                let resumeHoldTimer = null;
-                let resumeHoldProgress = null;
-                
-                const executeResume = async () => {
-                    // Update last opened timestamp
-                    await ipcRenderer.invoke('project-update-last-opened', projectPath);
-                    
-                    // Update last selected directory
-                    this.lastSelectedDirectories[quadrant] = projectPath;
-                    this.saveDirectoryToStorage(quadrant, projectPath);
-                    
-                    // Check if danger mode is enabled
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    // Remove selector and launch IDE directly
-                    wrapper.removeChild(selectorDiv);
-                    if (isDangerMode) {
-                        // Launch with danger mode
-                        this.startTerminal(quadrant, projectPath, 'dangerous-resume');
-                    } else {
-                        // Launch normally
-                        this.startTerminal(quadrant, projectPath, 'resume');
-                    }
-                };
-                
-                const startResumeHold = () => {
-                    // Check if danger mode is enabled
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    if (!isDangerMode) {
-                        // If danger mode is not enabled, execute immediately
-                        executeResume();
-                        return;
-                    }
-                    
-                    // Create progress indicator
-                    if (!resumeHoldProgress) {
-                        resumeHoldProgress = document.createElement('div');
-                        resumeHoldProgress.className = 'hold-progress';
-                        resumeHoldProgress.innerHTML = `
-                            <div class="hold-progress-bar"></div>
-                            <div class="hold-progress-text">Hold for 3 seconds</div>
-                        `;
-                        resumeBtn.appendChild(resumeHoldProgress);
-                    }
-                    
-                    // Start the progress animation
-                    const progressBar = resumeHoldProgress.querySelector('.hold-progress-bar');
-                    progressBar.style.width = '0%';
-                    resumeHoldProgress.classList.add('active');
-                    
-                    // Animate progress over 3 seconds
-                    let startTime = Date.now();
-                    const animateProgress = () => {
-                        const elapsed = Date.now() - startTime;
-                        const progress = Math.min((elapsed / 3000) * 100, 100);
-                        progressBar.style.width = progress + '%';
-                        
-                        if (progress < 100) {
-                            requestAnimationFrame(animateProgress);
-                        }
-                    };
-                    requestAnimationFrame(animateProgress);
-                    
-                    // Set timer for 3 seconds
-                    resumeHoldTimer = setTimeout(() => {
-                        executeResume();
-                    }, 3000);
-                };
-                
-                const cancelResumeHold = () => {
-                    const wasHolding = resumeHoldTimer !== null;
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    if (resumeHoldTimer) {
-                        clearTimeout(resumeHoldTimer);
-                        resumeHoldTimer = null;
-                    }
-                    if (resumeHoldProgress) {
-                        resumeHoldProgress.classList.remove('active');
-                        setTimeout(() => {
-                            const progressBar = resumeHoldProgress.querySelector('.hold-progress-bar');
-                            if (progressBar) progressBar.style.width = '0%';
-                        }, 300);
-                    }
-                    
-                    // Show warning if danger mode is on and user released early
-                    if (wasHolding && isDangerMode) {
-                        const warningElement = selectorDiv.querySelector('#hold-warning');
-                        if (warningElement) {
-                            warningElement.style.display = 'flex';
-                            warningElement.classList.add('show');
-                            
-                            // Hide warning after 5 seconds
-                            setTimeout(() => {
-                                warningElement.classList.remove('show');
-                                setTimeout(() => {
-                                    warningElement.style.display = 'none';
-                                }, 300);
-                            }, 5000);
-                        }
-                    }
-                };
-                
-                // Mouse events
-                resumeBtn.addEventListener('mousedown', startResumeHold);
-                resumeBtn.addEventListener('mouseup', cancelResumeHold);
-                resumeBtn.addEventListener('mouseleave', cancelResumeHold);
-                
-                // Touch events for mobile
-                resumeBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    startResumeHold();
-                });
-                resumeBtn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    cancelResumeHold();
-                });
-                resumeBtn.addEventListener('touchcancel', cancelResumeHold);
-                
-                // Prevent default click behavior
-                resumeBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                });
-                
-                // Handle New Session button with hold functionality for danger mode
-                const newBtn = selectorDiv.querySelector('#new-session-btn');
-                let newHoldTimer = null;
-                let newHoldProgress = null;
-                
-                const executeNewSession = async () => {
-                    // Create new session in the same directory
-                    await ipcRenderer.invoke('project-update-last-opened', projectPath);
-                    
-                    this.lastSelectedDirectories[quadrant] = projectPath;
-                    this.saveDirectoryToStorage(quadrant, projectPath);
-                    
-                    // Check if danger mode is enabled
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    // Clear any existing session data before starting new
-                    // TODO: Add session clearing logic here if needed
-                    
-                    // Remove selector and launch IDE directly
-                    wrapper.removeChild(selectorDiv);
-                    if (isDangerMode) {
-                        // Launch new session with danger mode
-                        this.startTerminal(quadrant, projectPath, 'dangerous');
-                    } else {
-                        // Launch new session normally
-                        this.startTerminal(quadrant, projectPath, 'new');
-                    }
-                };
-                
-                const startNewHold = () => {
-                    // Check if danger mode is enabled
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    if (!isDangerMode) {
-                        // If danger mode is not enabled, execute immediately
-                        executeNewSession();
-                        return;
-                    }
-                    
-                    // Create progress indicator
-                    if (!newHoldProgress) {
-                        newHoldProgress = document.createElement('div');
-                        newHoldProgress.className = 'hold-progress';
-                        newHoldProgress.innerHTML = `
-                            <div class="hold-progress-bar"></div>
-                            <div class="hold-progress-text">Hold for 3 seconds</div>
-                        `;
-                        newBtn.appendChild(newHoldProgress);
-                    }
-                    
-                    // Start the progress animation
-                    const progressBar = newHoldProgress.querySelector('.hold-progress-bar');
-                    progressBar.style.width = '0%';
-                    newHoldProgress.classList.add('active');
-                    
-                    // Animate progress over 3 seconds
-                    let startTime = Date.now();
-                    const animateProgress = () => {
-                        const elapsed = Date.now() - startTime;
-                        const progress = Math.min((elapsed / 3000) * 100, 100);
-                        progressBar.style.width = progress + '%';
-                        
-                        if (progress < 100) {
-                            requestAnimationFrame(animateProgress);
-                        }
-                    };
-                    requestAnimationFrame(animateProgress);
-                    
-                    // Set timer for 3 seconds
-                    newHoldTimer = setTimeout(() => {
-                        executeNewSession();
-                    }, 3000);
-                };
-                
-                const cancelNewHold = () => {
-                    const wasHolding = newHoldTimer !== null;
-                    const isDangerMode = dangerCheckbox && dangerCheckbox.checked;
-                    
-                    if (newHoldTimer) {
-                        clearTimeout(newHoldTimer);
-                        newHoldTimer = null;
-                    }
-                    if (newHoldProgress) {
-                        newHoldProgress.classList.remove('active');
-                        setTimeout(() => {
-                            const progressBar = newHoldProgress.querySelector('.hold-progress-bar');
-                            if (progressBar) progressBar.style.width = '0%';
-                        }, 300);
-                    }
-                    
-                    // Show warning if danger mode is on and user released early
-                    if (wasHolding && isDangerMode) {
-                        const warningElement = selectorDiv.querySelector('#hold-warning');
-                        if (warningElement) {
-                            warningElement.style.display = 'flex';
-                            warningElement.classList.add('show');
-                            
-                            // Hide warning after 5 seconds
-                            setTimeout(() => {
-                                warningElement.classList.remove('show');
-                                setTimeout(() => {
-                                    warningElement.style.display = 'none';
-                                }, 300);
-                            }, 5000);
-                        }
-                    }
-                };
-                
-                // Mouse events
-                newBtn.addEventListener('mousedown', startNewHold);
-                newBtn.addEventListener('mouseup', cancelNewHold);
-                newBtn.addEventListener('mouseleave', cancelNewHold);
-                
-                // Touch events for mobile
-                newBtn.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    startNewHold();
-                });
-                newBtn.addEventListener('touchend', (e) => {
-                    e.preventDefault();
-                    cancelNewHold();
-                });
-                newBtn.addEventListener('touchcancel', cancelNewHold);
-                
-                // Prevent default click behavior
-                newBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                });
-                
-                // Back button functionality removed - no longer needed
+                // Use the shared function to setup session button listeners
+                setupSessionButtonListeners(projectPath);
             });
         });
         
@@ -2500,51 +2440,64 @@ class TerminalManager {
                         }
                     }
                     
-                    // Build the message to send
-                    let message = `\n# Work on task #${taskData.taskId}: ${taskData.title}\n\n`;
+                    // Debug: Log the taskData to verify what we're receiving
+                    console.log('TaskData received in renderer:', taskData);
+                    
+                    // Build the message to send - use taskId or id as fallback
+                    const taskId = taskData.taskId || taskData.id;
+                    const taskTitle = taskData.title || 'Untitled Task';
+                    
+                    // Use the same format as copyTaskSummary for consistency
+                    let message = `Task #${taskId}: ${taskTitle}\n\n`;
                     
                     if (taskData.description) {
-                        message += `## Description:\n${taskData.description}\n\n`;
-                    }
-                    
-                    if (taskData.implementation) {
-                        message += `## Previous Implementation:\n${taskData.implementation}\n\n`;
+                        message += `Description:\n${taskData.description}\n\n`;
                     }
                     
                     if (taskData.plan) {
-                        message += `## Plan:\n${taskData.plan}\n\n`;
+                        message += `Plan:\n${taskData.plan}\n\n`;
                     }
                     
-                    message += `## Command:\nWork on this task\n`;
+                    if (taskData.implementation) {
+                        message += `Previous Implementation:\n${taskData.implementation}\n\n`;
+                    }
+                    
+                    message += `Project: ${taskData.project || 'None'}\n`;
+                    message += `Status: pending\n`;
+                    message += `Terminal: ${quadrant + 1}\n\n`;
+                    message += `Command:\nWork on this task\n`;
+                    
+                    console.log('Message to send to terminal:', message);
                     
                     // Send the task info to Claude with a delay to ensure it's ready
                     setTimeout(() => {
-
+                        // Send the task summary first
+                        console.log('Sending task summary to terminal:', message);
                         ipcRenderer.send('send-to-terminal', quadrant, message);
                         
-                        // Then send the command to start the task
+                        // Then send the MCP command after a short delay
                         setTimeout(() => {
-                            const startCommand = `mcp__codeagentswarm-tasks__start_task --task_id ${taskData.taskId}\n`;
-
+                            const startCommand = `mcp__codeagentswarm-tasks__start_task --task_id ${taskId}`;
+                            console.log('Sending start command:', startCommand);
                             ipcRenderer.send('send-to-terminal', quadrant, startCommand);
-                            
-                            // NOW hide the loader and show the terminal after everything is sent
-                            setTimeout(() => {
-                                const finalLoader = document.getElementById(`loader-${quadrant}`);
-                                const terminalDiv = document.getElementById(`terminal-${quadrant}`);
-                                if (finalLoader && terminalDiv) {
-                                    finalLoader.style.display = 'none';
-                                    terminalDiv.style.display = 'block';
-                                    
-                                    // Fit terminal after showing
-                                    const terminalInfo = this.terminals.get(quadrant);
-                                    if (terminalInfo && terminalInfo.fitAddon) {
-                                        terminalInfo.fitAddon.fit();
-                                    }
+                        }, 1000);
+                        
+                        // Hide the loader and show the terminal after everything is sent
+                        setTimeout(() => {
+                            const finalLoader = document.getElementById(`loader-${quadrant}`);
+                            const terminalDiv = document.getElementById(`terminal-${quadrant}`);
+                            if (finalLoader && terminalDiv) {
+                                finalLoader.style.display = 'none';
+                                terminalDiv.style.display = 'block';
+                                
+                                // Fit terminal after showing
+                                const terminalInfo = this.terminals.get(quadrant);
+                                if (terminalInfo && terminalInfo.fitAddon) {
+                                    terminalInfo.fitAddon.fit();
                                 }
-                            }, 500); // Small delay to let the command register visually
-                        }, 500);
-                    }, 2000); // Increased delay to 2 seconds to ensure Claude is fully ready
+                            }
+                        }, 1500); // Small delay to let the command register visually
+                    }, 3000); // Increased delay to 3 seconds to ensure Claude is fully ready
                     
                     // Clear the pending task
                     delete window.pendingTerminalTasks[quadrant];

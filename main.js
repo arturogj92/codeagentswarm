@@ -3530,10 +3530,10 @@ ipcMain.handle('task-create', async (event, taskData) => {
     if (!db) return { success: false, error: 'Database not initialized' };
     
     // Handle both old format (separate arguments) and new format (object)
-    let title, description, terminalId, project, parentTaskId;
+    let title, description, terminalId, project, parentTaskId, labels;
     if (typeof taskData === 'object' && taskData !== null && taskData.title) {
       // New format with object
-      ({ title, description, terminal_id: terminalId, project, parent_task_id: parentTaskId } = taskData);
+      ({ title, description, terminal_id: terminalId, project, parent_task_id: parentTaskId, labels } = taskData);
     } else {
       // Old format with separate arguments (for backward compatibility)
       title = taskData;
@@ -3541,9 +3541,10 @@ ipcMain.handle('task-create', async (event, taskData) => {
       terminalId = arguments[3];
       project = arguments[4];
       parentTaskId = null;
+      labels = [];
     }
     
-    const result = db.createTask(title, description, terminalId, project, parentTaskId);
+    const result = db.createTask(title, description, terminalId, project, parentTaskId, labels);
     return result;
   } catch (error) {
     return { success: false, error: error.message };
@@ -3884,6 +3885,16 @@ ipcMain.handle('task-update-terminal', async (event, taskId, terminalId) => {
   try {
     if (!db) return { success: false, error: 'Database not initialized' };
     const result = db.updateTaskTerminal(taskId, terminalId);
+    return result;
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+});
+
+ipcMain.handle('task-update-labels', async (event, taskId, labels) => {
+  try {
+    if (!db) return { success: false, error: 'Database not initialized' };
+    const result = db.updateTaskLabels(taskId, labels);
     return result;
   } catch (error) {
     return { success: false, error: error.message };

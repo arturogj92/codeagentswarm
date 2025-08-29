@@ -124,6 +124,9 @@ class DatabaseManager {
         
         // Add parent_task_id column if it doesn't exist (migration)
         this.addParentTaskIdColumnIfNeeded();
+        
+        // Add labels column if it doesn't exist (migration)
+        this.addLabelsColumnIfNeeded();
 
     }
 
@@ -466,6 +469,22 @@ class DatabaseManager {
             console.error('Error checking/adding parent_task_id column:', error);
         }
     }
+    
+    addLabelsColumnIfNeeded() {
+        try {
+            // Check if labels column exists
+            const columns = this.db.prepare("PRAGMA table_info(tasks)").all();
+            const hasLabels = columns.some(col => col.name === 'labels');
+            
+            if (!hasLabels) {
+                console.log('Adding labels column to tasks table...');
+                this.db.exec("ALTER TABLE tasks ADD COLUMN labels TEXT DEFAULT '[]'");
+                console.log('Labels column added successfully');
+            }
+        } catch (error) {
+            console.error('Error checking/adding labels column:', error);
+        }
+    }
 
     // Save or update directory for a terminal
     saveTerminalDirectory(terminalId, directory) {
@@ -664,15 +683,18 @@ class DatabaseManager {
     // Task management methods
     
     // Create a new task
-    createTask(title, description, terminalId = null, project = null, parentTaskId = null) {
+    createTask(title, description, terminalId = null, project = null, parentTaskId = null, labels = []) {
         try {
+            // Convert labels array to JSON string
+            const labelsJSON = JSON.stringify(labels || []);
+            
             const stmt = this.db.prepare(`
-                INSERT INTO tasks (title, description, terminal_id, status, project, parent_task_id)
-                VALUES (?, ?, ?, 'pending', ?, ?)
+                INSERT INTO tasks (title, description, terminal_id, status, project, parent_task_id, labels)
+                VALUES (?, ?, ?, 'pending', ?, ?, ?)
             `);
             
             // Allow null project for tasks without a project
-            const result = stmt.run(title, description, terminalId, project || null, parentTaskId || null);
+            const result = stmt.run(title, description, terminalId, project || null, parentTaskId || null, labelsJSON);
             return { success: true, taskId: result.lastInsertRowid };
         } catch (err) {
             return { success: false, error: err.message };
@@ -708,7 +730,13 @@ class DatabaseManager {
             }
             
             const stmt = this.db.prepare(query);
-            return stmt.all();
+            const tasks = stmt.all();
+            
+            // Parse labels JSON for each task
+            return tasks.map(task => ({
+                ...task,
+                labels: task.labels ? JSON.parse(task.labels) : []
+            }));
         } catch (err) {
             return [];
         }
@@ -847,6 +875,23 @@ class DatabaseManager {
         }
     }
 
+    // Update task labels
+    updateTaskLabels(taskId, labels) {
+        try {
+            const labelsJSON = JSON.stringify(labels || []);
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET labels = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(labelsJSON, taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+
     // Update task plan
     updateTaskPlan(taskId, plan) {
         try {
@@ -873,6 +918,23 @@ class DatabaseManager {
             `);
             
             stmt.run(implementation || '', taskId);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: err.message };
+        }
+    }
+    
+    // Update task labels
+    updateTaskLabels(taskId, labels) {
+        try {
+            const labelsJSON = JSON.stringify(labels || []);
+            const stmt = this.db.prepare(`
+                UPDATE tasks 
+                SET labels = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `);
+            
+            stmt.run(labelsJSON, taskId);
             return { success: true };
         } catch (err) {
             return { success: false, error: err.message };

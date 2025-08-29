@@ -11,7 +11,9 @@ global.window = {
         invoke: jest.fn().mockResolvedValue({ success: true }),
         send: jest.fn(),
         on: jest.fn()
-    }
+    },
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn()
 };
 
 global.document = {

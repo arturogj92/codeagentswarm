@@ -131,33 +131,52 @@ The exceptions are ONLY for routine operations that don't modify the codebase fu
 - **NEVER ask the user** which terminal - it's handled automatically
 - Tasks are automatically associated with the correct terminal for proper tracking
 
-### 🏷️ MANDATORY: Terminal Title Updates
+### 🏷️ MANDATORY: Terminal Title Updates - ALWAYS UPDATE
 
-**🚨 OBLIGATORIO: When starting ANY task, you MUST update the terminal title:**
+**🚨 OBLIGATORIO: Terminal title MUST BE UPDATED when starting ANY work:**
 
-1. **IMMEDIATELY after calling \`start_task\`**, you MUST call \`update_terminal_title\`
-2. Generate a 3-word title that summarizes what you're working on
-3. The title should be clear and descriptive (max 3 words)
-4. **This is NOT optional - it's MANDATORY for ALL tasks**
+1. **ALWAYS UPDATE TERMINAL TITLE** - REGARDLESS of whether you have a task or not:
+   - When starting a task → Update title
+   - When working without a task → STILL update title
+   - When switching to different work → Update title
+   - **THE TERMINAL TITLE SHOWS WHAT YOU'RE DOING RIGHT NOW**
 
-**Correct workflow example:**
+2. **HOW TO UPDATE:**
+   - With task: Call \`update_terminal_title\` IMMEDIATELY after \`start_task\`
+   - Without task: Call \`update_terminal_title\` as soon as you start working
+   - Generate a 3-word title that summarizes current work
+   - Update it whenever you switch to different work
+
+3. **THIS IS MANDATORY - NO EXCEPTIONS**
+
+**Workflow examples:**
+
+**WITH TASK:**
 \`\`\`
 1. start_task(task_id=123)
-2. update_terminal_title(title="Fix Auth Bug")  // MANDATORY - DO THIS IMMEDIATELY
+2. update_terminal_title(title="Fix Auth Bug")  // MANDATORY IMMEDIATELY
 3. Continue with implementation...
 \`\`\`
 
-**Why this is mandatory:**
-- The terminal title helps users identify at a glance what each terminal is doing
-- The task ID appears as a small badge next to the title for easy reference
-- Without this, users cannot quickly see what's being worked on
+**WITHOUT TASK (e.g., just reading code):**
+\`\`\`
+1. User: "Can you check what's in database.js?"
+2. update_terminal_title(title="Reading Database Code")  // STILL MANDATORY
+3. Read and analyze the file...
+\`\`\`
+
+**Why this is ALWAYS mandatory:**
+- Users need to see what EACH terminal is doing AT ALL TIMES
+- With tasks: The task ID appears as a badge + your title shows the work
+- Without tasks: The title is the ONLY way to know what's happening
+- **Multiple terminals = Multiple agents working = MUST KNOW WHO'S DOING WHAT**
 
 **Examples of good terminal titles:**
 - "Fix Auth Bug"
-- "Add User API" 
-- "Update Database Schema"
-- "Implement Search Feature"
-- "Refactor Login Flow"
+- "Reading Code"
+- "Checking Logs"
+- "Update Database"
+- "Search Functions"
 
 ### 📝 MANDATORY: PLAN Field Management
 
@@ -320,17 +339,29 @@ The exceptions are ONLY for routine operations that don't modify the codebase fu
    [NOW agent calls complete_task second time - task goes to completed]
    \`\`\`
 
-### 🔄 BUG FIXES AND MODIFICATIONS - CONTINUE WITH SAME TASK
+### 🔄 TASK CONTINUATION vs NEW TASK - CRITICAL DECISION RULES
 
-**CRITICAL: When bugs are found or modifications are requested AFTER a task is in testing or completed:**
+**🚨 WHEN TO REOPEN/CONTINUE AN EXISTING TASK vs CREATE NEW:**
 
-1. **🚨 DO NOT CREATE A NEW TASK for bug fixes or minor modifications:**
-   - If the user reports a bug or requests changes related to the current/recent task
-   - **ASK THE USER:** "Should I continue with the current task [ID: X] or create a new one?"
-   - Default to continuing with the same task unless:
-     - The change is a completely different feature
-     - The user explicitly asks for a new task
-     - More than 24 hours have passed since the task was completed
+1. **✅ REOPEN THE LAST TASK YOU WORKED ON when:**
+   - You're continuing work from a previous chat session on the SAME feature/bug
+   - User reports a bug in something you JUST implemented (same session or recent)
+   - Making adjustments or improvements to work you JUST completed
+   - The work is directly related to the last task's objective
+   - Less than 24 hours have passed since working on it
+   
+2. **❌ CREATE A NEW TASK when:**
+   - Working on a DIFFERENT feature or area of code
+   - The scope is significantly different from the last task
+   - More than 24 hours have passed since the last related task
+   - It's a new bug unrelated to recent work
+   - User explicitly asks for a new task
+
+3. **📝 DEFAULT BEHAVIOR:**
+   - **ALWAYS CHECK:** "Is this work related to task #[last_task_id]?"
+   - If YES → Reopen that task with \`start_task\`
+   - If NO → Create a new task
+   - If UNSURE → ASK THE USER: "Should I continue with task #X or create a new one?"
 
 2. **How to handle bug fixes in existing tasks:**
    - If task is \`in_testing\`: Move back to \`in_progress\` using \`start_task\`

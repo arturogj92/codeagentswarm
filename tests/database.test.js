@@ -78,15 +78,20 @@ describe('Database', () => {
 
         test('should get all tasks', () => {
             const mockTasks = [
-                { id: 1, title: 'Task 1', status: 'pending' },
-                { id: 2, title: 'Task 2', status: 'completed' }
+                { id: 1, title: 'Task 1', status: 'pending', labels: null },
+                { id: 2, title: 'Task 2', status: 'completed', labels: null }
             ];
             db.db.prepare = jest.fn(() => ({
                 all: jest.fn(() => mockTasks)
             }));
 
             const tasks = db.getAllTasks();
-            expect(tasks).toEqual(mockTasks);
+            // getAllTasks processes labels field
+            const expected = mockTasks.map(task => ({
+                ...task,
+                labels: task.labels ? JSON.parse(task.labels) : []
+            }));
+            expect(tasks).toEqual(expected);
         });
 
         test('should get tasks by status', () => {

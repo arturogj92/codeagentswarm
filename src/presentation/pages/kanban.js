@@ -15,6 +15,9 @@ class KanbanManager {
         this.taskIndex = new Map(); // Quick task lookup by ID
         this.subtaskIndex = new Map(); // Parent ID -> subtask IDs mapping
         
+        // Global label color mapping to maintain consistency
+        this.globalLabelColors = new Map(); // label text -> color index
+        
         // Pagination configuration for each column
         this.paginationConfig = {
             pending: {
@@ -1179,6 +1182,9 @@ class KanbanManager {
                 this.taskIndex.clear();
                 this.subtaskIndex.clear();
                 
+                // Build global label color map from existing tasks
+                this.buildGlobalLabelColorMap();
+                
                 for (const task of this.tasks) {
                     this.taskIndex.set(task.id, task);
                     
@@ -1249,6 +1255,24 @@ class KanbanManager {
                 if (task.implementation && task.implementation.toLowerCase().includes(query)) return true;
                 // Search in task ID
                 if (task.id && task.id.toString().includes(query)) return true;
+                // Search in labels
+                if (task.labels) {
+                    let labelsArray = [];
+                    if (typeof task.labels === 'string') {
+                        try {
+                            labelsArray = JSON.parse(task.labels);
+                        } catch (e) {
+                            labelsArray = [];
+                        }
+                    } else if (Array.isArray(task.labels)) {
+                        labelsArray = task.labels;
+                    }
+                    // Handle both string labels and object labels {text, color}
+                    if (labelsArray.some(label => {
+                        const labelText = typeof label === 'string' ? label : (label.text || '');
+                        return labelText.toLowerCase().includes(query);
+                    })) return true;
+                }
                 return false;
             });
         }
@@ -1512,6 +1536,38 @@ class KanbanManager {
                 <span class="task-title-text" data-task-id="${task.id}">${this.escapeHtml(this.capitalizeFirstLetter(task.title))}</span>
             </div>
             ${task.description ? `<div class="task-description">${this.escapeHtml(task.description)}</div>` : ''}
+            ${(() => {
+                // Ensure labels is an array
+                let labelsArray = [];
+                if (task.labels) {
+                    if (typeof task.labels === 'string') {
+                        try {
+                            labelsArray = JSON.parse(task.labels);
+                        } catch (e) {
+                            labelsArray = [];
+                        }
+                    } else if (Array.isArray(task.labels)) {
+                        labelsArray = task.labels;
+                    }
+                }
+                if (labelsArray.length > 0) {
+                    const displayLabels = labelsArray.slice(0, 3);
+                    const moreCount = labelsArray.length - 3;
+                    return `
+                        <div class="task-labels">
+                            ${displayLabels.map(label => {
+                                const labelText = typeof label === 'string' ? label : label.text;
+                                const colorIndex = typeof label === 'string' 
+                                    ? this.getLabelColorIndex(label)
+                                    : (label.color !== undefined ? label.color : this.getLabelColorIndex(label.text));
+                                return `<span class="task-label-chip label-color-${colorIndex}">${this.escapeHtml(labelText)}</span>`;
+                            }).join('')}
+                            ${moreCount > 0 ? `<span class="task-labels-more">+${moreCount}</span>` : ''}
+                        </div>
+                    `;
+                }
+                return '';
+            })()}
             <div class="task-meta">
                 <span class="task-date">${createdDate}</span>
                 ${terminalIcon}
@@ -1658,12 +1714,17 @@ class KanbanManager {
                 status: taskData.status || 'pending',
                 project: taskData.project || null,
                 parent_task_id: taskData.parent_task_id || null,
-                terminal_id: taskData.terminal_id || null
+                terminal_id: taskData.terminal_id || null,
+                labels: taskData.labels || []
             });
 
             if (result.success) {
                 this.showNotification('Task created successfully', 'success');
-                this.loadTasks(); // Reload tasks
+                await this.loadTasks(); // Reload tasks
+                
+                // IMPORTANT: Rebuild global label color map after creating task with labels
+                // This ensures new labels are properly tracked
+                this.buildGlobalLabelColorMap();
             } else {
                 throw new Error(result.error || 'Failed to create task');
             }
@@ -1827,6 +1888,18 @@ class KanbanManager {
 
         this.currentTask = task;
         
+        // Hide the label tooltip when opening the modal
+        const tooltip = document.getElementById('details-existing-label-tooltip');
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
+        
+        // Clear the label input
+        const labelInput = document.getElementById('new-details-labels');
+        if (labelInput) {
+            labelInput.value = '';
+        }
+        
         // Track if editors are already initialized for this modal
         if (!this.markdownEditorsInitialized) {
             this.markdownEditorsInitialized = false;
@@ -1837,6 +1910,9 @@ class KanbanManager {
         const descEl = document.getElementById('details-description');
         if (titleEl) titleEl.value = task.title;
         if (descEl) descEl.value = task.description || '';
+        
+        // Initialize labels for details modal
+        this.initializeDetailsLabels(task);
         
         // Defer ALL other updates to avoid blocking
         setTimeout(() => {
@@ -2168,6 +2244,18 @@ class KanbanManager {
         this.removeAutoSaveListeners();
         // Reset markdown editors flag
         this.markdownEditorsInitialized = false;
+        
+        // Hide the label tooltip
+        const tooltip = document.getElementById('details-existing-label-tooltip');
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
+        
+        // Clear the label input
+        const labelInput = document.getElementById('new-details-labels');
+        if (labelInput) {
+            labelInput.value = '';
+        }
     }
 
     openSubtaskModal() {
@@ -4006,6 +4094,24 @@ class KanbanManager {
                 if (task.plan && task.plan.toLowerCase().includes(query)) return true;
                 if (task.implementation && task.implementation.toLowerCase().includes(query)) return true;
                 if (task.id && task.id.toString().includes(query)) return true;
+                // Search in labels
+                if (task.labels) {
+                    let labelsArray = [];
+                    if (typeof task.labels === 'string') {
+                        try {
+                            labelsArray = JSON.parse(task.labels);
+                        } catch (e) {
+                            labelsArray = [];
+                        }
+                    } else if (Array.isArray(task.labels)) {
+                        labelsArray = task.labels;
+                    }
+                    // Handle both string labels and object labels {text, color}
+                    if (labelsArray.some(label => {
+                        const labelText = typeof label === 'string' ? label : (label.text || '');
+                        return labelText.toLowerCase().includes(query);
+                    })) return true;
+                }
                 return false;
             });
         }
@@ -4349,6 +4455,15 @@ class KanbanManager {
             console.error('Task not found');
             return;
         }
+        
+        // Debug: Log the task data being sent
+        console.log('Sending task to new terminal:', {
+            id: task.id,
+            title: task.title,
+            description: task.description,
+            mode: mode,
+            project: task.project
+        });
 
         // Hide dropdown while processing
         const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
@@ -4365,11 +4480,12 @@ class KanbanManager {
         try {
             // Request main window to open a new terminal with the task
             const result = await ipcRenderer.invoke('open-terminal-with-task', {
+                id: task.id,  // Also include 'id' for compatibility
                 taskId: task.id,
                 title: task.title,
-                description: task.description,
-                implementation: task.implementation,
-                plan: task.plan,
+                description: task.description || '',  // Ensure description is always a string
+                implementation: task.implementation || '',  // Ensure implementation is always a string
+                plan: task.plan || '',  // Ensure plan is always a string
                 project: task.project,
                 mode: mode // Pass the mode (normal or danger)
             });
@@ -4699,6 +4815,495 @@ class KanbanManager {
         const dropdown = document.getElementById(`send-terminal-dropdown-${taskId}`);
         if (dropdown) {
             this.closeDropdownPortal(dropdown);
+        }
+    }
+
+    // Build global label color map from existing tasks
+    buildGlobalLabelColorMap() {
+        this.globalLabelColors.clear();
+        
+        // Scan all tasks to find existing labels with colors
+        for (const task of this.tasks) {
+            if (task.labels) {
+                let labelsArray = [];
+                if (typeof task.labels === 'string') {
+                    try {
+                        labelsArray = JSON.parse(task.labels);
+                    } catch (e) {
+                        labelsArray = [];
+                    }
+                } else if (Array.isArray(task.labels)) {
+                    labelsArray = task.labels;
+                }
+                
+                // Process each label
+                for (const label of labelsArray) {
+                    if (typeof label === 'object' && label.text && label.color !== undefined) {
+                        // If this label text doesn't have a color yet, store it
+                        if (!this.globalLabelColors.has(label.text)) {
+                            this.globalLabelColors.set(label.text, label.color);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Get color index for label - first check global map, then fallback to hash
+    getLabelColorIndex(labelText) {
+        // First check if we have a stored color for this label
+        if (this.globalLabelColors.has(labelText)) {
+            return this.globalLabelColors.get(labelText);
+        }
+        
+        // Fallback to hash-based color assignment for new labels
+        let hash = 0;
+        for (let i = 0; i < labelText.length; i++) {
+            hash = ((hash << 5) - hash) + labelText.charCodeAt(i);
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        // We have 8 color variants (0-7)
+        return Math.abs(hash) % 8;
+    }
+
+    // Labels functionality for task details modal
+    initializeDetailsLabels(task) {
+        const labelsInput = document.getElementById('details-labels-input');
+        const labelsContainer = document.getElementById('details-labels-container');
+        const labelSuggestions = document.getElementById('details-label-suggestions');
+        const colorPickerBtn = document.getElementById('details-label-color-picker-btn');
+        const colorPalette = document.getElementById('details-label-color-palette');
+        const colorPreview = document.getElementById('details-label-color-preview');
+        
+        if (!labelsInput || !labelsContainer) return;
+        
+        // Initialize selected color and preview
+        this.selectedDetailsLabelColor = 0; // Default color index (Blue)
+        
+        // Set default color preview
+        if (colorPreview) {
+            colorPreview.style.background = '#3b82f6'; // Default blue color
+            colorPreview.style.backgroundColor = '#3b82f6';
+            colorPreview.style.width = '100%';
+            colorPreview.style.height = '100%';
+            colorPreview.style.borderRadius = '4px';
+        }
+        
+        // Clear existing labels
+        this.detailsLabels = [];
+        labelsContainer.innerHTML = '';
+        
+        // Initialize color palette for details modal
+        this.initializeDetailsColorPalette();
+        
+        // Set the default color in the palette and preview
+        this.selectDetailsLabelColor(0);
+        
+        // Handle color picker button
+        if (colorPickerBtn && colorPalette) {
+            // Remove existing event listeners
+            const newColorPickerBtn = colorPickerBtn.cloneNode(true);
+            colorPickerBtn.parentNode.replaceChild(newColorPickerBtn, colorPickerBtn);
+            
+            newColorPickerBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = colorPalette.style.display !== 'none';
+                colorPalette.style.display = isVisible ? 'none' : 'block';
+            });
+            
+            // Close palette when clicking outside
+            const closeHandler = (e) => {
+                if (!newColorPickerBtn.contains(e.target) && !colorPalette.contains(e.target)) {
+                    colorPalette.style.display = 'none';
+                }
+            };
+            document.removeEventListener('click', this.detailsColorCloseHandler);
+            this.detailsColorCloseHandler = closeHandler;
+            document.addEventListener('click', closeHandler);
+        }
+        
+        // Update color preview with default color
+        if (colorPreview) {
+            colorPreview.className = `color-preview label-color-${this.selectedDetailsLabelColor}`;
+            // Also set inline style with important to ensure color is visible
+            const colors = ['#9333ea', '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+            colorPreview.style.setProperty('background', colors[this.selectedDetailsLabelColor], 'important');
+        }
+        
+        // Load task's existing labels
+        if (task.labels) {
+            let labelsArray = [];
+            if (typeof task.labels === 'string') {
+                try {
+                    labelsArray = JSON.parse(task.labels);
+                } catch (e) {
+                    labelsArray = [];
+                }
+            } else if (Array.isArray(task.labels)) {
+                labelsArray = task.labels;
+            }
+            
+            labelsArray.forEach(label => {
+                this.addDetailsLabel(label);
+            });
+        }
+        
+        // Load available labels for suggestions
+        this.loadAvailableLabelsForDetails();
+        
+        // Remove existing event listeners to prevent duplicates
+        const newLabelsInput = labelsInput.cloneNode(true);
+        labelsInput.parentNode.replaceChild(newLabelsInput, labelsInput);
+        
+        // Handle Enter key to add label
+        newLabelsInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const label = newLabelsInput.value.trim().toLowerCase(); // Convert to lowercase
+                if (label && !this.hasDetailsLabel(label)) {
+                    this.addDetailsLabelWithColor(label, this.selectedDetailsLabelColor);
+                    newLabelsInput.value = '';
+                    if (labelSuggestions) {
+                        labelSuggestions.style.display = 'none';
+                    }
+                    if (colorPalette) {
+                        colorPalette.style.display = 'none';
+                    }
+                    // Save labels immediately
+                    this.saveDetailsLabels();
+                }
+            }
+        });
+        
+        // Show suggestions on input
+        newLabelsInput.addEventListener('input', () => {
+            const query = newLabelsInput.value.toLowerCase().trim();
+            const tooltip = document.getElementById('details-existing-label-tooltip');
+            
+            if (query) {
+                this.showDetailsLabelSuggestions(query);
+                
+                // If this label already exists globally, show tooltip but DON'T change selected color
+                if (this.globalLabelColors.has(query)) {
+                    const existingColor = this.globalLabelColors.get(query);
+                    // Don't automatically change the selected color - user might want a different color for a similar label
+                    // this.selectedDetailsLabelColor = existingColor;  // REMOVED - this was causing the bug
+                    
+                    // Show tooltip
+                    if (tooltip) {
+                        tooltip.style.display = 'flex';
+                    }
+                    
+                    // Update the visual selection in the palette
+                    const paletteGrid = document.querySelector('#details-label-color-palette .color-palette-grid');
+                    if (paletteGrid) {
+                        paletteGrid.querySelectorAll('.color-btn').forEach((btn, index) => {
+                            if (index === existingColor) {
+                                btn.classList.add('selected');
+                            } else {
+                                btn.classList.remove('selected');
+                            }
+                        });
+                    }
+                    
+                    // Disable color picker when using existing label
+                    if (colorPickerBtn) {
+                        colorPickerBtn.style.opacity = '0.5';
+                        colorPickerBtn.style.pointerEvents = 'none';
+                    }
+                } else {
+                    // Hide tooltip and enable color picker for new labels
+                    if (tooltip) {
+                        tooltip.style.display = 'none';
+                    }
+                    if (colorPickerBtn) {
+                        colorPickerBtn.style.opacity = '1';
+                        colorPickerBtn.style.pointerEvents = 'auto';
+                    }
+                }
+            } else {
+                if (labelSuggestions) {
+                    labelSuggestions.style.display = 'none';
+                }
+                if (tooltip) {
+                    tooltip.style.display = 'none';
+                }
+                if (colorPickerBtn) {
+                    colorPickerBtn.style.opacity = '1';
+                    colorPickerBtn.style.pointerEvents = 'auto';
+                }
+            }
+        });
+        
+        // Hide suggestions on blur (with delay for click handling)
+        newLabelsInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (labelSuggestions) {
+                    labelSuggestions.style.display = 'none';
+                }
+            }, 200);
+        });
+    }
+    
+    // New helper functions for color support
+    initializeDetailsColorPalette() {
+        const paletteGrid = document.querySelector('#details-label-color-palette .color-palette-grid');
+        if (!paletteGrid) return;
+        
+        // Create 8 color options
+        const colorNames = ['Purple', 'Blue', 'Green', 'Red', 'Yellow', 'Pink', 'Cyan', 'Orange'];
+        
+        paletteGrid.innerHTML = '';
+        for (let i = 0; i < 8; i++) {
+            const colorOption = document.createElement('button');
+            colorOption.className = `color-option label-color-${i}`;
+            colorOption.title = colorNames[i];
+            colorOption.dataset.colorIndex = i;
+            
+            if (i === this.selectedDetailsLabelColor) {
+                colorOption.classList.add('selected');
+            }
+            
+            colorOption.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.selectDetailsLabelColor(i);
+            });
+            
+            paletteGrid.appendChild(colorOption);
+        }
+    }
+    
+    selectDetailsLabelColor(colorIndex) {
+        this.selectedDetailsLabelColor = colorIndex;
+        
+        // Update preview with both class and inline style
+        const colorPreview = document.getElementById('details-label-color-preview');
+        if (colorPreview) {
+            colorPreview.className = `color-preview label-color-${colorIndex}`;
+            // Also set inline style with important to ensure color is visible
+            const colors = ['#9333ea', '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+            colorPreview.style.setProperty('background', colors[colorIndex], 'important');
+            colorPreview.style.setProperty('background-color', colors[colorIndex], 'important');
+        }
+        
+        // Update selected state in palette
+        document.querySelectorAll('#details-label-color-palette .color-option').forEach(option => {
+            option.classList.toggle('selected', option.dataset.colorIndex == colorIndex);
+        });
+        
+        // Hide palette
+        const colorPalette = document.getElementById('details-label-color-palette');
+        if (colorPalette) {
+            colorPalette.style.display = 'none';
+        }
+    }
+    
+    hasDetailsLabel(labelText) {
+        const normalized = labelText.toLowerCase();
+        return this.detailsLabels.some(label => 
+            typeof label === 'string' ? label.toLowerCase() === normalized : label.text.toLowerCase() === normalized
+        );
+    }
+    
+    addDetailsLabelWithColor(labelText, colorIndex, useExistingColor = false) {
+        if (!this.detailsLabels) this.detailsLabels = [];
+        
+        // Convert label to lowercase for consistency
+        const normalizedLabel = labelText.toLowerCase();
+        
+        if (this.hasDetailsLabel(normalizedLabel)) return;
+        
+        // Hide the tooltip when adding a label
+        const tooltip = document.getElementById('details-existing-label-tooltip');
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
+        
+        // Check if this label already has a color in the global map
+        let finalColorIndex = colorIndex;
+        
+        // Only use existing color if explicitly requested (e.g., from suggestions)
+        if (useExistingColor && this.globalLabelColors.has(normalizedLabel)) {
+            // Use existing color for consistency
+            finalColorIndex = this.globalLabelColors.get(normalizedLabel);
+        }
+        
+        // Always update global map with the color being used
+        this.globalLabelColors.set(normalizedLabel, finalColorIndex);
+        
+        // Store as object with text and color
+        const labelObj = {
+            text: normalizedLabel,
+            color: finalColorIndex
+        };
+        
+        this.detailsLabels.push(labelObj);
+        this.renderDetailsLabel(labelObj);
+        // Save labels immediately 
+        this.saveDetailsLabels();
+    }
+    
+    addDetailsLabel(label) {
+        if (!this.detailsLabels) this.detailsLabels = [];
+        
+        let labelObj;
+        if (typeof label === 'string') {
+            // Legacy format - use hash-based color
+            if (this.hasDetailsLabel(label)) return;
+            labelObj = {
+                text: label,
+                color: this.getLabelColorIndex(label)
+            };
+        } else {
+            // New format with custom color
+            if (this.hasDetailsLabel(label.text)) return;
+            labelObj = label;
+        }
+        
+        this.detailsLabels.push(labelObj);
+        this.renderDetailsLabel(labelObj);
+    }
+    
+    renderDetailsLabel(labelObj) {
+        const labelsContainer = document.getElementById('details-labels-container');
+        if (!labelsContainer) return;
+        
+        const labelText = typeof labelObj === 'string' ? labelObj : labelObj.text;
+        const colorIndex = typeof labelObj === 'string' ? 
+            this.getLabelColorIndex(labelObj) : 
+            (labelObj.color !== undefined ? labelObj.color : this.getLabelColorIndex(labelObj.text));
+        
+        const chip = document.createElement('span');
+        chip.className = `task-label-chip label-color-${colorIndex}`;
+        chip.innerHTML = `
+            ${this.escapeHtml(labelText)}
+            <button class="label-remove-btn" data-label="${this.escapeHtml(labelText)}">×</button>
+        `;
+        
+        chip.querySelector('.label-remove-btn').addEventListener('click', () => {
+            this.removeDetailsLabel(labelText);
+            chip.remove();
+            // Save labels immediately
+            this.saveDetailsLabels();
+        });
+        
+        labelsContainer.appendChild(chip);
+    }
+    
+    removeDetailsLabel(labelText) {
+        if (!this.detailsLabels) return;
+        const index = this.detailsLabels.findIndex(label => 
+            typeof label === 'string' ? label === labelText : label.text === labelText
+        );
+        if (index > -1) {
+            this.detailsLabels.splice(index, 1);
+        }
+    }
+    
+    async loadAvailableLabelsForDetails() {
+        try {
+            // Get all unique label texts from all tasks
+            const allLabelTexts = new Set();
+            this.tasks.forEach(task => {
+                if (task.labels) {
+                    let labelsArray = [];
+                    if (typeof task.labels === 'string') {
+                        try {
+                            labelsArray = JSON.parse(task.labels);
+                        } catch (e) {
+                            labelsArray = [];
+                        }
+                    } else if (Array.isArray(task.labels)) {
+                        labelsArray = task.labels;
+                    }
+                    labelsArray.forEach(label => {
+                        // Extract just the text, not the whole object
+                        const labelText = typeof label === 'string' ? label : label.text;
+                        if (labelText) {
+                            allLabelTexts.add(labelText);
+                        }
+                    });
+                }
+            });
+            this.availableDetailsLabels = Array.from(allLabelTexts).sort();
+        } catch (error) {
+            console.error('Error loading available labels:', error);
+            this.availableDetailsLabels = [];
+        }
+    }
+    
+    showDetailsLabelSuggestions(query) {
+        const labelSuggestions = document.getElementById('details-label-suggestions');
+        if (!labelSuggestions || !this.availableDetailsLabels) return;
+        
+        // Now availableDetailsLabels contains only strings (label texts)
+        const filtered = this.availableDetailsLabels.filter(labelText => {
+            return labelText.toLowerCase().includes(query) && !this.hasDetailsLabel(labelText);
+        });
+        
+        if (filtered.length === 0) {
+            labelSuggestions.style.display = 'none';
+            return;
+        }
+        
+        // Show unique suggestions without duplicates
+        labelSuggestions.innerHTML = filtered.slice(0, 5).map(labelText => {
+            return `
+                <div class="label-suggestion-item" data-label="${this.escapeHtml(labelText)}">
+                    ${this.escapeHtml(labelText)}
+                </div>
+            `;
+        }).join('');
+        
+        // Add click handlers to suggestions
+        labelSuggestions.querySelectorAll('.label-suggestion-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const label = item.dataset.label;
+                // Use existing color if label already has one
+                let colorToUse = this.selectedDetailsLabelColor;
+                if (this.globalLabelColors.has(label)) {
+                    colorToUse = this.globalLabelColors.get(label);
+                }
+                // When clicking a suggestion, use the suggestion's existing color
+                // Pass true to indicate this is from a suggestion (should use existing color)
+                this.addDetailsLabelWithColor(label, colorToUse, true);
+                document.getElementById('details-labels-input').value = '';
+                labelSuggestions.style.display = 'none';
+                // Save labels immediately
+                this.saveDetailsLabels();
+            });
+        });
+        
+        labelSuggestions.style.display = 'block';
+    }
+    
+    async saveDetailsLabels() {
+        if (!this.currentTask) return;
+        
+        try {
+            const result = await ipcRenderer.invoke('task-update-labels', 
+                this.currentTask.id, 
+                this.detailsLabels || []
+            );
+            
+            if (result.success) {
+                // Update local task data
+                const task = this.tasks.find(t => t.id === this.currentTask.id);
+                if (task) {
+                    task.labels = this.detailsLabels || [];
+                }
+                
+                // IMPORTANT: Rebuild global label color map when labels change
+                // This ensures removed labels don't persist in the cache
+                this.buildGlobalLabelColorMap();
+                
+                // Refresh the task cards to show updated labels
+                this.renderTasks();
+            } else {
+                console.error('Failed to update labels:', result.error);
+            }
+        } catch (error) {
+            console.error('Error updating labels:', error);
         }
     }
 }

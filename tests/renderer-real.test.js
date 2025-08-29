@@ -4,7 +4,10 @@
  */
 
 // Setup global environment before requiring renderer
-global.window = {};
+global.window = {
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn()
+};
 global.document = {
     getElementById: jest.fn().mockReturnValue({
         appendChild: jest.fn(),

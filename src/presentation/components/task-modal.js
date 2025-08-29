@@ -12,6 +12,9 @@ class TaskModal {
         this.projects = [];
         this.modal = null;
         this.markdownEditors = {};
+        this.labels = [];
+        this.availableLabels = new Set(); // Track all available labels for suggestions
+        this.existingLabelColors = new Map(); // Track existing label colors from database
     }
 
     async show() {
@@ -192,6 +195,33 @@ class TaskModal {
                             <small class="form-help">Make this task a subtask of another task</small>
                         </div>
                         
+                        <!-- Labels -->
+                        <div class="form-group">
+                            <label for="task-labels"><i data-lucide="tags"></i> Labels</label>
+                            <div class="labels-input-wrapper">
+                                <div class="label-input-with-color">
+                                    <input type="text" id="task-labels-input" class="form-control" placeholder="Type a label and press Enter..." autocomplete="off">
+                                    <button type="button" id="label-color-picker-btn" class="label-color-picker-btn" title="Select color">
+                                        <div class="color-preview" id="label-color-preview"></div>
+                                    </button>
+                                </div>
+                                <div id="label-color-palette" class="label-color-palette" style="display: none;">
+                                    <div class="color-palette-grid">
+                                        <!-- Color options will be added dynamically -->
+                                    </div>
+                                </div>
+                                <div id="label-suggestions" class="label-suggestions-dropdown" style="display: none;">
+                                    <!-- Label suggestions will be populated dynamically -->
+                                </div>
+                                <div id="existing-label-tooltip" class="existing-label-tooltip" style="display: none;">
+                                    <i data-lucide="info"></i>
+                                    <span>This label already exists and will use its original color</span>
+                                </div>
+                                <div id="task-labels-container" class="task-labels-container"></div>
+                            </div>
+                            <small class="form-help">Add labels to categorize and search for tasks</small>
+                        </div>
+                        
                         ${this.getMarkdownEditorHTML('description', 'Description', 'Add description... (supports Markdown)', 4, 50000)}
                         ${this.getMarkdownEditorHTML('plan', 'Plan', 'Enter your plan for this task... (supports Markdown)', 3, 100000)}
                         ${this.getMarkdownEditorHTML('implementation', 'Implementation', 'Files modified, summary and implementation details... (supports Markdown)', 3, 100000)}
@@ -362,6 +392,9 @@ class TaskModal {
         
         // Parent task search
         this.initializeParentTaskSearch();
+        
+        // Initialize labels functionality
+        this.initializeLabels();
     }
 
     initializeStatusDropdown() {
@@ -540,6 +573,431 @@ class TaskModal {
             });
         }
         dropdown.style.display = 'block';
+    }
+
+    initializeLabels() {
+        const labelsInput = document.getElementById('task-labels-input');
+        const labelsContainer = document.getElementById('task-labels-container');
+        const labelSuggestions = document.getElementById('label-suggestions');
+        const colorPickerBtn = document.getElementById('label-color-picker-btn');
+        const colorPalette = document.getElementById('label-color-palette');
+        const colorPreview = document.getElementById('label-color-preview');
+        
+        if (!labelsInput || !labelsContainer) return;
+        
+        // Initialize selected color and preview
+        this.selectedLabelColor = 0; // Default color index (Blue)
+        if (colorPreview) {
+            // Apply both background color and ensure it's visible
+            colorPreview.style.background = '#3b82f6'; // Default blue color
+            colorPreview.style.backgroundColor = '#3b82f6'; // Ensure background-color is set
+            colorPreview.style.width = '100%';
+            colorPreview.style.height = '100%';
+            colorPreview.style.borderRadius = '4px';
+        }
+        
+        // Load existing labels for suggestions
+        this.loadAvailableLabels();
+        
+        // Initialize color palette
+        this.initializeColorPalette();
+        
+        // Handle color picker button
+        if (colorPickerBtn && colorPalette) {
+            colorPickerBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const isVisible = colorPalette.style.display !== 'none';
+                colorPalette.style.display = isVisible ? 'none' : 'block';
+                if (!isVisible) {
+                    // Position palette relative to the input container
+                    const inputContainer = colorPickerBtn.closest('.label-input-with-color');
+                    if (inputContainer) {
+                        const rect = inputContainer.getBoundingClientRect();
+                        const parentRect = inputContainer.offsetParent.getBoundingClientRect();
+                        colorPalette.style.left = `${rect.left - parentRect.left}px`;
+                        colorPalette.style.top = `${rect.bottom - parentRect.top + 5}px`;
+                    }
+                }
+            });
+            
+            // Close palette when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!colorPickerBtn.contains(e.target) && !colorPalette.contains(e.target)) {
+                    colorPalette.style.display = 'none';
+                }
+            });
+        }
+        
+        // Update color preview
+        if (colorPreview) {
+            colorPreview.className = `color-preview label-color-${this.selectedLabelColor}`;
+        }
+        
+        // Handle Enter key to add label
+        labelsInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const label = labelsInput.value.trim().toLowerCase(); // Convert to lowercase
+                if (label && !this.hasLabel(label)) {
+                    this.addLabelWithColor(label, this.selectedLabelColor);
+                    labelsInput.value = '';
+                    if (labelSuggestions) {
+                        labelSuggestions.style.display = 'none';
+                    }
+                    if (colorPalette) {
+                        colorPalette.style.display = 'none';
+                    }
+                }
+            }
+        });
+        
+        // Show suggestions on input
+        labelsInput.addEventListener('input', () => {
+            const query = labelsInput.value.toLowerCase().trim();
+            const tooltip = document.getElementById('existing-label-tooltip');
+            
+            if (query) {
+                this.showLabelSuggestions(query);
+                
+                // IMPORTANT: Always use kanban's globalLabelColors as the source of truth
+                // This ensures we don't show stale labels that have been deleted
+                if (window.kanban && window.kanban.globalLabelColors && window.kanban.globalLabelColors.has(query)) {
+                    const existingColor = window.kanban.globalLabelColors.get(query);
+                    // Don't automatically change the selected color - user might want a different color for a similar label
+                    // this.selectedLabelColor = existingColor;  // REMOVED - this was causing the bug
+                    
+                    // Show tooltip
+                    if (tooltip) {
+                        tooltip.style.display = 'flex';
+                    }
+                    
+                    // Update the visual selection in the palette
+                    const paletteGrid = document.querySelector('#label-color-palette .color-palette-grid');
+                    if (paletteGrid) {
+                        paletteGrid.querySelectorAll('.color-option').forEach((btn, index) => {
+                            if (index === existingColor) {
+                                btn.classList.add('selected');
+                            } else {
+                                btn.classList.remove('selected');
+                            }
+                        });
+                    }
+                    
+                    // Disable color picker when using existing label
+                    if (colorPickerBtn) {
+                        colorPickerBtn.style.opacity = '0.5';
+                        colorPickerBtn.style.pointerEvents = 'none';
+                    }
+                } else {
+                    // Hide tooltip and enable color picker for new labels
+                    if (tooltip) {
+                        tooltip.style.display = 'none';
+                    }
+                    if (colorPickerBtn) {
+                        colorPickerBtn.style.opacity = '1';
+                        colorPickerBtn.style.pointerEvents = 'auto';
+                    }
+                }
+            } else {
+                if (labelSuggestions) {
+                    labelSuggestions.style.display = 'none';
+                }
+                if (tooltip) {
+                    tooltip.style.display = 'none';
+                }
+                if (colorPickerBtn) {
+                    colorPickerBtn.style.opacity = '1';
+                    colorPickerBtn.style.pointerEvents = 'auto';
+                }
+            }
+        });
+        
+        // Hide suggestions on blur (with delay for click handling)
+        labelsInput.addEventListener('blur', () => {
+            setTimeout(() => {
+                if (labelSuggestions) {
+                    labelSuggestions.style.display = 'none';
+                }
+            }, 200);
+        });
+    }
+    
+    async loadAvailableLabels() {
+        try {
+            const { ipcRenderer } = window.require ? window.require('electron') : {};
+            
+            if (ipcRenderer && ipcRenderer.invoke) {
+                const result = await ipcRenderer.invoke('task-get-all');
+                if (result && result.success && result.tasks) {
+                    // Store label colors for later use
+                    this.existingLabelColors = new Map();
+                    
+                    // Extract unique label texts from all tasks
+                    result.tasks.forEach(task => {
+                        if (task.labels) {
+                            let labelsArray = [];
+                            
+                            // Handle both string and array formats
+                            if (typeof task.labels === 'string') {
+                                try {
+                                    labelsArray = JSON.parse(task.labels);
+                                } catch (e) {
+                                    labelsArray = [];
+                                }
+                            } else if (Array.isArray(task.labels)) {
+                                labelsArray = task.labels;
+                            }
+                            
+                            labelsArray.forEach(label => {
+                                if (typeof label === 'string') {
+                                    // Legacy format - just text
+                                    this.availableLabels.add(label);
+                                } else if (label && label.text) {
+                                    // New format with color
+                                    this.availableLabels.add(label.text);
+                                    // Store the color for this label if we don't have it yet
+                                    if (label.color !== undefined && !this.existingLabelColors.has(label.text)) {
+                                        this.existingLabelColors.set(label.text, label.color);
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Failed to load available labels:', error);
+        }
+    }
+    
+    showLabelSuggestions(query) {
+        const labelSuggestions = document.getElementById('label-suggestions');
+        if (!labelSuggestions) return;
+        
+        // IMPORTANT: Use kanban's globalLabelColors as source of truth for existing labels
+        // Fallback to availableLabels if kanban is not available
+        let availableLabelsSource = this.availableLabels;
+        if (window.kanban && window.kanban.globalLabelColors) {
+            availableLabelsSource = window.kanban.globalLabelColors.keys();
+        }
+        
+        // Filter available labels that match query and aren't already in this task
+        const suggestions = Array.from(availableLabelsSource)
+            .filter(labelText => {
+                // Check if label matches query
+                if (!labelText.toLowerCase().includes(query)) return false;
+                
+                // Check if label is already in current task
+                const alreadyHasLabel = this.labels.some(existingLabel => {
+                    const existingText = typeof existingLabel === 'string' ? existingLabel : existingLabel.text;
+                    return existingText === labelText;
+                });
+                
+                return !alreadyHasLabel;
+            })
+            .slice(0, 5);
+        
+        if (suggestions.length > 0) {
+            labelSuggestions.innerHTML = suggestions.map(label => 
+                `<div class="label-suggestion-item" data-label="${label}">${label}</div>`
+            ).join('');
+            
+            // Add click handlers
+            labelSuggestions.querySelectorAll('.label-suggestion-item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const label = item.dataset.label;
+                    // Use existing color if label already has one
+                    let colorToUse = this.selectedLabelColor;
+                    if (window.kanban && window.kanban.globalLabelColors && window.kanban.globalLabelColors.has(label)) {
+                        colorToUse = window.kanban.globalLabelColors.get(label);
+                    }
+                    // Pass true to use existing color from suggestions
+                    this.addLabelWithColor(label, colorToUse, true);
+                    document.getElementById('task-labels-input').value = '';
+                    labelSuggestions.style.display = 'none';
+                });
+            });
+            
+            labelSuggestions.style.display = 'block';
+        } else {
+            labelSuggestions.style.display = 'none';
+        }
+    }
+    
+    initializeColorPalette() {
+        const paletteGrid = document.querySelector('#label-color-palette .color-palette-grid');
+        if (!paletteGrid) {
+            console.warn('Color palette grid not found');
+            return;
+        }
+        
+        // Create 8 color options with hardcoded colors
+        const colors = ['#9333ea', '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+        const colorNames = ['Purple', 'Blue', 'Green', 'Red', 'Yellow', 'Pink', 'Cyan', 'Orange'];
+        
+        paletteGrid.innerHTML = '';
+        
+        for (let i = 0; i < 8; i++) {
+            const colorBtn = document.createElement('button');
+            colorBtn.type = 'button';
+            colorBtn.className = 'color-btn';
+            colorBtn.style.background = colors[i];
+            colorBtn.title = colorNames[i];
+            colorBtn.dataset.colorIndex = i;
+            
+            if (i === this.selectedLabelColor) {
+                colorBtn.classList.add('selected');
+            }
+            
+            colorBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.selectLabelColor(i);
+            });
+            
+            paletteGrid.appendChild(colorBtn);
+        }
+    }
+    
+    selectLabelColor(colorIndex) {
+        this.selectedLabelColor = colorIndex;
+        
+        // Update preview with actual color
+        const colorPreview = document.getElementById('label-color-preview');
+        if (colorPreview) {
+            const colors = ['#9333ea', '#3b82f6', '#22c55e', '#ef4444', '#eab308', '#ec4899', '#06b6d4', '#f97316'];
+            colorPreview.style.background = colors[colorIndex];
+        }
+        
+        // Update selected state in palette
+        document.querySelectorAll('#label-color-palette .color-btn').forEach(btn => {
+            btn.classList.toggle('selected', btn.dataset.colorIndex == colorIndex);
+        });
+        
+        // Hide palette
+        const colorPalette = document.getElementById('label-color-palette');
+        if (colorPalette) {
+            colorPalette.style.display = 'none';
+        }
+    }
+    
+    hasLabel(labelText) {
+        const normalized = labelText.toLowerCase();
+        return this.labels.some(label => 
+            typeof label === 'string' ? label.toLowerCase() === normalized : label.text.toLowerCase() === normalized
+        );
+    }
+    
+    getExistingLabelColor(labelText) {
+        // IMPORTANT: First check kanban's globalLabelColors as the source of truth
+        if (window.kanban && window.kanban.globalLabelColors && window.kanban.globalLabelColors.has(labelText)) {
+            return window.kanban.globalLabelColors.get(labelText);
+        }
+        // Fallback to local cache if kanban is not available
+        if (this.existingLabelColors && this.existingLabelColors.has(labelText)) {
+            return this.existingLabelColors.get(labelText);
+        }
+        return null;
+    }
+    
+    addLabelWithColor(labelText, colorIndex, useExistingColor = false) {
+        // Convert label to lowercase for consistency
+        const normalizedLabel = labelText.toLowerCase();
+        
+        if (!this.hasLabel(normalizedLabel)) {
+            // Check if this label already has a color in the global map
+            let finalColorIndex = colorIndex;
+            
+            // Only use existing color if explicitly requested (e.g., from suggestions)
+            if (useExistingColor) {
+                const existingLabelColor = this.getExistingLabelColor(normalizedLabel);
+                if (existingLabelColor !== null) {
+                    finalColorIndex = existingLabelColor;
+                    console.log(`Using existing color ${finalColorIndex} for label "${normalizedLabel}"`);
+                }
+            }
+            
+            // Always update global map with the color being used
+            if (window.kanban && window.kanban.globalLabelColors) {
+                window.kanban.globalLabelColors.set(normalizedLabel, finalColorIndex);
+                console.log(`Setting color ${finalColorIndex} for label "${normalizedLabel}"`);
+            }
+            
+            // Store as object with text and color
+            this.labels.push({
+                text: normalizedLabel,
+                color: finalColorIndex
+            });
+            this.renderLabels();
+            this.availableLabels.add(normalizedLabel);
+        }
+    }
+    
+    addLabel(label) {
+        // Legacy support - use hash-based color
+        if (!this.hasLabel(label)) {
+            this.labels.push({
+                text: label,
+                color: this.getLabelColorIndex(label)
+            });
+            this.renderLabels();
+            this.availableLabels.add(label);
+        }
+    }
+    
+    removeLabel(labelText) {
+        const index = this.labels.findIndex(label => 
+            typeof label === 'string' ? label === labelText : label.text === labelText
+        );
+        if (index > -1) {
+            this.labels.splice(index, 1);
+            this.renderLabels();
+        }
+    }
+    
+    getLabelColorIndex(label) {
+        // Simple hash function to consistently assign colors
+        let hash = 0;
+        for (let i = 0; i < label.length; i++) {
+            hash = ((hash << 5) - hash) + label.charCodeAt(i);
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        // We have 8 color variants (0-7)
+        return Math.abs(hash) % 8;
+    }
+
+    renderLabels() {
+        const labelsContainer = document.getElementById('task-labels-container');
+        if (!labelsContainer) return;
+        
+        labelsContainer.innerHTML = this.labels.map(label => {
+            let labelText, colorIndex;
+            
+            if (typeof label === 'string') {
+                // Legacy format - use hash-based color
+                labelText = label;
+                colorIndex = this.getLabelColorIndex(label);
+            } else {
+                // New format with custom color
+                labelText = label.text;
+                colorIndex = label.color !== undefined ? label.color : this.getLabelColorIndex(label.text);
+            }
+            
+            return `
+                <span class="task-label-chip label-color-${colorIndex}">
+                    ${labelText}
+                    <button class="label-remove-btn" data-label="${labelText}">&times;</button>
+                </span>
+            `;
+        }).join('');
+        
+        // Add remove handlers
+        labelsContainer.querySelectorAll('.label-remove-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.removeLabel(btn.dataset.label);
+            });
+        });
     }
 
     initializeMarkdownEditors() {
@@ -776,7 +1234,8 @@ class TaskModal {
             project,
             terminal_id: terminalId || null,
             parent_task_id: parentTaskId || null,
-            status: status || 'pending'
+            status: status || 'pending',
+            labels: this.labels || []
         };
         
         // Call the save callback

@@ -366,7 +366,7 @@ class MCPStdioServer {
 
     // Task management methods
     async createTask(params) {
-        const { title, description, terminal_id, project, parent_task_id } = params;
+        const { title, description, terminal_id, project, parent_task_id, labels } = params;
         
         if (!title) {
             throw new Error('Title is required');
@@ -396,7 +396,7 @@ class MCPStdioServer {
             }
         }
         
-        const result = await this.db.createTask(title, description, actualTerminalId, actualProject, parent_task_id);
+        const result = await this.db.createTask(title, description, actualTerminalId, actualProject, parent_task_id, labels);
         
         if (!result.success) {
             throw new Error(result.error);
@@ -587,6 +587,30 @@ class MCPStdioServer {
         return {
             task_id,
             terminal_id,
+            updated: true
+        };
+    }
+    
+    async updateTaskLabels(params) {
+        const { task_id, labels } = params;
+        
+        if (!task_id) {
+            throw new Error('task_id is required');
+        }
+        
+        if (!Array.isArray(labels)) {
+            throw new Error('labels must be an array');
+        }
+        
+        const result = this.db.updateTaskLabels(task_id, labels);
+        
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+        
+        return {
+            task_id,
+            labels,
             updated: true
         };
     }
@@ -1065,7 +1089,12 @@ class MCPStdioServer {
                             description: { type: 'string', description: 'Task description' },
                             terminal_id: { type: 'number', description: 'Terminal ID (0-3)' },
                             project: { type: 'string', description: 'Project name (optional, defaults to CodeAgentSwarm)' },
-                            parent_task_id: { type: 'number', description: 'Parent task ID to create this as a subtask (optional)' }
+                            parent_task_id: { type: 'number', description: 'Parent task ID to create this as a subtask (optional)' },
+                            labels: { 
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Array of label strings for the task (optional)'
+                            }
                         },
                         required: ['title']
                     }
@@ -1163,6 +1192,22 @@ class MCPStdioServer {
                             terminal_id: { type: 'string', description: 'Terminal ID (1, 2, 3, 4, etc.) or empty string to unassign' }
                         },
                         required: ['task_id', 'terminal_id']
+                    }
+                },
+                {
+                    name: 'update_task_labels',
+                    description: 'Update the labels for a task',
+                    inputSchema: {
+                        type: 'object',
+                        properties: {
+                            task_id: { type: 'number', description: 'Task ID' },
+                            labels: { 
+                                type: 'array',
+                                items: { type: 'string' },
+                                description: 'Array of label strings for the task'
+                            }
+                        },
+                        required: ['task_id', 'labels']
                     }
                 },
                 {
@@ -1502,6 +1547,10 @@ class MCPStdioServer {
                 
             case 'update_task_terminal':
                 result = await this.updateTaskTerminal({ task_id: args.task_id, terminal_id: args.terminal_id });
+                break;
+                
+            case 'update_task_labels':
+                result = await this.updateTaskLabels({ task_id: args.task_id, labels: args.labels });
                 break;
                 
             case 'update_terminal_title':

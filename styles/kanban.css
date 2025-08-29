@@ -747,6 +747,33 @@ body::before {
     font-style: italic;
 }
 
+/* Task Labels in Kanban Cards */
+.task-labels {
+    padding: 0 1rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+}
+
+.task-label-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    /* Background color will be set by label-color-X classes */
+    border-radius: 12px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    cursor: default;
+}
+
+.task-label-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(127, 90, 240, 0.15);
+}
+
 .task-id {
     background: transparent;
     color: var(--text-muted);
@@ -776,6 +803,149 @@ body::before {
     -webkit-box-orient: vertical;
     opacity: 0.9;
     padding: 0 1rem 0.75rem 1rem;
+}
+
+/* Task labels */
+.task-labels {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 2px;
+    margin: 2px 8px 2px 4px;
+    overflow: hidden;
+}
+
+.task-label-chip {
+    display: inline-flex;
+    align-items: center;
+    padding: 0px 4px;
+    border-radius: 6px;
+    font-size: 8px;
+    font-weight: 500;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    line-height: 14px;
+    height: 14px;
+}
+
+/* Label color variants - More solid backgrounds */
+/* Existing label tooltip */
+.existing-label-tooltip {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 4px;  /* Reduced from 0.5rem (8px) to 4px */
+    padding: 0.5rem 0.75rem;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    color: #93bbfc;
+    font-size: 0.85rem;
+    animation: slideIn 0.2s ease;
+}
+
+.existing-label-tooltip i {
+    width: 14px;
+    height: 14px;
+    color: #60a5fa;
+}
+
+.existing-label-tooltip span {
+    flex: 1;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.task-label-chip.label-color-0 { /* Purple */
+    background: rgba(147, 51, 234, 0.25);
+    border: 1px solid rgba(147, 51, 234, 0.5);
+    color: #e9d5ff;
+}
+.task-label-chip.label-color-0:hover {
+    background: rgba(147, 51, 234, 0.35);
+}
+
+.task-label-chip.label-color-1 { /* Blue */
+    background: rgba(59, 130, 246, 0.25);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    color: #dbeafe;
+}
+.task-label-chip.label-color-1:hover {
+    background: rgba(59, 130, 246, 0.35);
+}
+
+.task-label-chip.label-color-2 { /* Green */
+    background: rgba(34, 197, 94, 0.25);
+    border: 1px solid rgba(34, 197, 94, 0.5);
+    color: #bbf7d0;
+}
+.task-label-chip.label-color-2:hover {
+    background: rgba(34, 197, 94, 0.35);
+}
+
+.task-label-chip.label-color-3 { /* Red */
+    background: rgba(239, 68, 68, 0.25);
+    border: 1px solid rgba(239, 68, 68, 0.5);
+    color: #fecaca;
+}
+.task-label-chip.label-color-3:hover {
+    background: rgba(239, 68, 68, 0.35);
+}
+
+.task-label-chip.label-color-4 { /* Yellow */
+    background: rgba(250, 204, 21, 0.25);
+    border: 1px solid rgba(250, 204, 21, 0.5);
+    color: #fef3c7;
+}
+.task-label-chip.label-color-4:hover {
+    background: rgba(250, 204, 21, 0.35);
+}
+
+.task-label-chip.label-color-5 { /* Pink */
+    background: rgba(236, 72, 153, 0.25);
+    border: 1px solid rgba(236, 72, 153, 0.5);
+    color: #fce7f3;
+}
+.task-label-chip.label-color-5:hover {
+    background: rgba(236, 72, 153, 0.35);
+}
+
+.task-label-chip.label-color-6 { /* Cyan */
+    background: rgba(6, 182, 212, 0.25);
+    border: 1px solid rgba(6, 182, 212, 0.5);
+    color: #cffafe;
+}
+.task-label-chip.label-color-6:hover {
+    background: rgba(6, 182, 212, 0.35);
+}
+
+.task-label-chip.label-color-7 { /* Orange */
+    background: rgba(251, 146, 60, 0.25);
+    border: 1px solid rgba(251, 146, 60, 0.5);
+    color: #fed7aa;
+}
+.task-label-chip.label-color-7:hover {
+    background: rgba(251, 146, 60, 0.35);
+}
+
+.task-labels-more {
+    display: inline-flex;
+    align-items: center;
+    padding: 0px 3px;
+    font-size: 8px;
+    color: #8b7aa8;
+    white-space: nowrap;
+    line-height: 14px;
+    height: 14px;
+    opacity: 0.7;
 }
 
 .task-meta {
@@ -2704,6 +2874,123 @@ input[type="radio"]:checked + .color-option {
     width: 100%;
 }
 
+/* Label color picker styles */
+.label-input-with-color {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.label-color-picker-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: #2a2a3a;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.label-color-picker-btn:hover {
+    background: #3a3a4a;
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.color-preview {
+    width: 24px;
+    height: 24px;
+    border-radius: 4px;
+    border: 2px solid rgba(0, 0, 0, 0.2);
+}
+
+.labels-input-wrapper {
+    position: relative;
+}
+
+.label-color-palette {
+    position: absolute;
+    background: #1e1e2e;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 0.75rem;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    left: 0;
+    right: auto;
+    width: auto;
+    min-width: 200px;
+}
+
+.color-palette-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.5rem;
+}
+
+.color-option {
+    width: 32px;
+    height: 32px;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+}
+
+.color-option.selected {
+    border-color: white;
+    box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
+
+/* Solid colors for color picker buttons */
+.color-option.label-color-0,
+.color-preview.label-color-0 {
+    background: #9333ea !important; /* Purple */
+}
+
+.color-option.label-color-1,
+.color-preview.label-color-1 {
+    background: #3b82f6 !important; /* Blue */
+}
+
+.color-option.label-color-2,
+.color-preview.label-color-2 {
+    background: #22c55e !important; /* Green */
+}
+
+.color-option.label-color-3,
+.color-preview.label-color-3 {
+    background: #ef4444 !important; /* Red */
+}
+
+.color-option.label-color-4,
+.color-preview.label-color-4 {
+    background: #eab308 !important; /* Yellow */
+}
+
+.color-option.label-color-5,
+.color-preview.label-color-5 {
+    background: #ec4899 !important; /* Pink */
+}
+
+.color-option.label-color-6,
+.color-preview.label-color-6 {
+    background: #06b6d4 !important; /* Cyan */
+}
+
+.color-option.label-color-7,
+.color-preview.label-color-7 {
+    background: #f97316 !important; /* Orange */
+}
+
 /* Responsive adjustments for subtasks grid */
 @media (max-width: 480px) {
     .subtask-item {
@@ -3482,6 +3769,31 @@ input[type="radio"]:checked + .color-option {
     padding: 1.5rem 2rem;
     background: rgba(255, 255, 255, 0.02);
     border-top: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Task creation date in footer */
+#task-details-modal .modal-footer .task-header-created {
+    margin-right: auto;
+    background: rgba(156, 163, 175, 0.05);
+    border-color: rgba(156, 163, 175, 0.1);
+}
+
+#task-details-modal .modal-footer .task-header-created .header-icon {
+    color: rgba(156, 163, 175, 0.6);
+}
+
+#task-details-modal .modal-footer .task-header-created span {
+    color: rgba(156, 163, 175, 0.8);
+    font-size: 0.75rem;
+}
+
+/* Buttons container in footer */
+#task-details-modal .modal-footer .modal-footer-buttons {
+    display: flex;
+    gap: 0.75rem;
 }
 
 /* Task Details Modal Title and Status */

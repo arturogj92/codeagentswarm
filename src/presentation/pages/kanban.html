@@ -266,10 +266,6 @@
                                     <!-- Dropdown will be populated dynamically -->
                                 </div>
                             </div>
-                            <div class="task-header-created">
-                                <i data-lucide="clock" class="header-icon"></i>
-                                <span id="header-created-at"></span>
-                            </div>
                         </div>
                         <button class="modal-close" id="details-modal-close-btn">
                             <i data-lucide="x"></i>
@@ -305,6 +301,33 @@
                             </div>
                         </div>
                         <small class="form-help">Make this task a subtask of another task</small>
+                    </div>
+                    
+                    <!-- Labels Section -->
+                    <div class="form-group task-labels-section">
+                        <label for="details-labels"><i data-lucide="tags"></i> Labels</label>
+                        <div class="labels-input-wrapper">
+                            <div class="label-input-with-color">
+                                <input type="text" id="details-labels-input" class="form-control" placeholder="Type a label and press Enter..." autocomplete="off">
+                                <button type="button" id="details-label-color-picker-btn" class="label-color-picker-btn" title="Select color">
+                                    <div class="color-preview" id="details-label-color-preview"></div>
+                                </button>
+                            </div>
+                            <div id="details-label-color-palette" class="label-color-palette" style="display: none;">
+                                <div class="color-palette-grid">
+                                    <!-- Color options will be added dynamically -->
+                                </div>
+                            </div>
+                            <div id="details-label-suggestions" class="label-suggestions-dropdown" style="display: none;">
+                                <!-- Label suggestions will be populated dynamically -->
+                            </div>
+                            <div id="details-existing-label-tooltip" class="existing-label-tooltip" style="display: none;">
+                                <i data-lucide="info"></i>
+                                <span>This label already exists and will use its original color</span>
+                            </div>
+                            <div id="details-labels-container" class="task-labels-container"></div>
+                        </div>
+                        <small class="form-help">Add labels to categorize and search for tasks</small>
                     </div>
                     
                     <div class="form-group task-description-section">
@@ -529,8 +552,14 @@
                 </div>
             </div>
             <div class="modal-footer modal-actions">
-                <button type="button" class="btn-modern btn-danger-modern" id="delete-task-btn"><i data-lucide="trash-2"></i> Delete</button>
-                <button type="button" class="btn-modern btn-secondary-modern" id="close-details-btn"><i data-lucide="x"></i> Close</button>
+                <div class="task-header-created">
+                    <i data-lucide="clock" class="header-icon"></i>
+                    <span id="header-created-at"></span>
+                </div>
+                <div class="modal-footer-buttons">
+                    <button type="button" class="btn-modern btn-danger-modern" id="delete-task-btn"><i data-lucide="trash-2"></i> Delete</button>
+                    <button type="button" class="btn-modern btn-secondary-modern" id="close-details-btn"><i data-lucide="x"></i> Close</button>
+                </div>
             </div>
         </div>
     </div>
